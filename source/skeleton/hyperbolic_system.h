@@ -60,6 +60,24 @@ namespace ryujin
         return HyperbolicSystemView<dim, Number>{*this};
       }
 
+      /**
+       * Part of step 1 of the hyperbolic update step: Compute "precomputed
+       * values" and fill into the state vector.
+       *
+       * @note The method does not update the ghost range of the state
+       * vector. The precomputed part has to be synchronized by explicitly
+       * calling the update ghost values function.
+       */
+      template <int dim, typename ScalarNumber>
+      void fill_precomputed_values(
+          const OfflineData<dim, ScalarNumber> & /*offline_data*/,
+          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+              & /*state_vector*/,
+          const bool /*skip_constrained_dofs*/ = true) const
+      {
+        // nothing to do
+      }
+
     private:
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
@@ -220,30 +238,6 @@ namespace ryujin
 
       //@}
       /**
-       * @name Computing precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputation cycles.
-       */
-      static constexpr unsigned int n_precomputation_cycles = 0;
-
-      /**
-       * Precompute values for hyperbolic update. This routine is called
-       * within our usual loop() idiom in HyperbolicModule
-       */
-      template <typename SPARSITY>
-      void
-      precomputation_loop(unsigned int /*cycle*/,
-                          const SPARSITY & /*sparsity_simd*/,
-                          StateVector & /*state_vector*/,
-                          unsigned int /*left*/,
-                          unsigned int /*right*/,
-                          const bool /*skip_constrained_dofs*/) const = delete;
-
-      //@}
-      /**
        * @name Computing derived physical quantities
        */
       //@{
@@ -322,14 +316,14 @@ namespace ryujin
 
       /**
        * Given flux contributions @p flux_i and @p flux_j compute the flux
-       * <code>(-f(U_i) - f(U_j)</code>
+       * <code>(-f(U_i) - f(U_j) * c_ij</code>
        */
       state_type
-      flux_divergence(const flux_contribution_type & /*flux_i*/,
-                      const flux_contribution_type & /*flux_j*/,
-                      const dealii::Tensor<1, dim, Number> & /*c_ij*/) const
+      flux_divergence(const flux_contribution_type &flux_i,
+                      const flux_contribution_type &flux_j,
+                      const dealii::Tensor<1, dim, Number> &c_ij) const
       {
-        return state_type{};
+        return -contract(add(flux_i, flux_j), c_ij);
       }
 
       /**

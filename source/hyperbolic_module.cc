@@ -13,7 +13,7 @@
       const std::array<NUMBER, stages>,                                        \
       StateVector &,                                                           \
       NUMBER,                                                                  \
-      std::atomic<NUMBER>) const
+      NUMBER) const
 
 namespace ryujin
 {

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "openmp.h"
+#include "loop.h"
 #include "postprocessor.h"
 #include "simd.h"
 
@@ -139,85 +139,68 @@ namespace ryujin
      * Step 1: Compute quantities:
      */
 
-    {
-      RYUJIN_PARALLEL_REGION_BEGIN
+    const auto body = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+      constexpr unsigned int stride_size = get_stride_size<T>;
 
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-        using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
 
-        std::vector<grad_type<T>> local_schlieren_values(n_schlieren);
-        std::vector<curl_type<T>> local_vorticity_values(n_vorticities);
+      std::vector<grad_type<T>> local_schlieren_values(n_schlieren);
+      std::vector<curl_type<T>> local_vorticity_values(n_vorticities);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
+      for (auto &it : local_schlieren_values)
+        it = grad_type<T>();
+      for (auto &it : local_vorticity_values)
+        it = curl_type<T>();
 
-          for (auto &it : local_schlieren_values)
-            it = grad_type<T>();
-          for (auto &it : local_vorticity_values)
-            it = curl_type<T>();
+      const unsigned int *js = sparsity_simd.columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += stride_size) {
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
+        const auto U_j = U.template get_tensor<T>(js);
+        const auto view = hyperbolic_system_->template view<dim, T>();
+        const auto prim_j = view.to_primitive_state(U_j);
 
-          const unsigned int *js = sparsity_simd.columns(i);
-          for (unsigned int col_idx = 0; col_idx < row_length;
-               ++col_idx, js += stride_size) {
+        const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 
-            const auto U_j = U.template get_tensor<T>(js);
-            const auto view = hyperbolic_system_->template view<dim, T>();
-            const auto prim_j = view.to_primitive_state(U_j);
+        unsigned int k = 0;
+        for (const auto &[is_primitive, index] : schlieren_indices_) {
+          local_schlieren_values[k++] -=
+              c_ij * (is_primitive ? prim_j[index] : U_j[index]);
+        }
 
-            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+        k = 0;
+        for (const auto &[is_primitive, index] : vorticity_indices_) {
+          grad_type<T> q_j;
+          for (unsigned int d = 0; d < dim; ++d)
+            q_j[d] = (is_primitive ? prim_j[index + d] : U_j[index + d]);
 
-            unsigned int k = 0;
-            for (const auto &[is_primitive, index] : schlieren_indices_) {
-              local_schlieren_values[k++] -=
-                  c_ij * (is_primitive ? prim_j[index] : U_j[index]);
-            }
-
-            k = 0;
-            for (const auto &[is_primitive, index] : vorticity_indices_) {
-              grad_type<T> q_j;
-              for (unsigned int d = 0; d < dim; ++d)
-                q_j[d] = (is_primitive ? prim_j[index + d] : U_j[index + d]);
-
-              if constexpr (dim == 2) {
-                local_vorticity_values[k++][0] -= cross_product_2d(c_ij) * q_j;
-              } else if constexpr (dim == 3) {
-                local_vorticity_values[k++] -= cross_product_3d(c_ij, q_j);
-              }
-            }
+          if constexpr (dim == 2) {
+            local_vorticity_values[k++][0] -= cross_product_2d(c_ij) * q_j;
+          } else if constexpr (dim == 3) {
+            local_vorticity_values[k++] -= cross_product_3d(c_ij, q_j);
           }
+        }
+      }
 
-          /* Populate quantities: */
+      /* Populate quantities: */
+      const auto m_i = get_entry<T>(lumped_mass_matrix, i);
 
-          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+      unsigned int k = 0;
+      for (const auto &schlieren : local_schlieren_values) {
+        const auto value_i = schlieren.norm() / m_i;
+        write_entry<T>(quantities_[k++], value_i, i);
+      }
+      for (const auto &vorticity : local_vorticity_values) {
+        auto value_i = (dim == 2 ? vorticity[0] / m_i : vorticity.norm() / m_i);
+        write_entry<T>(quantities_[k++], value_i, i);
+      }
+    };
 
-          unsigned int k = 0;
-
-          for (const auto &schlieren : local_schlieren_values) {
-            const auto value_i = schlieren.norm() / m_i;
-            write_entry<T>(quantities_[k++], value_i, i);
-          }
-
-          for (const auto &vorticity : local_vorticity_values) {
-            auto value_i =
-                (dim == 2 ? vorticity[0] / m_i : vorticity.norm() / m_i);
-            write_entry<T>(quantities_[k++], value_i, i);
-          }
-        } /* i */
-      };
-
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
-
-      RYUJIN_PARALLEL_REGION_END
-    }
+    cpu_simd_loop<Number>("", body, 0, n_internal, n_owned);
 
     /*
      * Step 2: Compute bounds and synchronize over MPI ranks:

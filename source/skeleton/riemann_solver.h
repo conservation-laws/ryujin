@@ -84,7 +84,7 @@ namespace ryujin
                      const unsigned int * /*js*/,
                      const dealii::Tensor<1, dim, Number> & /*n_ij*/) const
       {
-        return Number(1.);
+        return Number(std::numeric_limits<ScalarNumber>::epsilon());
       }
 
     private:

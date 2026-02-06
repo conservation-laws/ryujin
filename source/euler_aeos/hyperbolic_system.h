@@ -12,7 +12,6 @@
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
-#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 #include <state_vector.h>
@@ -86,6 +85,21 @@ namespace ryujin
       {
         return HyperbolicSystemView<dim, Number>{*this};
       }
+
+      /**
+       * Part of step 1 of the hyperbolic update step: Compute "precomputed
+       * values" and fill into the state vector.
+       *
+       * @note The method does not update the ghost range of the state
+       * vector. The precomputed part has to be synchronized by explicitly
+       * calling the update ghost values function.
+       */
+      template <int dim, typename ScalarNumber>
+      void fill_precomputed_values(
+          const OfflineData<dim, ScalarNumber> &offline_data,
+          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+              &state_vector,
+          const bool skip_constrained_dofs = true) const;
 
     private:
       /**
@@ -439,29 +453,6 @@ namespace ryujin
       using InitialPrecomputedVector =
           Vectors::MultiComponentVector<ScalarNumber,
                                         n_initial_precomputed_values>;
-
-      //@}
-      /**
-       * @name Computing precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputation cycles.
-       */
-      static constexpr unsigned int n_precomputation_cycles = 2;
-
-      /**
-       * Step 0: precompute values for hyperbolic update. This routine is
-       * called within our usual loop() idiom in HyperbolicModule
-       */
-      template <typename SPARSITY>
-      void precomputation_loop(unsigned int cycle,
-                               const SPARSITY &sparsity_simd,
-                               StateVector &state_vector,
-                               unsigned int left,
-                               unsigned int right,
-                               const bool skip_constrained_dofs = true) const;
 
       //@}
       /**
@@ -869,136 +860,90 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    template <typename SPARSITY>
-    DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystemView<dim, Number>::precomputation_loop(
-        unsigned int cycle [[maybe_unused]],
-        const SPARSITY &sparsity_simd,
-        StateVector &state_vector,
-        unsigned int left,
-        unsigned int right,
-        const bool skip_constrained_dofs /*= true*/) const
+    template <int dim, typename ScalarNumber>
+    inline void HyperbolicSystem::fill_precomputed_values(
+        const OfflineData<dim, ScalarNumber> &offline_data,
+        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+            &state_vector,
+        const bool skip_constrained_dofs) const
     {
-      Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
+      const unsigned int n_internal = offline_data.n_locally_internal();
+      const unsigned int n_owned = offline_data.n_locally_owned();
+      const auto &sparsity_simd = offline_data.sparsity_pattern_simd();
+      using VA = dealii::VectorizedArray<ScalarNumber>;
 
       const auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
 
-      /* We are inside a thread parallel context */
+      /* FIXME: come up with a better interface, disable for now. */
+      const auto &eos = this->selected_equation_of_state_;
+      AssertThrow(!eos->prefer_vector_interface(), dealii::ExcNotImplemented());
 
-      const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-      unsigned int stride_size = get_stride_size<Number>;
+      /* Compute values over the diagonal: */
 
-      if (cycle == 0) {
-        if (eos->prefer_vector_interface()) {
-          /*
-           * Set up temporary storage for p, rho, e and make two calls into
-           * the eos library.
-           */
-          const auto offset = left;
-          const auto size = right - left;
+      const auto body = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+        using View = HyperbolicSystemView<dim, T>;
+        using precomputed_type = typename View::precomputed_type;
 
-          static /* shared */ std::vector<double> p;
-          static /* shared */ std::vector<double> rho;
-          static /* shared */ std::vector<double> e;
-          RYUJIN_OMP_SINGLE
-          {
-            p.resize(size);
-            rho.resize(size);
-            e.resize(size);
-          }
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (skip_constrained_dofs && row_length == 1)
+          return;
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = 0; i < size; i += stride_size) {
-            const auto U_i = U.template get_tensor<Number>(offset + i);
-            const auto rho_i = density(U_i);
-            const auto e_i = internal_energy(U_i) / rho_i;
-            /*
-             * Populate rho and e also for interpolated values from
-             * constrainted degrees of freedom so that the vectors contain
-             * physically admissible entries throughout.
-             */
-            write_entry<Number>(rho, rho_i, i);
-            write_entry<Number>(e, e_i, i);
-          }
+        const auto U_i = U.template get_tensor<T>(i);
+        const auto view = this->view<dim, T>();
+        const auto rho_i = view.density(U_i);
+        const auto e_i = view.internal_energy(U_i) / rho_i;
 
-          /* Make sure the call into eospac (and others) is single threaded. */
-          RYUJIN_OMP_SINGLE
-          {
-            eos->pressure(p, rho, e);
-          }
+        /* Calls into the selected equation of state: */
+        const auto p_i = view.eos_pressure(rho_i, e_i);
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = 0; i < size; i += stride_size) {
-            /* Skip constrained degrees of freedom: */
-            const unsigned int row_length = sparsity_simd.row_length(i);
-            if (skip_constrained_dofs && row_length == 1)
-              continue;
+        const auto gamma_i = view.surrogate_gamma(U_i, p_i);
+        using PT = precomputed_type;
+        const PT prec_i{p_i, gamma_i, T(0.), T(0.)};
+        precomputed.template write_tensor<T>(prec_i, i);
+      };
 
-            using PT = precomputed_type;
-            const auto U_i = U.template get_tensor<Number>(offset + i);
-            const auto p_i = get_entry<Number>(p, i);
-            const auto gamma_i = surrogate_gamma(U_i, p_i);
-            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-            precomputed.template write_tensor<Number>(prec_i, offset + i);
-          }
-        } else {
-          /*
-           * This is the variant with slightly better performance provided
-           * that a call to the eos is not too expensive. This variant
-           * calls into the eos library for every single degree of freedom.
-           */
-          RYUJIN_OMP_FOR
-          for (unsigned int i = left; i < right; i += stride_size) {
-            /* Skip constrained degrees of freedom: */
-            const unsigned int row_length = sparsity_simd.row_length(i);
-            if (skip_constrained_dofs && row_length == 1)
-              continue;
+      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
+      precomputed.update_ghost_values();
 
-            const auto U_i = U.template get_tensor<Number>(i);
-            const auto rho_i = density(U_i);
-            const auto e_i = internal_energy(U_i) / rho_i;
-            const auto p_i = eos_pressure(rho_i, e_i);
+      /* Compute gamma_min over the stencil: */
 
-            const auto gamma_i = surrogate_gamma(U_i, p_i);
-            using PT = precomputed_type;
-            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-            precomputed.template write_tensor<Number>(prec_i, i);
-          }
-        } /* prefer_vector_interface */
-      }   /* cycle == 0 */
+      const auto body_stencil = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+        using View = HyperbolicSystemView<dim, T>;
+        using PT = typename View::precomputed_type;
 
-      if (cycle == 1) {
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
-          using PT = precomputed_type;
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (skip_constrained_dofs && row_length == 1)
+          return;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (skip_constrained_dofs && row_length == 1)
-            continue;
+        const auto U_i = U.template get_tensor<T>(i);
+        auto prec_i = precomputed.template get_tensor<T, PT>(i);
+        /* Previous loop: gamma_min_i == gamma_i, s_i == 0, eta_i == 0 */
+        auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
 
-          const auto U_i = U.template get_tensor<Number>(i);
-          auto prec_i = precomputed.template get_tensor<Number, PT>(i);
-          auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+        const auto view = this->view<dim, T>();
 
-          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-          for (unsigned int col_idx = 1; col_idx < row_length;
-               ++col_idx, js += stride_size) {
+        constexpr unsigned int stride_size = get_stride_size<T>;
+        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+        for (unsigned int col_idx = 1; col_idx < row_length;
+             ++col_idx, js += stride_size) {
 
-            const auto U_j = U.template get_tensor<Number>(js);
-            const auto prec_j = precomputed.template get_tensor<Number, PT>(js);
-            auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
-            const auto gamma_j = surrogate_gamma(U_j, p_j);
-            gamma_min_i = std::min(gamma_min_i, gamma_j);
-          }
-
-          s_i = surrogate_specific_entropy(U_i, gamma_min_i);
-          eta_i = surrogate_harten_entropy(U_i, gamma_min_i);
-          precomputed.template write_tensor<Number>(prec_i, i);
+          const auto U_j = U.template get_tensor<T>(js);
+          const auto prec_j = precomputed.template get_tensor<T, PT>(js);
+          const auto p_j = std::get<0>(prec_j);
+          const auto gamma_j = view.surrogate_gamma(U_j, p_j);
+          gamma_min_i = std::min(gamma_min_i, gamma_j);
         }
-      }
+
+        s_i = view.surrogate_specific_entropy(U_i, gamma_min_i);
+        eta_i = view.surrogate_harten_entropy(U_i, gamma_min_i);
+        precomputed.template write_tensor<T>(prec_i, i);
+      };
+
+      cpu_simd_loop<ScalarNumber>(
+          "time_step_1", body_stencil, 0, n_internal, n_owned);
     }
 
 

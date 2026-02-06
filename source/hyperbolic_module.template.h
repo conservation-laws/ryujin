@@ -7,8 +7,8 @@
 
 #include "hyperbolic_module.h"
 #include "instrumentation.h"
+#include "loop.h"
 #include "mpi_ensemble.h"
-#include "openmp.h"
 #include "scope.h"
 #include "simd.h"
 
@@ -151,18 +151,14 @@ namespace ryujin
 #endif
 
     auto &U = std::get<0>(state_vector);
-    auto &precomputed = std::get<1>(state_vector);
 
-    const unsigned int n_internal = offline_data_->n_locally_internal();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &boundary_map = offline_data_->boundary_map();
     using VA = VectorizedArray<Number>;
 
     Scope scope(computing_timer_,
                 "time step [H] 1 - update boundary values, precompute values");
 
-    LIKWID_MARKER_START("time_step_1a");
+    LIKWID_MARKER_START("time_step_1");
 
     /* FIXME: not thread parallel... */
     for (const auto &entry : boundary_map) {
@@ -188,39 +184,22 @@ namespace ryujin
       U.write_tensor(U_i, i);
     }
 
-    LIKWID_MARKER_STOP("time_step_1a");
+    LIKWID_MARKER_STOP("time_step_1");
 
     U.update_ghost_values();
 
     /*
-     * Precompute values
+     * Compute and populate precomputed values.
      */
 
-    if constexpr (n_precomputation_cycles != 0) {
-      for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
+    LIKWID_MARKER_START("time_step_1");
 
-        RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START(("time_step_1b"));
+    auto &precomputed = std::get<1>(state_vector);
+    hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
 
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-          using T = decltype(sentinel);
+    LIKWID_MARKER_STOP("time_step_1");
 
-          const auto view = hyperbolic_system_->template view<dim, T>();
-          view.precomputation_loop(
-              cycle, sparsity_simd, state_vector, left, right);
-        };
-
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_internal, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_internal);
-
-        LIKWID_MARKER_STOP("time_step_1b");
-        RYUJIN_PARALLEL_REGION_END
-
-        precomputed.update_ghost_values();
-      }
-    }
+    precomputed.update_ghost_values();
   }
 
 
@@ -271,7 +250,7 @@ namespace ryujin
       const std::array<Number, stages> stage_weights,
       StateVector &new_state_vector,
       Number tau /*= 0.*/,
-      std::atomic<Number> tau_max /*std::numeric_limits<Number>::max()*/) const
+      Number tau_max /*= std::numeric_limits<Number>::max()*/) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, Number>::step()"
@@ -328,12 +307,20 @@ namespace ryujin
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
 
-    /* Lambda for creating the computing timer string: */
+    /*
+     * Lambdas for creating the computing timer and loop strings:
+     */
+
     int step_no = 1;
+
     const auto scoped_name = [&step_no](const auto &name,
                                         const bool advance = true) {
       advance || step_no--;
       return "time step [H] " + std::to_string(++step_no) + " - " + name;
+    };
+
+    const auto loop_name = [&step_no]() {
+      return "time_step_" + std::to_string(step_no);
     };
 
     /* A boolean signalling that a restart is necessary: */
@@ -364,16 +351,12 @@ namespace ryujin
      *  sounds a bit too expensive...
      * -------------------------------------------------------------------------
      */
-
     {
       Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
+        constexpr unsigned int stride_size = get_stride_size<T>;
 
         using RiemannSolver =
             typename Description::template RiemannSolver<dim, T>;
@@ -384,58 +367,47 @@ namespace ryujin
         Indicator indicator(
             *hyperbolic_system_, indicator_parameters_, old_precomputed);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          return;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
+        const auto U_i = old_U.template get_tensor<T>(i);
+
+        indicator.reset(i, U_i);
+
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length;
+             ++col_idx, js += stride_size) {
+
+          const auto U_j = old_U.template get_tensor<T>(js);
+
+          const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+
+          indicator.accumulate(js, U_j, c_ij);
+
+          /* Skip diagonal. */
+          if (col_idx == 0)
             continue;
 
-          const auto U_i = old_U.template get_tensor<T>(i);
+          /* Only iterate over the upper triangular portion of d_ij */
+          if (all_below_diagonal<T>(i, js))
+            continue;
 
-          indicator.reset(i, U_i);
+          const auto norm = c_ij.norm();
+          const auto n_ij = c_ij / norm;
+          const auto lambda_max = riemann_solver.compute(U_i, U_j, i, js, n_ij);
+          const auto d_ij = norm * lambda_max;
 
-          const unsigned int *js = sparsity_simd.columns(i);
-          for (unsigned int col_idx = 0; col_idx < row_length;
-               ++col_idx, js += stride_size) {
-
-            const auto U_j = old_U.template get_tensor<T>(js);
-
-            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-
-            indicator.accumulate(js, U_j, c_ij);
-
-            /* Skip diagonal. */
-            if (col_idx == 0)
-              continue;
-
-            /* Only iterate over the upper triangular portion of d_ij */
-            if (all_below_diagonal<T>(i, js))
-              continue;
-
-            const auto norm = c_ij.norm();
-            const auto n_ij = c_ij / norm;
-            const auto lambda_max =
-                riemann_solver.compute(U_i, U_j, i, js, n_ij);
-            const auto d_ij = norm * lambda_max;
-
-            dij_matrix_.write_entry(d_ij, i, col_idx, true);
-          }
-
-          const auto mass = get_entry<T>(lumped_mass_matrix, i);
-          const auto hd_i = mass * measure_of_omega_inverse;
-          write_entry<T>(alpha_, indicator.alpha(hd_i), i);
+          dij_matrix_.write_entry(d_ij, i, col_idx, true);
         }
+
+        const auto mass = get_entry<T>(lumped_mass_matrix, i);
+        const auto hd_i = mass * measure_of_omega_inverse;
+        write_entry<T>(alpha_, indicator.alpha(hd_i), i);
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+      cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
       alpha_.update_ghost_values();
     }
@@ -450,10 +422,6 @@ namespace ryujin
       Scope scope(computing_timer_,
                   scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
 
-      /* Parallel region */
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
       /*
        * Complete d_ij at boundary:
        *
@@ -463,21 +431,18 @@ namespace ryujin
        * boundary degrees of freedom as well.
        */
 
-      using RiemannSolver =
-          typename Description::template RiemannSolver<dim, Number>;
-      RiemannSolver riemann_solver(
-          *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
-
-      Number local_tau_max = std::numeric_limits<Number>::max();
-
       /*
        * Note: we need this dance of iterating over an integer and then
        * accessing the element to make Apple's OpenMP implementation
        * happy.
        */
-      RYUJIN_OMP_FOR
-      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
+      const auto body_boundary = [&](const auto &, const unsigned int k) {
         const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
+
+        using RiemannSolver =
+            typename Description::template RiemannSolver<dim, Number>;
+        RiemannSolver riemann_solver(
+            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
 
         /*
          * Only work on index pairs "i < j" that point to the upper
@@ -488,7 +453,7 @@ namespace ryujin
          * we symmetrize the matrix later on anyway.
          */
         if (j < i)
-          continue;
+          return;
 
         const auto U_i = old_U.get_tensor(i);
         const auto U_j = old_U.get_tensor(j);
@@ -504,17 +469,22 @@ namespace ryujin
         const auto d_ji = norm_ji * lambda_max;
 
         dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
-      }
+      };
+
+      cpu_simd_loop<Number>(loop_name(),
+                            body_boundary,
+                            0,
+                            /*no vectorization*/ 0,
+                            coupling_boundary_pairs.size());
+
+      std::atomic<Number> local_tau_max = tau_max;
 
       /* Symmetrize d_ij: */
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < n_owned; ++i) {
-
+      const auto body = [&](auto, unsigned int i) {
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
-          continue;
+          return;
 
         Number d_sum = Number(0.);
 
@@ -567,17 +537,17 @@ namespace ryujin
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
-        local_tau_max = std::min(local_tau_max, local_tau);
-      }
 
-      /* Synchronize tau max over all threads: */
-      Number current_tau_max = tau_max.load();
-      while (current_tau_max > local_tau_max &&
-             !tau_max.compare_exchange_weak(current_tau_max, local_tau_max))
-        ;
+        Number current_value = local_tau_max.load();
+        while (current_value > local_tau &&
+               !local_tau_max.compare_exchange_weak(current_value, local_tau))
+          ;
+      };
 
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+      cpu_simd_loop<Number>(
+          loop_name(), body, 0, /*no vectorization*/ 0, n_owned);
+
+      tau_max = local_tau_max.load();
     }
 
     {
@@ -588,15 +558,15 @@ namespace ryujin
        * MPI Barrier: Synchronize the maximal time-step size. This has to
        * happen either over the global, or the local subrange communicator:
        */
-      tau_max.store(Utilities::MPI::min(
-          tau_max.load(), mpi_ensemble_.synchronization_communicator()));
+      tau_max = Utilities::MPI::min(
+          tau_max, mpi_ensemble_.synchronization_communicator());
 
       AssertThrow(
           !std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
           ExcMessage(
               "I'm sorry, Dave. I'm afraid I can't do that.\nWe crashed."));
 
-      tau = (tau == Number(0.) ? tau_max.load() : tau);
+      tau = (tau == Number(0.) ? tau_max : tau);
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        computed tau_max = " << tau_max
@@ -605,7 +575,7 @@ namespace ryujin
 #endif
 
       /* We need to signal a restart if the enforced tau is too wacky: */
-      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
+      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max);
 
       /* Don't bother with computing the update step, signal a restart: */
       if (restart_needed &&
@@ -638,14 +608,9 @@ namespace ryujin
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
 
-      /* Parallel region */
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
-      auto loop = [&](auto sentinel,
+      auto body = [&](auto sentinel,
                       auto have_discontinuous_ansatz,
-                      unsigned int left,
-                      unsigned int right) {
+                      const unsigned int i) {
         using T = decltype(sentinel);
         using View =
             typename Description::template HyperbolicSystemView<dim, T>;
@@ -653,234 +618,229 @@ namespace ryujin
         using flux_contribution_type = typename View::flux_contribution_type;
         using state_type = typename View::state_type;
 
-        unsigned int stride_size = get_stride_size<T>;
+        constexpr unsigned int stride_size = get_stride_size<T>;
 
         const auto view = hyperbolic_system_->template view<dim, T>();
 
         Limiter limiter(
             *hyperbolic_system_, limiter_parameters_, old_precomputed);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          return;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
+        const auto U_i = old_U.template get_tensor<T>(i);
+        auto U_i_new = U_i;
 
-          const auto U_i = old_U.template get_tensor<T>(i);
-          auto U_i_new = U_i;
+        const auto alpha_i = get_entry<T>(alpha_, i);
+        const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
-          const auto alpha_i = get_entry<T>(alpha_, i);
-          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
-          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+        const auto flux_i = view.flux_contribution(
+            old_precomputed, initial_precomputed_, i, U_i);
 
-          const auto flux_i = view.flux_contribution(
-              old_precomputed, initial_precomputed_, i, U_i);
+        std::array<flux_contribution_type, stages> flux_iHs;
+        [[maybe_unused]] state_type S_iH;
 
-          std::array<flux_contribution_type, stages> flux_iHs;
-          [[maybe_unused]] state_type S_iH;
+        for (int s = 0; s < stages; ++s) {
+          const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
 
-          for (int s = 0; s < stages; ++s) {
-            const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
-
-            const auto U_iHs = U_s.template get_tensor<T>(i);
-            flux_iHs[s] =
-                view.flux_contribution(prec_s, initial_precomputed_, i, U_iHs);
-
-            if constexpr (View::have_source_terms) {
-              S_iH +=
-                  stage_weights[s] * view.nodal_source(prec_s, i, U_iHs, tau);
-            }
-          }
-
-          [[maybe_unused]] state_type S_i;
-          state_type F_iH;
+          const auto U_iHs = U_s.template get_tensor<T>(i);
+          flux_iHs[s] =
+              view.flux_contribution(prec_s, initial_precomputed_, i, U_iHs);
 
           if constexpr (View::have_source_terms) {
-            S_i = view.nodal_source(old_precomputed, i, U_i, tau);
-            S_iH += weight * S_i;
-            U_i_new += tau * /* m_i_inv * m_i */ S_i;
-            F_iH += m_i * S_iH;
+            S_iH += stage_weights[s] * view.nodal_source(prec_s, i, U_iHs, tau);
           }
+        }
 
-          limiter.reset(i, U_i, flux_i);
+        [[maybe_unused]] state_type S_i;
+        state_type F_iH;
 
-          [[maybe_unused]] state_type affine_shift;
+        if constexpr (View::have_source_terms) {
+          S_i = view.nodal_source(old_precomputed, i, U_i, tau);
+          S_iH += weight * S_i;
+          U_i_new += tau * /* m_i_inv * m_i */ S_i;
+          F_iH += m_i * S_iH;
+        }
 
-          /*
-           * Workaround: For shallow water we need to accumulate an
-           * additional contribution to the affine shift over the stencil
-           * before we can compute limiter bounds.
-           */
+        limiter.reset(i, U_i, flux_i);
 
-          const unsigned int *js = sparsity_simd.columns(i);
-          if constexpr (shallow_water) {
-            for (unsigned int col_idx = 0; col_idx < row_length;
-                 ++col_idx, js += stride_size) {
+        [[maybe_unused]] state_type affine_shift;
 
-              const auto U_j = old_U.template get_tensor<T>(js);
-              const auto flux_j = view.flux_contribution(
-                  old_precomputed, initial_precomputed_, js, U_j);
+        /*
+         * Workaround: For shallow water we need to accumulate an
+         * additional contribution to the affine shift over the stencil
+         * before we can compute limiter bounds.
+         */
 
-              const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
-              const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-
-              const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
-              affine_shift += B_ij;
-            }
-
-            affine_shift *= tau * m_i_inv;
-          }
-
-          if constexpr (View::have_source_terms) {
-            affine_shift += tau * /* m_i_inv * m_i */ S_i;
-          }
-
-          js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd.columns(i);
+        if constexpr (shallow_water) {
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
             const auto U_j = old_U.template get_tensor<T>(js);
-
-            const auto alpha_j = get_entry<T>(alpha_, js);
-
-            const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
-            auto factor = (alpha_i + alpha_j) * Number(.5);
-
-            if constexpr (have_discontinuous_ansatz) {
-              const auto incidence_ij =
-                  incidence_matrix.template get_entry<T>(i, col_idx);
-              factor = std::max(factor, incidence_ij);
-            }
-
-            const auto d_ijH = d_ij * factor;
-
-#ifdef DEBUG_SYMMETRY_CHECK
-            /*
-             * Verify that all local chunks of the d_ij matrix have been
-             * computed consistently over all MPI ranks. For that we import
-             * all ghost rows from neighboring MPI ranks and simply check
-             * that the (local) values of d_ij and d_ji match.
-             */
-            const auto d_ji =
-                dij_matrix_.template get_transposed_entry<T>(i, col_idx);
-            Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
-                   dealii::ExcMessage(
-                       "d_ij not symmetrized correctly over MPI ranks"));
-#endif
-
-            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            constexpr auto eps = std::numeric_limits<Number>::epsilon();
-            const auto scale = dealii::compare_and_apply_mask<
-                dealii::SIMDComparison::less_than>(
-                std::abs(d_ij), T(eps * eps), T(0.), T(1.) / d_ij);
-            const auto scaled_c_ij = c_ij * scale;
-
             const auto flux_j = view.flux_contribution(
                 old_precomputed, initial_precomputed_, js, U_j);
 
-            const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+            const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 
+            const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
+            affine_shift += B_ij;
+          }
+
+          affine_shift *= tau * m_i_inv;
+        }
+
+        if constexpr (View::have_source_terms) {
+          affine_shift += tau * /* m_i_inv * m_i */ S_i;
+        }
+
+        js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length;
+             ++col_idx, js += stride_size) {
+
+          const auto U_j = old_U.template get_tensor<T>(js);
+
+          const auto alpha_j = get_entry<T>(alpha_, js);
+
+          const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+          auto factor = (alpha_i + alpha_j) * Number(.5);
+
+          if constexpr (have_discontinuous_ansatz) {
+            const auto incidence_ij =
+                incidence_matrix.template get_entry<T>(i, col_idx);
+            factor = std::max(factor, incidence_ij);
+          }
+
+          const auto d_ijH = d_ij * factor;
+
+#ifdef DEBUG_SYMMETRY_CHECK
+          /*
+           * Verify that all local chunks of the d_ij matrix have been
+           * computed consistently over all MPI ranks. For that we import
+           * all ghost rows from neighboring MPI ranks and simply check
+           * that the (local) values of d_ij and d_ji match.
+           */
+          const auto d_ji =
+              dij_matrix_.template get_transposed_entry<T>(i, col_idx);
+          Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
+                 dealii::ExcMessage(
+                     "d_ij not symmetrized correctly over MPI ranks"));
+#endif
+
+          const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+          constexpr auto eps = std::numeric_limits<Number>::epsilon();
+          const auto scale =
+              dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                  std::abs(d_ij), T(eps * eps), T(0.), T(1.) / d_ij);
+          const auto scaled_c_ij = c_ij * scale;
+
+          const auto flux_j = view.flux_contribution(
+              old_precomputed, initial_precomputed_, js, U_j);
+
+          const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+
+          /*
+           * Compute low-order flux and limiter bounds:
+           */
+
+          const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
+          U_i_new += tau * m_i_inv * flux_ij;
+          auto P_ij = -flux_ij;
+
+          if constexpr (shallow_water) {
             /*
-             * Compute low-order flux and limiter bounds:
+             * Workaround: Shallow water (and related) are special:
              */
 
-            const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
-            U_i_new += tau * m_i_inv * flux_ij;
-            auto P_ij = -flux_ij;
+            const auto &[U_star_ij, U_star_ji] =
+                view.equilibrated_states(flux_i, flux_j);
 
-            if constexpr (shallow_water) {
-              /*
-               * Workaround: Shallow water (and related) are special:
-               */
+            U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
+            F_iH += d_ijH * (U_star_ji - U_star_ij);
+            P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
-              const auto &[U_star_ij, U_star_ji] =
-                  view.equilibrated_states(flux_i, flux_j);
+            limiter.accumulate(
+                U_j, U_star_ij, U_star_ji, scaled_c_ij, affine_shift);
 
-              U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
-              F_iH += d_ijH * (U_star_ji - U_star_ij);
-              P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
+          } else {
 
-              limiter.accumulate(
-                  U_j, U_star_ij, U_star_ji, scaled_c_ij, affine_shift);
+            U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
+            F_iH += d_ijH * (U_j - U_i);
+            P_ij += (d_ijH - d_ij) * (U_j - U_i);
 
-            } else {
+            limiter.accumulate(js, U_j, flux_j, scaled_c_ij, affine_shift);
+          }
 
-              U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
-              F_iH += d_ijH * (U_j - U_i);
-              P_ij += (d_ijH - d_ij) * (U_j - U_i);
+          if constexpr (View::have_source_terms) {
+            F_iH -= m_ij * S_iH;
+            P_ij -= m_ij * /*sic!*/ S_i;
+          }
 
-              limiter.accumulate(js, U_j, flux_j, scaled_c_ij, affine_shift);
-            }
+          /*
+           * Compute high-order fluxes and source terms:
+           */
 
-            if constexpr (View::have_source_terms) {
-              F_iH -= m_ij * S_iH;
-              P_ij -= m_ij * /*sic!*/ S_i;
-            }
+          if constexpr (View::have_high_order_flux) {
+            const auto high_order_flux_ij =
+                view.high_order_flux_divergence(flux_i, flux_j, c_ij);
+            F_iH += weight * high_order_flux_ij;
+            P_ij += weight * high_order_flux_ij;
+          } else {
+            F_iH += weight * flux_ij;
+            P_ij += weight * flux_ij;
+          }
 
-            /*
-             * Compute high-order fluxes and source terms:
-             */
+          if constexpr (View::have_source_terms) {
+            const auto S_j = view.nodal_source(old_precomputed, js, U_j, tau);
+            F_iH += weight * m_ij * S_j;
+            P_ij += weight * m_ij * S_j;
+          }
+
+          for (int s = 0; s < stages; ++s) {
+            const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+
+            const auto U_jHs = U_s.template get_tensor<T>(js);
+            const auto flux_jHs =
+                view.flux_contribution(prec_s, initial_precomputed_, js, U_jHs);
 
             if constexpr (View::have_high_order_flux) {
               const auto high_order_flux_ij =
-                  view.high_order_flux_divergence(flux_i, flux_j, c_ij);
-              F_iH += weight * high_order_flux_ij;
-              P_ij += weight * high_order_flux_ij;
+                  view.high_order_flux_divergence(flux_iHs[s], flux_jHs, c_ij);
+              F_iH += stage_weights[s] * high_order_flux_ij;
+              P_ij += stage_weights[s] * high_order_flux_ij;
             } else {
-              F_iH += weight * flux_ij;
-              P_ij += weight * flux_ij;
+              const auto flux_ij =
+                  view.flux_divergence(flux_iHs[s], flux_jHs, c_ij);
+              F_iH += stage_weights[s] * flux_ij;
+              P_ij += stage_weights[s] * flux_ij;
             }
 
             if constexpr (View::have_source_terms) {
-              const auto S_j = view.nodal_source(old_precomputed, js, U_j, tau);
-              F_iH += weight * m_ij * S_j;
-              P_ij += weight * m_ij * S_j;
+              const auto S_js = view.nodal_source(prec_s, js, U_jHs, tau);
+              F_iH += stage_weights[s] * m_ij * S_js;
+              P_ij += stage_weights[s] * m_ij * S_js;
             }
-
-            for (int s = 0; s < stages; ++s) {
-              const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
-
-              const auto U_jHs = U_s.template get_tensor<T>(js);
-              const auto flux_jHs = view.flux_contribution(
-                  prec_s, initial_precomputed_, js, U_jHs);
-
-              if constexpr (View::have_high_order_flux) {
-                const auto high_order_flux_ij = view.high_order_flux_divergence(
-                    flux_iHs[s], flux_jHs, c_ij);
-                F_iH += stage_weights[s] * high_order_flux_ij;
-                P_ij += stage_weights[s] * high_order_flux_ij;
-              } else {
-                const auto flux_ij =
-                    view.flux_divergence(flux_iHs[s], flux_jHs, c_ij);
-                F_iH += stage_weights[s] * flux_ij;
-                P_ij += stage_weights[s] * flux_ij;
-              }
-
-              if constexpr (View::have_source_terms) {
-                const auto S_js = view.nodal_source(prec_s, js, U_jHs, tau);
-                F_iH += stage_weights[s] * m_ij * S_js;
-                P_ij += stage_weights[s] * m_ij * S_js;
-              }
-            }
-
-            pij_matrix_.write_entry(P_ij, i, col_idx, true);
           }
+
+          pij_matrix_.write_entry(P_ij, i, col_idx, true);
+        }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-          if (!view.is_admissible(U_i_new)) {
-            restart_needed = true;
-          }
+        if (!view.is_admissible(U_i_new)) {
+          restart_needed = true;
+        }
 #endif
 
-          new_U.template write_tensor<T>(U_i_new, i);
-          r_.template write_tensor<T>(F_iH, i);
+        new_U.template write_tensor<T>(U_i_new, i);
+        r_.template write_tensor<T>(F_iH, i);
 
-          const auto hd_i = m_i * measure_of_omega_inverse;
-          const auto relaxed_bounds = limiter.bounds(hd_i);
-          bounds_.template write_tensor<T>(relaxed_bounds, i);
-        }
+        const auto hd_i = m_i * measure_of_omega_inverse;
+        const auto relaxed_bounds = limiter.bounds(hd_i);
+        bounds_.template write_tensor<T>(relaxed_bounds, i);
       };
 
       /*
@@ -890,17 +850,12 @@ namespace ryujin
        * computing d_ijH.
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(Number(), std::true_type{}, n_internal, n_owned);
-        loop(VA(), std::true_type{}, 0, n_internal);
+        cpu_simd_loop<Number>(
+            loop_name(), body, 0, n_internal, n_owned, std::true_type{});
       } else {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(Number(), std::false_type{}, n_internal, n_owned);
-        loop(VA(), std::false_type{}, 0, n_internal);
+        cpu_simd_loop<Number>(
+            loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
 
       r_.update_ghost_values();
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
@@ -922,121 +877,113 @@ namespace ryujin
     if (limiter_parameters_.iterations() != 0) {
       Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
-      auto loop = [&](auto sentinel,
+      auto body = [&](auto sentinel,
                       auto have_discontinuous_ansatz,
-                      unsigned int left,
-                      unsigned int right) {
+                      const unsigned int i) {
         using T = decltype(sentinel);
         using View =
             typename Description::template HyperbolicSystemView<dim, T>;
         using Limiter = typename Description::template Limiter<dim, T>;
 
-        unsigned int stride_size = get_stride_size<T>;
+        constexpr unsigned int stride_size = get_stride_size<T>;
 
         Limiter limiter(
             *hyperbolic_system_, limiter_parameters_, old_precomputed);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          return;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
+        auto bounds =
+            bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
 
-          auto bounds =
-              bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
-
-          /*
-           * In case of a discontinuous finite element ansatz we need to
-           * extend bounds over the stencil. We do this by looping over the
-           * stencil once and taking the minimum/maximum:
-           */
-          if constexpr (have_discontinuous_ansatz) {
-            /* Skip diagonal. */
-            const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-            for (unsigned int col_idx = 1; col_idx < row_length;
-                 ++col_idx, js += stride_size) {
-              bounds = limiter.combine_bounds(
-                  bounds,
-                  bounds_.template get_tensor<T, std::array<T, n_bounds>>(js));
-            }
-            bounds_.template write_tensor<T>(bounds, i);
-          }
-
-          [[maybe_unused]] T m_i;
-          if constexpr (have_discontinuous_ansatz)
-            m_i = get_entry<T>(lumped_mass_matrix, i);
-          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
-
-          const auto U_i_new = new_U.template get_tensor<T>(i);
-
-          const auto F_iH = r_.template get_tensor<T>(i);
-
-          const auto lambda_inv = Number(row_length - 1);
-          const auto factor = tau * m_i_inv * lambda_inv;
-
+        /*
+         * In case of a discontinuous finite element ansatz we need to
+         * extend bounds over the stencil. We do this by looping over the
+         * stencil once and taking the minimum/maximum:
+         */
+        if constexpr (have_discontinuous_ansatz) {
           /* Skip diagonal. */
           const unsigned int *js = sparsity_simd.columns(i) + stride_size;
           for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
-
-            auto P_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
-            const auto F_jH = r_.template get_tensor<T>(js);
-
-            /*
-             * Mass matrix correction:
-             */
-
-            const auto kronecker_ij = col_idx == 0 ? T(1.) : T(0.);
-
-            if constexpr (have_discontinuous_ansatz) {
-              /* Use full consistent mass matrix inverse: */
-
-              const auto m_j = get_entry<T>(lumped_mass_matrix, js);
-              const auto m_ij_inv =
-                  mass_matrix_inverse.template get_entry<T>(i, col_idx);
-              const auto b_ij = m_i * m_ij_inv - kronecker_ij;
-              const auto b_ji = m_j * m_ij_inv - kronecker_ij;
-
-              P_ij += b_ij * F_jH - b_ji * F_iH;
-
-            } else {
-              /* Use Neumann series expansion: */
-
-              const auto m_j_inv = get_entry<T>(lumped_mass_matrix_inverse, js);
-              const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
-              const auto b_ij = kronecker_ij - m_ij * m_j_inv;
-              const auto b_ji = kronecker_ij - m_ij * m_i_inv;
-
-              P_ij += b_ij * F_jH - b_ji * F_iH;
-            }
-
-            P_ij *= factor;
-            pij_matrix_.write_entry(P_ij, i, col_idx);
-
-            /*
-             * Compute limiter coefficients:
-             */
-
-            const auto &[l_ij, success] = limiter.limit(bounds, U_i_new, P_ij);
-            lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
-
-            /*
-             * If the success is set to false then the low-order update
-             * resulted in a state outside of the limiter bounds. This can
-             * happen if we compute with an aggressive CFL number. We
-             * signal this condition by setting the restart_needed boolean
-             * to true and defer further action to the chosen
-             * IDViolationStrategy and the policy set in the
-             * TimeIntegrator.
-             */
-            if (!success)
-              restart_needed = true;
+            bounds = limiter.combine_bounds(
+                bounds,
+                bounds_.template get_tensor<T, std::array<T, n_bounds>>(js));
           }
+          bounds_.template write_tensor<T>(bounds, i);
+        }
+
+        [[maybe_unused]] T m_i;
+        if constexpr (have_discontinuous_ansatz)
+          m_i = get_entry<T>(lumped_mass_matrix, i);
+        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+
+        const auto U_i_new = new_U.template get_tensor<T>(i);
+
+        const auto F_iH = r_.template get_tensor<T>(i);
+
+        const auto lambda_inv = Number(row_length - 1);
+        const auto factor = tau * m_i_inv * lambda_inv;
+
+        /* Skip diagonal. */
+        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+        for (unsigned int col_idx = 1; col_idx < row_length;
+             ++col_idx, js += stride_size) {
+
+          auto P_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+          const auto F_jH = r_.template get_tensor<T>(js);
+
+          /*
+           * Mass matrix correction:
+           */
+
+          const auto kronecker_ij = col_idx == 0 ? T(1.) : T(0.);
+
+          if constexpr (have_discontinuous_ansatz) {
+            /* Use full consistent mass matrix inverse: */
+
+            const auto m_j = get_entry<T>(lumped_mass_matrix, js);
+            const auto m_ij_inv =
+                mass_matrix_inverse.template get_entry<T>(i, col_idx);
+            const auto b_ij = m_i * m_ij_inv - kronecker_ij;
+            const auto b_ji = m_j * m_ij_inv - kronecker_ij;
+
+            P_ij += b_ij * F_jH - b_ji * F_iH;
+
+          } else {
+            /* Use Neumann series expansion: */
+
+            const auto m_j_inv = get_entry<T>(lumped_mass_matrix_inverse, js);
+            const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+            const auto b_ij = kronecker_ij - m_ij * m_j_inv;
+            const auto b_ji = kronecker_ij - m_ij * m_i_inv;
+
+            P_ij += b_ij * F_jH - b_ji * F_iH;
+          }
+
+          P_ij *= factor;
+          pij_matrix_.write_entry(P_ij, i, col_idx);
+
+          /*
+           * Compute limiter coefficients:
+           */
+
+          const auto &[l_ij, success] = limiter.limit(bounds, U_i_new, P_ij);
+          lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
+
+          /*
+           * If the success is set to false then the low-order update
+           * resulted in a state outside of the limiter bounds. This can
+           * happen if we compute with an aggressive CFL number. We
+           * signal this condition by setting the restart_needed boolean
+           * to true and defer further action to the chosen
+           * IDViolationStrategy and the policy set in the
+           * TimeIntegrator.
+           */
+          if (!success)
+            restart_needed = true;
         }
       };
 
@@ -1047,17 +994,12 @@ namespace ryujin
        * computing d_ijH.
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(Number(), std::true_type{}, n_internal, n_owned);
-        loop(VA(), std::true_type{}, 0, n_internal);
+        cpu_simd_loop<Number>(
+            loop_name(), body, 0, n_internal, n_owned, std::true_type{});
       } else {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(Number(), std::false_type{}, n_internal, n_owned);
-        loop(VA(), std::false_type{}, 0, n_internal);
+        cpu_simd_loop<Number>(
+            loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
 
       lij_matrix_.update_ghost_rows();
     }
@@ -1085,111 +1027,95 @@ namespace ryujin
         std::swap(lij_matrix_, lij_matrix_next_);
       }
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
         using View =
             typename Description::template HyperbolicSystemView<dim, T>;
         using Limiter = typename Description::template Limiter<dim, T>;
 
-        unsigned int stride_size = get_stride_size<T>;
-
-        /* Stored thread locally: */
-        AlignedVector<T> lij_row;
         Limiter limiter(
             *hyperbolic_system_, limiter_parameters_, old_precomputed);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          return;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
+        auto U_i_new = new_U.template get_tensor<T>(i);
 
-          auto U_i_new = new_U.template get_tensor<T>(i);
+        const Number lambda = Number(1.) / Number(row_length - 1);
 
-          const Number lambda = Number(1.) / Number(row_length - 1);
-          lij_row.resize_fast(row_length);
+        /* Stored thread locally: */
+        boost::container::small_vector<T, 54> lij_row(row_length);
 
-          /* Skip diagonal. */
-          for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        /* Skip diagonal. */
+        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
-            const auto l_ij = std::min(
-                lij_matrix_.template get_entry<T>(i, col_idx),
-                lij_matrix_.template get_transposed_entry<T>(i, col_idx));
+          const auto l_ij = std::min(
+              lij_matrix_.template get_entry<T>(i, col_idx),
+              lij_matrix_.template get_transposed_entry<T>(i, col_idx));
 
-            const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+          const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
 
-            U_i_new += l_ij * lambda * p_ij;
+          U_i_new += l_ij * lambda * p_ij;
 
-            if (!last_round)
-              lij_row[col_idx] = l_ij;
-          }
+          if (!last_round)
+            lij_row[col_idx] = l_ij;
+        }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-          const auto view = hyperbolic_system_->template view<dim, T>();
-          if (!view.is_admissible(U_i_new)) {
+        const auto view = hyperbolic_system_->template view<dim, T>();
+        if (!view.is_admissible(U_i_new)) {
+          restart_needed = true;
+        }
+#endif
+
+        new_U.template write_tensor<T>(U_i_new, i);
+
+        /* Skip computating l_ij and updating p_ij in the last round */
+        if (last_round)
+          return;
+
+        const auto bounds =
+            bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
+        /* Skip diagonal. */
+        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+
+          const auto old_l_ij = lij_row[col_idx];
+
+          const auto new_p_ij = (T(1.) - old_l_ij) *
+                                pij_matrix_.template get_tensor<T>(i, col_idx);
+
+          const auto &[new_l_ij, success] =
+              limiter.limit(bounds, U_i_new, new_p_ij);
+
+          /*
+           * This is the second pass of the limiter. Under rare
+           * circumstances the previous high-order update might be
+           * slightly out of bounds due to roundoff errors. This happens
+           * for example in flat regions or in stagnation points at a
+           * (slip boundary) point. The limiter should ensure that we do
+           * not further manipulate the state in this case. We thus only
+           * signal a restart condition if the `EXPENSIVE_BOUNDS_CHECK` debug
+           * macro is defined.
+           */
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
+          if (!success)
             restart_needed = true;
-          }
 #endif
 
-          new_U.template write_tensor<T>(U_i_new, i);
-
-          /* Skip computating l_ij and updating p_ij in the last round */
-          if (last_round)
-            continue;
-
-          const auto bounds =
-              bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
-          /* Skip diagonal. */
-          for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-
-            const auto old_l_ij = lij_row[col_idx];
-
-            const auto new_p_ij =
-                (T(1.) - old_l_ij) *
-                pij_matrix_.template get_tensor<T>(i, col_idx);
-
-            const auto &[new_l_ij, success] =
-                limiter.limit(bounds, U_i_new, new_p_ij);
-
-            /*
-             * This is the second pass of the limiter. Under rare
-             * circumstances the previous high-order update might be
-             * slightly out of bounds due to roundoff errors. This happens
-             * for example in flat regions or in stagnation points at a
-             * (slip boundary) point. The limiter should ensure that we do
-             * not further manipulate the state in this case. We thus only
-             * signal a restart condition if the `EXPENSIVE_BOUNDS_CHECK` debug
-             * macro is defined.
-             */
-#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-            if (!success)
-              restart_needed = true;
-#endif
-
-            /*
-             * Shortcut: We omit updating the p_ij and q_ij matrices and
-             * simply write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix.
-             *
-             * This approach only works for at most two limiting steps.
-             */
-            const auto entry = (T(1.) - old_l_ij) * new_l_ij;
-            lij_matrix_next_.write_entry(entry, i, col_idx, true);
-          }
+          /*
+           * Shortcut: We omit updating the p_ij and q_ij matrices and
+           * simply write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix.
+           *
+           * This approach only works for at most two limiting steps.
+           */
+          const auto entry = (T(1.) - old_l_ij) * new_l_ij;
+          lij_matrix_next_.write_entry(entry, i, col_idx, true);
         }
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+      cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
       if (!last_round) {
         lij_matrix_next_.update_ghost_rows();

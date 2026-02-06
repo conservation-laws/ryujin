@@ -137,9 +137,6 @@ namespace ryujin
 
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
-    static constexpr auto n_precomputation_cycles =
-        View::n_precomputation_cycles;
-
     //@}
     /**
      * @name Constructor and setup
@@ -258,14 +255,13 @@ namespace ryujin
      * prior to calling the step function.
      */
     template <int stages>
-    Number step(
-        const StateVector &old_state_vector,
-        std::array<std::reference_wrapper<const StateVector>, stages>
-            stage_state_vectors,
-        const std::array<Number, stages> stage_weights,
-        StateVector &new_state_vector,
-        Number tau = Number(0.),
-        std::atomic<Number> tau_max = std::numeric_limits<Number>::max()) const;
+    Number step(const StateVector &old_state_vector,
+                std::array<std::reference_wrapper<const StateVector>, stages>
+                    stage_state_vectors,
+                const std::array<Number, stages> stage_weights,
+                StateVector &new_state_vector,
+                Number tau = Number(0.),
+                Number tau_max = std::numeric_limits<Number>::max()) const;
 
     /**
      * Sets the relative CFL number used for computing an appropriate
