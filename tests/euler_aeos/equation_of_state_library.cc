@@ -72,21 +72,35 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos,
     std::array<double, 5> c;
     std::array<double, 5> T;
 
-    eos.pressure(dealii::ArrayView<double>(p),
-                 dealii::ArrayView<double>(rho),
-                 dealii::ArrayView<double>(e));
+    std::transform(
+        std::begin(rho),
+        std::end(rho),
+        std::begin(e),
+        std::begin(p),
+        [&](const auto rho, const auto e) { return eos.pressure(rho, e); });
 
-    eos.specific_internal_energy(dealii::ArrayView<double>(e_back),
-                                 dealii::ArrayView<double>(rho),
-                                 dealii::ArrayView<double>(p));
+    std::transform(std::begin(rho),
+                   std::end(rho),
+                   std::begin(p),
+                   std::begin(e_back),
+                   [&](const auto rho, const auto p) {
+                     return eos.specific_internal_energy(rho, p);
+                   });
 
-    eos.speed_of_sound(dealii::ArrayView<double>(c),
-                       dealii::ArrayView<double>(rho),
-                       dealii::ArrayView<double>(e));
+    std::transform(std::begin(rho),
+                   std::end(rho),
+                   std::begin(e),
+                   std::begin(c),
+                   [&](const auto rho, const auto e) {
+                     return eos.speed_of_sound(rho, e);
+                   });
 
-    eos.temperature(dealii::ArrayView<double>(T),
-                    dealii::ArrayView<double>(rho),
-                    dealii::ArrayView<double>(e));
+    std::transform(
+        std::begin(rho),
+        std::end(rho),
+        std::begin(e),
+        std::begin(T),
+        [&](const auto rho, const auto e) { return eos.temperature(rho, e); });
 
     print_array("input rho     ", rho, std::cout);
     print_array("input e       ", e, std::cout);

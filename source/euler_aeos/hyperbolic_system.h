@@ -875,10 +875,6 @@ namespace ryujin
       const auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
 
-      /* FIXME: come up with a better interface, disable for now. */
-      const auto &eos = this->selected_equation_of_state_;
-      AssertThrow(!eos->prefer_vector_interface(), dealii::ExcNotImplemented());
-
       /* Compute values over the diagonal: */
 
       const auto body = [&](auto sentinel, unsigned int i) {
