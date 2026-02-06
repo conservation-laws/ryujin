@@ -1106,18 +1106,17 @@ namespace ryujin
     if (mpi_ensemble_.n_ensembles() > 1) {
       stream << mpi_ensemble_.n_ensembles() << " ensembles ";
     }
-    stream << "with "                                      //
-           << n_global_dofs_ << " Qdofs on "               //
-           << mpi_ensemble_.n_world_ranks() << " ranks / " //
-#ifdef WITH_OPENMP
-           << omp_get_max_threads() << " omp"
-#else
-           << "[openmp disabled]"
+    stream << "with " << n_global_dofs_ << " Qdofs on "
+           << mpi_ensemble_.n_world_ranks() << " ranks "
+#if defined(WITH_OPENMP)
+           << "/ " << omp_get_max_threads() << " threads "
+#ifndef WITH_DEAL_II_THREADS
+           << "[serial dealii] "
 #endif
-#ifdef WITH_DEAL_II_THREADS
-           << " (" << MultithreadInfo::n_threads() << " dealii)"
+#elif defined(WITH_DEAL_II_THREADS)
+           << "/ " << MultithreadInfo::n_threads() << " threads "
 #endif
-           << " threads <" << vectorization_name << ">\n";
+           << "<" << vectorization_name << ">\n";
 
     stream << "             Last output cycle "                    //
            << timer_cycle - 1                                      //
@@ -1329,8 +1328,10 @@ namespace ryujin
 
     /* Determine whether we fudge the CPU timings: */
     const bool fudge_cpu_timings = terminal_correct_for_hypertreadhing_ &&
-#ifdef WITH_OPENMP
+#if defined(WITH_OPENMP)
                                    (omp_get_max_threads() == 2);
+#elif defined(WITH_DEAL_II_THREADS)
+                                   (MultithreadInfo::n_threads() == 2);
 #else
                                    false;
 #endif

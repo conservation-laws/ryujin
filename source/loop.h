@@ -10,6 +10,7 @@
 #include <simd.h>
 
 #include <deal.II/base/config.h>
+#include <deal.II/base/parallel.h>
 
 #include <string>
 
@@ -51,7 +52,8 @@ namespace ryujin
     using VA = dealii::VectorizedArray<ScalarNumber>;
 
     constexpr unsigned int stride_size = get_stride_size<VA>;
-    const unsigned int regular = internal / stride_size * stride_size;
+    const unsigned int regular =
+        left + (internal - left) / stride_size * stride_size;
 
 #if defined(WITH_OPENMP)
     /* Variant using OpenMP: */
@@ -68,7 +70,38 @@ namespace ryujin
       for (unsigned int i = regular; i < right; i += 1)
         body(ScalarNumber(), std::forward<Args>(args)..., i);
     }
+
+#elif defined(WITH_DEAL_II_THREADS)
+    /* Variant using dealii's parallel for: */
+    {
+      /*
+       * We have to ensure that the deal.II routine only schedules a
+       * workload that is divisible by stride_size.
+       */
+      Assert((regular - left) % stride_size == 0, dealii::ExcInternalError());
+      dealii::parallel::apply_to_subranges(
+          0,
+          (regular - left) / stride_size,
+          [&](const unsigned int begin, const unsigned int end) {
+            /* SIMD vectorized loop: */
+            for (unsigned int i = begin; i < end; ++i)
+              body(VA(), std::forward<Args>(args)..., left + stride_size * i);
+          },
+          1000);
+
+      dealii::parallel::apply_to_subranges(
+          regular,
+          right,
+          [&](const unsigned int begin, const unsigned int end) {
+            /* Serial loop: */
+            for (unsigned int i = begin; i < end; ++i)
+              body(ScalarNumber(), std::forward<Args>(args)..., i);
+          },
+          1000);
+    }
+
 #else
+    /* Execute loops in serial: */
     {
       /* SIMD vectorized loop: */
       for (unsigned int i = left; i < regular; i += stride_size)
