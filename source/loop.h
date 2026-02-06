@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <instrumentation.h>
 #include <openmp.h>
 #include <simd.h>
 
@@ -45,7 +44,6 @@ namespace ryujin
     using VA = dealii::VectorizedArray<ScalarNumber>;
 
     RYUJIN_PARALLEL_REGION_BEGIN
-    LIKWID_MARKER_START(region_name.c_str());
 
     constexpr unsigned int stride_size = get_stride_size<VA>;
     const unsigned int regular = internal / stride_size * stride_size;
@@ -62,7 +60,6 @@ namespace ryujin
     for (unsigned int i = regular; i < right; i += 1)
       body(ScalarNumber(), std::forward<Args>(args)..., i);
 
-    LIKWID_MARKER_STOP(region_name.c_str());
     RYUJIN_PARALLEL_REGION_END
   }
 } // namespace ryujin

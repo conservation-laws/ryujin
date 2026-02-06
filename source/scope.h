@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "instrumentation.h"
 #include <compile_time_options.h>
 
 #include <deal.II/base/timer.h>
@@ -19,10 +20,15 @@
 namespace ryujin
 {
   /**
-   * A RAII scope for deal.II timer objects.
+   * A RAII scope for deal.II timer objects and likwid instrumentation.
    *
-   * This class does not perform MPI synchronization in contrast to the
-   * deal.II counterpart.
+   * The constructor of the class starts a timer with the specified name.
+   * If ryujin is configured with likwid then likwid instrumentation will
+   * also be started with the given section name. The destructor of the
+   * class stops the timer again and also stops likwid instrumentation.
+   *
+   * @note This class does not perform MPI synchronization in contrast to
+   * the deal.II counterpart.
    *
    * @ingroup Miscellaneous
    */
@@ -37,6 +43,7 @@ namespace ryujin
         : computing_timer_(computing_timer)
         , section_(section)
     {
+      LIKWID_MARKER_START(section_.c_str());
       computing_timer_[section_].start();
 #ifdef DEBUG_OUTPUT
       std::cout << "{scoped timer} \"" << section_ << "\" started" << std::endl;
@@ -52,6 +59,7 @@ namespace ryujin
       std::cout << "{scoped timer} \"" << section_ << "\" stopped" << std::endl;
 #endif
       computing_timer_[section_].stop();
+      LIKWID_MARKER_STOP(section_.c_str());
     }
 
   private:

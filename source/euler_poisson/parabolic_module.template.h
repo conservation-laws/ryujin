@@ -9,7 +9,6 @@
 #include "parabolic_module.h"
 
 #include <convenience_macros.h>
-#include <instrumentation.h>
 #include <loop.h>
 #include <scope.h>
 #include <simd.h>
@@ -553,7 +552,6 @@ namespace ryujin
        */
 
       Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
-      LIKWID_MARKER_START("time_step_parabolic_1a");
 
       update_background_density(t);
 
@@ -610,15 +608,11 @@ namespace ryujin
           density_,
           /*zero destination*/ true);
 
-      LIKWID_MARKER_STOP("time_step_parabolic_1a");
-
       /*
        * -----------------------------------------------------------------------
        * Step 1b: solve Poisson problem
        * -----------------------------------------------------------------------
        */
-
-      LIKWID_MARKER_START("time_step_parabolic_1b");
 
       matrix_free_.get_affine_constraints(0).distribute(potential);
       matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
@@ -669,8 +663,6 @@ namespace ryujin
       }
 
       matrix_free_.get_affine_constraints(0).distribute(potential);
-
-      LIKWID_MARKER_STOP("time_step_parabolic_1b");
     }
 
 
@@ -702,8 +694,6 @@ namespace ryujin
        * Step 1c: enforce magnetic drift velocity
        * -----------------------------------------------------------------------
        */
-
-      LIKWID_MARKER_START("time_step_parabolic_1b");
 
       update_magnetic_field(Number(0.));
 
@@ -777,8 +767,6 @@ namespace ryujin
 
       cpu_simd_loop<Number>(
           "time_step_parabolic_1c", body, 0, n_owned, n_owned);
-
-      LIKWID_MARKER_STOP("time_step_parabolic_1c");
     }
 
 
@@ -848,7 +836,6 @@ namespace ryujin
          */
 
         Scope scope(computing_timer_, "time step [P] 2 - update potential");
-        LIKWID_MARKER_START("time_step_parabolic_2a");
 
         /* Query the magnetic field at the time t + tau: */
         update_magnetic_field(t + tau);
@@ -947,8 +934,6 @@ namespace ryujin
             velocity_rhs_,
             /*zero destination*/ false);
 
-        LIKWID_MARKER_STOP("time_step_parabolic_2a");
-
         /* Time-dependent background density: */
 
         if (selected_electrostatic_configuration_->is_time_dependent()) {
@@ -1011,8 +996,6 @@ namespace ryujin
          * ---------------------------------------------------------------------
          */
 
-        LIKWID_MARKER_START("time_step_parabolic_2b");
-
         update_operator_.set_alpha(alpha);
         update_operator_.set_theta_tau(tau);
 
@@ -1054,8 +1037,6 @@ namespace ryujin
         }
 
         matrix_free_.get_affine_constraints(0).distribute(new_potential);
-
-        LIKWID_MARKER_STOP("time_step_parabolic_2b");
       }
 
       /*
@@ -1063,8 +1044,6 @@ namespace ryujin
        * Step 2c: update velocity vector field; Crank-Nicolson extrapolation
        * ---------------------------------------------------------------------
        */
-
-      LIKWID_MARKER_START("time_step_parabolic_2c");
 
       /* Project gradient of potential into velocity space: */
 
@@ -1150,8 +1129,6 @@ namespace ryujin
 
       cpu_simd_loop<Number>(
           "time_step_parabolic_2c", body, 0, n_owned, n_owned);
-
-      LIKWID_MARKER_STOP("time_step_parabolic_2c");
     }
 
 

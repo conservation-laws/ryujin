@@ -6,7 +6,6 @@
 #pragma once
 
 #include "hyperbolic_module.h"
-#include "instrumentation.h"
 #include "loop.h"
 #include "mpi_ensemble.h"
 #include "scope.h"
@@ -158,8 +157,6 @@ namespace ryujin
     Scope scope(computing_timer_,
                 "time step [H] 1 - update boundary values, precompute values");
 
-    LIKWID_MARKER_START("time_step_1");
-
     /* FIXME: not thread parallel... */
     for (const auto &entry : boundary_map) {
       const auto &[i, normal, normal_mass, boundary_mass, id, position] = entry;
@@ -184,21 +181,15 @@ namespace ryujin
       U.write_tensor(U_i, i);
     }
 
-    LIKWID_MARKER_STOP("time_step_1");
-
     U.update_ghost_values();
 
     /*
      * Compute and populate precomputed values.
      */
 
-    LIKWID_MARKER_START("time_step_1");
-
-    auto &precomputed = std::get<1>(state_vector);
     hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
 
-    LIKWID_MARKER_STOP("time_step_1");
-
+    auto &precomputed = std::get<1>(state_vector);
     precomputed.update_ghost_values();
   }
 

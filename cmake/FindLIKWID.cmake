@@ -23,14 +23,19 @@ find_library(LIKWID_LUA_LIBRARY
   )
 
 find_package_handle_standard_args(LIKWID DEFAULT_MSG
-  LIKWID_LIBRARY LIKWID_HWLOC_LIBRARY LIKWID_LUA_LIBRARY LIKWID_INCLUDE_DIR
+  LIKWID_LIBRARY LIKWID_INCLUDE_DIR
   )
 
 if(LIKWID_FOUND AND NOT TARGET Likdwid::Likwid)
   add_library(Likwid::Likwid INTERFACE IMPORTED)
-  target_link_libraries(Likwid::Likwid INTERFACE
-    ${LIKWID_LIBRARY} ${LIKWID_HWLOC_LIBRARY} ${LIKWID_LUA_LIBRARY}
-    )
+  target_link_libraries(Likwid::Likwid INTERFACE ${LIKWID_LIBRARY})
+
+  foreach(_lib LIKWID_HWLOC_LIBRARY LIKWID_LUA_LIBRARY)
+    if(NOT "${${_lib}}" MATCHES "-NOTFOUND")
+      target_link_libraries(Likwid::Likwid INTERFACE ${${_lib}})
+    endif()
+  endforeach()
+
   target_include_directories(Likwid::Likwid SYSTEM INTERFACE ${LIKWID_INCLUDE_DIR})
   target_compile_definitions(Likwid::Likwid INTERFACE "LIKWID_PERFMON")
 endif()
