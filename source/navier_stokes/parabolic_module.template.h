@@ -8,7 +8,7 @@
 #include "parabolic_module.h"
 
 #include <instrumentation.h>
-#include <openmp.h>
+#include <loop.h>
 #include <scope.h>
 #include <simd.h>
 
@@ -313,16 +313,12 @@ namespace ryujin
       const auto &old_U = std::get<0>(old_state_vector);
       auto &new_U = std::get<0>(new_state_vector);
 
-      using VA = VectorizedArray<Number>;
-
       const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
       const auto &affine_constraints = offline_data_->affine_constraints();
 
       /* Index ranges for the iteration over the sparsity pattern : */
 
-      constexpr auto simd_length = VA::size();
       const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_regular = n_owned / simd_length * simd_length;
 
       const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
@@ -376,39 +372,29 @@ namespace ryujin
        */
       {
         Scope scope(computing_timer_, "time step [P] 1 - update velocities");
-        RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_parabolic_1");
 
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
-          unsigned int stride_size = get_stride_size<T>;
 
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = left; i < right; i += stride_size) {
-            const auto U_i = old_U.template get_tensor<T>(i);
-            const auto rho_i = view.density(U_i);
-            const auto M_i = view.momentum(U_i);
-            const auto rho_e_i = view.internal_energy(U_i);
-            const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+          const auto M_i = view.momentum(U_i);
+          const auto rho_e_i = view.internal_energy(U_i);
+          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
 
-            write_entry<T>(density_, rho_i, i);
-            /* (5.4a) */
-            for (unsigned int d = 0; d < dim; ++d) {
-              write_entry<T>(velocity_.block(d), M_i[d] / rho_i, i);
-              write_entry<T>(velocity_rhs_.block(d), m_i * (M_i[d]), i);
-            }
-            write_entry<T>(internal_energy_, rho_e_i / rho_i, i);
+          write_entry<T>(density_, rho_i, i);
+          /* (5.4a) */
+          for (unsigned int d = 0; d < dim; ++d) {
+            write_entry<T>(velocity_.block(d), M_i[d] / rho_i, i);
+            write_entry<T>(velocity_rhs_.block(d), m_i * (M_i[d]), i);
           }
+          write_entry<T>(internal_energy_, rho_e_i / rho_i, i);
         };
 
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_regular, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_regular);
-
-        RYUJIN_PARALLEL_REGION_END
+        cpu_simd_loop<Number>(
+            "time_step_parabolic_1", body, 0, n_owned, n_owned);
 
         /*
          * Set up "strongly enforced" boundary conditions that are not stored
@@ -681,50 +667,40 @@ namespace ryujin
 
         const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
 
-        RYUJIN_PARALLEL_REGION_BEGIN
-
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
-          unsigned int stride_size = get_stride_size<T>;
 
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = left; i < right; i += stride_size) {
-            const auto rhs_i = get_entry<T>(internal_energy_rhs_, i);
-            const auto m_i = get_entry<T>(lumped_mass_matrix, i);
-            const auto rho_i = get_entry<T>(density_, i);
-            const auto e_i = get_entry<T>(internal_energy_, i);
+          const auto rhs_i = get_entry<T>(internal_energy_rhs_, i);
+          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+          const auto rho_i = get_entry<T>(density_, i);
+          const auto e_i = get_entry<T>(internal_energy_, i);
 
-            const auto U_i = old_U.template get_tensor<T>(i);
-            const auto V_i = view.momentum(U_i) / rho_i;
+          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto V_i = view.momentum(U_i) / rho_i;
 
-            dealii::Tensor<1, dim, T> V_i_new;
-            for (unsigned int d = 0; d < dim; ++d) {
-              V_i_new[d] = get_entry<T>(velocity_.block(d), i);
-            }
-
-            /*
-             * For backward Euler we have to add this algebraic correction
-             * to ensure conservation of total energy.
-             */
-            const auto correction =
-                crank_nicolson_extrapolation
-                    ? T(0.)
-                    : Number(0.5) * (V_i - V_i_new).norm_square();
-
-            /* rhs_i contains already m_i K_i^{n+1/2} */
-            const auto result = m_i * rho_i * (e_i + correction) + tau * rhs_i;
-            write_entry<T>(internal_energy_rhs_, result, i);
+          dealii::Tensor<1, dim, T> V_i_new;
+          for (unsigned int d = 0; d < dim; ++d) {
+            V_i_new[d] = get_entry<T>(velocity_.block(d), i);
           }
+
+          /*
+           * For backward Euler we have to add this algebraic correction
+           * to ensure conservation of total energy.
+           */
+          const auto correction =
+              crank_nicolson_extrapolation
+                  ? T(0.)
+                  : Number(0.5) * (V_i - V_i_new).norm_square();
+
+          /* rhs_i contains already m_i K_i^{n+1/2} */
+          const auto result = m_i * rho_i * (e_i + correction) + tau * rhs_i;
+          write_entry<T>(internal_energy_rhs_, result, i);
         };
 
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_regular, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_regular);
-
-        RYUJIN_PARALLEL_REGION_END
+        cpu_simd_loop<Number>(
+            "time_step_parabolic_2", body, 0, n_owned, n_owned);
 
         /*
          * Set up "strongly enforced" boundary conditions that are not stored
@@ -888,93 +864,84 @@ namespace ryujin
       {
         Scope scope(computing_timer_, "time step [P] 3 - write back vectors");
 
-        RYUJIN_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_parabolic_3");
 
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
-          unsigned int stride_size = get_stride_size<T>;
 
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = left; i < right; i += stride_size) {
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            return;
 
-            /* Skip constrained degrees of freedom: */
-            const unsigned int row_length = sparsity_simd.row_length(i);
-            if (row_length == 1)
-              continue;
+          auto U_i = old_U.template get_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
 
-            auto U_i = old_U.template get_tensor<T>(i);
-            const auto rho_i = view.density(U_i);
+          Tensor<1, dim, T> m_i_new;
+          for (unsigned int d = 0; d < dim; ++d) {
+            m_i_new[d] = rho_i * get_entry<T>(velocity_.block(d), i);
+          }
 
-            Tensor<1, dim, T> m_i_new;
-            for (unsigned int d = 0; d < dim; ++d) {
-              m_i_new[d] = rho_i * get_entry<T>(velocity_.block(d), i);
-            }
+          auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
 
-            auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
+          /*
+           * Check that the backward Euler step itself (which is our "low
+           * order" update) satisfies bounds. If not, signal a restart.
+           */
+
+          if (!(T(0.) == std::max(T(0.), rho_i * e_min_old - rho_e_i_new))) {
+#ifdef DEBUG_OUTPUT
+            std::cout << std::fixed << std::setprecision(16);
+            const auto e_i_new = rho_e_i_new / rho_i;
+            std::cout << "Bounds violation: internal energy (critical)!\n"
+                      << "\t\te_min_old:         " << e_min_old << "\n"
+                      << "\t\te_min_old (delta): "
+                      << negative_part(e_i_new - e_min_old) << "\n"
+                      << "\t\te_min_new:         " << e_i_new << "\n"
+                      << std::endl;
+#endif
+            restart_needed = true;
+          }
+
+          if (crank_nicolson_extrapolation) {
+            m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
+            rho_e_i_new = Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
 
             /*
-             * Check that the backward Euler step itself (which is our "low
-             * order" update) satisfies bounds. If not, signal a restart.
+             * If we do perform an extrapolation step for Crank Nicolson
+             * we have to check whether we maintain admissibility
              */
 
-            if (!(T(0.) == std::max(T(0.), rho_i * e_min_old - rho_e_i_new))) {
+            if (!(T(0.) ==
+                  std::max(T(0.), eps * rho_i * e_min_old - rho_e_i_new))) {
 #ifdef DEBUG_OUTPUT
               std::cout << std::fixed << std::setprecision(16);
               const auto e_i_new = rho_e_i_new / rho_i;
-              std::cout << "Bounds violation: internal energy (critical)!\n"
-                        << "\t\te_min_old:         " << e_min_old << "\n"
-                        << "\t\te_min_old (delta): "
-                        << negative_part(e_i_new - e_min_old) << "\n"
+
+              std::cout << "Bounds violation: high-order internal energy!"
                         << "\t\te_min_new:         " << e_i_new << "\n"
-                        << std::endl;
+                        << "\t\t-- correction required --" << std::endl;
 #endif
-              restart_needed = true;
+              correction_needed = true;
             }
-
-            if (crank_nicolson_extrapolation) {
-              m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
-              rho_e_i_new =
-                  Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
-
-              /*
-               * If we do perform an extrapolation step for Crank Nicolson
-               * we have to check whether we maintain admissibility
-               */
-
-              if (!(T(0.) ==
-                    std::max(T(0.), eps * rho_i * e_min_old - rho_e_i_new))) {
-#ifdef DEBUG_OUTPUT
-                std::cout << std::fixed << std::setprecision(16);
-                const auto e_i_new = rho_e_i_new / rho_i;
-
-                std::cout << "Bounds violation: high-order internal energy!"
-                          << "\t\te_min_new:         " << e_i_new << "\n"
-                          << "\t\t-- correction required --" << std::endl;
-#endif
-                correction_needed = true;
-              }
-            }
-
-            const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
-
-            for (unsigned int d = 0; d < dim; ++d)
-              U_i[1 + d] = m_i_new[d];
-            U_i[1 + dim] = E_i_new;
-
-            new_U.template write_tensor<T>(U_i, i);
           }
+
+          const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
+
+          for (unsigned int d = 0; d < dim; ++d)
+            U_i[1 + d] = m_i_new[d];
+          U_i[1 + dim] = E_i_new;
+
+          new_U.template write_tensor<T>(U_i, i);
         };
 
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_regular, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_regular);
+        cpu_simd_loop<Number>(
+            "time_step_parabolic_3", body, 0, n_owned, n_owned);
+
 
         LIKWID_MARKER_STOP("time_step_parabolic_3");
-        RYUJIN_PARALLEL_REGION_END
 
         new_U.update_ghost_values();
       }

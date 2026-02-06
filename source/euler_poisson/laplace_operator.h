@@ -6,9 +6,9 @@
 #pragma once
 
 #include <deal.II/base/config.h>
+#include <loop.h>
 #include <observer_pointer.h>
 #include <offline_data.h>
-#include <openmp.h>
 #include <simd.h>
 
 #include <deal.II/base/vectorization.h>
@@ -154,7 +154,7 @@ namespace ryujin
       ScalarVector &diagonal_vector = diagonal_matrix.get_vector();
       matrix_free_->initialize_dof_vector(diagonal_vector, /*CG*/ 0);
 
-      const auto body =
+      const auto body_matrix_free =
           [](const auto &data, auto &dst, const auto &, const auto range) {
             FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
                 fee_read(data, /*CG*/ 0, /*lumped quadrature*/ 1);
@@ -187,7 +187,7 @@ namespace ryujin
 
       unsigned int dummy = 0;
       matrix_free_->template cell_loop<ScalarVector, unsigned int>(
-          body,
+          body_matrix_free,
           diagonal_vector,
           dummy,
           /*zero destination*/ true);
@@ -197,18 +197,16 @@ namespace ryujin
       const auto n_owned_cg =
           diagonal_vector.get_partitioner()->locally_owned_size();
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < n_owned_cg; ++i) {
+      const auto body_invert = [&](auto sentinel, const unsigned int i) {
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
-        diagonal_vector.local_element(i) =
-            std::abs(diagonal_vector.local_element(i)) > eps
-                ? 1. / diagonal_vector.local_element(i)
-                : Number(1.);
-      }
-
-      RYUJIN_PARALLEL_REGION_END
+        using T = decltype(sentinel);
+        const auto m_i = get_entry<T>(diagonal_vector, i);
+        constexpr auto gt = dealii::SIMDComparison::greater_than;
+        const auto m_i_inv = dealii::compare_and_apply_mask<gt>(
+            std::abs(m_i), T(eps), Number(1.) / m_i, T(1.));
+        write_entry<T>(diagonal_vector, m_i_inv, i);
+      };
+      cpu_simd_loop<Number>("", body_invert, 0, n_owned_cg, n_owned_cg);
     }
 
   private:
