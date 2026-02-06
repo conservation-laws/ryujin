@@ -7,7 +7,6 @@
 
 #include "parabolic_module.h"
 
-#include <instrumentation.h>
 #include <loop.h>
 #include <scope.h>
 #include <simd.h>
@@ -516,8 +515,6 @@ namespace ryujin
           mg_smoother_velocity_.initialize(level_velocity_matrices_,
                                            smoother_data);
         }
-
-        LIKWID_MARKER_STOP("time_step_parabolic_1");
       }
 
       Number e_min_old;
@@ -545,8 +542,6 @@ namespace ryujin
        */
       {
         Scope scope(computing_timer_, "time step [P] 1 - update velocities");
-
-        LIKWID_MARKER_START("time_step_parabolic_1");
 
         VelocityMatrix<dim, Number, Number> velocity_operator;
         velocity_operator.initialize(
@@ -607,8 +602,6 @@ namespace ryujin
               0.1 * (use_gmg_velocity_ ? gmg_max_iter_vel_ : 0) +
               0.1 * solver_control.last_step();
         }
-
-        LIKWID_MARKER_STOP("time_step_parabolic_1");
       }
 
       /*
@@ -617,8 +610,6 @@ namespace ryujin
       {
         Scope scope(computing_timer_,
                     "time step [P] 2 - update internal energy");
-
-        LIKWID_MARKER_START("time_step_parabolic_2");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
         matrix_free_.template cell_loop<ScalarVector, BlockVector>(
@@ -780,8 +771,6 @@ namespace ryujin
           }
           mg_smoother_energy_.initialize(level_energy_matrices_, smoother_data);
         }
-
-        LIKWID_MARKER_STOP("time_step_parabolic_2");
       }
 
       /*
@@ -790,8 +779,6 @@ namespace ryujin
       {
         Scope scope(computing_timer_,
                     "time step [P] 2 - update internal energy");
-
-        LIKWID_MARKER_START("time_step_parabolic_2");
 
         EnergyMatrix<dim, Number, Number> energy_operator;
         const auto &kappa = parabolic_system_->cv_inverse_kappa();
@@ -851,8 +838,6 @@ namespace ryujin
               0.1 * (use_gmg_internal_energy_ ? gmg_max_iter_en_ : 0) +
               0.1 * solver_control.last_step();
         }
-
-        LIKWID_MARKER_STOP("time_step_parabolic_2");
       }
 
       /*
@@ -863,8 +848,6 @@ namespace ryujin
        */
       {
         Scope scope(computing_timer_, "time step [P] 3 - write back vectors");
-
-        LIKWID_MARKER_START("time_step_parabolic_3");
 
         const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
@@ -939,9 +922,6 @@ namespace ryujin
 
         cpu_simd_loop<Number>(
             "time_step_parabolic_3", body, 0, n_owned, n_owned);
-
-
-        LIKWID_MARKER_STOP("time_step_parabolic_3");
 
         new_U.update_ghost_values();
       }
