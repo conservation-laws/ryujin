@@ -64,11 +64,12 @@ namespace ryujin
       }
 
       /**
-       * Step 0 of the hyperbolic update step: Compute "precomputed values"
-       * and fill into into the state vector.
+       * Part of step 1 of the hyperbolic update step: Compute "precomputed
+       * values" and fill into the state vector.
        *
-       * @note The method does not update the ghost range of the state vector.
-       *       The precomputed part has to be synchronized by hand.
+       * @note The method does not update the ghost range of the state
+       * vector. The precomputed part has to be synchronized by explicitly
+       * calling the update ghost values function.
        */
       template <int dim, typename ScalarNumber>
       void fill_precomputed_values(
