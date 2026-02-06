@@ -538,10 +538,6 @@ namespace ryujin
           std::cout << f.rdbuf();
       }
     }
-
-#ifdef WITH_VALGRIND
-    CALLGRIND_DUMP_STATS;
-#endif
   }
 
 

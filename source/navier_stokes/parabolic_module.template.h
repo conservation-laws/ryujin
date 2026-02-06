@@ -313,8 +313,6 @@ namespace ryujin
       const auto &old_U = std::get<0>(old_state_vector);
       auto &new_U = std::get<0>(new_state_vector);
 
-      CALLGRIND_START_INSTRUMENTATION;
-
       using VA = VectorizedArray<Number>;
 
       const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
@@ -980,8 +978,6 @@ namespace ryujin
 
         new_U.update_ghost_values();
       }
-
-      CALLGRIND_STOP_INSTRUMENTATION;
 
       {
         Scope scope(computing_timer_,

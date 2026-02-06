@@ -8,45 +8,6 @@
 #include <compile_time_options.h>
 #include <openmp.h>
 
-#ifdef WITH_VALGRIND
-
-#include <valgrind/callgrind.h>
-
-#else
-
-/**
- * @name Various macros and include for instrumentation via valgrind,
- * likwid, and clang lsan.
- */
-//@{
-
-
-/**
- * A set of macros that start and stop callgrind instrumentation (if the
- * executable is run with valgrind). We currently wrap the hot paths in the
- * Euler and Navier-Stokes modules in the HyperbolicModule::step() and
- * DissipationModule::step() functions. Usage:
- *
- * @code
- * CALLGRIND_START_INSTRUMENTATION
- * // critical compute kernel section
- * CALLGRIND_STOP_INSTRUMENTATION
- * @endcode
- */
-#define CALLGRIND_START_INSTRUMENTATION                                        \
-  do {                                                                         \
-  } while (false)
-
-/**
- * @copydoc CALLGRIND_START_INSTRUMENTATION
- */
-#define CALLGRIND_STOP_INSTRUMENTATION                                         \
-  do {                                                                         \
-  } while (false)
-
-#endif
-
-
 #ifdef WITH_LIKWID
 #include <likwid.h>
 
