@@ -261,8 +261,6 @@ namespace ryujin
     auto &old_precomputed = std::get<1>(old_state_vector);
     auto &new_U = std::get<0>(new_state_vector);
 
-    CALLGRIND_START_INSTRUMENTATION;
-
     /*
      * Workaround: A constexpr boolean storing the fact whether we
      * instantiate the HyperbolicModule for the shallow water equations.
@@ -1121,8 +1119,6 @@ namespace ryujin
         lij_matrix_next_.update_ghost_rows();
       }
     } /* limiter_iter_ */
-
-    CALLGRIND_STOP_INSTRUMENTATION;
 
     /*
      * Pass through the parabolic state vector
