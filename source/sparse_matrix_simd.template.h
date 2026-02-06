@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "openmp.h"
+#include "loop.h"
 #include "simd.h"
 #include "sparse_matrix_simd.h"
 
@@ -301,8 +301,6 @@ namespace ryujin
       const std::array<SparseMatrix, n_components> &sparse_matrix,
       bool locally_indexed /*= true*/)
   {
-    RYUJIN_PARALLEL_REGION_BEGIN
-
     /*
      * We use the indirect (and slow) access via operator()(i, j) into the
      * sparse matrix we are copying from. This allows for significantly
@@ -310,50 +308,50 @@ namespace ryujin
      * the sparse_matrix object.
      */
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = 0; i < sparsity->n_internal_dofs; i += simd_length) {
+    const auto body = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+      constexpr unsigned int stride_size = get_stride_size<T>;
+      static_assert(stride_size == 1 || stride_size == simd_length);
 
       const unsigned int row_length = sparsity->row_length(i);
-
       const unsigned int *js = sparsity->columns(i);
-      for (unsigned int col_idx = 0; col_idx < row_length;
-           ++col_idx, js += simd_length) {
 
-        dealii::Tensor<1, n_components, VectorizedArray> temp;
-        for (unsigned int k = 0; k < simd_length; ++k)
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += stride_size) {
+
+        dealii::Tensor<1, n_components, T> temp;
+
+        if constexpr (std::is_same_v<T, VectorizedArray>) {
+          /* Special access for VectorizedArray: */
+          for (unsigned int k = 0; k < simd_length; ++k)
+            for (unsigned int d = 0; d < n_components; ++d)
+              if (locally_indexed)
+                temp[d][k] = sparse_matrix[d](i + k, js[k]);
+              else
+                temp[d][k] = sparse_matrix[d].el(
+                    sparsity->partitioner->local_to_global(i + k),
+                    sparsity->partitioner->local_to_global(js[k]));
+
+          write_entry(temp, i, col_idx, true);
+
+        } else {
           for (unsigned int d = 0; d < n_components; ++d)
             if (locally_indexed)
-              temp[d][k] = sparse_matrix[d](i + k, js[k]);
+              temp[d] = sparse_matrix[d](i, js[0]);
             else
-              temp[d][k] = sparse_matrix[d].el(
-                  sparsity->partitioner->local_to_global(i + k),
-                  sparsity->partitioner->local_to_global(js[k]));
-
-        write_entry(temp, i, col_idx, true);
+              temp[d] = sparse_matrix[d].el(
+                  sparsity->partitioner->local_to_global(i),
+                  sparsity->partitioner->local_to_global(js[0]));
+          write_entry(temp, i, col_idx);
+        }
       }
-    }
+    };
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = sparsity->n_internal_dofs;
-         i < sparsity->n_locally_owned_dofs;
-         ++i) {
-      const unsigned int row_length = sparsity->row_length(i);
-      const unsigned int *js = sparsity->columns(i);
-      for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
-
-        dealii::Tensor<1, n_components, Number> temp;
-        for (unsigned int d = 0; d < n_components; ++d)
-          if (locally_indexed)
-            temp[d] = sparse_matrix[d](i, js[0]);
-          else
-            temp[d] = sparse_matrix[d].el(
-                sparsity->partitioner->local_to_global(i),
-                sparsity->partitioner->local_to_global(js[0]));
-        write_entry(temp, i, col_idx);
-      }
-    }
-
-    RYUJIN_PARALLEL_REGION_END
+    cpu_simd_loop<Number>("sparse_matrix_read_in",
+                          body,
+                          0,
+                          sparsity->n_internal_dofs,
+                          sparsity->n_locally_owned_dofs);
   }
 
 
@@ -362,8 +360,6 @@ namespace ryujin
   void SparseMatrixSIMD<Number, n_components, simd_length>::read_in(
       const SparseMatrix &sparse_matrix, bool locally_indexed /*= true*/)
   {
-    RYUJIN_PARALLEL_REGION_BEGIN
-
     /*
      * We use the indirect (and slow) access via operator()(i, j) into the
      * sparse matrix we are copying from. This allows for significantly
@@ -371,48 +367,46 @@ namespace ryujin
      * the sparse_matrix object.
      */
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = 0; i < sparsity->n_internal_dofs; i += simd_length) {
+    const auto body = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+      constexpr unsigned int stride_size = get_stride_size<T>;
+      static_assert(stride_size == 1 || stride_size == simd_length);
 
       const unsigned int row_length = sparsity->row_length(i);
-
       const unsigned int *js = sparsity->columns(i);
+
       for (unsigned int col_idx = 0; col_idx < row_length;
-           ++col_idx, js += simd_length) {
+           ++col_idx, js += stride_size) {
 
-        VectorizedArray temp = {};
-        for (unsigned int k = 0; k < simd_length; ++k)
-          if (locally_indexed)
-            temp[k] = sparse_matrix(i + k, js[k]);
-          else
-            temp[k] =
-                sparse_matrix.el(sparsity->partitioner->local_to_global(i + k),
-                                 sparsity->partitioner->local_to_global(js[k]));
+        auto temp = T{};
 
-        write_entry(temp, i, col_idx, true);
+        if constexpr (std::is_same_v<T, VectorizedArray>) {
+          for (unsigned int k = 0; k < simd_length; ++k)
+            if (locally_indexed)
+              temp[k] = sparse_matrix(i + k, js[k]);
+            else
+              temp[k] = sparse_matrix.el(
+                  sparsity->partitioner->local_to_global(i + k),
+                  sparsity->partitioner->local_to_global(js[k]));
+
+          write_entry(temp, i, col_idx, true);
+
+        } else {
+          temp = locally_indexed
+                     ? sparse_matrix(i, js[0])
+                     : sparse_matrix.el(
+                           sparsity->partitioner->local_to_global(i),
+                           sparsity->partitioner->local_to_global(js[0]));
+          write_entry(temp, i, col_idx);
+        }
       }
-    }
+    };
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = sparsity->n_internal_dofs;
-         i < sparsity->n_locally_owned_dofs;
-         ++i) {
-
-      const unsigned int row_length = sparsity->row_length(i);
-      const unsigned int *js = sparsity->columns(i);
-      for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
-
-        const Number temp =
-            locally_indexed
-                ? sparse_matrix(i, js[0])
-                : sparse_matrix.el(
-                      sparsity->partitioner->local_to_global(i),
-                      sparsity->partitioner->local_to_global(js[0]));
-        write_entry(temp, i, col_idx);
-      }
-    }
-
-    RYUJIN_PARALLEL_REGION_END
+    cpu_simd_loop<Number>("sparse_matrix_read_in",
+                          body,
+                          0,
+                          sparsity->n_internal_dofs,
+                          sparsity->n_locally_owned_dofs);
   }
 
 } // namespace ryujin
