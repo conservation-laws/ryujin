@@ -5,10 +5,18 @@
 
 #pragma once
 
-#include <openmp.h>
+#include <compile_time_options.h>
+#include <convenience_macros.h>
 #include <simd.h>
 
+#include <deal.II/base/config.h>
+#include <deal.II/base/parallel.h>
+
 #include <string>
+
+#ifdef WITH_OPENMP
+#include <omp.h>
+#endif
 
 namespace ryujin
 {
@@ -43,23 +51,66 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<ScalarNumber>;
 
-    RYUJIN_PARALLEL_REGION_BEGIN
-
     constexpr unsigned int stride_size = get_stride_size<VA>;
-    const unsigned int regular = internal / stride_size * stride_size;
+    const unsigned int regular =
+        left + (internal - left) / stride_size * stride_size;
 
-    /* SIMD vectorized loop: */
+#if defined(WITH_OPENMP)
+    /* Variant using OpenMP: */
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = left; i < regular; i += stride_size)
-      body(VA(), std::forward<Args>(args)..., i);
+    RYUJIN_PRAGMA(omp parallel default(shared))
+    {
+      /* SIMD vectorized loop: */
+      RYUJIN_PRAGMA(omp for nowait)
+      for (unsigned int i = left; i < regular; i += stride_size)
+        body(VA(), std::forward<Args>(args)..., i);
 
-    /* Serial loop: */
+      /* Serial loop: */
+      RYUJIN_PRAGMA(omp for)
+      for (unsigned int i = regular; i < right; i += 1)
+        body(ScalarNumber(), std::forward<Args>(args)..., i);
+    }
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = regular; i < right; i += 1)
-      body(ScalarNumber(), std::forward<Args>(args)..., i);
+#elif defined(WITH_DEAL_II_THREADS)
+    /* Variant using dealii's parallel for: */
+    {
+      /*
+       * We have to ensure that the deal.II routine only schedules a
+       * workload that is divisible by stride_size.
+       */
+      Assert((regular - left) % stride_size == 0, dealii::ExcInternalError());
+      dealii::parallel::apply_to_subranges(
+          0,
+          (regular - left) / stride_size,
+          [&](const unsigned int begin, const unsigned int end) {
+            /* SIMD vectorized loop: */
+            for (unsigned int i = begin; i < end; ++i)
+              body(VA(), std::forward<Args>(args)..., left + stride_size * i);
+          },
+          1000);
 
-    RYUJIN_PARALLEL_REGION_END
+      dealii::parallel::apply_to_subranges(
+          regular,
+          right,
+          [&](const unsigned int begin, const unsigned int end) {
+            /* Serial loop: */
+            for (unsigned int i = begin; i < end; ++i)
+              body(ScalarNumber(), std::forward<Args>(args)..., i);
+          },
+          1000);
+    }
+
+#else
+    /* Execute loops in serial: */
+    {
+      /* SIMD vectorized loop: */
+      for (unsigned int i = left; i < regular; i += stride_size)
+        body(VA(), std::forward<Args>(args)..., i);
+
+      /* Serial loop: */
+      for (unsigned int i = regular; i < right; i += 1)
+        body(ScalarNumber(), std::forward<Args>(args)..., i);
+    }
+#endif
   }
 } // namespace ryujin

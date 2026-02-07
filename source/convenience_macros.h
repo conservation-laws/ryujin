@@ -282,6 +282,14 @@ namespace
  */
 //@{
 
+/**
+ * Macro expanding to a `#pragma` directive that looks nicer in indented
+ * code and can be used in other preprocessor macro definitions.
+ *
+ * @ingroup Miscellaneous
+ */
+#define RYUJIN_PRAGMA(x) _Pragma(#x)
+
 
 /**
  * Compiler hint annotating a boolean to be likely true.

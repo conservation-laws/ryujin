@@ -77,7 +77,13 @@ int main(int argc, char *argv[])
   set_thread_limit(mpi_communicator);
   LSAN_ENABLE
 
-  LIKWID_INIT;
+  LIKWID_MARKER_INIT;
+#ifdef WITH_OPENMP
+  RYUJIN_PRAGMA(omp parallel)
+  {
+    LIKWID_MARKER_THREAD_INIT;
+  }
+#endif
 
   if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
     std::cout << "[INFO] initiating flux capacitor" << std::endl;
@@ -89,7 +95,7 @@ int main(int argc, char *argv[])
                 << "supported which has to be a parameter file." << std::endl;
     }
 
-    LIKWID_CLOSE;
+    LIKWID_MARKER_CLOSE;
     LSAN_DISABLE;
     return 1;
   }
@@ -106,7 +112,7 @@ int main(int argc, char *argv[])
                   << "« does not exist." << std::endl;
       }
 
-      LIKWID_CLOSE;
+      LIKWID_MARKER_CLOSE;
       LSAN_DISABLE;
       return 1;
     }
@@ -123,7 +129,7 @@ int main(int argc, char *argv[])
 
     MPI_Barrier(mpi_communicator);
 
-    LIKWID_CLOSE;
+    LIKWID_MARKER_CLOSE;
     LSAN_DISABLE;
     return 1;
   }
@@ -133,7 +139,7 @@ int main(int argc, char *argv[])
     equation_dispatch.dispatch(parameter_file, mpi_communicator);
   }
 
-  LIKWID_CLOSE;
+  LIKWID_MARKER_CLOSE;
   LSAN_DISABLE;
   return 0;
 }
