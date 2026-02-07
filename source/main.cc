@@ -16,6 +16,7 @@
 #include <omp.h>
 #endif
 
+#include <algorithm>
 #include <filesystem>
 
 /**
@@ -45,8 +46,9 @@ void set_thread_limit(const MPI_Comm &mpi_communicator [[maybe_unused]])
       dealii::MultithreadInfo::n_threads();
 
 #ifdef WITH_OPENMP
-  const unsigned int n_threads_omp = omp_get_thread_limit();
-  n_threads = std::min(n_threads_omp, n_threads);
+  const unsigned int omp_thread_limit = omp_get_thread_limit();
+  const unsigned int omp_max_threads = omp_get_max_threads();
+  n_threads = std::min({omp_thread_limit, omp_max_threads, n_threads});
   omp_set_num_threads(n_threads);
 #endif
 
