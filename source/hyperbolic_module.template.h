@@ -470,6 +470,14 @@ namespace ryujin
 
       /* Symmetrize d_ij: */
       const auto body = [&](auto, unsigned int i) {
+
+#ifdef DEBUG_SYMMETRY_CHECK
+        using RiemannSolver =
+            typename Description::template RiemannSolver<dim, Number>;
+        RiemannSolver riemann_solver(
+            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
+#endif
+
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)

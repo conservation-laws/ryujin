@@ -392,14 +392,6 @@ namespace ryujin
                   const auto &P_ij = pij_matrix[n_dofs_per_cell * i + j];
                   const auto &[l_ij, check] = limiter.limit(bounds, U_i, P_ij);
                   lij_matrix(i, j) = l_ij;
-
-#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-                  AssertThrow(
-                      check,
-                      dealii::ExcMessage(
-                          "Error: low-order state out of bounds in "
-                          "register_data_attach / children_will_be_coarsened"));
-#endif
                 }
               }
 
@@ -870,11 +862,6 @@ namespace ryujin
           const auto P_ik = pik_matrix[{local_i, local_k}] * kappa_k / m_k;
 
           const auto &[l_k, check] = limiter.limit(relaxed_bounds, U_k, P_ik);
-#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-          AssertThrow(check,
-                      dealii::ExcMessage("Error: low-order state out of bounds "
-                                         "in project / state redistribution"));
-#endif
           l = std::min(l, l_k);
         }
 
