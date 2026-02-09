@@ -58,9 +58,14 @@ namespace ryujin
               int n_comp,
               int simd_length = dealii::VectorizedArray<Number>::size()>
     class MultiComponentVector
-        : public dealii::LinearAlgebra::distributed::Vector<Number>
+        : private dealii::LinearAlgebra::distributed::Vector<Number>
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
       /**
        * Shorthand typedef for the underlying dealii::VectorizedArray type
        * used to insert and extract SIMD packed values from the
@@ -75,11 +80,25 @@ namespace ryujin
        */
       using ScalarVector = dealii::LinearAlgebra::distributed::Vector<Number>;
 
+      //@}
       /**
-       * We want to use the assignment operator of the virtual base class, so
-       * specify that here.
+       * @name Constructor and reinitialization
        */
-      using ScalarVector::operator=;
+      //@{
+
+      /**
+       * Default constructor
+       */
+      MultiComponentVector() = default;
+
+      /**
+       * Reinitializes the MultiComponentVector with a vector MPI
+       * partitioner that was created first with
+       * create_vector_partitioner().
+       */
+      void reinit_with_vector_partitioner(
+          const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+              &vector_partitioner);
 
       /**
        * Reinitializes the MultiComponentVector with a scalar MPI
@@ -90,6 +109,12 @@ namespace ryujin
       void reinit_with_scalar_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &scalar_partitioner);
+
+      //@}
+      /**
+       * @name Extracting and inserting values
+       */
+      //@{
 
       /**
        * Extracts a single component out of the MultiComponentVector and
@@ -182,6 +207,27 @@ namespace ryujin
       template <typename Number2 = Number,
                 typename Tensor = dealii::Tensor<1, n_comp, Number2>>
       void add_tensor(const Tensor &tensor, const unsigned int i);
+
+      //@}
+      /**
+       * @name Vector interface
+       */
+      //@{
+
+      void sadd(const Number s,
+                const Number a,
+                const MultiComponentVector<Number, n_comp> &V)
+      {
+        ScalarVector::sadd(s, a, V);
+      }
+
+      using ScalarVector::update_ghost_values;
+
+      using ScalarVector::zero_out_ghost_values;
+
+      using ScalarVector::compress;
+
+      //@}
     };
 
 
@@ -190,19 +236,35 @@ namespace ryujin
 
     template <typename Number, int n_comp, int simd_length>
     void MultiComponentVector<Number, n_comp, simd_length>::
-        reinit_with_scalar_partitioner(
+        reinit_with_vector_partitioner(
             const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &scalar_partitioner)
+                &vector_partitioner)
     {
       /* Special case of a zero component vector */
       if (n_comp == 0)
         return;
 
+      ScalarVector::reinit(vector_partitioner);
+    }
+
+    template <typename Number, int n_comp, int simd_length>
+    void MultiComponentVector<Number, n_comp, simd_length>::
+        reinit_with_scalar_partitioner(
+            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+                &scalar_partitioner)
+    {
+      /* Special case of a zero component vector: */
+      if (n_comp == 0)
+        return;
+
+      /* Special case of a scalar vector: */
+      if (n_comp == 1)
+        ScalarVector::reinit(scalar_partitioner);
+
       auto vector_partitioner =
           create_vector_partitioner(scalar_partitioner, n_comp);
 
-      dealii::LinearAlgebra::distributed::Vector<Number>::reinit(
-          vector_partitioner);
+      ScalarVector::reinit(vector_partitioner);
     }
 
 
@@ -254,7 +316,7 @@ namespace ryujin
     MultiComponentVector<Number, n_comp, simd_length>::get_tensor(
         const unsigned int i) const
     {
-      static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+      static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "dummy type mismatch");
       Tensor tensor;
 
@@ -262,13 +324,13 @@ namespace ryujin
       if constexpr (n_comp == 0)
         return tensor;
 
-      if constexpr (std::is_same<Number, Number2>::value) {
+      if constexpr (std::is_same_v<Number, Number2>) {
         /* Non-vectorized sequential access. */
 
         for (unsigned int d = 0; d < n_comp; ++d)
           tensor[d] = this->local_element(i * n_comp + d);
 
-      } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
 
         /* Vectorized fast access. index must be divisible by simd_length */
         std::array<unsigned int, VectorizedArray::size()> indices;
@@ -293,7 +355,7 @@ namespace ryujin
     MultiComponentVector<Number, n_comp, simd_length>::get_tensor(
         const unsigned int *js) const
     {
-      static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+      static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "dummy type mismatch");
       Tensor tensor;
 
@@ -301,13 +363,13 @@ namespace ryujin
       if constexpr (n_comp == 0)
         return tensor;
 
-      if constexpr (std::is_same<Number, Number2>::value) {
+      if constexpr (std::is_same_v<Number, Number2>) {
         /* Non-vectorized sequential access. */
 
         for (unsigned int d = 0; d < n_comp; ++d)
           tensor[d] = this->local_element(js[0] * n_comp + d);
 
-      } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;
@@ -332,20 +394,20 @@ namespace ryujin
     MultiComponentVector<Number, n_comp, simd_length>::write_tensor(
         const Tensor &tensor, const unsigned int i)
     {
-      static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+      static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "dummy type mismatch");
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)
         return;
 
-      if constexpr (std::is_same<Number, Number2>::value) {
+      if constexpr (std::is_same_v<Number, Number2>) {
         /* Non-vectorized sequential access. */
 
         for (unsigned int d = 0; d < n_comp; ++d)
           this->local_element(i * n_comp + d) = tensor[d];
 
-      } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;
@@ -371,20 +433,20 @@ namespace ryujin
     MultiComponentVector<Number, n_comp, simd_length>::add_tensor(
         const Tensor &tensor, const unsigned int i)
     {
-      static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+      static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "dummy type mismatch");
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)
         return;
 
-      if constexpr (std::is_same<Number, Number2>::value) {
+      if constexpr (std::is_same_v<Number, Number2>) {
         /* Non-vectorized sequential access. */
 
         for (unsigned int d = 0; d < n_comp; ++d)
           this->local_element(i * n_comp + d) += tensor[d];
 
-      } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;

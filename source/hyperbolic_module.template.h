@@ -68,8 +68,9 @@ namespace ryujin
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     alpha_.reinit(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
+    r_.reinit_with_vector_partitioner(
+        offline_data_->hyperbolic_vector_partitioner());
 
-    r_.reinit(offline_data_->hyperbolic_vector_partitioner());
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
@@ -113,8 +114,10 @@ namespace ryujin
 #endif
 
     auto &[U, precomputed, V] = state_vector;
-    U.reinit(offline_data_->hyperbolic_vector_partitioner());
-    precomputed.reinit(offline_data_->precomputed_vector_partitioner());
+    U.reinit_with_vector_partitioner(
+        offline_data_->hyperbolic_vector_partitioner());
+    precomputed.reinit_with_vector_partitioner(
+        offline_data_->precomputed_vector_partitioner());
 
 #ifdef DEBUG
     /* Poison all vectors: */
