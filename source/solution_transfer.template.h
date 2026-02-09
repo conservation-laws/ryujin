@@ -466,7 +466,8 @@ namespace ryujin
     ScalarVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
     HyperbolicVector projected_state;
-    projected_state.reinit(offline_data_->hyperbolic_vector_partitioner());
+    projected_state.reinit_with_vector_partitioner(
+        offline_data_->hyperbolic_vector_partitioner());
 
     /*
      * We only need to construct entries in a pik_matrix for a small subset

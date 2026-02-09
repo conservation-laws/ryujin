@@ -255,7 +255,8 @@ namespace ryujin
 #endif
 
     HyperbolicVector U;
-    U.reinit(offline_data_->hyperbolic_vector_partitioner());
+    U.reinit_with_vector_partitioner(
+        offline_data_->hyperbolic_vector_partitioner());
 
     using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
 
