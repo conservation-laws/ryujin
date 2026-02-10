@@ -387,7 +387,7 @@ namespace ryujin
     {
       static_assert(
           n_components == 1,
-          "Attempted to read a scalar value into a tensor-valued matrix entry");
+          "Attempted to read a scalar value from a tensor-valued vector entry");
 
       AssertIndexRange(i,
                        this->get_partitioner()->locally_owned_size() +
@@ -452,7 +452,7 @@ namespace ryujin
     {
       static_assert(
           n_components == 1,
-          "Attempted to read a scalar value into a tensor-valued matrix entry");
+          "Attempted to read a scalar value from a tensor-valued vector entry");
 
       const auto result = get_tensor<Number2>(js);
       return result[0];
@@ -514,7 +514,7 @@ namespace ryujin
     {
       static_assert(n_components == 1,
                     "Attempted to write a scalar value into a tensor-valued "
-                    "matrix entry");
+                    "vector entry");
 
       AssertIndexRange(i,
                        this->get_partitioner()->locally_owned_size() +

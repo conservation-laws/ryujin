@@ -1,0 +1,7 @@
+Scalar vector (packed SIMD)
+0 1 2 3
+4 5 6 7
+
+State vector (packed SIMD):
+0 10 20 30 1 11 21 31 2 12 22 32 3 13 23 33
+40 50 60 70 41 51 61 71 42 52 62 72 43 53 63 73
