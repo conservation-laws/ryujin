@@ -21,6 +21,8 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
+
+    using ScalarVector = Vectors::ScalarVector<Number>;
     using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
     SelectedComponentsExtractor() = delete;
@@ -56,7 +58,7 @@ namespace ryujin
             const StateVector &state_vector,
             const InitialPrecomputedVector &initial_precomputed,
             const std::vector<std::string> &additional_names,
-            const std::vector<std::reference_wrapper<const ScalarHostVector>>
+            const std::vector<std::reference_wrapper<const ScalarVector>>
                 &additional_vectors,
             const std::vector<std::string> &selected)
     {
@@ -138,7 +140,9 @@ namespace ryujin
       }
 
       for (const auto &[i, k] : additional_indices) {
-        extracted_components[i] = additional_vectors[k];
+        additional_vectors[k].get().extract_component( //
+            extracted_components[i],
+            0);
       }
 
       return extracted_components;
