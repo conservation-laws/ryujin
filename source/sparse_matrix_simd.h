@@ -13,24 +13,6 @@
 
 namespace ryujin
 {
-  namespace
-  {
-    /**
-     * Internally used: A small helper to determine the appropriate type
-     * for
-     */
-    template <typename Number, int n_components>
-    struct EntryType {
-      using type = dealii::Tensor<1, n_components, Number>;
-    };
-
-    template <typename Number>
-    struct EntryType<Number, 1> {
-      using type = Number;
-    };
-  } // namespace
-
-
   template <typename Number,
             int n_components = 1,
             int simd_length = dealii::VectorizedArray<Number>::size()>
@@ -176,31 +158,22 @@ namespace ryujin
 
     using VectorizedArray = dealii::VectorizedArray<Number, simd_length>;
 
-    /**
-     * The return type of get_entry and get_transposed_entry: If
-     * `n_components` is equal to one then `EntryType` reduces to `Number2`,
-     * otherwise the type is set to
-     * `dealii::tensor<1, n_components, Number2>`
-     */
-    template <typename Number2>
-    using EntryType = typename ryujin::EntryType<Number2, n_components>::type;
-
     /* Get scalar or tensor-valued entry: */
 
     /**
-     * Return the entry indexed by @p row and @p position_within_column.
-     * The return type will either be scalar if `n_components` is equal to
-     * 1, or a tensor if `n_components` is greater than 1.
+     * Return the (scalar) entry indexed by @p row and @p
+     * position_within_column.
      *
      * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
+     *
+     * @note This function is only available if `n_components` is equal to 1.
      */
     template <typename Number2 = Number>
-    EntryType<Number2>
-    get_entry(const unsigned int row,
-              const unsigned int position_within_column) const;
+    Number2 get_entry(const unsigned int row,
+                      const unsigned int position_within_column) const;
 
     /**
      * Return the tensor-valued entry indexed by @p row and
@@ -213,26 +186,26 @@ namespace ryujin
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
-    template <typename Number2 = Number>
-    dealii::Tensor<1, n_components, Number2>
-    get_tensor(const unsigned int row,
-               const unsigned int position_within_column) const;
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_components, Number2>>
+    Tensor get_tensor(const unsigned int row,
+                      const unsigned int position_within_column) const;
 
     /* Get transposed scalar or tensor-valued entry: */
 
     /**
-     * Return the transposed entry indexed by @p row and
-     * @p position_within_column. The return type will either be scalar
-     * if `n_components` is equal to 1, or a tensor if `n_components` is
-     * greater than 1.
+     * Return the transposed (sclar) entry indexed by @p row and
+     * @p position_within_column.
      *
      * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
+     *
+     * @note This function is only available if `n_components` is equal to 1.
      */
     template <typename Number2 = Number>
-    EntryType<Number2>
+    Number2
     get_transposed_entry(const unsigned int row,
                          const unsigned int position_within_column) const;
 
@@ -247,8 +220,9 @@ namespace ryujin
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
-    template <typename Number2 = Number>
-    dealii::Tensor<1, n_components, Number2>
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_components, Number2>>
+    Tensor
     get_transposed_tensor(const unsigned int row,
                           const unsigned int position_within_column) const;
 
@@ -263,8 +237,7 @@ namespace ryujin
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      *
-     * @note This function is only available if `n_components` is equal to
-     * 1.
+     * @note This function is only available if `n_components` is equal to 1.
      */
     template <typename Number2 = Number>
     void write_entry(const Number2 entry,
@@ -281,11 +254,12 @@ namespace ryujin
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
-    template <typename Number2 = Number>
-    void write_entry(const dealii::Tensor<1, n_components, Number2> &entry,
-                     const unsigned int row,
-                     const unsigned int position_within_column,
-                     const bool do_streaming_store = false);
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_components, Number2>>
+    void write_tensor(const Tensor &tensor,
+                      const unsigned int row,
+                      const unsigned int position_within_column,
+                      const bool do_streaming_store = false);
 
     /* Synchronize over MPI ranks: */
 
@@ -372,19 +346,20 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto
   SparseMatrixSIMD<Number, n_components, simd_length>::get_entry(
       const unsigned int row, const unsigned int position_within_column) const
-      -> EntryType<Number2>
+      -> Number2
   {
+    static_assert(
+        n_components == 1,
+        "Attempted to write a scalar value into a tensor-valued matrix entry");
+
     const auto result = get_tensor<Number2>(row, position_within_column);
-    if constexpr (n_components == 1)
-      return result[0];
-    else
-      return result;
+    return result[0];
   }
 
 
   template <typename Number, int n_components, int simd_length>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number2>
+  template <typename Number2, typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline Tensor
   SparseMatrixSIMD<Number, n_components, simd_length>::get_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
@@ -392,7 +367,10 @@ namespace ryujin
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    dealii::Tensor<1, n_components, Number2> result;
+    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
+                  "type mismatch");
+
+    Tensor result;
 
     if constexpr (std::is_same_v<Number, Number2>) {
       /*
@@ -452,20 +430,21 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto
   SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_entry(
       const unsigned int row, const unsigned int position_within_column) const
-      -> EntryType<Number2>
+      -> Number2
   {
+    static_assert(
+        n_components == 1,
+        "Attempted to write a scalar value into a tensor-valued matrix entry");
+
     const auto result =
         get_transposed_tensor<Number2>(row, position_within_column);
-    if constexpr (n_components == 1)
-      return result[0];
-    else
-      return result;
+    return result[0];
   }
 
 
   template <typename Number, int n_components, int simd_length>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number2>
+  template <typename Number2, typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline Tensor
   SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
@@ -473,7 +452,10 @@ namespace ryujin
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    dealii::Tensor<1, n_components, Number2> result;
+    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
+                  "type mismatch");
+
+    Tensor result;
 
     if constexpr (std::is_same_v<Number, Number2>) {
       /*
@@ -570,19 +552,19 @@ namespace ryujin
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    dealii::Tensor<1, n_components, Number2> result;
-    result[0] = entry;
+    dealii::Tensor<1, n_components, Number2> tensor;
+    tensor[0] = entry;
 
-    write_entry<Number2>(
-        result, row, position_within_column, do_streaming_store);
+    write_tensor<Number2>(
+        tensor, row, position_within_column, do_streaming_store);
   }
 
 
   template <typename Number, int n_components, int simd_length>
-  template <typename Number2>
+  template <typename Number2, typename Tensor>
   DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<Number, n_components, simd_length>::write_entry(
-      const dealii::Tensor<1, n_components, Number2> &entry,
+  SparseMatrixSIMD<Number, n_components, simd_length>::write_tensor(
+      const Tensor &tensor,
       const unsigned int row,
       const unsigned int position_within_column,
       const bool do_streaming_store)
@@ -590,6 +572,9 @@ namespace ryujin
     Assert(sparsity != nullptr, dealii::ExcNotInitialized());
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
+
+    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
+                  "type mismatch");
 
     if constexpr (std::is_same_v<Number, Number2>) {
       /*
@@ -605,13 +590,13 @@ namespace ryujin
           data[(sparsity->row_starts[simd_row] +
                 position_within_column * simd_length) *
                    n_components +
-               d * simd_length + simd_offset] = entry[d];
+               d * simd_length + simd_offset] = tensor[d];
       } else {
         // go through standard part
         for (unsigned int d = 0; d < n_components; ++d)
           data[(sparsity->row_starts[row] + position_within_column) *
                    n_components +
-               d] = entry[d];
+               d] = tensor[d];
       }
 
     } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
@@ -633,10 +618,10 @@ namespace ryujin
                             n_components;
       if (do_streaming_store)
         for (unsigned int d = 0; d < n_components; ++d)
-          entry[d].streaming_store(store_pos + d * simd_length);
+          tensor[d].streaming_store(store_pos + d * simd_length);
       else
         for (unsigned int d = 0; d < n_components; ++d)
-          entry[d].store(store_pos + d * simd_length);
+          tensor[d].store(store_pos + d * simd_length);
 
     } else {
       /* not implemented */
