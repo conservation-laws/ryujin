@@ -291,7 +291,12 @@ namespace ryujin
 
 
 #ifndef DOXYGEN
-    /* Template definitions: */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline function definitions
+     * -------------------------------------------------------------------------
+     */
+
 
     template <typename Number, int n_components, int simd_length>
     void MultiComponentVector<Number, n_components, simd_length>::
@@ -335,6 +340,7 @@ namespace ryujin
       Assert(n_components > 0,
              dealii::ExcMessage(
                  "Cannot extract from a vector with zero components."));
+      AssertIndexRange(component, n_components);
 
       Assert(n_components *
                      scalar_vector.get_partitioner()->locally_owned_size() ==
@@ -358,6 +364,7 @@ namespace ryujin
       Assert(n_components > 0,
              dealii::ExcMessage(
                  "Cannot insert into a vector with zero components."));
+      AssertIndexRange(component, n_components);
 
       Assert(n_components *
                      scalar_vector.get_partitioner()->locally_owned_size() ==
@@ -372,12 +379,6 @@ namespace ryujin
     }
 
 
-    /*
-     * -------------------------------------------------------------------------
-     * Inline function definitions
-     * -------------------------------------------------------------------------
-     */
-
     template <typename Number, int n_components, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline Number2
@@ -387,6 +388,10 @@ namespace ryujin
       static_assert(
           n_components == 1,
           "Attempted to read a scalar value into a tensor-valued matrix entry");
+
+      AssertIndexRange(i,
+                       this->get_partitioner()->locally_owned_size() +
+                           this->get_partitioner()->n_ghost_indices());
 
       const auto result = get_tensor<Number2>(i);
       return result[0];
@@ -401,6 +406,11 @@ namespace ryujin
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
+
+      AssertIndexRange(i,
+                       this->get_partitioner()->locally_owned_size() +
+                           this->get_partitioner()->n_ghost_indices());
+
       Tensor tensor;
 
       /* Special case of a zero component vector */
@@ -466,6 +476,10 @@ namespace ryujin
       if constexpr (std::is_same_v<Number, Number2>) {
         /* Non-vectorized sequential access. */
 
+        AssertIndexRange(*js,
+                         this->get_partitioner()->locally_owned_size() +
+                             this->get_partitioner()->n_ghost_indices());
+
         for (unsigned int d = 0; d < n_components; ++d)
           tensor[d] = this->local_element(js[0] * n_components + d);
 
@@ -473,8 +487,12 @@ namespace ryujin
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;
-        for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        for (unsigned int k = 0; k < VectorizedArray::size(); ++k) {
+          AssertIndexRange(js[k],
+                           this->get_partitioner()->locally_owned_size() +
+                               this->get_partitioner()->n_ghost_indices());
           indices[k] = js[k] * n_components;
+        }
 
         dealii::vectorized_load_and_transpose(
             n_components, this->begin(), indices.data(), &tensor[0]);
@@ -498,6 +516,10 @@ namespace ryujin
                     "Attempted to write a scalar value into a tensor-valued "
                     "matrix entry");
 
+      AssertIndexRange(i,
+                       this->get_partitioner()->locally_owned_size() +
+                           this->get_partitioner()->n_ghost_indices());
+
       dealii::Tensor<1, n_components, Number2> tensor;
       tensor[0] = entry;
 
@@ -513,6 +535,10 @@ namespace ryujin
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
+
+      AssertIndexRange(i,
+                       this->get_partitioner()->locally_owned_size() +
+                           this->get_partitioner()->n_ghost_indices());
 
       /* Special case of a zero component vector */
       if constexpr (n_components == 0)
@@ -555,6 +581,10 @@ namespace ryujin
                     "Attempted to write a scalar value into a tensor-valued "
                     "matrix entry");
 
+      AssertIndexRange(i,
+                       this->get_partitioner()->locally_owned_size() +
+                           this->get_partitioner()->n_ghost_indices());
+
       dealii::Tensor<1, n_components, Number2> tensor;
       tensor[0] = entry;
 
@@ -570,6 +600,10 @@ namespace ryujin
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
+
+      AssertIndexRange(i,
+                       this->get_partitioner()->locally_owned_size() +
+                           this->get_partitioner()->n_ghost_indices());
 
       /* Special case of a zero component vector */
       if constexpr (n_components == 0)
