@@ -317,7 +317,7 @@ namespace ryujin
         const unsigned int i) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
-                    "dummy type mismatch");
+                    "type mismatch");
       Tensor tensor;
 
       /* Special case of a zero component vector */
@@ -356,7 +356,7 @@ namespace ryujin
         const unsigned int *js) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
-                    "dummy type mismatch");
+                    "type mismatch");
       Tensor tensor;
 
       /* Special case of a zero component vector */
@@ -395,7 +395,7 @@ namespace ryujin
         const Tensor &tensor, const unsigned int i)
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
-                    "dummy type mismatch");
+                    "type mismatch");
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)
@@ -434,7 +434,7 @@ namespace ryujin
         const Tensor &tensor, const unsigned int i)
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
-                    "dummy type mismatch");
+                    "type mismatch");
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)

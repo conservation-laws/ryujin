@@ -826,7 +826,7 @@ namespace ryujin
             }
           }
 
-          pij_matrix_.write_entry(P_ij, i, col_idx, true);
+          pij_matrix_.template write_tensor<T>(P_ij, i, col_idx, true);
         }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
@@ -964,7 +964,7 @@ namespace ryujin
           }
 
           P_ij *= factor;
-          pij_matrix_.write_entry(P_ij, i, col_idx);
+          pij_matrix_.template write_tensor<T>(P_ij, i, col_idx);
 
           /*
            * Compute limiter coefficients:
