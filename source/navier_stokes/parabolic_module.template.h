@@ -381,7 +381,7 @@ namespace ryujin
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
           const auto rho_e_i = view.internal_energy(U_i);
-          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+          const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
 
           write_entry<T>(density_, rho_i, i);
           /* (5.4a) */
@@ -664,7 +664,7 @@ namespace ryujin
           const auto view = hyperbolic_system_->template view<dim, T>();
 
           const auto rhs_i = get_entry<T>(internal_energy_rhs_, i);
-          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+          const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
           const auto rho_i = get_entry<T>(density_, i);
           const auto e_i = get_entry<T>(internal_energy_, i);
 
