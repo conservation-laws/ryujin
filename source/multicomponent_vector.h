@@ -156,6 +156,15 @@ namespace ryujin
                             unsigned int component,
                             const Functor &functor = std::identity{});
 
+      /**
+       * Variant of the method above that reads values out of a
+       * dealii::Vector in (rank-) local numbering.
+       */
+      template <typename Functor = std::identity>
+      void insert_component(const dealii::Vector<Number> &scalar_vector,
+                            unsigned int component,
+                            const Functor &functor = std::identity{});
+
       //@}
       /**
        * @name Access to scalar or tensor-valued entries from various
@@ -395,6 +404,30 @@ namespace ryujin
       for (unsigned int i = 0; i < local_size; ++i)
         this->local_element(i * n_components + component) =
             functor(scalar_vector.local_element(i));
+    }
+
+
+    template <typename Number, int n_components, int simd_length>
+    template <typename Functor>
+    void
+    MultiComponentVector<Number, n_components, simd_length>::insert_component(
+        const dealii::Vector<Number> &scalar_vector,
+        unsigned int component,
+        const Functor &functor)
+    {
+      Assert(n_components > 0,
+             dealii::ExcMessage(
+                 "Cannot insert into a vector with zero components."));
+      AssertIndexRange(component, n_components);
+
+      Assert(n_components * scalar_vector.size() >=
+                 this->get_partitioner()->locally_owned_size(),
+             dealii::ExcMessage("Called with a scalar_vector argument that has "
+                                "incompatible local range."));
+      const auto local_size = scalar_vector.size();
+      for (unsigned int i = 0; i < local_size; ++i)
+        this->local_element(i * n_components + component) =
+            functor(scalar_vector[i]);
     }
 
 
