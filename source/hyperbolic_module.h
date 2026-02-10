@@ -394,8 +394,8 @@ namespace ryujin
 
     InitialPrecomputedVector initial_precomputed_;
 
-    using ScalarHostVector = typename Vectors::ScalarHostVector<Number>;
-    mutable ScalarHostVector alpha_;
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
         Description::template Limiter<dim, Number>::n_bounds;

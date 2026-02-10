@@ -66,7 +66,7 @@ namespace ryujin
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    alpha_.reinit(scalar_partitioner);
+    alpha_.reinit_with_scalar_partitioner(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
     r_.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner());
@@ -396,7 +396,7 @@ namespace ryujin
 
         const auto mass = lumped_mass_matrix.template get_entry<T>(i);
         const auto hd_i = mass * measure_of_omega_inverse;
-        write_entry<T>(alpha_, indicator.alpha(hd_i), i);
+        alpha_.template write_entry<T>(indicator.alpha(hd_i), i);
       };
 
       cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
@@ -633,7 +633,7 @@ namespace ryujin
         const auto U_i = old_U.template get_tensor<T>(i);
         auto U_i_new = U_i;
 
-        const auto alpha_i = get_entry<T>(alpha_, i);
+        const auto alpha_i = alpha_.template get_entry<T>(i);
         const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
         const auto m_i_inv =
             lumped_mass_matrix_inverse.template get_entry<T>(i);
@@ -705,7 +705,7 @@ namespace ryujin
 
           const auto U_j = old_U.template get_tensor<T>(js);
 
-          const auto alpha_j = get_entry<T>(alpha_, js);
+          const auto alpha_j = alpha_.template get_entry<T>(js);
 
           const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
           auto factor = (alpha_i + alpha_j) * Number(.5);
