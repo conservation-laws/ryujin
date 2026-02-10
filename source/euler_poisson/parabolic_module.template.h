@@ -728,7 +728,8 @@ namespace ryujin
         using T = decltype(sentinel);
         const auto view = hyperbolic_system_->template view<dim, T>();
 
-        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+        const auto m_i_inv =
+            lumped_mass_matrix_inverse.template get_entry<T>(i);
 
         auto U_i = U.template get_tensor<T>(i);
         const auto rho_i = view.density(U_i);
@@ -1095,7 +1096,8 @@ namespace ryujin
         using T = decltype(sentinel);
         const auto view = hyperbolic_system_->template view<dim, T>();
 
-        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+        const auto m_i_inv =
+            lumped_mass_matrix_inverse.template get_entry<T>(i);
 
         const auto old_U_i = old_U.template get_tensor<T>(i);
         const auto rho_i = view.density(old_U_i);
