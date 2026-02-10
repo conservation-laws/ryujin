@@ -73,7 +73,8 @@ namespace ryujin
        * dealii::LinearAlgebra::distributed::Vector<Number> used to insert
        * and extract a single component of the MultiComponentVector.
        */
-      using ScalarVector = dealii::LinearAlgebra::distributed::Vector<Number>;
+      using ScalarHostVector =
+          dealii::LinearAlgebra::distributed::Vector<Number>;
 
       //@}
       /**
@@ -106,7 +107,7 @@ namespace ryujin
       //@}
       /**
        * @name Extracting and inserting a single component stored in a
-       * ScalarVector
+       * ScalarHostVector
        */
       //@{
 
@@ -129,7 +130,7 @@ namespace ryujin
        * vectors).
        */
       template <typename Functor = std::identity>
-      void extract_component(ScalarVector &scalar_vector,
+      void extract_component(ScalarHostVector &scalar_vector,
                              unsigned int component,
                              const Functor &functor = std::identity{}) const;
 
@@ -151,7 +152,7 @@ namespace ryujin
        * single scalar vectors by deal.II interpolation functions.
        */
       template <typename Functor = std::identity>
-      void insert_component(const ScalarVector &scalar_vector,
+      void insert_component(const ScalarHostVector &scalar_vector,
                             unsigned int component,
                             const Functor &functor = std::identity{});
 
@@ -289,14 +290,14 @@ namespace ryujin
                 const Number a,
                 const MultiComponentVector<Number, n_components> &V)
       {
-        ScalarVector::sadd(s, a, V);
+        ScalarHostVector::sadd(s, a, V);
       }
 
-      using ScalarVector::update_ghost_values;
+      using ScalarHostVector::update_ghost_values;
 
-      using ScalarVector::zero_out_ghost_values;
+      using ScalarHostVector::zero_out_ghost_values;
 
-      using ScalarVector::compress;
+      using ScalarHostVector::compress;
 
       //@}
     };
@@ -320,7 +321,7 @@ namespace ryujin
       if (n_components == 0)
         return;
 
-      ScalarVector::reinit(vector_partitioner);
+      ScalarHostVector::reinit(vector_partitioner);
     }
 
     template <typename Number, int n_components, int simd_length>
@@ -335,12 +336,12 @@ namespace ryujin
 
       /* Special case of a scalar vector: */
       if (n_components == 1)
-        ScalarVector::reinit(scalar_partitioner);
+        ScalarHostVector::reinit(scalar_partitioner);
 
       auto vector_partitioner =
           create_vector_partitioner(scalar_partitioner, n_components);
 
-      ScalarVector::reinit(vector_partitioner);
+      ScalarHostVector::reinit(vector_partitioner);
     }
 
 
@@ -348,7 +349,7 @@ namespace ryujin
     template <typename Functor>
     void
     MultiComponentVector<Number, n_components, simd_length>::extract_component(
-        ScalarVector &scalar_vector,
+        ScalarHostVector &scalar_vector,
         unsigned int component,
         const Functor &functor) const
     {
@@ -375,7 +376,7 @@ namespace ryujin
     template <typename Functor>
     void
     MultiComponentVector<Number, n_components, simd_length>::insert_component(
-        const ScalarVector &scalar_vector,
+        const ScalarHostVector &scalar_vector,
         unsigned int component,
         const Functor &functor)
     {
