@@ -64,8 +64,6 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-
     //@}
     /**
      * @name Constructor and setup
@@ -166,6 +164,7 @@ namespace ryujin
     std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
 
     mutable std::vector<std::pair<Number, Number>> bounds_;
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
     mutable std::vector<ScalarHostVector> quantities_;
     //@}
   };

@@ -254,23 +254,22 @@ namespace ryujin
               << "interpolate_hyperbolic_vector(t = " << t << ")" << std::endl;
 #endif
 
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto &vector_partitioner =
+        offline_data_->hyperbolic_vector_partitioner();
+
     HyperbolicVector U;
-    U.reinit_with_vector_partitioner(
-        offline_data_->hyperbolic_vector_partitioner());
+    U.reinit_with_vector_partitioner(vector_partitioner);
 
-    using ScalarHostVector =
-        typename OfflineData<dim, Number>::ScalarHostVector;
-
-    const auto callable = [&](const auto &p) { return initial_state(p, t); };
-
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
     ScalarHostVector temp;
-    const auto scalar_partitioner = offline_data_->scalar_partitioner();
     temp.reinit(scalar_partitioner);
 
     // FIXME: it is not particularly efficient to call
     // VectorTools::interpolate for every component separately. If this
     // gets too slow, we should consider writing out to a temporary (block)
     // vector and then inserting into the MultiComponentVector.
+    const auto callable = [&](const auto &p) { return initial_state(p, t); };
     for (unsigned int d = 0; d < problem_dimension; ++d) {
       VectorTools::interpolate(offline_data_->discretization().mapping(),
                                offline_data_->dof_handler(),
@@ -294,7 +293,7 @@ namespace ryujin
               << "interpolate_initial_precomputed_vector()" << std::endl;
 #endif
 
-    const auto scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
     InitialPrecomputedVector precomputed;
     precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
@@ -302,11 +301,7 @@ namespace ryujin
     if constexpr (n_initial_precomputed_values == 0)
       return precomputed;
 
-    using ScalarHostVector =
-        typename OfflineData<dim, Number>::ScalarHostVector;
-
-    const auto callable = [&](const auto &p) { return initial_precomputed(p); };
-
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
     ScalarHostVector temp;
     temp.reinit(scalar_partitioner);
 
@@ -314,6 +309,7 @@ namespace ryujin
     // VectorTools::interpolate for every component separately. If this
     // gets too slow, we should consider writing out to a temporary (block)
     // vector and then inserting into the MultiComponentVector.
+    const auto callable = [&](const auto &p) { return initial_precomputed(p); };
     for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
       VectorTools::interpolate(offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
