@@ -6,12 +6,10 @@ int main(int argc, char *argv[])
 
   /* Set up locally owned and relevant index sets. */
 
-  dealii::IndexSet locally_owned(16);
-  dealii::IndexSet locally_relevant(16);
-
-  locally_owned.add_range(0, 8);
-  locally_relevant.add_range(0, 8);
-  locally_relevant.add_range(12, 16);
+  dealii::IndexSet locally_owned(12);
+  dealii::IndexSet locally_relevant(12);
+  locally_owned.add_range(0, 12);
+  locally_relevant.add_range(0, 12);
 
   const auto scalar_partitioner =
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
