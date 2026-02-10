@@ -146,9 +146,9 @@ namespace ryujin
 
       using StateVector = typename View::StateVector;
 
-      using ScalarVector = Vectors::ScalarVector<Number>;
+      using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
-      using BlockVector = Vectors::BlockVector<Number>;
+      using BlockHostVector = Vectors::BlockHostVector<Number>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -394,15 +394,15 @@ namespace ryujin
       dealii::AffineConstraints<Number> affine_constraints_potential_;
 
       LaplaceOperator<dim, Number> laplace_operator_;
-      dealii::DiagonalMatrix<ScalarVector> diagonal_preconditioner_;
+      dealii::DiagonalMatrix<ScalarHostVector> diagonal_preconditioner_;
       MGSmoother<dim, Number> multigrid_preconditioner_;
       UpdateOperator<dim, Number> update_operator_;
 
-      mutable ScalarVector potential_rhs_;
-      mutable ScalarVector density_;
-      mutable ScalarVector background_density_;
-      mutable BlockVector magnetic_field_;
-      mutable BlockVector velocity_rhs_;
+      mutable ScalarHostVector potential_rhs_;
+      mutable ScalarHostVector density_;
+      mutable ScalarHostVector background_density_;
+      mutable BlockHostVector magnetic_field_;
+      mutable BlockHostVector velocity_rhs_;
 
       mutable bool potential_initialized_;
       mutable Number t_background_density_;

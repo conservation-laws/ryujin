@@ -581,7 +581,7 @@ namespace ryujin
               preconditioner(dof_handler, mg, mg_transfer_velocity_);
 
           SolverControl solver_control(gmg_max_iter_vel_, tolerance_velocity);
-          SolverCG<BlockVector> solver(solver_control);
+          SolverCG<BlockHostVector> solver(solver_control);
           solver.solve(
               velocity_operator, velocity_, velocity_rhs_, preconditioner);
 
@@ -592,7 +592,7 @@ namespace ryujin
         } catch (SolverControl::NoConvergence &) {
 
           SolverControl solver_control(1000, tolerance_velocity);
-          SolverCG<BlockVector> solver(solver_control);
+          SolverCG<BlockHostVector> solver(solver_control);
           solver.solve(
               velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
 
@@ -612,7 +612,7 @@ namespace ryujin
                     "time step [P] 2 - update internal energy");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
-        matrix_free_.template cell_loop<ScalarVector, BlockVector>(
+        matrix_free_.template cell_loop<ScalarHostVector, BlockHostVector>(
             [this](const auto &data,
                    auto &dst,
                    const auto &src,
@@ -813,7 +813,7 @@ namespace ryujin
 
           SolverControl solver_control(gmg_max_iter_en_,
                                        tolerance_internal_energy);
-          SolverCG<ScalarVector> solver(solver_control);
+          SolverCG<ScalarHostVector> solver(solver_control);
           solver.solve(energy_operator,
                        internal_energy_,
                        internal_energy_rhs_,
@@ -826,7 +826,7 @@ namespace ryujin
         } catch (SolverControl::NoConvergence &) {
 
           SolverControl solver_control(1000, tolerance_internal_energy);
-          SolverCG<ScalarVector> solver(solver_control);
+          SolverCG<ScalarHostVector> solver(solver_control);
           solver.solve(energy_operator,
                        internal_energy_,
                        internal_energy_rhs_,

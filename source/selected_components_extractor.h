@@ -21,7 +21,7 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
     SelectedComponentsExtractor() = delete;
 
@@ -49,14 +49,14 @@ namespace ryujin
       }
     }
 
-    static std::vector<ScalarVector>
+    static std::vector<ScalarHostVector>
     extract(const OfflineData<dim, Number> &offline_data,
             const HyperbolicSystem &hyperbolic_system,
             const ParabolicSystem &parabolic_system,
             const StateVector &state_vector,
             const InitialPrecomputedVector &initial_precomputed,
             const std::vector<std::string> &additional_names,
-            const std::vector<std::reference_wrapper<const ScalarVector>>
+            const std::vector<std::reference_wrapper<const ScalarHostVector>>
                 &additional_vectors,
             const std::vector<std::string> &selected)
     {
@@ -101,7 +101,7 @@ namespace ryujin
           AssertThrow(false, dealii::ExcInternalError());
       }
 
-      std::vector<ScalarVector> extracted_components(selected.size());
+      std::vector<ScalarHostVector> extracted_components(selected.size());
       const auto &scalar_partitioner = offline_data.scalar_partitioner();
       for (auto &it : extracted_components)
         it.reinit(scalar_partitioner);

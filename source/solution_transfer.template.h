@@ -463,7 +463,7 @@ namespace ryujin
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
 
-    ScalarVector projected_mass;
+    ScalarHostVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
     HyperbolicVector projected_state;
     projected_state.reinit_with_vector_partitioner(
@@ -479,7 +479,7 @@ namespace ryujin
         pik_matrix;
     std::map<unsigned int /*i*/, Bounds> bounds_map;
 
-    ScalarVector kappa;
+    ScalarHostVector kappa;
     kappa.reinit(offline_data_->scalar_partitioner());
 
     /*

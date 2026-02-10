@@ -25,7 +25,7 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
       const InitialPrecomputedVector &initial_precomputed,
-      const ScalarVector &alpha,
+      const ScalarHostVector &alpha,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -228,8 +228,8 @@ namespace ryujin
     const unsigned int n_entries = quantities.size();
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    std::vector<ScalarVector> numerator(n_entries);
-    std::vector<ScalarVector> denominator(std::max(1u, n_entries));
+    std::vector<ScalarHostVector> numerator(n_entries);
+    std::vector<ScalarHostVector> denominator(std::max(1u, n_entries));
     for (auto &it : numerator)
       it.reinit(scalar_partitioner);
     for (auto &it : denominator)
