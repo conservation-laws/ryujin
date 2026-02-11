@@ -51,7 +51,7 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
     //@}
     /**
@@ -68,8 +68,8 @@ namespace ryujin
               const ParabolicSystem &parabolic_system,
               const Postprocessor<Description, dim, Number> &postprocessor,
               const InitialPrecomputedVector &initial_precomputed,
-              const ScalarHostVector &alpha,
-              const ScalarHostVector &smoothness_indicators,
+              const ScalarVector &alpha,
+              const ScalarVector &smoothness_indicators,
               const std::string &subsection = "/VTUOutput");
 
     /**
@@ -132,8 +132,8 @@ namespace ryujin
         postprocessor_;
 
     const InitialPrecomputedVector &initial_precomputed_;
-    const ScalarHostVector &alpha_;
-    const ScalarHostVector &smoothness_indicators_;
+    const ScalarVector &alpha_;
+    const ScalarVector &smoothness_indicators_;
     //@}
   };
 

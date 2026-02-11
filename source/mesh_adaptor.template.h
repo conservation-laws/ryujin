@@ -25,7 +25,7 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
       const InitialPrecomputedVector &initial_precomputed,
-      const ScalarHostVector &alpha,
+      const ScalarVector &alpha,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -228,7 +228,12 @@ namespace ryujin
     const unsigned int n_entries = quantities.size();
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    std::vector<ScalarHostVector> numerator(n_entries);
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    /*
+     * Ensure we have at least one entry in numerator and denominator
+     * available. We use those for temporary storage.
+     */
+    std::vector<ScalarHostVector> numerator(std::max(1u, n_entries));
     std::vector<ScalarHostVector> denominator(std::max(1u, n_entries));
     for (auto &it : numerator)
       it.reinit(scalar_partitioner);
@@ -284,10 +289,8 @@ namespace ryujin
     cpu_simd_loop<Number>("mesh_adaptor_1", body, 0, n_internal, n_owned);
 
     /*
-     * Normalize and populate smoothness_indicators_ vector:
+     * Sum up and normalize the indicators and store the result in numerator[0]:
      */
-
-    smoothness_indicators_.reinit(scalar_partitioner);
 
     constexpr Number eps = std::numeric_limits<Number>::epsilon();
 
@@ -323,7 +326,7 @@ namespace ryujin
 
       alpha_i = std::min(alpha_i, T(smoothness_max_cutoff_));
       alpha_i = std::max(alpha_i, T(smoothness_min_cutoff_));
-      write_entry<T>(smoothness_indicators_, alpha_i, i);
+      write_entry<T>(/*SIC!*/ numerator[0], alpha_i, i);
     };
 
     cpu_simd_loop<Number>(
@@ -342,7 +345,7 @@ namespace ryujin
       if (row_length == 1)
         return;
 
-      auto alpha_i = get_entry<T>(smoothness_indicators_, i);
+      auto alpha_i = get_entry<T>(numerator[0], i);
 
       const unsigned int *js = sparsity_simd.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
@@ -352,7 +355,7 @@ namespace ryujin
         if (col_idx == 0)
           continue;
 
-        const auto alpha_j = get_entry<T>(smoothness_indicators_, js);
+        const auto alpha_j = get_entry<T>(numerator[0], js);
 
         alpha_i = std::max(alpha_i, alpha_j);
       }
@@ -361,14 +364,21 @@ namespace ryujin
     };
 
     for (unsigned int cycle = 0; cycle < smoothness_widen_stencil_; ++cycle) {
-      smoothness_indicators_.update_ghost_values();
+      numerator[0].update_ghost_values();
       cpu_simd_loop<Number>(
           "mesh_adaptor_3", body_widen, 0, n_internal, n_owned);
-      smoothness_indicators_ = /*SIC!*/ denominator[0];
+      numerator[0] = /*SIC!*/ denominator[0];
     }
 
-    smoothness_indicators_.update_ghost_values();
-    affine_constraints.distribute(smoothness_indicators_);
+    numerator[0].update_ghost_values();
+    affine_constraints.distribute(numerator[0]);
+
+    /*
+     * Insert result into smoothness_indicators_:
+     */
+
+    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
+    smoothness_indicators_.insert_component(numerator[0], 0);
     smoothness_indicators_.update_ghost_values();
   }
 
@@ -479,7 +489,8 @@ namespace ryujin
       for (unsigned int i = 0; i < dofs_per_cell; ++i) {
         const auto global_i = local_dof_indices[i];
         const auto local_i = scalar_partitioner->global_to_local(global_i);
-        auto alpha_i = get_entry<Number>(smoothness_indicators_, local_i);
+        auto alpha_i =
+            smoothness_indicators_.template get_entry<Number>(local_i);
         alpha_cell += alpha_i;
       }
       alpha_cell *= scale;

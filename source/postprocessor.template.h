@@ -187,7 +187,7 @@ namespace ryujin
       }
 
       /* Populate quantities: */
-      const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+      const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
 
       unsigned int k = 0;
       for (const auto &schlieren : local_schlieren_values) {

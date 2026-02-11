@@ -121,7 +121,7 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
     //@}
     /**
@@ -137,7 +137,7 @@ namespace ryujin
                 const HyperbolicSystem &hyperbolic_system,
                 const ParabolicSystem &parabolic_system,
                 const InitialPrecomputedVector &initial_precomputed,
-                const ScalarHostVector &alpha,
+                const ScalarVector &alpha,
                 const std::string &subsection = "/MeshAdaptor");
 
     /**
@@ -226,7 +226,7 @@ namespace ryujin
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
     const InitialPrecomputedVector &initial_precomputed_;
-    const ScalarHostVector &alpha_;
+    const ScalarVector &alpha_;
 
     bool need_mesh_adaptation_;
 
@@ -242,7 +242,7 @@ namespace ryujin
 
     void populate_cell_indicators_from_smoothness_indicators() const;
 
-    mutable ScalarHostVector smoothness_indicators_;
+    mutable ScalarVector smoothness_indicators_;
     //@}
   };
 

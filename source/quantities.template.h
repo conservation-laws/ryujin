@@ -168,7 +168,7 @@ namespace ryujin
                 continue;
 
               const Number interior_mass =
-                  offline_data_->lumped_mass_matrix().local_element(index);
+                  offline_data_->lumped_mass_matrix().get_entry(index);
               // FIXME: change to std::set
               preliminary_map[index] = {index, interior_mass, position};
             }
