@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 
   std::cout << "Scalar vector:\n";
   for (unsigned int i = 0; i < 12; ++i) {
-    std::cout << scalar_vector.get_entry<double>(i) << "\n";
+    std::cout << scalar_vector.read_entry<double>(i) << "\n";
   }
 
   std::cout << "\nState vector:\n";

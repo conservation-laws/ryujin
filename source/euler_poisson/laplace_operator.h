@@ -200,7 +200,7 @@ namespace ryujin
       const auto body_invert = [&](auto sentinel, const unsigned int i) {
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
         using T = decltype(sentinel);
-        const auto m_i = get_entry<T>(diagonal_vector, i);
+        const auto m_i = read_entry<T>(diagonal_vector, i);
         constexpr auto gt = dealii::SIMDComparison::greater_than;
         const auto m_i_inv = dealii::compare_and_apply_mask<gt>(
             std::abs(m_i), T(eps), Number(1.) / m_i, T(1.));

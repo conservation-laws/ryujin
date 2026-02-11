@@ -1110,8 +1110,8 @@ namespace ryujin
                       scalar_partitioner_->global_to_local(global_i);
                   const auto local_j =
                       scalar_partitioner_->global_to_local(global_j);
-                  const auto m_i = lumped_mass_matrix_.get_entry(local_i);
-                  const auto m_j = lumped_mass_matrix_.get_entry(local_j);
+                  const auto m_i = lumped_mass_matrix_.read_entry(local_i);
+                  const auto m_j = lumped_mass_matrix_.read_entry(local_j);
                   const auto hd_ij =
                       Number(0.5) * (m_i + m_j) / measure_of_omega_;
 
@@ -1223,7 +1223,7 @@ namespace ryujin
 
     double total_mass = 0.;
     for (unsigned int i = 0; i < n_locally_owned_; ++i)
-      total_mass += lumped_mass_matrix_.get_entry(i);
+      total_mass += lumped_mass_matrix_.read_entry(i);
     total_mass =
         Utilities::MPI::sum(total_mass, mpi_ensemble_.ensemble_communicator());
 
@@ -1243,7 +1243,7 @@ namespace ryujin
         continue;
 
       auto sum =
-          mass_matrix_.get_entry(i, 0) - lumped_mass_matrix_.get_entry(i);
+          mass_matrix_.read_entry(i, 0) - lumped_mass_matrix_.get_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -1253,7 +1253,7 @@ namespace ryujin
                                                  : js + col_idx);
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
-        const auto m_ij = mass_matrix_.get_entry(i, col_idx);
+        const auto m_ij = mass_matrix_.read_entry(i, col_idx);
         if (discretization_->have_discontinuous_ansatz()) {
           // Interfacial coupling terms are present in the stencil but zero
           // in the mass matrix

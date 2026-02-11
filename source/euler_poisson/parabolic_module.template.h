@@ -729,7 +729,7 @@ namespace ryujin
         const auto view = hyperbolic_system_->template view<dim, T>();
 
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template get_entry<T>(i);
+            lumped_mass_matrix_inverse.template read_entry<T>(i);
 
         auto U_i = U.template get_tensor<T>(i);
         const auto rho_i = view.density(U_i);
@@ -738,11 +738,11 @@ namespace ryujin
 
         dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
         for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
-          magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+          magnetic_field[d] = read_entry<T>(magnetic_field_.block(d), i);
 
         dealii::Tensor<1, dim, T> grad_phi;
         for (unsigned int d = 0; d < dim; ++d)
-          grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
+          grad_phi[d] = m_i_inv * read_entry<T>(velocity_rhs_.block(d), i);
 
         auto new_v_i = v_i;
 
@@ -856,7 +856,7 @@ namespace ryujin
 
           dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
           for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
-            magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+            magnetic_field[d] = read_entry<T>(magnetic_field_.block(d), i);
 
           const auto velocity_rhs =
               tau * alpha * rho_i *
@@ -1097,7 +1097,7 @@ namespace ryujin
         const auto view = hyperbolic_system_->template view<dim, T>();
 
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template get_entry<T>(i);
+            lumped_mass_matrix_inverse.template read_entry<T>(i);
 
         const auto old_U_i = old_U.template get_tensor<T>(i);
         const auto rho_i = view.density(old_U_i);
@@ -1106,11 +1106,11 @@ namespace ryujin
 
         dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
         for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
-          magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+          magnetic_field[d] = read_entry<T>(magnetic_field_.block(d), i);
 
         dealii::Tensor<1, dim, T> grad_phi;
         for (unsigned int d = 0; d < dim; ++d)
-          grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
+          grad_phi[d] = m_i_inv * read_entry<T>(velocity_rhs_.block(d), i);
 
         auto new_v_i =
             apply_B_n_inverse(magnetic_field, tau, old_v_i - tau * grad_phi);

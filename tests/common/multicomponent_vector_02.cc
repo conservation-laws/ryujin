@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 
   std::cout << "Scalar vector (packed SIMD)\n";
   for (unsigned int i = 0; i < 8; i += simd_width) {
-    std::cout << scalar_vector.get_entry<VA>(i) << "\n";
+    std::cout << scalar_vector.read_entry<VA>(i) << "\n";
   }
 
   std::cout << "\nState vector (packed SIMD):\n";
