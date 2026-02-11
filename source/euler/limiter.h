@@ -275,7 +275,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
       const auto rho_i = view.density(U_i);
       const auto &[s_i, eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       return {/*rho_min*/ rho_i, /*rho_max*/ rho_i, /*s_min*/ s_i};
     }
@@ -379,7 +379,7 @@ namespace ryujin
       rho_max = std::max(rho_max, rho_ij_bar);
 
       const auto &[s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values.template read_tensor<Number, precomputed_type>(js);
       s_min = std::min(s_min, s_j);
 
       /* Relaxation: */

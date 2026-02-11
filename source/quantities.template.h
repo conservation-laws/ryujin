@@ -392,7 +392,7 @@ namespace ryujin
               std::is_same_v<point_type, interior_point> ? 1 : 3;
           const auto mass_i = std::get<index>(point);
 
-          const auto U_i = U.get_tensor(i);
+          const auto U_i = U.read_tensor(i);
           const auto view = hyperbolic_system_->template view<dim, Number>();
           const auto primitive_state = view.to_primitive_state(U_i);
 

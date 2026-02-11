@@ -169,7 +169,7 @@ namespace ryujin
       if (id == Boundary::do_nothing)
         continue;
 
-      auto U_i = U.get_tensor(i);
+      auto U_i = U.read_tensor(i);
 
       /* Use a lambda to avoid computing unnecessary state values */
       auto get_dirichlet_data = [position = position, t = t, this]() {
@@ -361,7 +361,7 @@ namespace ryujin
         if (row_length == 1)
           return;
 
-        const auto U_i = old_U.template get_tensor<T>(i);
+        const auto U_i = old_U.template read_tensor<T>(i);
 
         indicator.reset(i, U_i);
 
@@ -369,9 +369,9 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = old_U.template get_tensor<T>(js);
+          const auto U_j = old_U.template read_tensor<T>(js);
 
-          const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+          const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
 
           indicator.accumulate(js, U_j, c_ij);
 
@@ -444,10 +444,10 @@ namespace ryujin
         if (j < i)
           return;
 
-        const auto U_i = old_U.get_tensor(i);
-        const auto U_j = old_U.get_tensor(j);
+        const auto U_i = old_U.read_tensor(i);
+        const auto U_j = old_U.read_tensor(j);
 
-        const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
+        const auto c_ji = cij_matrix.read_transposed_tensor(i, col_idx);
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm_ji = c_ji.norm();
         const auto n_ji = c_ji / norm_ji;
@@ -493,15 +493,15 @@ namespace ryujin
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
-            const auto d_ji = dij_matrix_.get_transposed_entry(i, col_idx);
+            const auto d_ji = dij_matrix_.read_transposed_entry(i, col_idx);
 
 #ifdef DEBUG_SYMMETRY_CHECK
             /* Verify that d_ji == std::max(d_ij, d_ji): */
 
-            const auto U_i = old_U.get_tensor(i);
-            const auto U_j = old_U.get_tensor(j);
+            const auto U_i = old_U.read_tensor(i);
+            const auto U_j = old_U.read_tensor(j);
 
-            const auto c_ij = cij_matrix.get_tensor(i, col_idx);
+            const auto c_ij = cij_matrix.read_tensor(i, col_idx);
             Assert(c_ij.norm() > 1.e-12, ExcInternalError());
             const auto norm_ij = c_ij.norm();
             const auto n_ij = c_ij / norm_ij;
@@ -627,7 +627,7 @@ namespace ryujin
         if (row_length == 1)
           return;
 
-        const auto U_i = old_U.template get_tensor<T>(i);
+        const auto U_i = old_U.template read_tensor<T>(i);
         auto U_i_new = U_i;
 
         const auto alpha_i = alpha_.template read_entry<T>(i);
@@ -644,7 +644,7 @@ namespace ryujin
         for (int s = 0; s < stages; ++s) {
           const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
 
-          const auto U_iHs = U_s.template get_tensor<T>(i);
+          const auto U_iHs = U_s.template read_tensor<T>(i);
           flux_iHs[s] =
               view.flux_contribution(prec_s, initial_precomputed_, i, U_iHs);
 
@@ -678,12 +678,12 @@ namespace ryujin
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
-            const auto U_j = old_U.template get_tensor<T>(js);
+            const auto U_j = old_U.template read_tensor<T>(js);
             const auto flux_j = view.flux_contribution(
                 old_precomputed, initial_precomputed_, js, U_j);
 
             const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
-            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+            const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
 
             const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
             affine_shift += B_ij;
@@ -700,7 +700,7 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = old_U.template get_tensor<T>(js);
+          const auto U_j = old_U.template read_tensor<T>(js);
 
           const auto alpha_j = alpha_.template read_entry<T>(js);
 
@@ -723,13 +723,13 @@ namespace ryujin
            * that the (local) values of d_ij and d_ji match.
            */
           const auto d_ji =
-              dij_matrix_.template get_transposed_entry<T>(i, col_idx);
+              dij_matrix_.template read_transposed_entry<T>(i, col_idx);
           Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
                  dealii::ExcMessage(
                      "d_ij not symmetrized correctly over MPI ranks"));
 #endif
 
-          const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+          const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
           constexpr auto eps = std::numeric_limits<Number>::epsilon();
           const auto scale =
               dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
@@ -801,7 +801,7 @@ namespace ryujin
           for (int s = 0; s < stages; ++s) {
             const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
 
-            const auto U_jHs = U_s.template get_tensor<T>(js);
+            const auto U_jHs = U_s.template read_tensor<T>(js);
             const auto flux_jHs =
                 view.flux_contribution(prec_s, initial_precomputed_, js, U_jHs);
 
@@ -894,7 +894,7 @@ namespace ryujin
           return;
 
         auto bounds =
-            bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
+            bounds_.template read_tensor<T, std::array<T, n_bounds>>(i);
 
         /*
          * In case of a discontinuous finite element ansatz we need to
@@ -908,7 +908,7 @@ namespace ryujin
                ++col_idx, js += stride_size) {
             bounds = limiter.combine_bounds(
                 bounds,
-                bounds_.template get_tensor<T, std::array<T, n_bounds>>(js));
+                bounds_.template read_tensor<T, std::array<T, n_bounds>>(js));
           }
           bounds_.template write_tensor<T>(bounds, i);
         }
@@ -920,9 +920,9 @@ namespace ryujin
         const auto m_i_inv =
             lumped_mass_matrix_inverse.template read_entry<T>(i);
 
-        const auto U_i_new = new_U.template get_tensor<T>(i);
+        const auto U_i_new = new_U.template read_tensor<T>(i);
 
-        const auto F_iH = r_.template get_tensor<T>(i);
+        const auto F_iH = r_.template read_tensor<T>(i);
 
         const auto lambda_inv = Number(row_length - 1);
         const auto factor = tau * m_i_inv * lambda_inv;
@@ -932,8 +932,8 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          auto P_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
-          const auto F_jH = r_.template get_tensor<T>(js);
+          auto P_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
+          const auto F_jH = r_.template read_tensor<T>(js);
 
           /*
            * Mass matrix correction:
@@ -1042,7 +1042,7 @@ namespace ryujin
         if (row_length == 1)
           return;
 
-        auto U_i_new = new_U.template get_tensor<T>(i);
+        auto U_i_new = new_U.template read_tensor<T>(i);
 
         const Number lambda = Number(1.) / Number(row_length - 1);
 
@@ -1054,9 +1054,9 @@ namespace ryujin
 
           const auto l_ij = std::min(
               lij_matrix_.template read_entry<T>(i, col_idx),
-              lij_matrix_.template get_transposed_entry<T>(i, col_idx));
+              lij_matrix_.template read_transposed_entry<T>(i, col_idx));
 
-          const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+          const auto p_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
 
           U_i_new += l_ij * lambda * p_ij;
 
@@ -1078,14 +1078,14 @@ namespace ryujin
           return;
 
         const auto bounds =
-            bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
+            bounds_.template read_tensor<T, std::array<T, n_bounds>>(i);
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
           const auto old_l_ij = lij_row[col_idx];
 
           const auto new_p_ij = (T(1.) - old_l_ij) *
-                                pij_matrix_.template get_tensor<T>(i, col_idx);
+                                pij_matrix_.template read_tensor<T>(i, col_idx);
 
           const auto &[new_l_ij, success] =
               limiter.limit(bounds, U_i_new, new_p_ij);

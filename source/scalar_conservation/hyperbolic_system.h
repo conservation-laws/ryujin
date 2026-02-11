@@ -565,7 +565,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto u_i = view.state(U_i);
         const auto f_i = view.flux_function(u_i);
@@ -798,7 +798,7 @@ namespace ryujin
       /* The flux contribution is a rank 2 tensor, thus a little dance: */
       flux_contribution_type result;
       result[0] = construct_flux_tensor(
-          pv.template get_tensor<Number, precomputed_type>(i));
+          pv.template read_tensor<Number, precomputed_type>(i));
       return result;
     }
 
@@ -814,7 +814,7 @@ namespace ryujin
       /* The flux contribution is a rank 2 tensor, thus a little dance: */
       flux_contribution_type result;
       result[0] = construct_flux_tensor(
-          pv.template get_tensor<Number, precomputed_type>(js));
+          pv.template read_tensor<Number, precomputed_type>(js));
       return result;
     }
 

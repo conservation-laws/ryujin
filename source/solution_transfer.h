@@ -182,8 +182,8 @@ namespace ryujin
      * would happen with AffineConstraints<>::distribute() - but this
      * function is incompatible with our MultiComponentVector.
      */
-    state_type get_tensor(const HyperbolicVector &U,
-                          const dealii::types::global_dof_index global_i);
+    state_type read_tensor(const HyperbolicVector &U,
+                           const dealii::types::global_dof_index global_i);
 
     /**
      * Helper function adding a supplied state to the hyperbolic state

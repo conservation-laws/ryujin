@@ -887,7 +887,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto rho_i = view.density(U_i);
         const auto e_i = view.internal_energy(U_i) / rho_i;
@@ -915,8 +915,8 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
-        auto prec_i = precomputed.template get_tensor<T, PT>(i);
+        const auto U_i = U.template read_tensor<T>(i);
+        auto prec_i = precomputed.template read_tensor<T, PT>(i);
         /* Previous loop: gamma_min_i == gamma_i, s_i == 0, eta_i == 0 */
         auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
 
@@ -927,8 +927,8 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = U.template get_tensor<T>(js);
-          const auto prec_j = precomputed.template get_tensor<T, PT>(js);
+          const auto U_j = U.template read_tensor<T>(js);
+          const auto prec_j = precomputed.template read_tensor<T, PT>(js);
           const auto p_j = std::get<0>(prec_j);
           const auto gamma_j = view.surrogate_gamma(U_j, p_j);
           gamma_min_i = std::min(gamma_min_i, gamma_j);
@@ -1523,7 +1523,7 @@ namespace ryujin
         const state_type &U_i) const -> flux_contribution_type
     {
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          pv.template get_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
       return f(U_i, p_i);
     }
 
@@ -1537,7 +1537,7 @@ namespace ryujin
         const state_type &U_j) const -> flux_contribution_type
     {
       const auto &[p_j, gamma_min_j, s_j, eta_j] =
-          pv.template get_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
       return f(U_j, p_j);
     }
 

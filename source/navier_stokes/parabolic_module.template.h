@@ -377,7 +377,7 @@ namespace ryujin
 
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto U_i = old_U.template read_tensor<T>(i);
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
           const auto rho_e_i = view.internal_energy(U_i);
@@ -668,7 +668,7 @@ namespace ryujin
           const auto rho_i = read_entry<T>(density_, i);
           const auto e_i = read_entry<T>(internal_energy_, i);
 
-          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto U_i = old_U.template read_tensor<T>(i);
           const auto V_i = view.momentum(U_i) / rho_i;
 
           dealii::Tensor<1, dim, T> V_i_new;
@@ -859,7 +859,7 @@ namespace ryujin
           if (row_length == 1)
             return;
 
-          auto U_i = old_U.template get_tensor<T>(i);
+          auto U_i = old_U.template read_tensor<T>(i);
           const auto rho_i = view.density(U_i);
 
           Tensor<1, dim, T> m_i_new;

@@ -194,7 +194,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[new_s_i, new_eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       const auto rho_i = view.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
@@ -220,7 +220,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values.template read_tensor<Number, precomputed_type>(js);
 
       const auto rho_j = view.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;

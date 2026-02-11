@@ -728,7 +728,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto rho_i = view.density(U_i);
 
@@ -979,7 +979,7 @@ namespace ryujin
         const state_type &U_i) const -> flux_contribution_type
     {
       const auto &[e_i, p_i, a_i] =
-          pv.template get_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
       return f(U_i, p_i);
     }
 
@@ -993,7 +993,7 @@ namespace ryujin
         const state_type &U_j) const -> flux_contribution_type
     {
       const auto &[e_j, p_j, a_j] =
-          pv.template get_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
       return f(U_j, p_j);
     }
 

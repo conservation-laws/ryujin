@@ -163,7 +163,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[eta_m, h_star] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       h_i = view.water_depth(U_i);
       eta_i = eta_m;
@@ -187,7 +187,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[eta_j, h_star_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values.template read_tensor<Number, precomputed_type>(js);
 
       const auto velocity_j =
           view.momentum(U_j) * view.inverse_water_depth_sharp(U_j);

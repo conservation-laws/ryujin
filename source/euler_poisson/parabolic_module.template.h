@@ -558,7 +558,7 @@ namespace ryujin
       const auto body_copy = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
         const auto view = hyperbolic_system_->template view<dim, T>();
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto rho_i = view.density(U_i);
         write_entry<T>(density_, rho_i, i);
       };
@@ -731,7 +731,7 @@ namespace ryujin
         const auto m_i_inv =
             lumped_mass_matrix_inverse.template read_entry<T>(i);
 
-        auto U_i = U.template get_tensor<T>(i);
+        auto U_i = U.template read_tensor<T>(i);
         const auto rho_i = view.density(U_i);
         const auto m_i = view.momentum(U_i);
         const auto v_i = m_i / rho_i;
@@ -850,7 +850,7 @@ namespace ryujin
           using T = decltype(sentinel);
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto U_i = old_U.template read_tensor<T>(i);
           const auto rho_i = view.density(U_i);
           const auto m_i = view.momentum(U_i);
 
@@ -1099,7 +1099,7 @@ namespace ryujin
         const auto m_i_inv =
             lumped_mass_matrix_inverse.template read_entry<T>(i);
 
-        const auto old_U_i = old_U.template get_tensor<T>(i);
+        const auto old_U_i = old_U.template read_tensor<T>(i);
         const auto rho_i = view.density(old_U_i);
         const auto old_m_i = view.momentum(old_U_i);
         const auto old_v_i = old_m_i / rho_i;

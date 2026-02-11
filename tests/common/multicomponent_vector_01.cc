@@ -43,6 +43,6 @@ int main(int argc, char *argv[])
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 12; ++i) {
-    std::cout << state_vector.get_tensor<double>(i) << "\n";
+    std::cout << state_vector.read_tensor<double>(i) << "\n";
   }
 }
