@@ -20,6 +20,7 @@ set(COMMON_SOURCE_FILES
   offline_data.cc
   simd.cc
   sparse_matrix_simd.cc
+  sparsity_pattern.cc
   version_info.cc
   )
 
