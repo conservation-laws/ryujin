@@ -9,6 +9,7 @@
 
 #include <convenience_macros.h>
 #include <discretization.h>
+#include <loop.h>
 #include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>

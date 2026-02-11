@@ -5,8 +5,6 @@
 
 #pragma once
 
-
-#include "loop.h"
 #include "solution_transfer.h"
 #if DEAL_II_VERSION_GTE(9, 6, 0)
 #include "tensor_product_point_kernels.h"
@@ -462,7 +460,7 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
-
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
     ScalarHostVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
     HyperbolicVector projected_state;

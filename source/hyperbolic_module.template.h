@@ -71,9 +71,6 @@ namespace ryujin
     r_.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner());
 
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
-
     /* Initialize matrices: */
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
