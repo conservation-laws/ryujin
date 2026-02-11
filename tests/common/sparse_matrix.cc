@@ -29,6 +29,7 @@ int main()
 
   ryujin::SparsityPattern<simd_width> my_sparsity(
       (12 / simd_width) * simd_width, spars, partitioner);
+
   ryujin::SparseMatrix<double, 1, simd_width> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)

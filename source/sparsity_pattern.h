@@ -18,6 +18,12 @@ namespace ryujin
   class SparsityPatternView;
 
 
+  template <typename Number,
+            int n_components = 1,
+            int simd_length = dealii::VectorizedArray<Number>::size()>
+  class SparseMatrix;
+
+
   /**
    * A specialized sparsity pattern for efficient, vectorized SIMD access.
    *
@@ -121,6 +127,9 @@ namespace ryujin
 
     template <int>
     friend class SparsityPatternView;
+
+    template <typename, int, int>
+    friend class SparseMatrix;
 
     //@}
   };

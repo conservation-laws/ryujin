@@ -15,7 +15,6 @@
 #include <mpi_ensemble.h>
 #include <offline_data.h>
 #include <simd.h>
-#include <sparse_matrix_simd.h>
 
 #include "parabolic_module_gmg_operators.h"
 

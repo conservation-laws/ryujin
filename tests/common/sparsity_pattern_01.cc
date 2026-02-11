@@ -33,11 +33,11 @@ namespace ryujin
       //   ss << left << " : " << right << "\n";
 
       ss << "Send targets:\n";
-      for (const auto &[left, right] : this->send_targets)
+      for (const auto &[left, right] : this->send_targets_)
         ss << left << " : " << right << "\n";
 
       ss << "Entries to be sent:\n";
-      for (const auto &[left, right] : this->send_targets)
+      for (const auto &[left, right] : this->send_targets_)
         ss << left << " : " << right << "\n";
 
       std::cout << ss.str() << std::endl;

@@ -618,7 +618,7 @@ namespace ryujin
     affine_constraints_assembly.copy_from(affine_constraints);
     transform_to_local_range(*scalar_partitioner_, affine_constraints_assembly);
 
-    SparsityPattern sparsity_pattern_assembly;
+    dealii::SparsityPattern sparsity_pattern_assembly;
     {
       DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
       for (const auto &entry : sparsity_pattern_) {
