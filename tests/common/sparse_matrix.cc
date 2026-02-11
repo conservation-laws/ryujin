@@ -1,5 +1,5 @@
-#include <sparse_matrix_simd.h>
-#include <sparse_matrix_simd.template.h>
+#include <sparse_matrix.h>
+#include <sparse_matrix.template.h>
 
 int main()
 {
@@ -27,12 +27,12 @@ int main()
   auto partitioner = std::make_shared<dealii::Utilities::MPI::Partitioner>(
       locally_owned, locally_relevant, MPI_COMM_SELF);
 
-  ryujin::SparsityPatternSIMD<simd_width> my_sparsity(
+  ryujin::SparsityPattern<simd_width> my_sparsity(
       (12 / simd_width) * simd_width, spars, partitioner);
-  ryujin::SparseMatrixSIMD<double, 1, simd_width> my_sparse(my_sparsity);
+  ryujin::SparseMatrix<double, 1, simd_width> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
-      my_sparse.write_entry(double(i * 3 + j), i, j);
+      my_sparse.write_entry(static_cast<double>(i * 3 + j), i, j);
   my_sparse.write_entry(36., 12, 0);
   my_sparse.write_entry(37., 12, 1);
   my_sparse.write_entry(38., 13, 0);

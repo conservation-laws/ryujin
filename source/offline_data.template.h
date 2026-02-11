@@ -10,7 +10,7 @@
 #include "multicomponent_vector.h"
 #include "offline_data.h"
 #include "scratch_data.h"
-#include "sparse_matrix_simd.template.h" /* instantiate read_in */
+#include "sparse_matrix.template.h" /* instantiate read_in */
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>
@@ -422,7 +422,7 @@ namespace ryujin
     /*
      * We have to complete the local stencil to have consistent size over
      * all MPI ranks. Otherwise, MPI synchronization in our
-     * SparseMatrixSIMD class will fail.
+     * SparseMatrix class will fail.
      */
 
     SparsityTools::distribute_sparsity_pattern(
@@ -527,9 +527,10 @@ namespace ryujin
 #endif
 
     /*
-     * Set up SIMD sparsity pattern in local numbering. Nota bene: The
-     * SparsityPatternSIMD::reinit() function translates the pattern from
-     * global deal.II (typical) dof indexing to local indices.
+     * Set up SIMD sparsity pattern in local numbering.
+     *
+     * Nota bene: The SparsityPattern::reinit() function translates the
+     * pattern from global deal.II (typical) dof indexing to local indices.
      */
 
     sparsity_pattern_simd_.reinit(

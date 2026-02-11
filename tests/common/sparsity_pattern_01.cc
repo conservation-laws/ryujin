@@ -1,5 +1,5 @@
-#include <sparse_matrix_simd.h>
-#include <sparse_matrix_simd.template.h>
+#include <sparse_matrix.h>
+#include <sparse_matrix.template.h>
 
 /*
  * A quick check that "send_targets" and "entries_to_be_sent" are set up
@@ -14,14 +14,14 @@
 namespace ryujin
 {
   template <int simd_length>
-  class Debug : public SparsityPatternSIMD<simd_length>
+  class Debug : public SparsityPattern<simd_length>
   {
   public:
     Debug(const unsigned int n_internal_dofs,
           const dealii::DynamicSparsityPattern &sparsity,
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &partitioner)
-        : SparsityPatternSIMD<simd_length>(
+        : SparsityPattern<simd_length>(
               n_internal_dofs, sparsity, partitioner)
     {
     }

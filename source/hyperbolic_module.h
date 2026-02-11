@@ -12,7 +12,7 @@
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
-#include "sparse_matrix_simd.h"
+#include "sparse_matrix.h"
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -405,10 +405,10 @@ namespace ryujin
         Vectors::MultiComponentVector<Number, problem_dimension>;
     mutable HyperbolicVector r_;
 
-    mutable SparseMatrixSIMD<Number> dij_matrix_;
-    mutable SparseMatrixSIMD<Number> lij_matrix_;
-    mutable SparseMatrixSIMD<Number> lij_matrix_next_;
-    mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
+    mutable SparseMatrix<Number> dij_matrix_;
+    mutable SparseMatrix<Number> lij_matrix_;
+    mutable SparseMatrix<Number> lij_matrix_next_;
+    mutable SparseMatrix<Number, problem_dimension> pij_matrix_;
 
     //@}
   };

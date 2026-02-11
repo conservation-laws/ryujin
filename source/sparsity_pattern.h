@@ -125,7 +125,7 @@ namespace ryujin
     MPI_Comm mpi_communicator;
 
     template <typename, int, int>
-    friend class SparseMatrixSIMD;
+    friend class SparseMatrix;
   };
 
 
