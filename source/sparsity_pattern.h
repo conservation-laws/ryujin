@@ -195,5 +195,6 @@ namespace ryujin
 
     return row_starts.back();
   }
+
 #endif
 } // namespace ryujin
