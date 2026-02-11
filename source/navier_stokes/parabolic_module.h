@@ -129,9 +129,9 @@ namespace ryujin
 
       using StateVector = typename View::StateVector;
 
-      using ScalarVector = Vectors::ScalarVector<Number>;
+      using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
-      using BlockVector = Vectors::BlockVector<Number>;
+      using BlockHostVector = Vectors::BlockHostVector<Number>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -334,11 +334,11 @@ namespace ryujin
 
       mutable dealii::MatrixFree<dim, Number> matrix_free_;
 
-      mutable BlockVector velocity_;
-      mutable BlockVector velocity_rhs_;
-      mutable ScalarVector internal_energy_;
-      mutable ScalarVector internal_energy_rhs_;
-      mutable ScalarVector density_;
+      mutable BlockHostVector velocity_;
+      mutable BlockHostVector velocity_rhs_;
+      mutable ScalarHostVector internal_energy_;
+      mutable ScalarHostVector internal_energy_rhs_;
+      mutable ScalarHostVector density_;
 
       mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
           level_matrix_free_;

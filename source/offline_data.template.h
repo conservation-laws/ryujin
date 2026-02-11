@@ -958,11 +958,11 @@ namespace ryujin
 
     {
 #ifdef DEAL_II_WITH_TRILINOS
-      ScalarVector one(scalar_partitioner_);
+      ScalarHostVector one(scalar_partitioner_);
       one = 1.;
       affine_constraints_assembly.set_zero(one);
 
-      ScalarVector local_lumped_mass_matrix(scalar_partitioner_);
+      ScalarHostVector local_lumped_mass_matrix(scalar_partitioner_);
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
       local_lumped_mass_matrix.compress(VectorOperation::add);
 

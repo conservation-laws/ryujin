@@ -26,8 +26,8 @@ namespace ryujin
       const ParabolicSystem &parabolic_system,
       const Postprocessor<Description, dim, Number> &postprocessor,
       const InitialPrecomputedVector &initial_precomputed,
-      const ScalarVector &alpha,
-      const ScalarVector &smoothness_indicators,
+      const ScalarHostVector &alpha,
+      const ScalarHostVector &smoothness_indicators,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -94,8 +94,8 @@ namespace ryujin
 #endif
 
     /*
-     * Extract quantities and store in ScalarVectors so that we can call
-     * DataOut::add_data_vector()
+     * Extract quantities and store in ScalarHostVectors so that we can
+     * call DataOut::add_data_vector()
      */
 
     auto selected_components =

@@ -27,17 +27,29 @@ namespace ryujin
   namespace Vectors
   {
     /**
-     * Shorthand for dealii::LinearAlgebra::distributed::Vector<Number>.
+     * A scalar vector representing a single component given by a deal.II
+     * data type that is compatible with deal.II functions and methods and
+     * lives in the host memory space.
      */
     template <typename Number>
-    using ScalarVector = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using ScalarHostVector = dealii::LinearAlgebra::distributed::Vector<Number>;
 
 
     /**
-     * Shorthand for dealii::LinearAlgebra::distributed::BlockVector<Number>.
+     * A block vector representing a multiple components given by a deal.II
+     * data type that is compatible with deal.II functions and methods and
+     * lives in the host memory space.
      */
     template <typename Number>
-    using BlockVector = dealii::LinearAlgebra::distributed::BlockVector<Number>;
+    using BlockHostVector =
+        dealii::LinearAlgebra::distributed::BlockVector<Number>;
+
+
+    /**
+     * A scalar vector representing a single component.
+     */
+    template <typename Number>
+    using ScalarVector = MultiComponentVector<Number, 1>;
 
 
     /**
@@ -52,7 +64,7 @@ namespace ryujin
     using StateVector = std::tuple<
         MultiComponentVector<Number, problem_dim> /*U*/,
         MultiComponentVector<Number, prec_dim> /*precomputed values*/,
-        BlockVector<Number> /*parabolic state vector*/>;
+        BlockHostVector<Number> /*parabolic state vector*/>;
 
 
     /**
@@ -63,10 +75,10 @@ namespace ryujin
      *  - constrained degrees of freedom of the hyperbolic state vector
      *  - the ghost range of the hyperbolic state vector
      */
-    template <typename Number, int prob_dim, int prec_dim, typename O>
+    template <typename Number, int prob_dim, int prec_dim, typename OfflineData>
     void debug_poison_invalid_values(
         StateVector<Number, prob_dim, prec_dim> &state_vector [[maybe_unused]],
-        const O &offline_data [[maybe_unused]])
+        const OfflineData &offline_data [[maybe_unused]])
     {
 #ifdef DEBUG
       auto &[U, prec, V] = state_vector;

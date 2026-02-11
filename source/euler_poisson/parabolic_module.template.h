@@ -602,7 +602,7 @@ namespace ryujin
         }
       };
 
-      matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+      matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
           body_matrix_free,
           potential_rhs_,
           density_,
@@ -622,11 +622,11 @@ namespace ryujin
                                   : potential_rhs_.l2_norm()) *
           tolerance_;
 
-      typename dealii::SolverCG<ScalarVector>::AdditionalData solver_data;
+      typename dealii::SolverCG<ScalarHostVector>::AdditionalData solver_data;
 
       try {
         SolverControl solver_control(gmg_max_iter_, tolerance);
-        dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
+        dealii::SolverCG<ScalarHostVector> solver(solver_control, solver_data);
         solver.solve(laplace_operator_,
                      potential,
                      potential_rhs_,
@@ -643,7 +643,7 @@ namespace ryujin
 
       } catch (SolverControl::NoConvergence &) {
         SolverControl solver_control(1000, tolerance);
-        dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
+        dealii::SolverCG<ScalarHostVector> solver(solver_control, solver_data);
 
         solver.solve(laplace_operator_,
                      potential,
@@ -718,7 +718,7 @@ namespace ryujin
             }
           };
 
-      matrix_free_.template cell_loop<BlockVector, ScalarVector>(
+      matrix_free_.template cell_loop<BlockHostVector, ScalarHostVector>(
           body_velocity,
           velocity_rhs_,
           potential,
@@ -892,7 +892,7 @@ namespace ryujin
           }
         };
 
-        matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+        matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
             body_laplace,
             potential_rhs_,
             old_potential,
@@ -928,7 +928,7 @@ namespace ryujin
           }
         };
 
-        matrix_free_.template cell_loop<ScalarVector, BlockVector>(
+        matrix_free_.template cell_loop<ScalarHostVector, BlockHostVector>(
             body_velocity,
             potential_rhs_,
             velocity_rhs_,
@@ -968,7 +968,7 @@ namespace ryujin
             }
           };
 
-          matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+          matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
               body,
               potential_rhs_,
               background_density_,
@@ -983,7 +983,7 @@ namespace ryujin
 
           factor *= -1.;
 
-          matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+          matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
               body,
               potential_rhs_,
               background_density_,
@@ -1007,11 +1007,12 @@ namespace ryujin
                                     : potential_rhs_.l2_norm()) *
             tolerance_;
 
-        typename dealii::SolverCG<ScalarVector>::AdditionalData solver_data;
+        typename dealii::SolverCG<ScalarHostVector>::AdditionalData solver_data;
 
         try {
           SolverControl solver_control(gmg_max_iter_, tolerance);
-          dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
+          dealii::SolverCG<ScalarHostVector> solver(solver_control,
+                                                    solver_data);
           solver.solve(update_operator_,
                        new_potential,
                        potential_rhs_,
@@ -1023,7 +1024,8 @@ namespace ryujin
 
         } catch (SolverControl::NoConvergence &) {
           SolverControl solver_control(1000, tolerance);
-          dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
+          dealii::SolverCG<ScalarHostVector> solver(solver_control,
+                                                    solver_data);
 
           solver.solve(update_operator_,
                        new_potential,
@@ -1066,7 +1068,7 @@ namespace ryujin
             }
           };
 
-      matrix_free_.template cell_loop<BlockVector, ScalarVector>(
+      matrix_free_.template cell_loop<BlockHostVector, ScalarHostVector>(
           body_velocity,
           velocity_rhs_,
           new_potential,

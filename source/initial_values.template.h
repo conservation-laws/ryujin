@@ -258,11 +258,12 @@ namespace ryujin
     U.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner());
 
-    using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
+    using ScalarHostVector =
+        typename OfflineData<dim, Number>::ScalarHostVector;
 
     const auto callable = [&](const auto &p) { return initial_state(p, t); };
 
-    ScalarVector temp;
+    ScalarHostVector temp;
     const auto scalar_partitioner = offline_data_->scalar_partitioner();
     temp.reinit(scalar_partitioner);
 
@@ -301,11 +302,12 @@ namespace ryujin
     if constexpr (n_initial_precomputed_values == 0)
       return precomputed;
 
-    using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
+    using ScalarHostVector =
+        typename OfflineData<dim, Number>::ScalarHostVector;
 
     const auto callable = [&](const auto &p) { return initial_precomputed(p); };
 
-    ScalarVector temp;
+    ScalarHostVector temp;
     temp.reinit(scalar_partitioner);
 
     // FIXME: it is not particularly efficient to call

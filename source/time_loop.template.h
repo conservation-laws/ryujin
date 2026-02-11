@@ -737,8 +737,8 @@ namespace ryujin
         initial_values_.get().interpolate_hyperbolic_vector(t);
     const auto &U = std::get<0>(state_vector);
 
-    ScalarVector analytic_component;
-    ScalarVector error_component;
+    ScalarHostVector analytic_component;
+    ScalarHostVector error_component;
     analytic_component.reinit(offline_data_.scalar_partitioner());
     error_component.reinit(offline_data_.scalar_partitioner());
 

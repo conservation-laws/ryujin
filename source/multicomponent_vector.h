@@ -73,7 +73,8 @@ namespace ryujin
        * dealii::LinearAlgebra::distributed::Vector<Number> used to insert
        * and extract a single component of the MultiComponentVector.
        */
-      using ScalarVector = dealii::LinearAlgebra::distributed::Vector<Number>;
+      using ScalarHostVector =
+          dealii::LinearAlgebra::distributed::Vector<Number>;
 
       //@}
       /**
@@ -106,7 +107,7 @@ namespace ryujin
       //@}
       /**
        * @name Extracting and inserting a single component stored in a
-       * ScalarVector
+       * ScalarHostVector
        */
       //@{
 
@@ -119,13 +120,19 @@ namespace ryujin
        * The function calls scalar_vector.update_ghost_values() before
        * returning.
        *
+       * Optionally, a third argument @p functor can be supplied that is
+       * applied to each (scalar) value individually before stored in
+       * @p scalar_vector.
+       *
        * @note This function is used in the VTUOutput module to unpack a
        * single component out of our custom MultiComponentVector in order to
        * call deal.II specific functions (that can only operate on scalar
        * vectors).
        */
-      void extract_component(ScalarVector &scalar_vector,
-                             unsigned int component) const;
+      template <typename Functor = std::identity>
+      void extract_component(ScalarHostVector &scalar_vector,
+                             unsigned int component,
+                             const Functor &functor = std::identity{}) const;
 
       /**
        * Inserts a single component into a MultiComponentVector. The source
@@ -136,12 +143,18 @@ namespace ryujin
        * The function does not call update_ghost_values() automatically. This
        * has to be done by the user once all components are updated.
        *
+       * Optionally, a third argument @p functor can be supplied that is
+       * applied to each (scalar) value individually before stored in the
+       * corresponding component.
+       *
        * @note This function is used in InitialValues to populate all
        * components of the initial state that are returned component wise as
        * single scalar vectors by deal.II interpolation functions.
        */
-      void insert_component(const ScalarVector &scalar_vector,
-                            unsigned int component);
+      template <typename Functor = std::identity>
+      void insert_component(const ScalarHostVector &scalar_vector,
+                            unsigned int component,
+                            const Functor &functor = std::identity{});
 
       //@}
       /**
@@ -277,14 +290,14 @@ namespace ryujin
                 const Number a,
                 const MultiComponentVector<Number, n_components> &V)
       {
-        ScalarVector::sadd(s, a, V);
+        ScalarHostVector::sadd(s, a, V);
       }
 
-      using ScalarVector::update_ghost_values;
+      using ScalarHostVector::update_ghost_values;
 
-      using ScalarVector::zero_out_ghost_values;
+      using ScalarHostVector::zero_out_ghost_values;
 
-      using ScalarVector::compress;
+      using ScalarHostVector::compress;
 
       //@}
     };
@@ -308,7 +321,7 @@ namespace ryujin
       if (n_components == 0)
         return;
 
-      ScalarVector::reinit(vector_partitioner);
+      ScalarHostVector::reinit(vector_partitioner);
     }
 
     template <typename Number, int n_components, int simd_length>
@@ -323,19 +336,22 @@ namespace ryujin
 
       /* Special case of a scalar vector: */
       if (n_components == 1)
-        ScalarVector::reinit(scalar_partitioner);
+        ScalarHostVector::reinit(scalar_partitioner);
 
       auto vector_partitioner =
           create_vector_partitioner(scalar_partitioner, n_components);
 
-      ScalarVector::reinit(vector_partitioner);
+      ScalarHostVector::reinit(vector_partitioner);
     }
 
 
     template <typename Number, int n_components, int simd_length>
+    template <typename Functor>
     void
     MultiComponentVector<Number, n_components, simd_length>::extract_component(
-        ScalarVector &scalar_vector, unsigned int component) const
+        ScalarHostVector &scalar_vector,
+        unsigned int component,
+        const Functor &functor) const
     {
       Assert(n_components > 0,
              dealii::ExcMessage(
@@ -351,15 +367,18 @@ namespace ryujin
           scalar_vector.get_partitioner()->locally_owned_size();
       for (unsigned int i = 0; i < local_size; ++i)
         scalar_vector.local_element(i) =
-            this->local_element(i * n_components + component);
+            functor(this->local_element(i * n_components + component));
       scalar_vector.update_ghost_values();
     }
 
 
     template <typename Number, int n_components, int simd_length>
+    template <typename Functor>
     void
     MultiComponentVector<Number, n_components, simd_length>::insert_component(
-        const ScalarVector &scalar_vector, unsigned int component)
+        const ScalarHostVector &scalar_vector,
+        unsigned int component,
+        const Functor &functor)
     {
       Assert(n_components > 0,
              dealii::ExcMessage(
@@ -375,7 +394,7 @@ namespace ryujin
           scalar_vector.get_partitioner()->locally_owned_size();
       for (unsigned int i = 0; i < local_size; ++i)
         this->local_element(i * n_components + component) =
-            scalar_vector.local_element(i);
+            functor(scalar_vector.local_element(i));
     }
 
 

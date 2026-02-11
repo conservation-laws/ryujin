@@ -24,14 +24,14 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ryujin::ScalarVector
+     * @copydoc ryujin::ScalarHostVector
      */
-    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    using ScalarHostVector = typename Vectors::ScalarHostVector<Number>;
 
     /**
      * @copydoc ryujin::BlockVector
      */
-    using BlockVector = typename Vectors::BlockVector<Number>;
+    using BlockHostVector = typename Vectors::BlockHostVector<Number>;
 
     /**
      * Constructor
@@ -50,7 +50,7 @@ namespace ryujin
     /**
      * Get access to the internal vector to be externally filled.
      */
-    ScalarVector &scaling_vector()
+    ScalarHostVector &scaling_vector()
     {
       return diagonal_;
     }
@@ -58,7 +58,7 @@ namespace ryujin
     /**
      * Apply on a scalar vector.
      */
-    void vmult(ScalarVector &dst, const ScalarVector &src) const
+    void vmult(ScalarHostVector &dst, const ScalarHostVector &src) const
     {
       const auto n_owned = diagonal_.get_partitioner()->locally_owned_size();
       AssertDimension(n_owned, src.get_partitioner()->locally_owned_size());
@@ -73,7 +73,7 @@ namespace ryujin
     /**
      * Apply on a block vector.
      */
-    void vmult(BlockVector &dst, const BlockVector &src) const
+    void vmult(BlockHostVector &dst, const BlockHostVector &src) const
     {
       const auto n_blocks = src.n_blocks();
       AssertDimension(n_blocks, dst.n_blocks());
@@ -94,7 +94,7 @@ namespace ryujin
     }
 
   private:
-    ScalarVector diagonal_;
+    ScalarHostVector diagonal_;
   };
 
 } /* namespace ryujin */

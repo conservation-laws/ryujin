@@ -52,14 +52,14 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ryujin::ScalarVector
+     * @copydoc ryujin::ScalarHostVector
      */
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
     /**
      * Scalar vector storing single-precision floats
      */
-    using ScalarVectorFloat = Vectors::ScalarVector<float>;
+    using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
 
     /**
      * A tuple describing (local) dof index, boundary normal, normal mass,
@@ -450,10 +450,10 @@ namespace ryujin
     SparseMatrixSIMD<Number> mass_matrix_;
     SparseMatrixSIMD<Number> mass_matrix_inverse_;
 
-    ScalarVector lumped_mass_matrix_;
-    ScalarVector lumped_mass_matrix_inverse_;
+    ScalarHostVector lumped_mass_matrix_;
+    ScalarHostVector lumped_mass_matrix_inverse_;
 
-    std::vector<ScalarVectorFloat> level_lumped_mass_matrix_;
+    std::vector<ScalarHostVectorFloat> level_lumped_mass_matrix_;
 
     SparseMatrixSIMD<Number> betaij_matrix_;
     SparseMatrixSIMD<Number, dim> cij_matrix_;

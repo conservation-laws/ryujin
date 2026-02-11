@@ -48,7 +48,7 @@ namespace ryujin
     using StateVector = typename View::StateVector;
     using HyperbolicVector = typename View::HyperbolicVector;
 
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
     /**
      * The number of stored entries in the bounds array.
