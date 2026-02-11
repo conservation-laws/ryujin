@@ -394,7 +394,7 @@ namespace ryujin
           dij_matrix_.write_entry(d_ij, i, col_idx, true);
         }
 
-        const auto mass = get_entry<T>(lumped_mass_matrix, i);
+        const auto mass = lumped_mass_matrix.template get_entry<T>(i);
         const auto hd_i = mass * measure_of_omega_inverse;
         write_entry<T>(alpha_, indicator.alpha(hd_i), i);
       };
@@ -535,7 +535,7 @@ namespace ryujin
         /* write diagonal element */
         dij_matrix_.write_entry(d_sum, i, 0);
 
-        const Number mass = lumped_mass_matrix.local_element(i);
+        const Number mass = lumped_mass_matrix.get_entry(i);
         const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
 
         Number current_value = local_tau_max.load();
@@ -634,8 +634,9 @@ namespace ryujin
         auto U_i_new = U_i;
 
         const auto alpha_i = get_entry<T>(alpha_, i);
-        const auto m_i = get_entry<T>(lumped_mass_matrix, i);
-        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+        const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
+        const auto m_i_inv =
+            lumped_mass_matrix_inverse.template get_entry<T>(i);
 
         const auto flux_i = view.flux_contribution(
             old_precomputed, initial_precomputed_, i, U_i);
@@ -917,8 +918,10 @@ namespace ryujin
 
         [[maybe_unused]] T m_i;
         if constexpr (have_discontinuous_ansatz)
-          m_i = get_entry<T>(lumped_mass_matrix, i);
-        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+          m_i = lumped_mass_matrix.template get_entry<T>(i);
+
+        const auto m_i_inv =
+            lumped_mass_matrix_inverse.template get_entry<T>(i);
 
         const auto U_i_new = new_U.template get_tensor<T>(i);
 
@@ -944,7 +947,7 @@ namespace ryujin
           if constexpr (have_discontinuous_ansatz) {
             /* Use full consistent mass matrix inverse: */
 
-            const auto m_j = get_entry<T>(lumped_mass_matrix, js);
+            const auto m_j = lumped_mass_matrix.template get_entry<T>(js);
             const auto m_ij_inv =
                 mass_matrix_inverse.template get_entry<T>(i, col_idx);
             const auto b_ij = m_i * m_ij_inv - kronecker_ij;
@@ -955,7 +958,8 @@ namespace ryujin
           } else {
             /* Use Neumann series expansion: */
 
-            const auto m_j_inv = get_entry<T>(lumped_mass_matrix_inverse, js);
+            const auto m_j_inv =
+                lumped_mass_matrix_inverse.template get_entry<T>(js);
             const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
             const auto b_ij = kronecker_ij - m_ij * m_j_inv;
             const auto b_ji = kronecker_ij - m_ij * m_i_inv;

@@ -552,8 +552,9 @@ namespace ryujin
     if (discretization_->have_discontinuous_ansatz())
       mass_matrix_inverse_.reinit(sparsity_pattern_simd_);
 
-    lumped_mass_matrix_.reinit(scalar_partitioner_);
-    lumped_mass_matrix_inverse_.reinit(scalar_partitioner_);
+    lumped_mass_matrix_.reinit_with_scalar_partitioner(scalar_partitioner_);
+    lumped_mass_matrix_inverse_.reinit_with_scalar_partitioner(
+        scalar_partitioner_);
 
     betaij_matrix_.reinit(sparsity_pattern_simd_);
     cij_matrix_.reinit(sparsity_pattern_simd_);
@@ -958,6 +959,7 @@ namespace ryujin
 
     {
 #ifdef DEAL_II_WITH_TRILINOS
+      using ScalarHostVector = Vectors::ScalarHostVector<Number>;
       ScalarHostVector one(scalar_partitioner_);
       one = 1.;
       affine_constraints_assembly.set_zero(one);
@@ -965,18 +967,13 @@ namespace ryujin
       ScalarHostVector local_lumped_mass_matrix(scalar_partitioner_);
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
       local_lumped_mass_matrix.compress(VectorOperation::add);
-
-      for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
-           ++i) {
-        lumped_mass_matrix_.local_element(i) =
-            local_lumped_mass_matrix.local_element(i);
-        lumped_mass_matrix_inverse_.local_element(i) =
-            1. / lumped_mass_matrix_.local_element(i);
-      }
-      lumped_mass_matrix_.update_ghost_values();
-      lumped_mass_matrix_inverse_.update_ghost_values();
-
 #else
+      /*
+       * Work around the little detail that dealii::SparseMatrix does not
+       * allow vmult() with a distributed vector. On a globally refined
+       * grid, contracting the mass matrix in this manner still works
+       * without knowledge of the ghost range.
+       */
 
       dealii::Vector<Number> one(mass_matrix_tmp.m());
       one = 1.;
@@ -984,16 +981,16 @@ namespace ryujin
 
       dealii::Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
-
-      for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
-           ++i) {
-        lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
-        lumped_mass_matrix_inverse_.local_element(i) =
-            1. / lumped_mass_matrix_.local_element(i);
-      }
-      lumped_mass_matrix_.update_ghost_values();
-      lumped_mass_matrix_inverse_.update_ghost_values();
 #endif
+
+      lumped_mass_matrix_.insert_component(local_lumped_mass_matrix, 0);
+      lumped_mass_matrix_.update_ghost_values();
+
+      lumped_mass_matrix_inverse_.insert_component(
+          local_lumped_mass_matrix, 0, [](const Number &value) {
+            return Number(1.) / value;
+          });
+      lumped_mass_matrix_inverse_.update_ghost_values();
     }
 
     /*
@@ -1107,10 +1104,14 @@ namespace ryujin
                 if (std::abs(v_i * v_j) > 100. * eps) {
                   const auto &ansatz = discretization_->ansatz();
 
-                  const auto glob_i = local_dof_indices[i];
-                  const auto glob_j = neighbor_local_dof_indices[f_index][j];
-                  const auto m_i = lumped_mass_matrix_[glob_i];
-                  const auto m_j = lumped_mass_matrix_[glob_j];
+                  const auto global_i = local_dof_indices[i];
+                  const auto global_j = neighbor_local_dof_indices[f_index][j];
+                  const auto local_i =
+                      scalar_partitioner_->global_to_local(global_i);
+                  const auto local_j =
+                      scalar_partitioner_->global_to_local(global_j);
+                  const auto m_i = lumped_mass_matrix_.get_entry(local_i);
+                  const auto m_j = lumped_mass_matrix_.get_entry(local_j);
                   const auto hd_ij =
                       Number(0.5) * (m_i + m_j) / measure_of_omega_;
 
@@ -1222,7 +1223,7 @@ namespace ryujin
 
     double total_mass = 0.;
     for (unsigned int i = 0; i < n_locally_owned_; ++i)
-      total_mass += lumped_mass_matrix_.local_element(i);
+      total_mass += lumped_mass_matrix_.get_entry(i);
     total_mass =
         Utilities::MPI::sum(total_mass, mpi_ensemble_.ensemble_communicator());
 
@@ -1242,7 +1243,7 @@ namespace ryujin
         continue;
 
       auto sum =
-          mass_matrix_.get_entry(i, 0) - lumped_mass_matrix_.local_element(i);
+          mass_matrix_.get_entry(i, 0) - lumped_mass_matrix_.get_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
