@@ -11,7 +11,7 @@
 #include "scope.h"
 #include "simd.h"
 
-#include "sparse_matrix_simd.template.h"
+#include "sparse_matrix.template.h"
 
 #include <atomic>
 

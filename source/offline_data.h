@@ -11,7 +11,8 @@
 #include "discretization.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
-#include "sparse_matrix_simd.h"
+#include "sparse_matrix.h"
+#include "sparsity_pattern.h"
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -434,11 +435,11 @@ namespace ryujin
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
+    SparsityPattern<dealii::VectorizedArray<Number>::size()>
         sparsity_pattern_simd_;
 
-    SparseMatrixSIMD<Number> mass_matrix_;
-    SparseMatrixSIMD<Number> mass_matrix_inverse_;
+    SparseMatrix<Number> mass_matrix_;
+    SparseMatrix<Number> mass_matrix_inverse_;
 
     using ScalarVector = Vectors::ScalarVector<Number>;
     ScalarVector lumped_mass_matrix_;
@@ -447,9 +448,9 @@ namespace ryujin
     using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
     std::vector<ScalarHostVectorFloat> level_lumped_mass_matrix_;
 
-    SparseMatrixSIMD<Number> betaij_matrix_;
-    SparseMatrixSIMD<Number, dim> cij_matrix_;
-    SparseMatrixSIMD<Number> incidence_matrix_;
+    SparseMatrix<Number> betaij_matrix_;
+    SparseMatrix<Number, dim> cij_matrix_;
+    SparseMatrix<Number> incidence_matrix_;
 
     Number measure_of_omega_;
 
