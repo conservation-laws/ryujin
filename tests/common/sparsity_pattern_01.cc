@@ -21,8 +21,7 @@ namespace ryujin
           const dealii::DynamicSparsityPattern &sparsity,
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &partitioner)
-        : SparsityPattern<simd_length>(
-              n_internal_dofs, sparsity, partitioner)
+        : SparsityPattern<simd_length>(n_internal_dofs, sparsity, partitioner)
     {
     }
 
