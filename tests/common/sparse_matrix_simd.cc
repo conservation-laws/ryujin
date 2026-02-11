@@ -40,7 +40,7 @@ int main()
   std::cout << "Matrix entries row by row" << std::endl;
   for (unsigned int i = 0; i < my_sparsity.n_rows(); ++i) {
     for (unsigned int j = 0; j < my_sparsity.row_length(i); ++j) {
-      const auto a = my_sparse.get_entry(i, j);
+      const auto a = my_sparse.read_entry(i, j);
       std::cout << a << " ";
     }
     std::cout << std::endl;
@@ -49,13 +49,13 @@ int main()
   unsigned int i = 0;
   for (; i < (12 / simd_width) * simd_width; i += simd_width) {
     for (unsigned int j = 0; j < 3; ++j) {
-      const auto a = my_sparse.template get_entry<VA>(i, j);
+      const auto a = my_sparse.template read_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
   }
   for (; i < 14; i++)
-    std::cout << my_sparse.get_entry(i, 0) << " " << my_sparse.get_entry(i, 1)
+    std::cout << my_sparse.read_entry(i, 0) << " " << my_sparse.read_entry(i, 1)
               << " ";
   std::cout << std::endl;
 

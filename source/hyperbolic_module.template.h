@@ -391,7 +391,7 @@ namespace ryujin
           dij_matrix_.write_entry(d_ij, i, col_idx, true);
         }
 
-        const auto mass = lumped_mass_matrix.template get_entry<T>(i);
+        const auto mass = lumped_mass_matrix.template read_entry<T>(i);
         const auto hd_i = mass * measure_of_omega_inverse;
         alpha_.template write_entry<T>(indicator.alpha(hd_i), i);
       };
@@ -452,7 +452,7 @@ namespace ryujin
         const auto norm_ji = c_ji.norm();
         const auto n_ji = c_ji / norm_ji;
 
-        const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+        const auto d_ij = dij_matrix_.read_entry(i, col_idx);
 
         const auto lambda_max = riemann_solver.compute(U_j, U_i, j, &i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
@@ -518,7 +518,7 @@ namespace ryujin
             dij_matrix_.write_entry(d_ji, i, col_idx);
           }
 
-          d_sum -= dij_matrix_.get_entry(i, col_idx);
+          d_sum -= dij_matrix_.read_entry(i, col_idx);
         }
 
         /*
@@ -532,7 +532,7 @@ namespace ryujin
         /* write diagonal element */
         dij_matrix_.write_entry(d_sum, i, 0);
 
-        const Number mass = lumped_mass_matrix.get_entry(i);
+        const Number mass = lumped_mass_matrix.read_entry(i);
         const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
 
         Number current_value = local_tau_max.load();
@@ -630,10 +630,10 @@ namespace ryujin
         const auto U_i = old_U.template get_tensor<T>(i);
         auto U_i_new = U_i;
 
-        const auto alpha_i = alpha_.template get_entry<T>(i);
-        const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
+        const auto alpha_i = alpha_.template read_entry<T>(i);
+        const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template get_entry<T>(i);
+            lumped_mass_matrix_inverse.template read_entry<T>(i);
 
         const auto flux_i = view.flux_contribution(
             old_precomputed, initial_precomputed_, i, U_i);
@@ -682,7 +682,7 @@ namespace ryujin
             const auto flux_j = view.flux_contribution(
                 old_precomputed, initial_precomputed_, js, U_j);
 
-            const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+            const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 
             const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
@@ -702,14 +702,14 @@ namespace ryujin
 
           const auto U_j = old_U.template get_tensor<T>(js);
 
-          const auto alpha_j = alpha_.template get_entry<T>(js);
+          const auto alpha_j = alpha_.template read_entry<T>(js);
 
-          const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+          const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
           auto factor = (alpha_i + alpha_j) * Number(.5);
 
           if constexpr (have_discontinuous_ansatz) {
             const auto incidence_ij =
-                incidence_matrix.template get_entry<T>(i, col_idx);
+                incidence_matrix.template read_entry<T>(i, col_idx);
             factor = std::max(factor, incidence_ij);
           }
 
@@ -739,7 +739,7 @@ namespace ryujin
           const auto flux_j = view.flux_contribution(
               old_precomputed, initial_precomputed_, js, U_j);
 
-          const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+          const auto m_ij = mass_matrix.template read_entry<T>(i, col_idx);
 
           /*
            * Compute low-order flux and limiter bounds:
@@ -915,10 +915,10 @@ namespace ryujin
 
         [[maybe_unused]] T m_i;
         if constexpr (have_discontinuous_ansatz)
-          m_i = lumped_mass_matrix.template get_entry<T>(i);
+          m_i = lumped_mass_matrix.template read_entry<T>(i);
 
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template get_entry<T>(i);
+            lumped_mass_matrix_inverse.template read_entry<T>(i);
 
         const auto U_i_new = new_U.template get_tensor<T>(i);
 
@@ -944,9 +944,9 @@ namespace ryujin
           if constexpr (have_discontinuous_ansatz) {
             /* Use full consistent mass matrix inverse: */
 
-            const auto m_j = lumped_mass_matrix.template get_entry<T>(js);
+            const auto m_j = lumped_mass_matrix.template read_entry<T>(js);
             const auto m_ij_inv =
-                mass_matrix_inverse.template get_entry<T>(i, col_idx);
+                mass_matrix_inverse.template read_entry<T>(i, col_idx);
             const auto b_ij = m_i * m_ij_inv - kronecker_ij;
             const auto b_ji = m_j * m_ij_inv - kronecker_ij;
 
@@ -956,8 +956,8 @@ namespace ryujin
             /* Use Neumann series expansion: */
 
             const auto m_j_inv =
-                lumped_mass_matrix_inverse.template get_entry<T>(js);
-            const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+                lumped_mass_matrix_inverse.template read_entry<T>(js);
+            const auto m_ij = mass_matrix.template read_entry<T>(i, col_idx);
             const auto b_ij = kronecker_ij - m_ij * m_j_inv;
             const auto b_ji = kronecker_ij - m_ij * m_i_inv;
 
@@ -1053,7 +1053,7 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
           const auto l_ij = std::min(
-              lij_matrix_.template get_entry<T>(i, col_idx),
+              lij_matrix_.template read_entry<T>(i, col_idx),
               lij_matrix_.template get_transposed_entry<T>(i, col_idx));
 
           const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);

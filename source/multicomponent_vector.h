@@ -183,7 +183,7 @@ namespace ryujin
        * @note This function is only available if `n_components` is equal to 1.
        */
       template <typename Number2 = Number>
-      Number2 get_entry(const unsigned int i) const;
+      Number2 read_entry(const unsigned int i) const;
 
       /**
        * Variant of above function.
@@ -196,7 +196,7 @@ namespace ryujin
        * @note This function is only available if `n_components` is equal to 1.
        */
       template <typename Number2 = Number>
-      Number2 get_entry(const unsigned int *js) const;
+      Number2 read_entry(const unsigned int *js) const;
 
       /**
        * Return the tensor-valued entry indexed by @p i.
@@ -434,7 +434,7 @@ namespace ryujin
     template <typename Number, int n_components, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline Number2
-    MultiComponentVector<Number, n_components, simd_length>::get_entry(
+    MultiComponentVector<Number, n_components, simd_length>::read_entry(
         const unsigned int i) const
     {
       static_assert(
@@ -499,7 +499,7 @@ namespace ryujin
     template <typename Number, int n_components, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline Number2
-    MultiComponentVector<Number, n_components, simd_length>::get_entry(
+    MultiComponentVector<Number, n_components, simd_length>::read_entry(
         const unsigned int *js) const
     {
       static_assert(

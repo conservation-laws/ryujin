@@ -78,12 +78,12 @@ namespace ryujin
 
           T m_i;
           if constexpr (std::is_same_v<Vector, vector_type>) {
-            m_i = get_entry<T>(lumped_mass_matrix, i);
+            m_i = read_entry<T>(lumped_mass_matrix, i);
           } else {
-            m_i = lumped_mass_matrix.template get_entry<T>(i);
+            m_i = lumped_mass_matrix.template read_entry<T>(i);
           }
 
-          const auto rho_i = get_entry<T>(density, i);
+          const auto rho_i = read_entry<T>(density, i);
           write_entry<T>(diagonal, Number(1.0) / (rho_i * m_i), i);
         };
 
@@ -211,22 +211,22 @@ namespace ryujin
             if constexpr (std::is_same_v<Number, float>) {
               if (level_ == dealii::numbers::invalid_unsigned_int) {
                 const auto &lumped = offline_data_->lumped_mass_matrix();
-                return lumped.template get_entry<T>(i);
+                return lumped.template read_entry<T>(i);
               } else {
                 const auto &level_lumped =
                     offline_data_->level_lumped_mass_matrix()[level_];
-                return get_entry<T>(level_lumped, i);
+                return read_entry<T>(level_lumped, i);
               }
             } else {
               Assert(level_ == dealii::numbers::invalid_unsigned_int,
                      dealii::ExcInternalError());
               const auto &lumped = offline_data_->lumped_mass_matrix();
-              return lumped.template get_entry<T>(i);
+              return lumped.template read_entry<T>(i);
             }
           } else {
             const auto &level_lumped =
                 offline_data_->level_lumped_mass_matrix()[level_];
-            return get_entry<T>(level_lumped, i);
+            return read_entry<T>(level_lumped, i);
           }
         };
 
@@ -238,9 +238,9 @@ namespace ryujin
 
           const auto m_i = get_lumped_mass(T(), i);
 
-          const auto rho_i = get_entry<T>(*density_, i);
+          const auto rho_i = read_entry<T>(*density_, i);
           for (unsigned int d = 0; d < dim; ++d) {
-            const auto temp = get_entry<T>(src.block(d), i);
+            const auto temp = read_entry<T>(src.block(d), i);
             write_entry<T>(dst.block(d), m_i * rho_i * temp, i);
           }
         };
@@ -600,22 +600,22 @@ namespace ryujin
             if constexpr (std::is_same_v<Number, float>) {
               if (level_ == dealii::numbers::invalid_unsigned_int) {
                 const auto &lumped = offline_data_->lumped_mass_matrix();
-                return lumped.template get_entry<T>(i);
+                return lumped.template read_entry<T>(i);
               } else {
                 const auto &level_lumped =
                     offline_data_->level_lumped_mass_matrix()[level_];
-                return get_entry<T>(level_lumped, i);
+                return read_entry<T>(level_lumped, i);
               }
             } else {
               Assert(level_ == dealii::numbers::invalid_unsigned_int,
                      dealii::ExcInternalError());
               const auto &lumped = offline_data_->lumped_mass_matrix();
-              return lumped.template get_entry<T>(i);
+              return lumped.template read_entry<T>(i);
             }
           } else {
             const auto &level_lumped =
                 offline_data_->level_lumped_mass_matrix()[level_];
-            return get_entry<T>(level_lumped, i);
+            return read_entry<T>(level_lumped, i);
           }
         };
 
@@ -625,8 +625,8 @@ namespace ryujin
         const auto body_mass = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
           const auto m_i = get_lumped_mass(T(), i);
-          const auto rho_i = get_entry<T>(*density_, i);
-          const auto e_i = get_entry<T>(src, i);
+          const auto rho_i = read_entry<T>(*density_, i);
+          const auto e_i = read_entry<T>(src, i);
           write_entry<T>(dst, m_i * rho_i * e_i, i);
         };
 
@@ -717,10 +717,10 @@ namespace ryujin
         const auto body_invert = [&](auto sentinel, const unsigned int i) {
           using T = decltype(sentinel);
 
-          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
-          const auto rho_i = get_entry<T>(*density_, i);
+          const auto m_i = read_entry<T>(lumped_mass_matrix, i);
+          const auto rho_i = read_entry<T>(*density_, i);
           write_entry<T>(
-              vector, Number(1.) / (m_i * rho_i + get_entry<T>(vector, i)), i);
+              vector, Number(1.) / (m_i * rho_i + read_entry<T>(vector, i)), i);
         };
         cpu_simd_loop<Number>("", body_invert, 0, n_owned, n_owned);
 

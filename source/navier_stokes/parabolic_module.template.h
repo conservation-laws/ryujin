@@ -381,7 +381,7 @@ namespace ryujin
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
           const auto rho_e_i = view.internal_energy(U_i);
-          const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
+          const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
 
           write_entry<T>(density_, rho_i, i);
           /* (5.4a) */
@@ -663,17 +663,17 @@ namespace ryujin
 
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          const auto rhs_i = get_entry<T>(internal_energy_rhs_, i);
-          const auto m_i = lumped_mass_matrix.template get_entry<T>(i);
-          const auto rho_i = get_entry<T>(density_, i);
-          const auto e_i = get_entry<T>(internal_energy_, i);
+          const auto rhs_i = read_entry<T>(internal_energy_rhs_, i);
+          const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
+          const auto rho_i = read_entry<T>(density_, i);
+          const auto e_i = read_entry<T>(internal_energy_, i);
 
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto V_i = view.momentum(U_i) / rho_i;
 
           dealii::Tensor<1, dim, T> V_i_new;
           for (unsigned int d = 0; d < dim; ++d) {
-            V_i_new[d] = get_entry<T>(velocity_.block(d), i);
+            V_i_new[d] = read_entry<T>(velocity_.block(d), i);
           }
 
           /*
@@ -864,10 +864,10 @@ namespace ryujin
 
           Tensor<1, dim, T> m_i_new;
           for (unsigned int d = 0; d < dim; ++d) {
-            m_i_new[d] = rho_i * get_entry<T>(velocity_.block(d), i);
+            m_i_new[d] = rho_i * read_entry<T>(velocity_.block(d), i);
           }
 
-          auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
+          auto rho_e_i_new = rho_i * read_entry<T>(internal_energy_, i);
 
           /*
            * Check that the backward Euler step itself (which is our "low

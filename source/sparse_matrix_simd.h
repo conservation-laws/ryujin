@@ -172,13 +172,13 @@ namespace ryujin
      * @note This function is only available if `n_components` is equal to 1.
      */
     template <typename Number2 = Number>
-    Number2 get_entry(const unsigned int row,
-                      const unsigned int position_within_column) const;
+    Number2 read_entry(const unsigned int row,
+                       const unsigned int position_within_column) const;
 
     /**
      * Return the tensor-valued entry indexed by @p row and
      * @p position_within_column. This function performs the same operation
-     * as get_entry() except that it always returns the entry as a tensor
+     * as read_entry() except that it always returns the entry as a tensor
      * (even if it is effectively a scalar entry).
      *
      * @note If the template argument @a Number2
@@ -212,7 +212,7 @@ namespace ryujin
     /**
      * Return the transposed tensor-valued entry indexed by @p row and
      * @a position_within_column. This function performs the same operation
-     * as get_entry() except that it always returns the entry as a tensor
+     * as read_entry() except that it always returns the entry as a tensor
      * (even if it is effectively a scalar entry).
      *
      * @note If the template argument @a Number2
@@ -344,7 +344,7 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   template <typename Number2>
   DEAL_II_ALWAYS_INLINE inline auto
-  SparseMatrixSIMD<Number, n_components, simd_length>::get_entry(
+  SparseMatrixSIMD<Number, n_components, simd_length>::read_entry(
       const unsigned int row, const unsigned int position_within_column) const
       -> Number2
   {

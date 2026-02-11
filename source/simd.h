@@ -275,7 +275,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T, typename V>
-  DEAL_II_ALWAYS_INLINE inline T get_entry(const V &vector, unsigned int i)
+  DEAL_II_ALWAYS_INLINE inline T read_entry(const V &vector, unsigned int i)
   {
     static_assert(std::is_same_v<typename get_value_type<T>::type,
                                  typename V::value_type>,
@@ -299,8 +299,8 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T, typename T2>
-  DEAL_II_ALWAYS_INLINE inline T get_entry(const std::vector<T2> &vector,
-                                           unsigned int i)
+  DEAL_II_ALWAYS_INLINE inline T read_entry(const std::vector<T2> &vector,
+                                            unsigned int i)
   {
     if constexpr (std::is_same_v<typename get_value_type<T>::type, T2>) {
       /* Optimized default for source and destination with same type: */
@@ -337,8 +337,8 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T, typename V>
-  DEAL_II_ALWAYS_INLINE inline T get_entry(const V &vector,
-                                           const unsigned int *js)
+  DEAL_II_ALWAYS_INLINE inline T read_entry(const V &vector,
+                                            const unsigned int *js)
   {
     static_assert(std::is_same_v<typename get_value_type<T>::type,
                                  typename V::value_type>,
@@ -362,8 +362,8 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T, typename T2>
-  DEAL_II_ALWAYS_INLINE inline T get_entry(const std::vector<T2> &vector,
-                                           const unsigned int *js)
+  DEAL_II_ALWAYS_INLINE inline T read_entry(const std::vector<T2> &vector,
+                                            const unsigned int *js)
   {
     static_assert(std::is_same_v<typename get_value_type<T>::type, T2>,
                   "type mismatch");

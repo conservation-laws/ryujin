@@ -255,7 +255,7 @@ namespace ryujin
 
       boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
       for (unsigned int k = 0; k < n_entries; ++k) {
-        value_i[k] = get_entry<T>(quantities[k], i);
+        value_i[k] = read_entry<T>(quantities[k], i);
       }
 
       boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
@@ -269,10 +269,10 @@ namespace ryujin
         if (col_idx == 0)
           continue;
 
-        const auto beta_ij = betaij_matrix.template get_entry<T>(i, col_idx);
+        const auto beta_ij = betaij_matrix.template read_entry<T>(i, col_idx);
 
         for (unsigned int k = 0; k < n_entries; ++k) {
-          const auto value_j_k = get_entry<T>(quantities[k], js);
+          const auto value_j_k = read_entry<T>(quantities[k], js);
           numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
           denominator_i[k] +=
               std::abs(beta_ij) * //
@@ -313,8 +313,8 @@ namespace ryujin
 
       auto alpha_i = T(0.);
       for (unsigned int k = 0; k < n_entries; ++k) {
-        const auto numerator_i = get_entry<T>(numerator[k], i);
-        const auto denominator_i = get_entry<T>(denominator[k], i);
+        const auto numerator_i = read_entry<T>(numerator[k], i);
+        const auto denominator_i = read_entry<T>(denominator[k], i);
 
         auto denominator =
             (Number(1.) - smoothness_local_global_ratio_) * denominator_i +
@@ -345,7 +345,7 @@ namespace ryujin
       if (row_length == 1)
         return;
 
-      auto alpha_i = get_entry<T>(numerator[0], i);
+      auto alpha_i = read_entry<T>(numerator[0], i);
 
       const unsigned int *js = sparsity_simd.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
@@ -355,7 +355,7 @@ namespace ryujin
         if (col_idx == 0)
           continue;
 
-        const auto alpha_j = get_entry<T>(numerator[0], js);
+        const auto alpha_j = read_entry<T>(numerator[0], js);
 
         alpha_i = std::max(alpha_i, alpha_j);
       }
@@ -490,7 +490,7 @@ namespace ryujin
         const auto global_i = local_dof_indices[i];
         const auto local_i = scalar_partitioner->global_to_local(global_i);
         auto alpha_i =
-            smoothness_indicators_.template get_entry<Number>(local_i);
+            smoothness_indicators_.template read_entry<Number>(local_i);
         alpha_cell += alpha_i;
       }
       alpha_cell *= scale;
