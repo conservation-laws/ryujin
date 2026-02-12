@@ -161,8 +161,8 @@ namespace ryujin
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_components, Number2>>
-    Tensor get_tensor(const unsigned int row,
-                      const unsigned int position_within_column) const;
+    Tensor read_tensor(const unsigned int row,
+                       const unsigned int position_within_column) const;
 
     /* Get transposed scalar or tensor-valued entry: */
 
@@ -179,8 +179,8 @@ namespace ryujin
      */
     template <typename Number2 = Number>
     Number2
-    get_transposed_entry(const unsigned int row,
-                         const unsigned int position_within_column) const;
+    read_transposed_entry(const unsigned int row,
+                          const unsigned int position_within_column) const;
 
     /**
      * Return the transposed tensor-valued entry indexed by @p row and
@@ -196,8 +196,8 @@ namespace ryujin
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_components, Number2>>
     Tensor
-    get_transposed_tensor(const unsigned int row,
-                          const unsigned int position_within_column) const;
+    read_transposed_tensor(const unsigned int row,
+                           const unsigned int position_within_column) const;
 
     /* Write scalar or tensor entry: */
 
@@ -281,7 +281,7 @@ namespace ryujin
         n_components == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
-    const auto result = get_tensor<Number2>(row, position_within_column);
+    const auto result = read_tensor<Number2>(row, position_within_column);
     return result[0];
   }
 
@@ -289,7 +289,7 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   template <typename Number2, typename Tensor>
   DEAL_II_ALWAYS_INLINE inline Tensor
-  SparseMatrixView<Number, n_components, simd_length>::get_tensor(
+  SparseMatrixView<Number, n_components, simd_length>::read_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
     using VA = dealii::VectorizedArray<Number>;
@@ -346,7 +346,7 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   template <typename Number2>
   DEAL_II_ALWAYS_INLINE inline Number2
-  SparseMatrixView<Number, n_components, simd_length>::get_transposed_entry(
+  SparseMatrixView<Number, n_components, simd_length>::read_transposed_entry(
       const unsigned int row, const unsigned int position_within_column) const
   {
     static_assert(
@@ -354,7 +354,7 @@ namespace ryujin
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
     const auto result =
-        get_transposed_tensor<Number2>(row, position_within_column);
+        read_transposed_tensor<Number2>(row, position_within_column);
     return result[0];
   }
 
@@ -362,7 +362,7 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   template <typename Number2, typename Tensor>
   DEAL_II_ALWAYS_INLINE inline Tensor
-  SparseMatrixView<Number, n_components, simd_length>::get_transposed_tensor(
+  SparseMatrixView<Number, n_components, simd_length>::read_transposed_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
     using VA = dealii::VectorizedArray<Number>;

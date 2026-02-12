@@ -196,7 +196,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       gamma_min = gamma_min_i;
 

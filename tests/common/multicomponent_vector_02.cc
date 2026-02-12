@@ -46,6 +46,6 @@ int main(int argc, char *argv[])
 
   std::cout << "\nState vector (packed SIMD):\n";
   for (unsigned int i = 0; i < 8; i += simd_width) {
-    std::cout << state_vector.get_tensor<VA>(i) << "\n";
+    std::cout << state_vector.read_tensor<VA>(i) << "\n";
   }
 }

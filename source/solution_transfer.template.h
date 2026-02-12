@@ -85,7 +85,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE auto
-  SolutionTransfer<Description, dim, Number>::get_tensor(
+  SolutionTransfer<Description, dim, Number>::read_tensor(
       const HyperbolicVector &U, const dealii::types::global_dof_index global_i)
       -> state_type
   {
@@ -97,11 +97,11 @@ namespace ryujin
       const auto &line = *affine_constraints.get_constraint_entries(global_i);
       for (const auto &[global_k, c_k] : line) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        result += c_k * U.get_tensor(local_k);
+        result += c_k * U.read_tensor(local_k);
       }
       return result;
     } else {
-      return U.get_tensor(local_i);
+      return U.read_tensor(local_i);
     }
   }
 
@@ -194,7 +194,7 @@ namespace ryujin
                 std::begin(dof_indices),
                 std::end(dof_indices),
                 std::begin(state_values),
-                [&](const auto global_i) { return get_tensor(U, global_i); });
+                [&](const auto global_i) { return read_tensor(U, global_i); });
           } break;
 
           case dealii::CellStatus::children_will_be_coarsened: {
@@ -274,7 +274,7 @@ namespace ryujin
               if (child == 0 &&
                   std::begin(dof_indices) != std::end(dof_indices)) {
                 const auto global_i = dof_indices[0];
-                const auto U_i = get_tensor(U, global_i);
+                const auto U_i = read_tensor(U, global_i);
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
                 bounds = limiter.projection_bounds_from_state(local_i, U_i);
@@ -285,7 +285,7 @@ namespace ryujin
 
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
                 const auto global_i = dof_indices[i];
-                const auto U_i = get_tensor(U, global_i);
+                const auto U_i = read_tensor(U, global_i);
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
                 const auto bounds_i =
@@ -709,7 +709,7 @@ namespace ryujin
     const auto update_new_state_vector = [&]() {
       for (unsigned int local_i = 0; local_i < n_locally_owned; ++local_i) {
 
-        const auto mU_i = projected_state.get_tensor(local_i);
+        const auto mU_i = projected_state.read_tensor(local_i);
         const auto m_i = projected_mass.local_element(local_i);
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
@@ -764,7 +764,7 @@ namespace ryujin
 
       /* The result of the mass projection: */
       const auto m_i_star = projected_mass.local_element(local_i);
-      const auto U_i_star = projected_state.get_tensor(local_i) / m_i_star;
+      const auto U_i_star = projected_state.read_tensor(local_i) / m_i_star;
 
       auto &bounds = bounds_map[local_i]; /* by reference */
       bounds = limiter.projection_bounds_from_state(local_i, U_i_star);
@@ -773,13 +773,13 @@ namespace ryujin
       state_type U_i_interp;
       for (const auto &[global_k, c_k] : line.entries) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        U_i_interp += c_k * new_U.get_tensor(local_k);
+        U_i_interp += c_k * new_U.read_tensor(local_k);
       }
 
       /* And redistribute low order update: */
       for (const auto &[global_k, c_k] : line.entries) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        const auto U_k = new_U.get_tensor(local_k);
+        const auto U_k = new_U.read_tensor(local_k);
 
         const auto bounds_k =
             limiter.projection_bounds_from_state(local_k, U_k);
@@ -836,7 +836,7 @@ namespace ryujin
         auto total_mass = Number(0.);
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
-          const auto U_k = new_U.get_tensor(local_k);
+          const auto U_k = new_U.read_tensor(local_k);
           const auto bounds_k =
               limiter.projection_bounds_from_state(local_k, U_k);
           bounds = limiter.combine_bounds(bounds, bounds_k);
@@ -857,7 +857,7 @@ namespace ryujin
           const auto local_k = scalar_partitioner->global_to_local(global_k);
           const auto kappa_k = kappa.local_element(local_k);
           const auto m_k = projected_mass.local_element(local_k);
-          const auto U_k = new_U.get_tensor(local_k);
+          const auto U_k = new_U.read_tensor(local_k);
           const auto P_ik = pik_matrix[{local_i, local_k}] * kappa_k / m_k;
 
           const auto &[l_k, check] = limiter.limit(relaxed_bounds, U_k, P_ik);

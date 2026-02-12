@@ -208,8 +208,8 @@ namespace ryujin
       const auto u_j = view.state(U_j);
 
       const auto &pv = precomputed_values;
-      const auto prec_i = pv.template get_tensor<Number, pst>(i);
-      const auto prec_j = pv.template get_tensor<Number, pst>(js);
+      const auto prec_i = pv.template read_tensor<Number, pst>(i);
+      const auto prec_j = pv.template read_tensor<Number, pst>(js);
 
       return compute(u_i, u_j, prec_i, prec_j, n_ij);
     }

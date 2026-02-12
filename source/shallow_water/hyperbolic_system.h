@@ -678,7 +678,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto eta_m = view.mathematical_entropy(U_i);
         const auto h_sharp = view.water_depth_sharp(U_i);
@@ -1080,7 +1080,7 @@ namespace ryujin
         const unsigned int i,
         const state_type &U_i) const -> flux_contribution_type
     {
-      const auto Z_i = piv.template get_tensor<Number>(i)[0];
+      const auto Z_i = piv.template read_tensor<Number>(i)[0];
       return {U_i, Z_i};
     }
 
@@ -1093,7 +1093,7 @@ namespace ryujin
         const unsigned int *js,
         const state_type &U_j) const -> flux_contribution_type
     {
-      const auto Z_j = piv.template get_tensor<Number>(js)[0];
+      const auto Z_j = piv.template read_tensor<Number>(js)[0];
       return {U_j, Z_j};
     }
 
@@ -1213,7 +1213,7 @@ namespace ryujin
         const ScalarNumber tau) const -> state_type
     {
       const auto &[eta_m, h_star] =
-          pv.template get_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
       return manning_friction(U_i, h_star, tau);
     }
@@ -1228,7 +1228,7 @@ namespace ryujin
         const ScalarNumber tau) const -> state_type
     {
       const auto &[eta_m, h_star] =
-          pv.template get_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
 
       return manning_friction(U_j, h_star, tau);
     }

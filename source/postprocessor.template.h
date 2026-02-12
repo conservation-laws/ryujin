@@ -160,11 +160,11 @@ namespace ryujin
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 
-        const auto U_j = U.template get_tensor<T>(js);
+        const auto U_j = U.template read_tensor<T>(js);
         const auto view = hyperbolic_system_->template view<dim, T>();
         const auto prim_j = view.to_primitive_state(U_j);
 
-        const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+        const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
 
         unsigned int k = 0;
         for (const auto &[is_primitive, index] : schlieren_indices_) {

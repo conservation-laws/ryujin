@@ -1264,7 +1264,7 @@ namespace ryujin
         }
         sum += m_ij;
 
-        const auto m_ji = mass_matrix_.get_transposed_entry(i, col_idx);
+        const auto m_ji = mass_matrix_.read_transposed_entry(i, col_idx);
         if (std::abs(m_ij - m_ji) >= 1.e-12) {
           // The m_ij matrix is not symmetric
           std::stringstream ss;
@@ -1286,7 +1286,7 @@ namespace ryujin
       if (row_length == 1)
         continue;
 
-      auto sum = cij_matrix_.get_tensor(i, 0);
+      auto sum = cij_matrix_.read_tensor(i, 0);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -1296,11 +1296,11 @@ namespace ryujin
                                                  : js + col_idx);
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
-        const auto c_ij = cij_matrix_.get_tensor(i, col_idx);
+        const auto c_ij = cij_matrix_.read_tensor(i, col_idx);
         Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
         sum += c_ij;
 
-        const auto c_ji = cij_matrix_.get_transposed_tensor(i, col_idx);
+        const auto c_ji = cij_matrix_.read_transposed_tensor(i, col_idx);
         if ((c_ij + c_ji).norm() >= 1.e-12) {
           // The c_ij matrix is not symmetric, this can only happen if i
           // and j are both located on the boundary.

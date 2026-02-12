@@ -208,7 +208,7 @@ namespace ryujin
        */
       template <typename Number2 = Number,
                 typename Tensor = dealii::Tensor<1, n_components, Number2>>
-      Tensor get_tensor(const unsigned int i) const;
+      Tensor read_tensor(const unsigned int i) const;
 
       /**
        * Variant of above function.
@@ -220,7 +220,7 @@ namespace ryujin
        */
       template <typename Number2 = Number,
                 typename Tensor = dealii::Tensor<1, n_components, Number2>>
-      Tensor get_tensor(const unsigned int *js) const;
+      Tensor read_tensor(const unsigned int *js) const;
 
       /**
        * Write a (scalar valued) @p entry to the vector at position by @p i.
@@ -445,7 +445,7 @@ namespace ryujin
                        this->get_partitioner()->locally_owned_size() +
                            this->get_partitioner()->n_ghost_indices());
 
-      const auto result = get_tensor<Number2>(i);
+      const auto result = read_tensor<Number2>(i);
       return result[0];
     }
 
@@ -453,7 +453,7 @@ namespace ryujin
     template <typename Number, int n_components, int simd_length>
     template <typename Number2, typename Tensor>
     DEAL_II_ALWAYS_INLINE inline Tensor
-    MultiComponentVector<Number, n_components, simd_length>::get_tensor(
+    MultiComponentVector<Number, n_components, simd_length>::read_tensor(
         const unsigned int i) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -506,7 +506,7 @@ namespace ryujin
           n_components == 1,
           "Attempted to read a scalar value from a tensor-valued vector entry");
 
-      const auto result = get_tensor<Number2>(js);
+      const auto result = read_tensor<Number2>(js);
       return result[0];
     }
 
@@ -514,7 +514,7 @@ namespace ryujin
     template <typename Number, int n_components, int simd_length>
     template <typename Number2, typename Tensor>
     DEAL_II_ALWAYS_INLINE inline Tensor
-    MultiComponentVector<Number, n_components, simd_length>::get_tensor(
+    MultiComponentVector<Number, n_components, simd_length>::read_tensor(
         const unsigned int *js) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,

@@ -715,7 +715,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const precomputed_type prec_i{view.specific_entropy(U_i),
                                       view.harten_entropy(U_i)};

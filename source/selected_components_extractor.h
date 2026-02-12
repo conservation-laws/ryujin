@@ -118,7 +118,7 @@ namespace ryujin
         const unsigned int n_owned = scalar_partitioner->locally_owned_size();
         const auto view = hyperbolic_system.template view<dim, Number>();
         for (unsigned int i = 0; i < n_owned; ++i) {
-          const auto U_i = U.get_tensor(i);
+          const auto U_i = U.read_tensor(i);
           const auto PU_i = view.to_primitive_state(U_i);
           for (const auto &[j, k] : primitive_indices)
             extracted_components[j].local_element(i) = PU_i[k];

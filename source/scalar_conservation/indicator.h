@@ -159,7 +159,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto prec_i =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       u_i = view.state(U_i);
       u_abs_max = std::abs(u_i);
@@ -180,7 +180,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto prec_j =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values.template read_tensor<Number, precomputed_type>(js);
 
       const auto u_j = view.state(U_j);
       u_abs_max = std::max(u_abs_max, std::abs(u_j));
