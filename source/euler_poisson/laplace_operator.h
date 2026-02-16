@@ -17,6 +17,7 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/matrix_free/matrix_free.h>
+#include <deal.II/matrix_free/tools.h>
 #include <deal.II/multigrid/mg_base.h>
 #include <deal.II/multigrid/mg_coarse.h>
 #include <deal.II/multigrid/mg_matrix.h>
@@ -121,19 +122,18 @@ namespace ryujin
 
       using namespace dealii;
 
-      const auto body = [](const auto &data,
-                           auto &dst,
-                           const auto &src,
-                           const auto range) {
+      const auto body = [this](const auto &data,
+                               auto &dst,
+                               const auto &src,
+                               const auto range) {
         FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number> fee(
             data, /*CG*/ 0, /*full quadrature*/ 0);
 
         for (unsigned int cell = range.first; cell < range.second; ++cell) {
           fee.reinit(cell);
-          fee.gather_evaluate(src, dealii::EvaluationFlags::gradients);
-          for (unsigned int q = 0; q < fee.n_q_points; ++q)
-            fee.submit_gradient(fee.get_gradient(q), q);
-          fee.integrate_scatter(dealii::EvaluationFlags::gradients, dst);
+          fee.read_dof_values(src);
+          apply_local_operator(fee);
+          fee.distribute_local_to_global(dst);
         }
       };
 
@@ -149,48 +149,17 @@ namespace ryujin
     void compute_diagonal(
         dealii::DiagonalMatrix<ScalarHostVector> &diagonal_matrix) const
     {
-      using namespace dealii;
-
       ScalarHostVector &diagonal_vector = diagonal_matrix.get_vector();
       matrix_free_->initialize_dof_vector(diagonal_vector, /*CG*/ 0);
 
-      const auto body_matrix_free =
-          [](const auto &data, auto &dst, const auto &, const auto range) {
-            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
-                fee_read(data, /*CG*/ 0, /*lumped quadrature*/ 1);
-            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
-                fee_write(data, /*CG*/ 0, /*lumped quadrature*/ 1);
-
-            for (unsigned int cell = range.first; cell < range.second; ++cell) {
-              fee_read.reinit(cell);
-              fee_write.reinit(cell);
-
-              for (unsigned int i = 0; i < fee_read.dofs_per_cell; ++i) {
-                /* Set up shape function for degree i: */
-                for (unsigned int j = 0; j < fee_read.dofs_per_cell; ++j)
-                  fee_read.begin_dof_values()[j] =
-                      dealii::VectorizedArray<Number>();
-                fee_read.begin_dof_values()[i] =
-                    dealii::make_vectorized_array<Number>(1.);
-
-                fee_read.evaluate(dealii::EvaluationFlags::gradients);
-                for (unsigned int q = 0; q < fee_write.n_q_points; ++q)
-                  fee_write.submit_gradient(fee_read.get_gradient(q), q);
-
-                fee_write.begin_dof_values()[i] =
-                    fee_read.begin_dof_values()[i];
-              }
-
-              fee_write.distribute_local_to_global(dst);
-            }
-          };
-
-      unsigned int dummy = 0;
-      matrix_free_->template cell_loop<ScalarHostVector, unsigned int>(
-          body_matrix_free,
+      dealii::MatrixFreeTools::compute_diagonal(
+          *matrix_free_,
           diagonal_vector,
-          dummy,
-          /*zero destination*/ true);
+          &LaplaceOperator::template apply_local_operator<
+              dealii::FEEvaluation<dim, -1, 0, 1, Number>>,
+          this,
+          0,
+          1);
 
       /* invert diagonal matrix: */
 
@@ -211,6 +180,15 @@ namespace ryujin
 
   private:
     const dealii::MatrixFree<dim, Number> *matrix_free_;
+
+    template <typename Evaluator>
+    void apply_local_operator(Evaluator &eval) const
+    {
+      eval.evaluate(dealii::EvaluationFlags::gradients);
+      for (const unsigned int q : eval.quadrature_point_indices())
+        eval.submit_gradient(eval.get_gradient(q), q);
+      eval.integrate(dealii::EvaluationFlags::gradients);
+    }
   };
 
 

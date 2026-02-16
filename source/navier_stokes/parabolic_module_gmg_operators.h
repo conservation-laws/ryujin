@@ -18,6 +18,7 @@
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/diagonal_matrix.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
+#include <deal.II/matrix_free/tools.h>
 #include <deal.II/multigrid/mg_base.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
@@ -319,46 +320,27 @@ namespace ryujin
           matrix_free_->initialize_dof_vector(vector.block(d));
         vector.collect_sizes();
 
-        unsigned int dummy = 0;
-        matrix_free_->template cell_loop<block_vector_type, unsigned int>(
-            [this](
-                const auto &data, auto &dst, const auto &, const auto range) {
-              dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number>
-                  velocity(data);
-              dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number>
-                  writer(data);
-
-              for (unsigned int cell = range.first; cell < range.second;
-                   ++cell) {
-                velocity.reinit(cell);
-                writer.reinit(cell);
-                for (unsigned int i = 0; i < velocity.dofs_per_cell; ++i) {
-                  for (unsigned int j = 0; j < velocity.dofs_per_cell; ++j)
-                    velocity.begin_dof_values()[j] =
-                        dealii::VectorizedArray<Number>();
-                  velocity.begin_dof_values()[i] =
-                      dealii::make_vectorized_array<Number>(1.);
-                  apply_local_operator(velocity);
-                  writer.begin_dof_values()[i] = velocity.begin_dof_values()[i];
-                }
-                writer.distribute_local_to_global(dst);
-              }
-            },
+        dealii::MatrixFreeTools::compute_diagonal(
+            *matrix_free_,
             vector,
-            dummy,
-            /* zero destination */ true);
+            &VelocityMatrix::template apply_local_operator<
+                dealii::FEEvaluation<dim, -1, 0, dim, Number>>,
+            this);
 
         const auto &lumped_mass_matrix =
             offline_data_->level_lumped_mass_matrix()[level_];
         const unsigned int n_owned =
             lumped_mass_matrix.get_partitioner()->locally_owned_size();
 
-        const auto body_invert = [&](const auto &, const unsigned int i) {
+        const auto body_invert = [&](auto sentinel, const unsigned int i) {
+          using T = decltype(sentinel);
           const auto m_i = lumped_mass_matrix.local_element(i);
           const auto rho_i = density_->local_element(i);
           for (unsigned int d = 0; d < dim; ++d)
-            vector.block(d).local_element(i) =
-                Number(1.) / (m_i * rho_i + vector.block(d).local_element(i));
+            write_entry(vector.block(d),
+                        Number(1.) /
+                            (m_i * rho_i + read_entry<T>(vector.block(d), i)),
+                        i);
         };
 
         cpu_simd_loop<Number>("", body_invert, 0, n_owned, n_owned);
@@ -413,7 +395,7 @@ namespace ryujin
 
         velocity.evaluate(dealii::EvaluationFlags::gradients);
 
-        for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+        for (const unsigned int q : velocity.quadrature_point_indices()) {
           if constexpr (dim == 1) {
             /* Workaround: no symmetric gradient for dim == 1: */
             const auto gradient = velocity.get_gradient(q);
@@ -682,34 +664,12 @@ namespace ryujin
         const vector_type &lumped_mass_matrix =
             offline_data_->level_lumped_mass_matrix()[level_];
 
-        unsigned int dummy = 0;
-        matrix_free_->template cell_loop<vector_type, unsigned int>(
-            [this](
-                const auto &data, auto &dst, const auto &, const auto range) {
-              dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
-                  data);
-              dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> writer(
-                  data);
-
-              for (unsigned int cell = range.first; cell < range.second;
-                   ++cell) {
-                energy.reinit(cell);
-                writer.reinit(cell);
-                for (unsigned int i = 0; i < energy.dofs_per_cell; ++i) {
-                  for (unsigned int j = 0; j < energy.dofs_per_cell; ++j)
-                    energy.begin_dof_values()[j] =
-                        dealii::VectorizedArray<Number>();
-                  energy.begin_dof_values()[i] =
-                      dealii::make_vectorized_array<Number>(1.);
-                  apply_local_operator(energy);
-                  writer.begin_dof_values()[i] = energy.begin_dof_values()[i];
-                }
-                writer.distribute_local_to_global(dst);
-              }
-            },
+        dealii::MatrixFreeTools::compute_diagonal(
+            *matrix_free_,
             vector,
-            dummy,
-            /* zero destination */ true);
+            &EnergyMatrix::template apply_local_operator<
+                dealii::FEEvaluation<dim, -1, 0, dim, Number>>,
+            this);
 
         const unsigned int n_owned =
             lumped_mass_matrix.get_partitioner()->locally_owned_size();
