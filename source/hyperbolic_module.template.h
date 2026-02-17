@@ -1022,9 +1022,8 @@ namespace ryujin
           computing_timer_,
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
-      if ((n_iterations == 2) && last_round) {
-        std::swap(lij_matrix_, lij_matrix_next_);
-      }
+      const auto &lij_matrix =
+          (n_iterations == 2 && last_round) ? lij_matrix_next_ : lij_matrix_;
 
       auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
@@ -1051,8 +1050,8 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
           const auto l_ij = std::min(
-              lij_matrix_.template read_entry<T>(i, col_idx),
-              lij_matrix_.template read_transposed_entry<T>(i, col_idx));
+              lij_matrix.template read_entry<T>(i, col_idx),
+              lij_matrix.template read_transposed_entry<T>(i, col_idx));
 
           const auto p_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
 
