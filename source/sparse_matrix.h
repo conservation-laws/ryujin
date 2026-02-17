@@ -42,7 +42,7 @@ namespace ryujin
   {
   public:
     /**
-     * Constructor, initialization, access.
+     * Constructor and initialization (in host memory space):
      */
     //@{
 
@@ -77,6 +77,12 @@ namespace ryujin
     void read_in(const SparseMatrix2 &sparse_matrix2,
                  bool locally_indexed = true);
 
+    //@}
+    /**
+     * Memory space access and synchronization:
+     */
+    //@{
+
     /**
      * Return a writable view on the sparse matrix for the selected memory
      * space.
@@ -92,6 +98,20 @@ namespace ryujin
     SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
     get_view() const;
 
+    /**
+     * Returns true if the templated memory space is the currently active
+     * memory space.
+     */
+    template <typename MemorySpace>
+    bool is_active_memory_space() const;
+
+    /**
+     * Move internal data from the currently active memory space to the
+     * templated memory space.
+     */
+    template <typename MemorySpace>
+    void move_to_memory_space();
+
     //@}
     /**
      * MPI synchronization.
@@ -99,12 +119,13 @@ namespace ryujin
     //@{
 
     /**
-     * Update ghost rows on the templated memory space.
+     * MPI synchronization: Import all ghost rows from neighboring MPI
+     * ranks on the templated memory space.
      */
     template <typename MemorySpace>
-    void update_ghost_rows();
+    void update_ghost_rows_on_memory_space();
 
-  protected:
+  private:
     //@}
     /**
      * @name Internal fields, methods, and friends
@@ -120,6 +141,8 @@ namespace ryujin
     using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
     Kokkos::View<Number *, DefaultSpace> data_default_;
     Kokkos::View<Number *, DefaultSpace> exchange_buffer_default_;
+
+    bool host_space_active_;
 
     std::vector<MPI_Request> requests_;
 
@@ -290,6 +313,7 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   SparseMatrix<Number, n_components, simd_length>::SparseMatrix()
       : sparsity_(nullptr)
+      , host_space_active_(true)
   {
   }
 
@@ -307,6 +331,7 @@ namespace ryujin
       const SparsityPattern<simd_length> &sparsity)
   {
     this->sparsity_ = &sparsity;
+    this->host_space_active_ = true;
 
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
     using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
@@ -337,6 +362,10 @@ namespace ryujin
       const std::array<SparseMatrix2, n_components> &sparse_matrix,
       bool locally_indexed /*= true*/)
   {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    Assert(is_active_memory_space<HostSpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
     /*
      * We use the indirect (and slow) access via operator()(i, j) into the
      * sparse matrix we are copying from. This allows for significantly
@@ -397,6 +426,10 @@ namespace ryujin
   void SparseMatrix<Number, n_components, simd_length>::read_in(
       const SparseMatrix2 &sparse_matrix, bool locally_indexed /*= true*/)
   {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    Assert(is_active_memory_space<HostSpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
     /*
      * We use the indirect (and slow) access via operator()(i, j) into the
      * sparse matrix we are copying from. This allows for significantly
@@ -448,13 +481,89 @@ namespace ryujin
   }
 
 
+  template <typename Number, int n_comp, int simd_length>
+  template <typename MemorySpace>
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>
+  SparseMatrix<Number, n_comp, simd_length>::get_view()
+  {
+    Assert(is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    return SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>(
+        *this);
+  }
+
+
+  template <typename Number, int n_comp, int simd_length>
+  template <typename MemorySpace>
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
+  SparseMatrix<Number, n_comp, simd_length>::get_view() const
+  {
+    Assert(is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    return SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>(
+        *this);
+  }
+
+
   template <typename Number, int n_components, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::update_ghost_rows()
+  bool SparseMatrix<Number, n_components, simd_length>::is_active_memory_space()
+      const
   {
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected Kokkos memory space");
+
+    return host_space_active_ == std::is_same_v<MemorySpace, HostSpace>;
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  template <typename MemorySpace>
+  void SparseMatrix<Number, n_components, simd_length>::move_to_memory_space()
+  {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected Kokkos memory space");
+
+    if (is_active_memory_space<MemorySpace>())
+      return;
+
+    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+      host_space_active_ = true;
+      Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
+      Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
+                        /*src*/ exchange_buffer_default_);
+
+    } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
+      host_space_active_ = false;
+      Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
+      Kokkos::deep_copy(/*dst*/ exchange_buffer_default_,
+                        /*src*/ exchange_buffer_host_);
+    }
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  template <typename MemorySpace>
+  void SparseMatrix<Number, n_components, simd_length>::
+      update_ghost_rows_on_memory_space()
+  {
+
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
+
+    Assert(is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
 
     const auto &receive_targets = sparsity_->receive_targets();
     const auto &send_targets = sparsity_->send_targets();
@@ -547,6 +656,13 @@ namespace ryujin
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
   {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected Kokkos memory space");
+
     reinit(sparse_matrix);
   }
 
@@ -594,6 +710,9 @@ namespace ryujin
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
     const auto result = read_tensor<Number2>(row, position_within_column);
     return result[0];
   }
@@ -610,16 +729,18 @@ namespace ryujin
       read_tensor(const unsigned int row,
                   const unsigned int position_within_column) const
   {
-    using VA = dealii::VectorizedArray<Number>;
+    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
+                  "type mismatch");
+
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
 
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
-    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
-                  "type mismatch");
-
     Tensor result;
 
+    using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<Number, Number2>) {
       /*
        * Non-vectorized slow access. Supports all row indices in
@@ -675,6 +796,9 @@ namespace ryujin
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
     const auto result =
         read_transposed_tensor<Number2>(row, position_within_column);
     return result[0];
@@ -692,16 +816,18 @@ namespace ryujin
       read_transposed_tensor(const unsigned int row,
                              const unsigned int position_within_column) const
   {
-    using VA = dealii::VectorizedArray<Number>;
+    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
+                  "type mismatch");
+
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
 
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
-    static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
-                  "type mismatch");
-
     dealii::Tensor<1, n_comp, Number2> result;
 
+    using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<Number, Number2>) {
       /*
        * Non-vectorized slow access. Supports all row indices in
@@ -760,6 +886,9 @@ namespace ryujin
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
@@ -785,11 +914,13 @@ namespace ryujin
                    const bool do_streaming_store)
     requires(writable)
   {
-    using VA = dealii::VectorizedArray<Number>;
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
 
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
+    using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<Number, Number2>) {
       /*
        * Non-vectorized slow access. Supports all row indices in
@@ -849,11 +980,10 @@ namespace ryujin
                       std::is_same_v<MemorySpace, DefaultSpace>,
                   "Unexpected Kokkos memory space");
 
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      sparse_matrix_->update_ghost_rows_host();
-    } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
-      sparse_matrix_->update_ghost_rows_default();
-    }
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    sparse_matrix_->template update_ghost_rows_on_memory_space<MemorySpace>();
   }
 
 #endif
