@@ -176,14 +176,13 @@ namespace ryujin
   class SparseMatrixView
   {
   public:
-    using SparseMatrix = SparseMatrix<Number, n_comp, simd_length>;
-
     SparseMatrixView() = default;
 
-    SparseMatrixView(SparseMatrix &sparse_matrix)
+    SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
       requires(writable);
 
-    SparseMatrixView(const SparseMatrix &sparse_matrix)
+    SparseMatrixView(
+        const SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
       requires(!writable);
 
     template <typename SparseMatrix>
@@ -311,8 +310,8 @@ namespace ryujin
     //@}
 
   private:
-    std::conditional_t<writable, SparseMatrix, const SparseMatrix>
-        *sparse_matrix_;
+    using SM = SparseMatrix<Number, n_comp, simd_length>;
+    std::conditional_t<writable, SM *, const SM *> sparse_matrix_;
     SparsityPatternView<simd_length, MemorySpace> sparsity_;
     Kokkos::View<Number *, MemorySpace> data_;
   };
@@ -670,7 +669,7 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      SparseMatrixView(SparseMatrix &sparse_matrix)
+      SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
     requires(writable)
   {
     reinit(sparse_matrix);
@@ -683,7 +682,8 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      SparseMatrixView(const SparseMatrix &sparse_matrix)
+      SparseMatrixView(
+          const SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
     requires(!writable)
   {
     reinit(sparse_matrix);
