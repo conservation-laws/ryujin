@@ -1,0 +1,14 @@
+HostSpace active == 1
+DefaultSpace active == 1
+After move to DefaultSpace:
+HostSpace active == 1
+DefaultSpace active == 1
+After repeated move to DefaultSpace:
+HostSpace active == 1
+DefaultSpace active == 1
+After move to HostSpace:
+HostSpace active == 1
+DefaultSpace active == 1
+Entry (0, 0): 42
+Entry (1, 1): 420
+Entry (2, 2): 4200

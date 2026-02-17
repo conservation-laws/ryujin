@@ -2,6 +2,10 @@
 
 int main(int argc, char *argv[])
 {
+  //
+  // Test basic SIMD functionality:
+  //
+
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
   using VA = dealii::VectorizedArray<double>;
