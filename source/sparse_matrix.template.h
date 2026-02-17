@@ -198,7 +198,7 @@ namespace ryujin
             MPI_BYTE,
             targets[p].first,
             mpi_tag,
-            sparsity->mpi_communicator_,
+            sparsity->partitioner()->get_mpi_communicator(),
             &requests[p]);
         AssertThrowMPI(ierr);
       }
@@ -254,7 +254,7 @@ namespace ryujin
             MPI_BYTE,
             targets[p].first,
             mpi_tag,
-            sparsity->mpi_communicator_,
+            sparsity->partitioner()->get_mpi_communicator(),
             &requests[p + sparsity->receive_targets_.size()]);
         AssertThrowMPI(ierr);
       }
