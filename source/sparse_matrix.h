@@ -18,6 +18,8 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 
+#include <type_traits>
+
 namespace ryujin
 {
   template <typename Number,
@@ -88,14 +90,14 @@ namespace ryujin
      * Return a writable view on the sparse matrix for the selected memory
      * space.
      */
-    template <typename MemorySpace>
+    template <typename MemorySpace = dealii::MemorySpace::Host::kokkos_space>
     SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true> get_view();
 
     /**
      * Return a read-only view on the sparse matrix for the selected memory
      * space.
      */
-    template <typename MemorySpace>
+    template <typename MemorySpace = dealii::MemorySpace::Host::kokkos_space>
     SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
     get_view() const;
 
@@ -174,11 +176,19 @@ namespace ryujin
   class SparseMatrixView
   {
   public:
+    using SparseMatrix = SparseMatrix<Number, n_comp, simd_length>;
+
     SparseMatrixView() = default;
 
-    SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix);
+    SparseMatrixView(SparseMatrix &sparse_matrix)
+      requires(writable);
 
-    void reinit(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix);
+    SparseMatrixView(const SparseMatrix &sparse_matrix)
+      requires(!writable);
+
+    template <typename SparseMatrix>
+    void reinit(SparseMatrix &sparse_matrix)
+      requires(writable != std::is_const_v<SparseMatrix>);
 
     /* Get scalar or tensor-valued entry: */
 
@@ -268,7 +278,7 @@ namespace ryujin
     write_entry(const Number2 entry,
                 const unsigned int row,
                 const unsigned int position_within_column,
-                const bool do_streaming_store = false)
+                const bool do_streaming_store = false) const
       requires(writable);
 
     /**
@@ -286,7 +296,7 @@ namespace ryujin
     write_tensor(const Tensor &tensor,
                  const unsigned int row,
                  const unsigned int position_within_column,
-                 const bool do_streaming_store = false)
+                 const bool do_streaming_store = false) const
       requires(writable);
 
     //@}
@@ -295,13 +305,14 @@ namespace ryujin
      */
     //@{
 
-    void update_ghost_rows()
+    void update_ghost_rows() const
       requires(writable);
 
     //@}
 
   private:
-    SparseMatrix<Number, n_comp, simd_length> *sparse_matrix_;
+    std::conditional_t<writable, SparseMatrix, const SparseMatrix>
+        *sparse_matrix_;
     SparsityPatternView<simd_length, MemorySpace> sparsity_;
     Kokkos::View<Number *, MemorySpace> data_;
   };
@@ -659,15 +670,9 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+      SparseMatrixView(SparseMatrix &sparse_matrix)
+    requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
-
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected Kokkos memory space");
-
     reinit(sparse_matrix);
   }
 
@@ -677,9 +682,24 @@ namespace ryujin
             int simd_length,
             typename MemorySpace,
             bool writable>
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      SparseMatrixView(const SparseMatrix &sparse_matrix)
+    requires(!writable)
+  {
+    reinit(sparse_matrix);
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
+  template <typename SparseMatrix>
   void
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::reinit(
-      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+      SparseMatrix &sparse_matrix)
+    requires(writable != std::is_const_v<SparseMatrix>)
   {
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
     using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
@@ -872,7 +892,7 @@ namespace ryujin
       write_entry(const Number2 entry,
                   const unsigned int row,
                   const unsigned int position_within_column,
-                  const bool do_streaming_store)
+                  const bool do_streaming_store) const
     requires(writable)
   {
     static_assert(
@@ -901,7 +921,7 @@ namespace ryujin
       write_tensor(const Tensor &tensor,
                    const unsigned int row,
                    const unsigned int position_within_column,
-                   const bool do_streaming_store)
+                   const bool do_streaming_store) const
     requires(writable)
   {
     AssertIndexRange(row, sparsity_.n_rows());
@@ -956,7 +976,7 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      update_ghost_rows()
+      update_ghost_rows() const
     requires(writable)
   {
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
