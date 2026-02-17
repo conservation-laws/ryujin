@@ -898,7 +898,7 @@ namespace ryujin
         continue;
 
       const auto m_i = projected_mass.local_element(local_i);
-      const auto m_i_reference = lumped_mass_matrix.local_element(local_i);
+      const auto m_i_reference = lumped_mass_matrix.read_entry(local_i);
       Assert(std::abs(m_i - m_i_reference) < 1.e-10,
              dealii::ExcMessage(
                  "SolutionTransfer::projection(): something went wrong. Final "

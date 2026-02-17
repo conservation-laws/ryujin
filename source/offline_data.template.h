@@ -1244,7 +1244,7 @@ namespace ryujin
         continue;
 
       auto sum =
-          mass_matrix_.read_entry(i, 0) - lumped_mass_matrix_.get_entry(i);
+          mass_matrix_.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();

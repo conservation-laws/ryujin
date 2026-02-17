@@ -17,8 +17,6 @@ namespace ryujin
   template <int simd_length>
   SparsityPattern<simd_length>::SparsityPattern()
       : n_internal_dofs_(0)
-      , row_starts_(1)
-      , mpi_communicator_(MPI_COMM_SELF)
   {
   }
 
@@ -29,9 +27,6 @@ namespace ryujin
       const dealii::DynamicSparsityPattern &sparsity,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &partitioner)
-      : n_internal_dofs_(0)
-      , row_starts_(1)
-      , mpi_communicator_(MPI_COMM_SELF)
   {
     reinit(n_internal_dofs, sparsity, partitioner);
   }
@@ -44,8 +39,6 @@ namespace ryujin
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &partitioner)
   {
-    this->mpi_communicator_ = partitioner->get_mpi_communicator();
-
     this->n_internal_dofs_ = n_internal_dofs;
     this->n_locally_owned_dofs_ = partitioner->locally_owned_size();
     this->partitioner_ = partitioner;
@@ -85,21 +78,35 @@ namespace ryujin
     Assert(n_locally_owned_dofs_ <= sparsity.n_rows(),
            dealii::ExcInternalError());
 
-    row_starts_.resize_fast(sparsity.n_rows() + 1);
-    column_indices_.resize_fast(sparsity.n_nonzero_elements());
-    indices_transposed_.resize_fast(sparsity.n_nonzero_elements());
-    AssertThrow(sparsity.n_nonzero_elements() <
-                    std::numeric_limits<unsigned int>::max(),
-                dealii::ExcMessage("Transposed indices only support up to 4 "
-                                   "billion matrix entries per MPI rank. Try to"
-                                   " split into smaller problems with MPI"));
+    AssertThrow(
+        sparsity.n_nonzero_elements() <
+            std::numeric_limits<unsigned int>::max(),
+        dealii::ExcMessage(
+            "Transposed indices only support up to 4 billion matrix entries "
+            "per MPI rank. Try to split into smaller problems with MPI"));
+
+    /* Allocate memory: */
+
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
+
+    row_starts_host_ = Kokkos::View<unsigned int *, HostSpace, Aligned>(
+        "sparsity_pattern_row_starts", sparsity.n_rows() + 1);
+
+    column_indices_host_ = Kokkos::View<unsigned int *, HostSpace, Aligned>(
+        "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
+
+    indices_transposed_host_ = Kokkos::View<unsigned int *, HostSpace, Aligned>(
+        "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
+
 
     /* Vectorized part: */
 
-    row_starts_[0] = 0;
+    row_starts_host_[0] = 0;
 
-    unsigned int *col_ptr = column_indices_.data();
-    unsigned int *transposed_ptr = indices_transposed_.data();
+    unsigned int *col_ptr = column_indices_host_.data();
+    unsigned int *transposed_ptr = indices_transposed_host_.data();
 
     for (unsigned int i = 0; i < n_internal_dofs; i += simd_length) {
       auto jts = generate_iterators<simd_length>(
@@ -122,12 +129,14 @@ namespace ryujin
             *transposed_ptr++ = position;
         }
 
-      row_starts_[i / simd_length + 1] = col_ptr - column_indices_.data();
+      row_starts_host_[i / simd_length + 1] =
+          col_ptr - column_indices_host_.data();
     }
 
     /* Rest: */
 
-    row_starts_[n_internal_dofs] = row_starts_[n_internal_dofs / simd_length];
+    row_starts_host_[n_internal_dofs] =
+        row_starts_host_[n_internal_dofs / simd_length];
 
     for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i) {
       for (auto j = sparsity.begin(i); j != sparsity.end(i); ++j) {
@@ -145,10 +154,14 @@ namespace ryujin
         } else
           *transposed_ptr++ = position;
       }
-      row_starts_[i + 1] = col_ptr - column_indices_.data();
+      row_starts_host_[i + 1] = col_ptr - column_indices_host_.data();
     }
 
-    Assert(col_ptr == column_indices_.end(), dealii::ExcInternalError());
+#ifdef DEBUG
+    const auto distance = std::distance(column_indices_host_.data(), col_ptr);
+    Assert(static_cast<std::size_t>(distance) == column_indices_host_.size(),
+           dealii::ExcInternalError());
+#endif
 
     /* Compute the data exchange pattern: */
 
@@ -269,8 +282,19 @@ namespace ryujin
       }
     }
 
-    /* reinitialize the view: */
+    /*
+     * Copy data over to device and initialize the default host view:
+     */
+
+    row_starts_default_ = Kokkos::create_mirror_view_and_copy(
+        typename DefaultSpace::execution_space(), row_starts_host_);
+
+    column_indices_default_ = Kokkos::create_mirror_view_and_copy(
+        typename DefaultSpace::execution_space(), column_indices_host_);
+
+    indices_transposed_default_ = Kokkos::create_mirror_view_and_copy(
+        typename DefaultSpace::execution_space(), indices_transposed_host_);
+
     SparsityPatternView<simd_length>::reinit(*this);
   }
-
 } // namespace ryujin
