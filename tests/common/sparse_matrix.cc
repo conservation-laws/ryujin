@@ -1,5 +1,4 @@
 #include <sparse_matrix.h>
-#include <sparse_matrix.template.h>
 
 int main(int argc, char *argv[])
 {

@@ -11,8 +11,6 @@
 #include "scope.h"
 #include "simd.h"
 
-#include "sparse_matrix.template.h"
-
 #include <atomic>
 
 namespace ryujin
