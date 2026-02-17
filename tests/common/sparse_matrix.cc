@@ -1,8 +1,10 @@
 #include <sparse_matrix.h>
 #include <sparse_matrix.template.h>
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   using VA = dealii::VectorizedArray<double>;
   constexpr auto simd_width = VA::size();
 

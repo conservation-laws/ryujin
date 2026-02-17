@@ -1,5 +1,4 @@
-#include <sparse_matrix.h>
-#include <sparse_matrix.template.h>
+#include <sparsity_pattern.h>
 
 /*
  * A quick check that "send_targets" and "entries_to_be_sent" are set up
@@ -33,11 +32,11 @@ namespace ryujin
       //   ss << left << " : " << right << "\n";
 
       ss << "Send targets:\n";
-      for (const auto &[left, right] : this->send_targets_)
+      for (const auto &[left, right] : this->send_targets())
         ss << left << " : " << right << "\n";
 
       ss << "Entries to be sent:\n";
-      for (const auto &[left, right] : this->send_targets_)
+      for (const auto &[left, right] : this->send_targets())
         ss << left << " : " << right << "\n";
 
       std::cout << ss.str() << std::endl;
