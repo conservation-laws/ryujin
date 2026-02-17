@@ -12,6 +12,7 @@
 #include "sparsity_pattern.h"
 
 #include <deal.II/base/aligned_vector.h>
+#include <deal.II/base/config.h>
 #include <deal.II/base/partitioner.h>
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -193,8 +194,9 @@ namespace ryujin
      * @note This function is only available if `n_comp` is equal to 1.
      */
     template <typename Number2 = Number>
-    Number2 read_entry(const unsigned int row,
-                       const unsigned int position_within_column) const;
+    DEAL_II_HOST_DEVICE Number2
+    read_entry(const unsigned int row,
+               const unsigned int position_within_column) const;
 
     /**
      * Return the tensor-valued entry indexed by @p row and
@@ -209,8 +211,9 @@ namespace ryujin
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
-    Tensor read_tensor(const unsigned int row,
-                       const unsigned int position_within_column) const;
+    DEAL_II_HOST_DEVICE Tensor
+    read_tensor(const unsigned int row,
+                const unsigned int position_within_column) const;
 
     /* Get transposed scalar or tensor-valued entry: */
 
@@ -226,7 +229,7 @@ namespace ryujin
      * @note This function is only available if `n_comp` is equal to 1.
      */
     template <typename Number2 = Number>
-    Number2
+    DEAL_II_HOST_DEVICE Number2
     read_transposed_entry(const unsigned int row,
                           const unsigned int position_within_column) const;
 
@@ -243,7 +246,7 @@ namespace ryujin
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
-    Tensor
+    DEAL_II_HOST_DEVICE Tensor
     read_transposed_tensor(const unsigned int row,
                            const unsigned int position_within_column) const;
 
@@ -261,10 +264,11 @@ namespace ryujin
      * @note This function is only available if `n_comp` is equal to 1.
      */
     template <typename Number2 = Number>
-    void write_entry(const Number2 entry,
-                     const unsigned int row,
-                     const unsigned int position_within_column,
-                     const bool do_streaming_store = false)
+    DEAL_II_HOST_DEVICE void
+    write_entry(const Number2 entry,
+                const unsigned int row,
+                const unsigned int position_within_column,
+                const bool do_streaming_store = false)
       requires(writable);
 
     /**
@@ -278,10 +282,11 @@ namespace ryujin
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
-    void write_tensor(const Tensor &tensor,
-                      const unsigned int row,
-                      const unsigned int position_within_column,
-                      const bool do_streaming_store = false)
+    DEAL_II_HOST_DEVICE void
+    write_tensor(const Tensor &tensor,
+                 const unsigned int row,
+                 const unsigned int position_within_column,
+                 const bool do_streaming_store = false)
       requires(writable);
 
     //@}
@@ -701,7 +706,7 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       read_entry(const unsigned int row,
                  const unsigned int position_within_column) const
@@ -709,9 +714,6 @@ namespace ryujin
     static_assert(
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
-
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
 
     const auto result = read_tensor<Number2>(row, position_within_column);
     return result[0];
@@ -724,16 +726,13 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
-  DEAL_II_ALWAYS_INLINE inline Tensor
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       read_tensor(const unsigned int row,
                   const unsigned int position_within_column) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
-
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
 
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
@@ -787,7 +786,7 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       read_transposed_entry(const unsigned int row,
                             const unsigned int position_within_column) const
@@ -795,9 +794,6 @@ namespace ryujin
     static_assert(
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
-
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
 
     const auto result =
         read_transposed_tensor<Number2>(row, position_within_column);
@@ -811,16 +807,13 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
-  DEAL_II_ALWAYS_INLINE inline Tensor
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       read_transposed_tensor(const unsigned int row,
                              const unsigned int position_within_column) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
-
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
 
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
@@ -874,7 +867,7 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline void
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       write_entry(const Number2 entry,
                   const unsigned int row,
@@ -885,9 +878,6 @@ namespace ryujin
     static_assert(
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
-
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
 
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
@@ -906,7 +896,7 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
-  DEAL_II_ALWAYS_INLINE inline void
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       write_tensor(const Tensor &tensor,
                    const unsigned int row,
@@ -914,9 +904,6 @@ namespace ryujin
                    const bool do_streaming_store)
     requires(writable)
   {
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
-
     AssertIndexRange(row, sparsity_.n_rows());
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
@@ -968,8 +955,7 @@ namespace ryujin
             int simd_length,
             typename MemorySpace,
             bool writable>
-  inline void
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+  void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       update_ghost_rows()
     requires(writable)
   {
