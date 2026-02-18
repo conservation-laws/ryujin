@@ -298,6 +298,42 @@ namespace ryujin
                  const bool do_streaming_store = false) const
       requires(writable);
 
+    /**
+     * Add a (scalar-valued) @p entry to the matrix indexed by @p row
+     * and @p position_within_column.
+     *
+     * @note If the template argument @a Number2
+     * is a vectorized array a specialized, faster access will be performed.
+     * In this case the index @p row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     *
+     * @note This function is only available if `n_comp` is equal to 1.
+     */
+    template <typename Number2 = Number>
+    DEAL_II_HOST_DEVICE void
+    add_entry(const Number2 entry,
+              const unsigned int row,
+              const unsigned int position_within_column) const
+      requires(writable);
+
+    /**
+     * Add a tensor-valued @p entry to the matrix indexed by @p row and @p
+     * position_within_column.
+     *
+     * @note If the template argument @a Number2
+     * is a vectorized array a specialized, faster access will be performed.
+     * In this case the index @p row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+    DEAL_II_HOST_DEVICE void
+    add_tensor(const Tensor &tensor,
+               const unsigned int row,
+               const unsigned int position_within_column) const
+      requires(writable);
+
+
     //@}
     /**
      * MPI synchronization.
@@ -956,6 +992,93 @@ namespace ryujin
       else
         for (unsigned int d = 0; d < n_comp; ++d)
           tensor[d].store(store_pos + d * simd_length);
+
+    } else {
+      /* not implemented */
+      __builtin_trap();
+    }
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
+  template <typename Number2>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      add_entry(const Number2 entry,
+                const unsigned int row,
+                const unsigned int position_within_column) const
+    requires(writable)
+  {
+    static_assert(
+        n_comp == 1,
+        "Attempted to write a scalar value into a tensor-valued matrix entry");
+
+    AssertIndexRange(row, sparsity_.n_rows());
+    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+
+    dealii::Tensor<1, n_comp, Number2> tensor;
+    tensor[0] = entry;
+
+    add_tensor<Number2>(tensor, row, position_within_column);
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
+  template <typename Number2, typename Tensor>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      add_tensor(const Tensor &tensor,
+                 const unsigned int row,
+                 const unsigned int position_within_column) const
+    requires(writable)
+  {
+    AssertIndexRange(row, sparsity_.n_rows());
+    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+
+    using VA = dealii::VectorizedArray<Number>;
+    if constexpr (std::is_same_v<Number, Number2>) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        const auto offset =
+            sparsity_.template offset<n_comp>(row, position_within_column, d);
+        data_(offset) += tensor[d]; /*add*/
+        ;
+      }
+
+    } else if constexpr (std::is_same_v<VA, Number2>) {
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      Assert(row < sparsity_.n_internal_dofs(),
+             dealii::ExcMessage(
+                 "Vectorized access only possible in vectorized part"));
+      Assert(row % simd_length == 0,
+             dealii::ExcMessage(
+                 "Access only supported for rows at the SIMD granularity"));
+
+      Number *store_pos = data_.data();
+      store_pos += sparsity_.template offset_internal<n_comp>(
+          row, position_within_column);
+
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        auto temp = tensor[d];
+        temp.load(store_pos + d * simd_length);
+        temp += tensor[d];
+        temp.store(store_pos + d * simd_length);
+      }
 
     } else {
       /* not implemented */
