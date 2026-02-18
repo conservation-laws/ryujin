@@ -122,11 +122,25 @@ namespace ryujin
     //@{
 
     /**
+     * MPI synchronization: Zero out all ghost rows.
+     */
+    template <typename MemorySpace>
+    void zero_out_ghost_rows_on_memory_space();
+
+    /**
      * MPI synchronization: Import all ghost rows from neighboring MPI
      * ranks on the templated memory space.
      */
     template <typename MemorySpace>
     void update_ghost_rows_on_memory_space();
+
+    /**
+     * MPI synchronization: Copy the data that has accumulated in the ghost
+     * range to the owning processor. This function operates on the
+     * templated memory space.
+     */
+    template <typename MemorySpace>
+    void compress_on_memory_space(dealii::VectorOperation::values operation);
 
   private:
     //@}
@@ -340,7 +354,13 @@ namespace ryujin
      */
     //@{
 
+    void zero_out_ghost_rows() const
+      requires(writable);
+
     void update_ghost_rows() const
+      requires(writable);
+
+    void compress(dealii::VectorOperation::values operation) const
       requires(writable);
 
     //@}
@@ -604,9 +624,30 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   template <typename MemorySpace>
   void SparseMatrix<Number, n_components, simd_length>::
+      zero_out_ghost_rows_on_memory_space()
+  {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+
+    Assert(is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
+                dealii::ExcNotImplemented());
+
+    const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
+    const auto end_offset = sparsity_->n_nonzero_elements() * n_components;
+    std::fill(data_host_.data() + ghost_offset,
+              data_host_.data() + end_offset,
+              Number{});
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  template <typename MemorySpace>
+  void SparseMatrix<Number, n_components, simd_length>::
       update_ghost_rows_on_memory_space()
   {
-
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
     using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
 
@@ -629,12 +670,6 @@ namespace ryujin
     const unsigned int n_requests =
         receive_targets.size() + send_targets.size();
     std::vector<MPI_Request> requests(n_requests);
-
-    /*
-     * Set up MPI receive requests. We will always receive data for indices
-     * in the range [n_locally_owned_, n_locally_relevant_), thus the DATA
-     * is stored in non-vectorized CSR format.
-     */
 
     const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
 
@@ -664,12 +699,6 @@ namespace ryujin
       }
     }
 
-    /*
-     * Set up MPI send requests. We have copied everything we intend to
-     * send to the exchange_buffer compatible with the CSR storage format
-     * of the receiving MPI rank.
-     */
-
     for (unsigned int p = 0; p < send_targets.size(); ++p) {
       const auto send_offset =
           n_components * (p == 0 ? 0 : send_targets[p - 1].second);
@@ -690,6 +719,95 @@ namespace ryujin
     const int ierr =
         MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
     AssertThrowMPI(ierr);
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  template <typename MemorySpace>
+  void
+  SparseMatrix<Number, n_components, simd_length>::compress_on_memory_space(
+      dealii::VectorOperation::values operation)
+  {
+    Assert(operation == dealii::VectorOperation::add,
+           dealii::ExcNotImplemented());
+
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+
+    AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
+                dealii::ExcNotImplemented());
+
+    Assert(is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    const auto &receive_targets = sparsity_->receive_targets();
+    const auto &send_targets = sparsity_->send_targets();
+    const auto &entries_to_be_sent = sparsity_->entries_to_be_sent();
+
+    const unsigned int mpi_tag =
+        dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
+    Assert(mpi_tag <=
+               dealii::Utilities::MPI::internal::Tags::partitioner_export_end,
+           dealii::ExcInternalError());
+
+    const unsigned int n_requests =
+        receive_targets.size() + send_targets.size();
+    std::vector<MPI_Request> requests(n_requests);
+
+    /* Note: For compress() we receive from the "send targets" */
+    for (unsigned int p = 0; p < send_targets.size(); ++p) {
+      const auto receive_offset =
+          n_components * (p == 0 ? 0 : send_targets[p - 1].second);
+      const auto receive_size =
+          (send_targets[p].second * n_components - receive_offset);
+
+      const int ierr =
+          MPI_Irecv(exchange_buffer_host_.data() + receive_offset,
+                    receive_size,
+                    dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
+                    send_targets[p].first,
+                    mpi_tag,
+                    sparsity_->partitioner()->get_mpi_communicator(),
+                    &requests[p]);
+      AssertThrowMPI(ierr);
+    }
+
+    const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
+
+    /* Note: For compress() we send to the "receive targets" */
+    for (unsigned int p = 0; p < receive_targets.size(); ++p) {
+      const auto send_offset =
+          n_components * (p == 0 ? 0 : receive_targets[p - 1].second);
+      const auto send_size =
+          (receive_targets[p].second * n_components - send_offset);
+
+      const int ierr =
+          MPI_Isend(data_host_.data() + ghost_offset + send_offset,
+                    send_size,
+                    dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
+                    receive_targets[p].first,
+                    mpi_tag,
+                    sparsity_->partitioner()->get_mpi_communicator(),
+                    &requests[send_targets.size() + p]);
+      AssertThrowMPI(ierr);
+    }
+
+    const int ierr =
+        MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+    AssertThrowMPI(ierr);
+
+    /* Add back contributions and clear ghost range: */
+
+    for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
+      const auto &[row, position_within_column] = entries_to_be_sent[c];
+      for (unsigned int d = 0; d < n_components; ++d) {
+        const auto offset = sparsity_->template offset<n_components>(
+            row, position_within_column, d);
+        data_host_(offset) += exchange_buffer_host_(n_components * c + d);
+      }
+    }
+
+    zero_out_ghost_rows_on_memory_space<MemorySpace>();
   }
 
 
@@ -1082,6 +1200,29 @@ namespace ryujin
             typename MemorySpace,
             bool writable>
   void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      zero_out_ghost_rows() const
+    requires(writable)
+  {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected Kokkos memory space");
+
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    sparse_matrix_->template zero_out_ghost_rows<MemorySpace>();
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
+  void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       update_ghost_rows() const
     requires(writable)
   {
@@ -1096,6 +1237,29 @@ namespace ryujin
            dealii::ExcMessage("The chosen memory space is not active."));
 
     sparse_matrix_->template update_ghost_rows_on_memory_space<MemorySpace>();
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
+  void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      compress(dealii::VectorOperation::values operation) const
+    requires(writable)
+  {
+    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected Kokkos memory space");
+
+    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not active."));
+
+    sparse_matrix_->template compress_on_memory_space<MemorySpace>(operation);
   }
 
 #endif
