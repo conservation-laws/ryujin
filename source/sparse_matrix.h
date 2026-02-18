@@ -619,12 +619,6 @@ namespace ryujin
       AssertThrowMPI(ierr);
     }
 
-    /*
-     * Copy all entries that we plan to send over to the exchange buffer.
-     * Here, we have to be careful with indices falling into the "locally
-     * internal" range that are stored in an array-of-struct-of-array type.
-     */
-
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
       const auto &[row, position_within_column] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
