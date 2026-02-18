@@ -61,7 +61,7 @@ namespace ryujin
 
     /**
      * Reinit function reinitializes the matrix with the given SIMD
-     * sparsity pattern.
+     * sparsity pattern. The locally owned and ghost ranges are zeroed.
      */
     void reinit(const SparsityPattern<simd_length> &sparsity);
 
@@ -196,7 +196,7 @@ namespace ryujin
      * position_within_column.
      *
      * @note If the template argument @a Number2
-     * is a vetorized array a specialized, faster access will be performed.
+     * is a vectorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      *
@@ -214,7 +214,7 @@ namespace ryujin
      * (even if it is effectively a scalar entry).
      *
      * @note If the template argument @a Number2
-     * is a vetorized array a specialized, faster access will be performed.
+     * is a vectorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
@@ -231,7 +231,7 @@ namespace ryujin
      * @p position_within_column.
      *
      * @note If the template argument @a Number2
-     * is a vetorized array a specialized, faster access will be performed.
+     * is a vectorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      *
@@ -249,7 +249,7 @@ namespace ryujin
      * (even if it is effectively a scalar entry).
      *
      * @note If the template argument @a Number2
-     * is a vetorized array a specialized, faster access will be performed.
+     * is a vectorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
@@ -262,11 +262,11 @@ namespace ryujin
     /* Write scalar or tensor entry: */
 
     /**
-     * Write a (scalar valued) @p entry to the matrix indexed by @p row
+     * Write a (scalar-valued) @p entry to the matrix indexed by @p row
      * and @p position_within_column.
      *
      * @note If the template argument @a Number2
-     * is a vetorized array a specialized, faster access will be performed.
+     * is a vectorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      *
@@ -285,7 +285,7 @@ namespace ryujin
      * and @p position_within_column.
      *
      * @note If the template argument @a Number2
-     * is a vetorized array a specialized, faster access will be performed.
+     * is a vectorized array a specialized, faster access will be performed.
      * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
