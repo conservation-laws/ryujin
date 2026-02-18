@@ -469,14 +469,7 @@ namespace ryujin
       if constexpr (n_components == 0)
         return tensor;
 
-      if constexpr (std::is_same_v<Number, Number2>) {
-        /* Non-vectorized sequential access. */
-
-        for (unsigned int d = 0; d < n_components; ++d)
-          tensor[d] = this->local_element(i * n_components + d);
-
-      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
-
+      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
         std::array<unsigned int, VectorizedArray::size()> indices;
         for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
@@ -486,10 +479,11 @@ namespace ryujin
                                               this->begin() + i * n_components,
                                               indices.data(),
                                               &tensor[0]);
-
       } else {
-        /* not implemented */
-        __builtin_trap();
+        /* Non-vectorized sequential access. */
+
+        for (unsigned int d = 0; d < n_components; ++d)
+          tensor[d] = this->local_element(i * n_components + d);
       }
 
       return tensor;
@@ -525,17 +519,7 @@ namespace ryujin
       if constexpr (n_components == 0)
         return tensor;
 
-      if constexpr (std::is_same_v<Number, Number2>) {
-        /* Non-vectorized sequential access. */
-
-        AssertIndexRange(*js,
-                         this->get_partitioner()->locally_owned_size() +
-                             this->get_partitioner()->n_ghost_indices());
-
-        for (unsigned int d = 0; d < n_components; ++d)
-          tensor[d] = this->local_element(js[0] * n_components + d);
-
-      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;
@@ -550,8 +534,14 @@ namespace ryujin
             n_components, this->begin(), indices.data(), &tensor[0]);
 
       } else {
-        /* not implemented */
-        __builtin_trap();
+        /* Non-vectorized sequential access. */
+
+        AssertIndexRange(*js,
+                         this->get_partitioner()->locally_owned_size() +
+                             this->get_partitioner()->n_ghost_indices());
+
+        for (unsigned int d = 0; d < n_components; ++d)
+          tensor[d] = this->local_element(js[0] * n_components + d);
       }
 
       return tensor;
@@ -596,13 +586,7 @@ namespace ryujin
       if constexpr (n_components == 0)
         return;
 
-      if constexpr (std::is_same_v<Number, Number2>) {
-        /* Non-vectorized sequential access. */
-
-        for (unsigned int d = 0; d < n_components; ++d)
-          this->local_element(i * n_components + d) = tensor[d];
-
-      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;
@@ -617,8 +601,10 @@ namespace ryujin
                                                    i * n_components);
 
       } else {
-        /* not implemented */
-        __builtin_trap();
+        /* Non-vectorized sequential access. */
+
+        for (unsigned int d = 0; d < n_components; ++d)
+          this->local_element(i * n_components + d) = tensor[d];
       }
     }
 
@@ -661,13 +647,7 @@ namespace ryujin
       if constexpr (n_components == 0)
         return;
 
-      if constexpr (std::is_same_v<Number, Number2>) {
-        /* Non-vectorized sequential access. */
-
-        for (unsigned int d = 0; d < n_components; ++d)
-          this->local_element(i * n_components + d) += tensor[d];
-
-      } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
         std::array<unsigned int, VectorizedArray::size()> indices;
@@ -682,8 +662,10 @@ namespace ryujin
                                                    i * n_components);
 
       } else {
-        /* not implemented */
-        __builtin_trap();
+        /* Non-vectorized sequential access. */
+
+        for (unsigned int d = 0; d < n_components; ++d)
+          this->local_element(i * n_components + d) += tensor[d];
       }
     }
 
