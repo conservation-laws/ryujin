@@ -790,18 +790,7 @@ namespace ryujin
     Tensor result;
 
     using VA = dealii::VectorizedArray<Number>;
-    if constexpr (std::is_same_v<Number, Number2>) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-      for (unsigned int d = 0; d < n_comp; ++d) {
-        const auto offset =
-            sparsity_.template offset<n_comp>(row, position_within_column, d);
-        result[d] = data_(offset);
-      }
-
-    } else if constexpr (std::is_same_v<VA, Number2>) {
+    if constexpr (std::is_same_v<VA, Number2>) {
       /*
        * Vectorized fast access. Indices must be in the range
        * [0,n_internal), index must be divisible by simd_length
@@ -822,8 +811,15 @@ namespace ryujin
         result[d].load(load_pos + d * simd_length);
 
     } else {
-      /* not implemented */
-      __builtin_trap();
+      /*
+       * Non-vectorized slow access. Supports all row indices in [0,n_owned):
+       */
+
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        const auto offset =
+            sparsity_.template offset<n_comp>(row, position_within_column, d);
+        result[d] = data_(offset);
+      }
     }
 
     return result;
@@ -871,18 +867,7 @@ namespace ryujin
     dealii::Tensor<1, n_comp, Number2> result;
 
     using VA = dealii::VectorizedArray<Number>;
-    if constexpr (std::is_same_v<Number, Number2>) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-      for (unsigned int d = 0; d < n_comp; ++d) {
-        const auto offset = sparsity_.template transposed_offset<n_comp>(
-            row, position_within_column, d);
-        result[d] = data_(offset);
-      }
-
-    } else if constexpr (std::is_same_v<VA, Number2> && (n_comp == 1)) {
+    if constexpr (std::is_same_v<VA, Number2> && (n_comp == 1)) {
       /*
        * Vectorized fast access. Indices must be in the range
        * [0,n_internal), index must be divisible by simd_length
@@ -899,12 +884,24 @@ namespace ryujin
           row, position_within_column);
       result[0].gather(data_.data(), offsets);
 
-    } else {
+    } else if constexpr (std::is_same_v<VA, Number2> && (n_comp != 1)) {
+
       /* not implemented */
       Assert(false,
              dealii::ExcMessage("Vectorized transposed access to multiple "
                                 "components is not implemented."));
       __builtin_trap();
+
+    } else {
+      /*
+       * Non-vectorized slow access. Supports all row indices in [0,n_owned):
+       */
+
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        const auto offset = sparsity_.template transposed_offset<n_comp>(
+            row, position_within_column, d);
+        result[d] = data_(offset);
+      }
     }
 
     return result;
@@ -958,21 +955,10 @@ namespace ryujin
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
     using VA = dealii::VectorizedArray<Number>;
-    if constexpr (std::is_same_v<Number, Number2>) {
+    if constexpr (std::is_same_v<VA, Number2>) {
       /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-      for (unsigned int d = 0; d < n_comp; ++d) {
-        const auto offset =
-            sparsity_.template offset<n_comp>(row, position_within_column, d);
-        data_(offset) = tensor[d];
-      }
-
-    } else if constexpr (std::is_same_v<VA, Number2>) {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
+       * Vectorized fast access. Indices must be in the range [0,n_internal),
+       * index must be divisible by simd_length:
        */
 
       Assert(row < sparsity_.n_internal_dofs(),
@@ -994,8 +980,15 @@ namespace ryujin
           tensor[d].store(store_pos + d * simd_length);
 
     } else {
-      /* not implemented */
-      __builtin_trap();
+      /*
+       * Non-vectorized slow access. Supports all row indices in [0,n_owned):
+       */
+
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        const auto offset =
+            sparsity_.template offset<n_comp>(row, position_within_column, d);
+        data_(offset) = tensor[d];
+      }
     }
   }
 
@@ -1044,22 +1037,10 @@ namespace ryujin
     AssertIndexRange(position_within_column, sparsity_.row_length(row));
 
     using VA = dealii::VectorizedArray<Number>;
-    if constexpr (std::is_same_v<Number, Number2>) {
+    if constexpr (std::is_same_v<VA, Number2>) {
       /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-      for (unsigned int d = 0; d < n_comp; ++d) {
-        const auto offset =
-            sparsity_.template offset<n_comp>(row, position_within_column, d);
-        data_(offset) += tensor[d]; /*add*/
-        ;
-      }
-
-    } else if constexpr (std::is_same_v<VA, Number2>) {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
+       * Vectorized fast access. Indices must be in the range [0,n_internal),
+       * index must be divisible by simd_length:
        */
 
       Assert(row < sparsity_.n_internal_dofs(),
@@ -1081,8 +1062,16 @@ namespace ryujin
       }
 
     } else {
-      /* not implemented */
-      __builtin_trap();
+      /*
+       * Non-vectorized slow access. Supports all row indices in [0,n_owned):
+       */
+
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        const auto offset =
+            sparsity_.template offset<n_comp>(row, position_within_column, d);
+        data_(offset) += tensor[d]; /*add*/
+        ;
+      }
     }
   }
 
