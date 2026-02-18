@@ -10,7 +10,6 @@
 #include "multicomponent_vector.h"
 #include "offline_data.h"
 #include "scratch_data.h"
-#include "sparse_matrix.template.h" /* instantiate read_in */
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>

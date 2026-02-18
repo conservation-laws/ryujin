@@ -20,12 +20,6 @@ namespace ryujin
   class SparsityPatternView;
 
 
-  template <typename Number,
-            int n_components = 1,
-            int simd_length = dealii::VectorizedArray<Number>::size()>
-  class SparseMatrix;
-
-
   /**
    * A specialized sparsity pattern for efficient, vectorized SIMD access.
    *
@@ -119,7 +113,7 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(receive_targets);
 
-  public: // FIXME
+  private:
     //@}
     /**
      * @name Internal fields, methods, and friends
@@ -275,7 +269,7 @@ namespace ryujin
     template <unsigned int n_components = 1>
     DEAL_II_HOST_DEVICE unsigned int ghost_offset() const;
 
-  public: // FIXME
+  private:
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 

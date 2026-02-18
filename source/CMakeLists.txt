@@ -19,7 +19,6 @@ set(COMMON_SOURCE_FILES
   multicomponent_vector.cc
   offline_data.cc
   simd.cc
-  sparse_matrix.cc
   sparsity_pattern.cc
   version_info.cc
   )
