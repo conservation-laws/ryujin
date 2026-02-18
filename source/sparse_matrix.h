@@ -20,6 +20,12 @@
 
 #include <type_traits>
 
+// #define DEBUG_MPI_EXCHANGE
+
+#ifdef DEBUG_MPI_EXCHANGE
+#include <chrono>
+#endif
+
 namespace ryujin
 {
   template <typename Number,
@@ -679,6 +685,14 @@ namespace ryujin
       const auto receive_size =
           (receive_targets[p].second * n_components - receive_offset);
 
+#ifdef DEBUG_MPI_EXCHANGE
+      const auto mpi_rank =
+          dealii::Utilities::MPI::this_mpi_process(MPI_COMM_WORLD);
+      std::cout << "Rank " << mpi_rank << " receive from "
+                << receive_targets[p].first << " offset = " << receive_offset
+                << " size = " << receive_size << std::endl;
+#endif
+
       const int ierr =
           MPI_Irecv(data_host_.data() + ghost_offset + receive_offset,
                     receive_size,
@@ -705,6 +719,14 @@ namespace ryujin
       const auto send_size =
           (send_targets[p].second * n_components - send_offset);
 
+#ifdef DEBUG_MPI_EXCHANGE
+      const auto mpi_rank =
+          dealii::Utilities::MPI::this_mpi_process(MPI_COMM_WORLD);
+      std::cout << "Rank " << mpi_rank << " send to " << send_targets[p].first
+                << " offset = " << send_offset << " size = " << send_size
+                << std::endl;
+#endif
+
       const int ierr =
           MPI_Isend(exchange_buffer_host_.data() + send_offset,
                     send_size,
@@ -715,6 +737,11 @@ namespace ryujin
                     &requests[receive_targets.size() + p]);
       AssertThrowMPI(ierr);
     }
+
+#ifdef DEBUG_MPI_EXCHANGE
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(200ms);
+#endif
 
     const int ierr =
         MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
@@ -754,12 +781,24 @@ namespace ryujin
         receive_targets.size() + send_targets.size();
     std::vector<MPI_Request> requests(n_requests);
 
-    /* Note: For compress() we receive from the "send targets" */
+    /*
+     * Note: For the compress() operation we receive from the "send
+     * targets" and store in the exchange buffer.
+     */
+
     for (unsigned int p = 0; p < send_targets.size(); ++p) {
       const auto receive_offset =
           n_components * (p == 0 ? 0 : send_targets[p - 1].second);
       const auto receive_size =
           (send_targets[p].second * n_components - receive_offset);
+
+#ifdef DEBUG_MPI_EXCHANGE
+      const auto mpi_rank =
+          dealii::Utilities::MPI::this_mpi_process(MPI_COMM_WORLD);
+      std::cout << "Rank " << mpi_rank << " receive from "
+                << send_targets[p].first << " offset = " << receive_offset
+                << " size = " << receive_size << std::endl;
+#endif
 
       const int ierr =
           MPI_Irecv(exchange_buffer_host_.data() + receive_offset,
@@ -774,12 +813,24 @@ namespace ryujin
 
     const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
 
-    /* Note: For compress() we send to the "receive targets" */
+    /*
+     * Note: For the compress() operation we send our ghost range to the
+     * "receive targets".
+     */
+
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
       const auto send_offset =
           n_components * (p == 0 ? 0 : receive_targets[p - 1].second);
       const auto send_size =
           (receive_targets[p].second * n_components - send_offset);
+
+#ifdef DEBUG_MPI_EXCHANGE
+      const auto mpi_rank =
+          dealii::Utilities::MPI::this_mpi_process(MPI_COMM_WORLD);
+      std::cout << "Rank " << mpi_rank << " send to "
+                << receive_targets[p].first << " offset = " << send_offset
+                << " size = " << send_size << std::endl;
+#endif
 
       const int ierr =
           MPI_Isend(data_host_.data() + ghost_offset + send_offset,
@@ -791,6 +842,11 @@ namespace ryujin
                     &requests[send_targets.size() + p]);
       AssertThrowMPI(ierr);
     }
+
+#ifdef DEBUG_MPI_EXCHANGE
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(200ms);
+#endif
 
     const int ierr =
         MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
