@@ -31,28 +31,38 @@ int main(int argc, char *argv[])
 
   auto view_1 = sparse_matrix.get_view();
   const auto view_2 = sparse_matrix.get_view();
-  view_1.read_entry(0, 0);      // OK
-  view_2.read_entry(0, 0);      // OK
+  std::cout << view_1.read_entry(0, 0) << std::endl;
+  std::cout << view_2.read_entry(0, 0) << std::endl;
   view_1.write_entry(0., 0, 0); // OK
-  view_2.write_entry(0., 0, 0); // OK
+  view_2.write_entry(1., 0, 0); // OK
+  view_1.add_entry(2., 0, 0);   // OK
+  view_2.add_entry(3., 0, 0);   // OK
+  std::cout << view_1.read_entry(0, 0) << std::endl;
+  std::cout << view_2.read_entry(0, 0) << std::endl;
 
   auto &sparse_matrix_ref_1 = sparse_matrix;
 
   auto view_3 = sparse_matrix_ref_1.get_view();
   const auto view_4 = sparse_matrix_ref_1.get_view();
 
-  view_3.read_entry(0, 0);      // OK
-  view_4.read_entry(0, 0);      // OK
-  view_3.write_entry(0., 0, 0); // OK
-  view_4.write_entry(0., 0, 0); // OK
+  std::cout << view_3.read_entry(0, 0) << std::endl;
+  std::cout << view_4.read_entry(0, 0) << std::endl;
+  view_3.write_entry(10., 0, 0); // OK
+  view_4.write_entry(11., 0, 0); // OK
+  view_3.add_entry(2., 0, 0);    // OK
+  view_4.add_entry(3., 0, 0);    // OK
+  std::cout << view_3.read_entry(0, 0) << std::endl;
+  std::cout << view_4.read_entry(0, 0) << std::endl;
 
   const auto &sparse_matrix_ref_2 = sparse_matrix;
 
   auto view_5 = sparse_matrix_ref_2.get_view();
   const auto view_6 = sparse_matrix_ref_2.get_view();
 
-  view_5.read_entry(0, 0); // OK
-  view_6.read_entry(0, 0); // OK
+  std::cout << view_5.read_entry(0, 0) << std::endl;
+  std::cout << view_6.read_entry(0, 0) << std::endl;
   // view_5.write_entry(0., 0, 0); // disallowed due to writable == false
-  // view_6.write_entry(0., 0, 0); // disallowed due to writable == false
+  // view_6.write_entry(1., 0, 0); // disallowed due to writable == false
+  // view_5.add_entry(2., 0, 0);   // disallowed due to writable == false
+  // view_6.add_entry(3., 0, 0);   // disallowed due to writable == false
 }

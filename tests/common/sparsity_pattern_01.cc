@@ -1,13 +1,9 @@
 #include <sparsity_pattern.h>
 
 /*
- * A quick check that "send_targets" and "entries_to_be_sent" are set up
- * correctly. Note that the sparsity pattern we create is artificial.
- *
- * A consequence is that the "receive targets" are not set up correctly.
- * Some ranks expect to receive more data than what is actually sent. This
- * is due to the fact that we violate the symmetry assumption that a
- * nonzero m_ij/c_ij entry implies a corresponding nonzero m_ji/c_ji entry.
+ * A quick check that "receive_targets", "send_targets" and
+ * "entries_to_be_sent" are set up correctly. Note that the sparsity
+ * pattern we create is artificial.
  */
 
 namespace ryujin
@@ -27,16 +23,16 @@ namespace ryujin
     void print()
     {
       std::stringstream ss;
-      // ss << "Receive targets:\n";
-      // for (const auto &[left, right] : this->receive_targets)
-      //   ss << left << " : " << right << "\n";
+      ss << "Receive targets:\n";
+      for (const auto &[left, right] : this->receive_targets())
+        ss << left << " : " << right << "\n";
 
       ss << "Send targets:\n";
       for (const auto &[left, right] : this->send_targets())
         ss << left << " : " << right << "\n";
 
       ss << "Entries to be sent:\n";
-      for (const auto &[left, right] : this->send_targets())
+      for (const auto &[left, right] : this->entries_to_be_sent())
         ss << left << " : " << right << "\n";
 
       std::cout << ss.str() << std::endl;
