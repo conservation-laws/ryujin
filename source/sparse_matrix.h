@@ -11,10 +11,9 @@
 #include "simd.h"
 #include "sparsity_pattern.h"
 
-#include <deal.II/base/aligned_vector.h>
-#include <deal.II/base/config.h>
+#include <deal.II/base/exceptions.h>
 #include <deal.II/base/partitioner.h>
-#include <deal.II/base/vectorization.h>
+#include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 
@@ -381,6 +380,46 @@ namespace ryujin
     SparsityPatternView<simd_length, MemorySpace> sparsity_pattern_;
     Kokkos::View<Number *, MemorySpace> data_;
   };
+
+
+  /*
+   * Given a matrix contribution and row and column indices in (deal.II
+   * typical) global numbering, add the contribution to the sparse matrix.
+   * The function takes an @p affine_constraints object in  (deal.II
+   * typical) global numbering and resolves constrained degrees of freedom
+   * prior to distributing to the matrix.
+   *
+   * @note The method will not modify the diagonal entry of constrained
+   * degrees of freedom, in contrast to the deal.II version
+   * AffineConstraints<Number>::distribute_local_to_global().
+   *
+   * @note For a vector-valued matrix with n_comp > 1 the @p cell_matrix
+   * must be a container with a subscript operator[] returning a matrix for
+   * each component.
+   */
+  template <typename Number, int n_comp, int simd_length, typename FullMatrix>
+  void distribute_local_to_global(
+      const FullMatrix &cell_matrix,
+      const std::vector<dealii::types::global_dof_index> &dof_indices_row,
+      const std::vector<dealii::types::global_dof_index> &dof_indices_column,
+      const dealii::AffineConstraints<Number> &affine_constraints,
+      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix);
+
+
+  /*
+   * Variant of the function above that takes a symmetric matrix
+   * constribution where the column and row indices are the same.
+   */
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename FullMatrix,
+            typename Vector>
+  void distribute_local_to_global(
+      const FullMatrix &cell_matrix,
+      const std::vector<dealii::types::global_dof_index> &dof_indices,
+      const dealii::AffineConstraints<Number> &affine_constraints,
+      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix);
 
 
 #ifndef DOXYGEN
@@ -1324,6 +1363,123 @@ namespace ryujin
            dealii::ExcMessage("The chosen memory space is not active."));
 
     sparse_matrix_->template compress_on_memory_space<MemorySpace>(operation);
+  }
+
+
+  template <typename Number, int n_comp, int simd_length, typename FM>
+  void distribute_local_to_global(
+      const FM &cell_matrix,
+      const std::vector<dealii::types::global_dof_index> &dof_indices_row,
+      const std::vector<dealii::types::global_dof_index> &dof_indices_column,
+      const dealii::AffineConstraints<Number> &affine_constraints
+      [[maybe_unused]],
+      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+  {
+    constexpr bool is_matrix = std::is_same_v<FM, dealii::FullMatrix<Number>>;
+    constexpr bool is_array =
+        std::is_same_v<FM, std::array<dealii::FullMatrix<Number>, n_comp>>;
+    static_assert((n_comp == 1 && is_matrix) || is_array, "not implemented");
+
+    if constexpr (is_matrix) {
+      Assert(cell_matrix.m() == dof_indices_row.size(),
+             dealii::ExcInternalError());
+      Assert(cell_matrix.n() == dof_indices_column.size(),
+             dealii::ExcInternalError());
+    } else if constexpr (is_array) {
+      Assert(cell_matrix.size() == n_comp, dealii::ExcInternalError());
+      for (unsigned int d = 0; d < n_comp; ++d) {
+        Assert(cell_matrix[d].m() == dof_indices_row.size(),
+               dealii::ExcInternalError());
+        Assert(cell_matrix[d].n() == dof_indices_column.size(),
+               dealii::ExcInternalError());
+      }
+    }
+
+    const auto &sparsity_pattern = sparse_matrix.sparsity_pattern();
+    const auto &partitioner = sparsity_pattern.partitioner();
+
+    /*
+     * Helper that inserts a single entry into the matrix indexed by (r, c)
+     * in the cell_matrix and by (i, j) in the sparse matrix and multiplied
+     * by a weight c_ij.
+     */
+
+    const auto insert_entry =
+        [&](auto r, auto c, auto i, auto j, auto c_ij) DEAL_II_ALWAYS_INLINE {
+          if constexpr (is_matrix) {
+            const Number &entry = cell_matrix(r, c);
+            if (entry == Number{})
+              return;
+            const auto col_idx = sparsity_pattern.column_index(i, j);
+            sparse_matrix.add_entry(c_ij * entry, i, col_idx);
+          } else if constexpr (is_array) {
+            dealii::Tensor<1, n_comp, Number> entry;
+            for (unsigned int k = 0; k < n_comp; ++k)
+              entry[k] = cell_matrix[k](r, c);
+            if (entry == dealii::Tensor<1, n_comp>{})
+              return;
+            const auto col_idx = sparsity_pattern.column_index(i, j);
+            sparse_matrix.add_tensor(c_ij * entry, i, col_idx);
+          }
+        };
+
+    /*
+     * Helper that iterates over row entries:
+     */
+
+    const auto iterate_over_row_entries =
+        [&](const auto r, const auto i, const auto c_i) DEAL_II_ALWAYS_INLINE {
+          /* Iterate over columns: c - column index; j_global, j - dof index */
+          for (unsigned int c = 0; c < dof_indices_column.size(); ++c) {
+            const auto j_global = dof_indices_column[c];
+            if (affine_constraints.is_constrained(j_global)) {
+              const auto &line =
+                  *affine_constraints.get_constraint_entries(j_global);
+              for (const auto &[k_global, c_k] : line) {
+                const auto k = partitioner->global_to_local(k_global);
+                insert_entry(r, c, i, k, c_i * c_k);
+              }
+            } else {
+              const auto j = partitioner->global_to_local(j_global);
+              insert_entry(r, c, i, j, c_i);
+            }
+          }
+        };
+
+    /* Now, iterate over rows: r - row index; i_global, i - dof index */
+    for (unsigned int r = 0; r < dof_indices_row.size(); ++r) {
+      const auto i_global = dof_indices_row[r];
+      if (affine_constraints.is_constrained(i_global)) {
+        const auto &line = *affine_constraints.get_constraint_entries(i_global);
+        for (const auto &[k_global, c_k] : line) {
+          const auto k = partitioner->global_to_local(k_global);
+          iterate_over_row_entries(r, k, c_k);
+        }
+      } else {
+        const auto i = partitioner->global_to_local(i_global);
+        iterate_over_row_entries(r, i, Number(1.));
+      }
+    }
+  }
+
+
+  template <typename Number, int n_comp, int simd_length, typename FM>
+  void distribute_local_to_global(
+      const FM &cell_matrix,
+      const std::vector<dealii::types::global_dof_index> &dof_indices,
+      const dealii::AffineConstraints<Number> &affine_constraints,
+      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+  {
+    constexpr bool is_matrix = std::is_same_v<FM, dealii::FullMatrix<Number>>;
+    constexpr bool is_array =
+        std::is_same_v<FM, std::array<dealii::FullMatrix<Number>, n_comp>>;
+    static_assert((n_comp == 1 && is_matrix) || is_array, "not implemented");
+
+    distribute_local_to_global(cell_matrix,
+                               dof_indices,
+                               dof_indices,
+                               affine_constraints,
+                               sparse_matrix);
   }
 
 #endif
