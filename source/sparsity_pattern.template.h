@@ -47,29 +47,32 @@ namespace ryujin
         partitioner->locally_owned_size() + partitioner->n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern (in local indexing), where
-     * the only off-processor rows are the ones for which locally owned rows
-     * request the transpose entries. This will be the one we finally
-     * compute on.
+     * First, create a static sparsity pattern in local indexing.
      */
 
-    dealii::DynamicSparsityPattern dsp_minimal(n_locally_relevant_dofs,
-                                               n_locally_relevant_dofs);
-    for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i) {
+    dealii::DynamicSparsityPattern dsp_local(n_locally_relevant_dofs,
+                                             n_locally_relevant_dofs);
+    for (unsigned int i = 0; i < n_locally_relevant_dofs; ++i) {
       const auto global_row = partitioner->local_to_global(i);
       for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it) {
         const auto global_column = it->column();
         const auto j = partitioner->global_to_local(global_column);
-        dsp_minimal.add(i, j);
-        if (j >= n_locally_owned_dofs_) {
-          Assert(j < n_locally_relevant_dofs, dealii::ExcInternalError());
-          dsp_minimal.add(j, i);
-        }
+        dsp_local.add(i, j);
       }
     }
 
+#ifdef DEBUG
+    /* Verify symmetric access: */
+    for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i) {
+      for (auto it = dsp_local.begin(i); it != dsp_local.end(i); ++it) {
+        const auto j = it->column();
+        Assert(dsp_local.exists(j, i), dealii::ExcInternalError());
+      }
+    }
+#endif
+
     dealii::SparsityPattern sparsity;
-    sparsity.copy_from(dsp_minimal);
+    sparsity.copy_from(dsp_local);
 
     Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
     Assert(n_internal_dofs % simd_length == 0, dealii::ExcInternalError());
@@ -163,122 +166,226 @@ namespace ryujin
            dealii::ExcInternalError());
 #endif
 
-    /* Compute the data exchange pattern: */
+    /*
+     * Compute the data exchange pattern:
+     */
+
+    receive_targets_.clear();
+    send_targets_.clear();
+    entries_to_be_sent_.clear();
 
     if (sparsity.n_rows() > n_locally_owned_dofs_) {
+      const unsigned int mpi_tag =
+          dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
+
+      const auto &ghost_targets = partitioner->ghost_targets();
+      const auto &import_targets = partitioner->import_targets();
+      const auto &mpi_communicator = partitioner->get_mpi_communicator();
+
+      const unsigned int n_requests =
+          ghost_targets.size() + import_targets.size();
+      std::vector<MPI_Request> requests(n_requests);
 
       /*
        * Set up receive targets.
        *
-       * We receive our (reduced) ghost rows from MPI ranks in the ghost
-       * range of the (scalar) partitioner. We receive the entire (reduced)
-       * ghost row from that MPI rank; we can thus simply query the
-       * sparsity pattern how many data points we receive from each MPI
-       * rank.
+       * We receive our local ghost rows from MPI ranks in the ghost range
+       * of the (scalar) partitioner. We receive our entire local ghost row
+       * from the owning MPI rank. We have to navigate one detail, though.
+       * Our local view of the ghost row is a subset of the full row of the
+       * owning rank. We thus have to communicate to the owning rank how
+       * many entries and what indices we are expecting.
+       *
+       * First, set up the receive_targets_ vector and send the cummulative
+       * row size to the owning MPI rank:
        */
 
-      const auto &ghost_targets = partitioner->ghost_targets();
-
       receive_targets_.resize(ghost_targets.size());
-
       for (unsigned int p = 0; p < receive_targets_.size(); ++p) {
         receive_targets_[p].first = ghost_targets[p].first;
       }
 
-      const auto gt_begin = ghost_targets.begin();
-      auto gt_ptr = ghost_targets.begin();
-      std::size_t index = 0; /* index into ghost range of sparsity pattern */
-      unsigned int row_count = 0;
+      {
+        /* Index into ghost targets: */
+        unsigned int ghost_targets_index = 0;
+        /* Current and previous index into ghost range of sparsity pattern: */
+        unsigned int index = 0;
+        unsigned int previous_index = 0;
 
-      for (unsigned int i = n_locally_owned_dofs_; i < sparsity.n_rows(); ++i) {
-        index += sparsity.row_length(i);
-        ++row_count;
-        if (row_count == gt_ptr->second) {
-          receive_targets_[gt_ptr - gt_begin].second = index;
-          row_count = 0; /* reset row count and move on to new rank */
-          ++gt_ptr;
-        }
-      }
+        unsigned int row_count = 0;
+        for (unsigned int i = n_locally_owned_dofs_; i < sparsity.n_rows();
+             ++i) {
+          index += sparsity.row_length(i);
+          ++row_count;
+          const auto ghost_target = ghost_targets[ghost_targets_index];
+          if (row_count == ghost_target.second) {
+            receive_targets_[ghost_targets_index].second = index;
 
-      Assert(gt_ptr == partitioner->ghost_targets().end(),
-             dealii::ExcInternalError());
+            unsigned int n_entries = index - previous_index;
+            const int ierr = MPI_Isend(
+                &n_entries,
+                1,
+                dealii::Utilities::MPI::mpi_type_id_for_type<unsigned int>,
+                ghost_target.first,
+                mpi_tag,
+                mpi_communicator,
+                &requests[ghost_targets_index]);
+            AssertThrowMPI(ierr);
 
-      /*
-       * Collect indices to be sent.
-       *
-       * These consist of the diagonal, as well as the part of columns of
-       * the given range. Note that this assumes that the sparsity pattern
-       * only contains those entries in ghosted rows which have a
-       * corresponding transpose entry in the owned rows; which is the case
-       * for our minimized sparsity pattern.
-       */
-
-      std::vector<unsigned int> ghost_ranges(ghost_targets.size() + 1);
-      ghost_ranges[0] = n_locally_owned_dofs_;
-      for (unsigned int p = 0; p < receive_targets_.size(); ++p) {
-        ghost_ranges[p + 1] = ghost_ranges[p] + ghost_targets[p].second;
-      }
-
-      std::vector<unsigned int> import_indices_part;
-      for (auto i : partitioner->import_indices())
-        for (unsigned int j = i.first; j < i.second; ++j)
-          import_indices_part.push_back(j);
-
-      AssertDimension(import_indices_part.size(),
-                      partitioner->n_import_indices());
-
-      const auto &import_targets = partitioner->import_targets();
-      entries_to_be_sent_.clear();
-      send_targets_.resize(import_targets.size());
-      auto idx = import_indices_part.begin();
-
-      /*
-       * Index p iterates over import_targets() and index p_match iterates
-       * over ghost_ranges. such that
-       *   import_targets()[p].first == ghost_rangs[p_match].first
-       */
-      unsigned int p_match = 0;
-      for (unsigned int p = 0; p < import_targets.size(); ++p) {
-
-        /*
-         * Match up the rank index between receive and import targets. If
-         * we do not find a match, which can happen for locally refined
-         * meshes, then we set p_match equal to receive_targets.size().
-         *
-         * When trying to match the next processor index we consequently
-         * have to reset p_match to 0 again. This assumes that processor
-         * indices are sorted in the receive_targets and ghost_targets
-         * vectors.
-         */
-        p_match = (p_match == receive_targets_.size() ? 0 : p_match);
-        while (p_match < receive_targets_.size() &&
-               receive_targets_[p_match].first != import_targets[p].first)
-          p_match++;
-
-        for (unsigned int c = 0; c < import_targets[p].second; ++c, ++idx) {
-          /*
-           * Continue if we do not have a match. Note that we need to enter
-           * and continue this loop till the end in order to advance idx
-           * correctly.
-           */
-          if (p_match == receive_targets_.size())
-            continue;
-
-          const unsigned int row = *idx;
-
-          entries_to_be_sent_.emplace_back(row, 0);
-          for (auto jt = ++sparsity.begin(row); jt != sparsity.end(row); ++jt) {
-            if (jt->column() >= ghost_ranges[p_match] &&
-                jt->column() < ghost_ranges[p_match + 1]) {
-              const unsigned int position_within_column =
-                  jt - sparsity.begin(row);
-              entries_to_be_sent_.emplace_back(row, position_within_column);
-            }
+            /* Update indices: */
+            ++ghost_targets_index;
+            previous_index = index;
+            row_count = 0;
           }
         }
 
-        send_targets_[p].first = partitioner->import_targets()[p].first;
-        send_targets_[p].second = entries_to_be_sent_.size();
+        Assert(ghost_targets_index == partitioner->ghost_targets().size(),
+               dealii::ExcInternalError());
+      }
+
+
+      /*
+       * Set up send targets.
+       *
+       * First receive the number of entries that we will need to send.
+       */
+
+      std::vector<unsigned int> send_ranges(import_targets.size());
+      for (unsigned int p = 0; p < import_targets.size(); ++p) {
+        const int ierr = MPI_Irecv(
+            &send_ranges[p],
+            1,
+            dealii::Utilities::MPI::mpi_type_id_for_type<unsigned int>,
+            import_targets[p].first,
+            mpi_tag,
+            mpi_communicator,
+            &requests[ghost_targets.size() + p]);
+        AssertThrowMPI(ierr);
+      }
+
+      {
+        const int ierr =
+            MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+        AssertThrowMPI(ierr);
+      }
+
+      /*
+       * Now, that the owning rank knows the number of entries we request
+       * we can send the actual index pairs (i_global, j_global) that we
+       * require.
+       */
+
+      std::vector<dealii::types::global_dof_index> requested_entries;
+      {
+        /* Index into ghost targets: */
+        unsigned int ghost_targets_index = 0;
+
+        unsigned int row_count = 0;
+        for (unsigned int i = n_locally_owned_dofs_; i < sparsity.n_rows();
+             ++i) {
+          const auto i_global = partitioner_->local_to_global(i);
+          for (auto idx = sparsity.begin(i); idx != sparsity.end(i); ++idx) {
+            const unsigned int j = idx->column();
+            const auto j_global = partitioner_->local_to_global(j);
+            requested_entries.push_back(i_global);
+            requested_entries.push_back(j_global);
+          }
+
+          ++row_count;
+          if (row_count == ghost_targets[ghost_targets_index].second) {
+            /* Update indices: */
+            ++ghost_targets_index;
+            row_count = 0;
+          }
+        }
+
+        Assert(ghost_targets_index == partitioner->ghost_targets().size(),
+               dealii::ExcInternalError());
+
+#ifdef DEBUG
+        const auto ghost_offset = row_starts_host_(n_locally_owned_dofs_);
+        const auto n_nonzero_elements =
+            row_starts_host_(row_starts_host_.size() - 1);
+        Assert(requested_entries.size() ==
+                   2 * (n_nonzero_elements - ghost_offset),
+               dealii::ExcInternalError());
+#endif
+
+        for (unsigned int p = 0; p < receive_targets_.size(); ++p) {
+          const auto request_offset =
+              p == 0 ? 0 : receive_targets_[p - 1].second;
+          const auto request_size = receive_targets_[p].second - request_offset;
+
+          const int ierr =
+              MPI_Isend(requested_entries.data() + 2 * request_offset,
+                        2 * request_size,
+                        dealii::Utilities::MPI::mpi_type_id_for_type<
+                            dealii::types::global_dof_index>,
+                        receive_targets_[p].first,
+                        mpi_tag,
+                        mpi_communicator,
+                        &requests[p]);
+          AssertThrowMPI(ierr);
+        }
+      }
+
+      /*
+       * Accumulate all requests we received from other ranks:
+       */
+
+      send_targets_.resize(import_targets.size());
+
+      const unsigned int n_entries_to_be_sent =
+          std::accumulate(send_ranges.begin(), send_ranges.end(), 0);
+      std::vector<unsigned int> entries_buffer(2 * n_entries_to_be_sent /*!*/);
+
+      {
+        /* Index into entries_to_be_sent: */
+        unsigned int index = 0;
+
+        for (unsigned int p = 0; p < send_targets_.size(); ++p) {
+          const auto n_entries = send_ranges[p];
+
+          const int ierr = MPI_Irecv(
+              entries_buffer.data() + 2 * index /*!*/,
+              2 * n_entries /*!*/,
+              dealii::Utilities::MPI::mpi_type_id_for_type<unsigned int>,
+              import_targets[p].first,
+              mpi_tag,
+              mpi_communicator,
+              &requests[ghost_targets.size() + p]);
+          AssertThrowMPI(ierr);
+
+          index += n_entries;
+          send_targets_[p].first = import_targets[p].first;
+          send_targets_[p].second = index;
+        }
+      }
+
+      {
+        const int ierr =
+            MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+        AssertThrowMPI(ierr);
+      }
+
+      entries_to_be_sent_.clear();
+      for (unsigned int e = 0; e < n_entries_to_be_sent; ++e) {
+        const auto i_global = entries_buffer[2 * e];
+        const auto j_global = entries_buffer[2 * e + 1];
+        const auto i = partitioner_->global_to_local(i_global);
+        const auto j = partitioner_->global_to_local(j_global);
+
+        const std::size_t position = sparsity(i, j);
+        Assert(
+            position != sparsity.invalid_entry,
+            dealii::ExcMessage("Inconsistent global view of sparsity pattern: "
+                               "the requested column index is not present on "
+                               "the row stored on the owning MPI rank."));
+
+        const std::size_t position_diag = sparsity(i, i);
+        const std::size_t position_within_row = position - position_diag;
+
+        entries_to_be_sent_.emplace_back(i, position_within_row);
       }
     }
 
