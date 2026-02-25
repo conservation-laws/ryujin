@@ -65,17 +65,24 @@ namespace ryujin
         const unsigned int n_internal_dofs,
         const dealii::DynamicSparsityPattern &sparsity,
         const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-            &partitioner);
+            &partitioner,
+        bool symmetrize_ghost_range = true);
 
     /**
      * Reinit function that reinitializes the SIMD sparsity pattern for a
      * given sparsity pattern template, an MPI partitioner and the number
      * of (regular) internal dofs.
+     *
+     * @note If the @p symmetrize_ghost_range parameter is set to true,
+     * then all transpose entries (j, i) are added to the sparsity pattern,
+     * where i is within the locally owned range. This access is required
+     * for our stencil based methods.
      */
     void reinit(const unsigned int n_internal_dofs,
                 const dealii::DynamicSparsityPattern &sparsity,
                 const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                    &partitioner);
+                    &partitioner,
+                bool symmetrize_ghost_range = true);
 
     /**
      * Return a (read only) view on the sparsity pattern for the selected

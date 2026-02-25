@@ -26,9 +26,10 @@ namespace ryujin
       const unsigned int n_internal_dofs,
       const dealii::DynamicSparsityPattern &sparsity,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-          &partitioner)
+          &partitioner,
+      bool symmetrize_ghost_range)
   {
-    reinit(n_internal_dofs, sparsity, partitioner);
+    reinit(n_internal_dofs, sparsity, partitioner, symmetrize_ghost_range);
   }
 
 
@@ -37,7 +38,8 @@ namespace ryujin
       const unsigned int n_internal_dofs,
       const dealii::DynamicSparsityPattern &dsp,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-          &partitioner)
+          &partitioner,
+      const bool symmetrize_ghost_range)
   {
     this->n_internal_dofs_ = n_internal_dofs;
     this->n_locally_owned_dofs_ = partitioner->locally_owned_size();
@@ -61,15 +63,14 @@ namespace ryujin
       }
     }
 
-#ifdef DEBUG
-    /* Verify symmetric access: */
-    for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i) {
-      for (auto it = dsp_local.begin(i); it != dsp_local.end(i); ++it) {
-        const auto j = it->column();
-        Assert(dsp_local.exists(j, i), dealii::ExcInternalError());
+    if (symmetrize_ghost_range) {
+      for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i) {
+        for (auto it = dsp_local.begin(i); it != dsp_local.end(i); ++it) {
+          const auto j = it->column();
+          dsp_local.add(j, i);
+        }
       }
     }
-#endif
 
     dealii::SparsityPattern sparsity;
     sparsity.copy_from(dsp_local);
