@@ -1,9 +1,20 @@
+#include <sparse_matrix.h>
 #include <sparsity_pattern.h>
 
+#include <deal.II/distributed/tria.h>
+#include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_out.h>
+#include <deal.II/lac/sparsity_tools.h>
+
+#include <deal.II/lac/trilinos_sparse_matrix.h>
+
+#include <chrono>
+
 /*
- * A quick check that "receive_targets", "send_targets" and
- * "entries_to_be_sent" are set up correctly. Note that the sparsity
- * pattern we create is artificial.
+ * Test SparseMatrix::compress(VectorOperation::add)
  */
 
 namespace ryujin
@@ -16,13 +27,17 @@ namespace ryujin
           const dealii::DynamicSparsityPattern &sparsity,
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &partitioner)
-        : SparsityPattern<simd_length>(n_internal_dofs, sparsity, partitioner)
+        : SparsityPattern<simd_length>(n_internal_dofs,
+                                       sparsity,
+                                       partitioner,
+                                       /*symmetrize ghost range*/ true)
     {
     }
 
     void print()
     {
       std::stringstream ss;
+
       ss << "Receive targets:\n";
       for (const auto &[left, right] : this->receive_targets())
         ss << left << " : " << right << "\n";
@@ -43,6 +58,8 @@ namespace ryujin
 
 int main(int argc, char *argv[])
 {
+  using namespace std::chrono_literals;
+
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
   const auto mpi_rank =
@@ -51,111 +68,142 @@ int main(int argc, char *argv[])
   const auto n_mpi_processes =
       dealii::Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD);
 
-  AssertThrow(n_mpi_processes == 4, dealii::ExcMessage("set up for 4 ranks"));
+  /*
+   * Create a unit square twice globally refined and the bottom left
+   * quadrant once more. Creating a mesh with 4 hanging nodes.
+   */
 
-  /* Set up locally owned and relevant index sets. */
+  constexpr int dim = 2;
 
-  dealii::IndexSet locally_owned(16);
-  dealii::IndexSet locally_relevant(16);
+  dealii::parallel::distributed::Triangulation<dim> triangulation(
+      MPI_COMM_WORLD);
+  dealii::GridGenerator::hyper_cube(triangulation);
+  triangulation.refine_global(1);
+  triangulation.begin_active()->set_refine_flag();
+  triangulation.execute_coarsening_and_refinement();
+  triangulation.refine_global(1);
 
-  switch (mpi_rank) {
-  case 0:
-    // import only
-    locally_owned.add_range(0, 4);
-    locally_relevant.add_range(0, 4);   // own
-    locally_relevant.add_range(4, 6);   // from rank 1
-    locally_relevant.add_range(8, 10);  // from rank 2
-    locally_relevant.add_range(12, 14); // from rank 3
-    break;
-  case 1:
-    locally_owned.add_range(4, 8);
-    locally_relevant.add_range(4, 8);
-    locally_relevant.add_range(8, 10);  // from rank 2
-    locally_relevant.add_range(12, 14); // from rank 3
-    break;
-  case 2:
-    locally_owned.add_range(8, 12);
-    locally_relevant.add_range(8, 12);
-    locally_relevant.add_range(4, 6);   // from rank 1
-    locally_relevant.add_range(14, 16); // from rank 3
-    break;
-  case 3:
-    // export only
-    locally_owned.add_range(12, 16);
-    locally_relevant.add_range(12, 16);
-    break;
-  default:
-    __builtin_unreachable();
+  dealii::FE_Q<dim> fe(1);
+
+  /*
+   * Distribute DoFs, set up locally owned and relevant ranges, and partitioner.
+   */
+
+  dealii::DoFHandler<dim> dof_handler(triangulation);
+  dof_handler.distribute_dofs(fe);
+
+  const dealii::IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+
+  auto locally_relevant =
+      dealii::DoFTools::extract_locally_relevant_dofs(dof_handler);
+
+  dealii::AffineConstraints<double> affine_constraints;
+  affine_constraints.reinit(locally_owned, locally_relevant);
+  dealii::DoFTools::make_hanging_node_constraints(dof_handler,
+                                                  affine_constraints);
+  affine_constraints.close();
+
+  /* We should be consistent... */
+  if (!affine_constraints.is_consistent_in_parallel(
+          dealii::Utilities::MPI::all_gather(MPI_COMM_WORLD, locally_owned),
+          locally_relevant,
+          MPI_COMM_WORLD,
+          true)) {
+    std::cout << "Oh Nooo!" << std::endl;
+    __builtin_trap();
+  }
+
+  dealii::DynamicSparsityPattern dsp;
+  dsp.reinit(dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
+
+  /* Create temporary sparsity pattern: */
+  dealii::DoFTools::make_sparsity_pattern(
+      dof_handler, dsp, affine_constraints, false);
+  dealii::SparsityTools::distribute_sparsity_pattern(
+      dsp, locally_owned, MPI_COMM_WORLD, locally_relevant);
+
+  for (unsigned int i = 0; i < n_mpi_processes; ++i) {
+    if (i == mpi_rank) {
+      if (mpi_rank == 0)
+        std::cout << "\nPreliminary sparsity pattern (global numbering):\n";
+      std::cout << "Rank " << mpi_rank << std::endl;
+      dsp.print(std::cout);
+    }
+    std::this_thread::sleep_for(200ms);
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+
+  /*
+   * Enlarge the locally relevant set to include all additional couplings:
+   */
+
+  dealii::IndexSet additional_dofs(dof_handler.n_dofs());
+  for (auto &entry : dsp)
+    if (!locally_relevant.is_element(entry.column())) {
+      Assert(locally_owned.is_element(entry.row()), dealii::ExcInternalError());
+      additional_dofs.add_index(entry.column());
+    }
+  additional_dofs.compress();
+  locally_relevant.add_indices(additional_dofs);
+  locally_relevant.compress();
+  const auto n_locally_relevant = locally_relevant.n_elements();
+
+  for (unsigned int i = 0; i < n_mpi_processes; ++i) {
+    if (i == mpi_rank) {
+      if (mpi_rank == 0)
+        std::cout << "\nIndex sets (owned and extended relevant):\n";
+      std::cout << "Rank " << mpi_rank << std::endl;
+      locally_owned.print(std::cout);
+      locally_relevant.print(std::cout);
+    }
+    std::this_thread::sleep_for(200ms);
+    MPI_Barrier(MPI_COMM_WORLD);
   }
 
   const auto partitioner =
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
-  /* Set up sparsity pattern: */
-
-  dealii::DynamicSparsityPattern dsp(16, 16, locally_relevant);
-
-  switch (mpi_rank) {
-  case 0:
-    dsp.add(0, 0);
-    dsp.add(1, 1);
-    dsp.add(2, 2);
-    dsp.add(3, 3);
-    dsp.add(8, 3);
-    dsp.add(9, 3);
-    dsp.add(3, 8);
-    dsp.add(3, 9);
-    dsp.add(3, 12);
-    break;
-  case 1:
-    dsp.add(4, 4);
-    dsp.add(5, 5);
-    dsp.add(6, 6);
-    dsp.add(7, 7);
-    dsp.add(5, 8);
-    dsp.add(5, 9);
-    dsp.add(5, 12);
-    dsp.add(5, 13);
-    dsp.add(8, 5);
-    dsp.add(9, 5);
-    dsp.add(12, 5);
-    dsp.add(13, 5);
-    break;
-  case 2:
-    dsp.add(8, 8);
-    dsp.add(9, 9);
-    dsp.add(10, 10);
-    dsp.add(11, 11);
-    dsp.add(10, 4);
-    dsp.add(10, 5);
-    dsp.add(4, 10);
-    dsp.add(5, 10);
-    dsp.add(11, 14);
-    dsp.add(11, 15);
-    dsp.add(14, 11);
-    dsp.add(15, 11);
-    break;
-  case 3:
-    dsp.add(12, 12);
-    dsp.add(13, 13);
-    dsp.add(14, 14);
-    dsp.add(15, 15);
-    break;
-  default:
-    __builtin_unreachable();
-  }
-  dsp.compress();
+  /*
+   * Create final sparsity pattern:
+   */
 
   using VA = dealii::VectorizedArray<double>;
   constexpr auto simd_width = VA::size();
-  ryujin::Debug<simd_width> sparsity_pattern_simd(
-      /* vectorized internal range */ 0, dsp, partitioner);
+  ryujin::Debug<simd_width> sparsity_pattern(0, dsp, partitioner);
+  const auto print_sparsity = [&]() {
+    for (unsigned int i = 0; i < n_locally_relevant; ++i) {
+      const auto i_global = partitioner->local_to_global(i);
+      const unsigned int row_length = sparsity_pattern.row_length(i);
+      const unsigned int *js = sparsity_pattern.columns(i);
+      std::cout << "[" << i_global;
+      for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
+        const auto j_global = partitioner->local_to_global(*js);
+        std::cout << "," << j_global;
+      }
+      std::cout << "]" << std::endl;
+    }
+  };
 
   for (unsigned int i = 0; i < n_mpi_processes; ++i) {
-    if (i == mpi_rank)
-      sparsity_pattern_simd.print();
-    sleep(1);
+    if (i == mpi_rank) {
+      if (mpi_rank == 0)
+        std::cout << "\nModified sparsity pattern (global numbering):\n";
+      std::cout << "Rank " << mpi_rank << std::endl;
+      print_sparsity();
+    }
+    std::this_thread::sleep_for(200ms);
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+
+  for (unsigned int i = 0; i < n_mpi_processes; ++i) {
+    if (i == mpi_rank) {
+      if (mpi_rank == 0)
+        std::cout << "\nExchange pattern:\n";
+      std::cout << "Rank " << mpi_rank << std::endl;
+      sparsity_pattern.print();
+    }
+    std::this_thread::sleep_for(200ms);
     MPI_Barrier(MPI_COMM_WORLD);
   }
 }
