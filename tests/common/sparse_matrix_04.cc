@@ -30,7 +30,7 @@ namespace ryujin
         : SparsityPattern<simd_length>(n_internal_dofs,
                                        sparsity,
                                        partitioner,
-                                       /*symmetrize ghost range*/ true)
+                                       /*symmetrize ghost range*/ false)
     {
     }
 
@@ -206,4 +206,75 @@ int main(int argc, char *argv[])
     std::this_thread::sleep_for(200ms);
     MPI_Barrier(MPI_COMM_WORLD);
   }
+
+  /*
+   * Create a sparse matrix:
+   */
+
+  ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
+  sparse_matrix.reinit(sparsity_pattern);
+
+  for (unsigned int i = 0; i < n_locally_relevant; ++i) {
+    const unsigned int row_length = sparsity_pattern.row_length(i);
+    for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+      sparse_matrix.write_entry(std::pow(10., mpi_rank), i, col_idx);
+    }
+  }
+
+  sparse_matrix.compress(dealii::VectorOperation::add);
+
+  const auto print_matrix = [&]() {
+    for (unsigned int i = 0; i < n_locally_relevant; ++i) {
+      const auto i_global = partitioner->local_to_global(i);
+      const unsigned int row_length = sparsity_pattern.row_length(i);
+      const unsigned int *js = sparsity_pattern.columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
+        const auto j_global = partitioner->local_to_global(*js);
+        std::cout << "(" << i_global << "," << j_global << ") "
+                  << sparse_matrix.read_entry(i, col_idx) << std::endl;
+      }
+    }
+  };
+
+  for (unsigned int i = 0; i < n_mpi_processes; ++i) {
+    if (i == mpi_rank) {
+      if (mpi_rank == 0)
+        std::cout << "\n\nSparse matrix contents:\n";
+      std::cout << "Rank " << mpi_rank << std::endl;
+      print_matrix();
+    }
+    std::this_thread::sleep_for(200ms);
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+
+#if 0
+  /*
+   * Reference values computed with Trilinos matrix: Note that diagonal
+   * entries might differ between the two matrices because we always store
+   * the diagonal entry in our custom sparsity pattern.
+   */
+
+  dealii::TrilinosWrappers::SparsityPattern trilinos_sparsity_pattern;
+  trilinos_sparsity_pattern.reinit(locally_owned, dsp, MPI_COMM_WORLD);
+  dealii::TrilinosWrappers::SparseMatrix trilinos_sparse_matrix(
+      trilinos_sparsity_pattern);
+
+  for (const auto &it : dsp) {
+    const auto i = it.row();
+    const auto j = it.column();
+    trilinos_sparse_matrix.add(i, j, std::pow(10., mpi_rank));
+  }
+
+  trilinos_sparse_matrix.compress(dealii::VectorOperation::add);
+
+  for (unsigned int i = 0; i < n_mpi_processes; ++i) {
+    if (i == mpi_rank) {
+      if (mpi_rank == 0)
+        std::cout << "\n\n(Reference) sparse matrix contents:\n";
+      std::cout << "Rank " << mpi_rank << "\n";
+      trilinos_sparse_matrix.print(std::cout);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+#endif
 }

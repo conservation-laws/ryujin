@@ -3,4 +3,3 @@ Scalar vector (packed SIMD)
 
 State vector (packed SIMD):
 0 10 20 30 40 50 60 70 1 11 21 31 41 51 61 71 2 12 22 32 42 52 62 72 3 13 23 33 43 53 63 73
-
