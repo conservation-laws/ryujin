@@ -18,6 +18,9 @@
 #include <deal.II/fe/fe_simplex_p.h>
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/fe/mapping_fe.h>
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+#include <deal.II/fe/mapping_p1.h>
+#endif
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/grid/grid_out.h>
 
@@ -254,9 +257,18 @@ namespace ryujin
       collection_.finite_element_dg = std::make_unique<hp::FECollection<dim>>(
           FE_SimplexDGP<dim>(fe_degree));
 
-      collection_.mapping =
-          std::make_unique<dealii::hp::MappingCollection<dim>>(
-              MappingFE<dim>(FE_SimplexP<dim>(mapping_degree)));
+      if (mapping_degree == 1) {
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+        collection_.mapping =
+            std::make_unique<hp::MappingCollection<dim>>(MappingP1<dim>());
+#else
+        collection_.mapping = std::make_unique<hp::MappingCollection<dim>>(
+            MappingFE<dim>(FE_SimplexP<dim>(fe_degree)));
+#endif
+      } else {
+        collection_.mapping = std::make_unique<hp::MappingCollection<dim>>(
+            MappingFE<dim>(FE_SimplexP<dim>(fe_degree)));
+      }
 
       collection_.quadrature = std::make_unique<hp::QCollection<dim>>(
           QGaussSimplex<dim>(quadrature_degree));
