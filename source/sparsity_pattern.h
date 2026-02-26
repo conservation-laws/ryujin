@@ -244,6 +244,15 @@ namespace ryujin
     DEAL_II_HOST_DEVICE
     unsigned int row_length(const unsigned int row) const;
 
+    /**
+     * Given a row index @p row and a column index @p column return the
+     * corresponding column index, i.e., the position of the column in the
+     * stencil of nonzero row entries.
+     */
+    DEAL_II_HOST_DEVICE
+    unsigned int column_index(const unsigned int row,
+                              const unsigned int column) const;
+
     //@}
     /**
      * @name Offset calculation
@@ -454,6 +463,26 @@ namespace ryujin
     } else {
       return row_starts_(row + 1) - row_starts_(row);
     }
+  }
+
+
+  template <int simd_length, typename MemorySpace>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  SparsityPatternView<simd_length, MemorySpace>::column_index(
+      const unsigned int row, const unsigned int column) const
+  {
+    const auto &row_length = this->row_length(row);
+    const auto &stride_size = this->stride_of_row(row);
+
+    // FIXME: with C++23 use std::views::stride and binary search instead...
+
+    const unsigned int *js = columns(row);
+    for (unsigned int k = 0; k < row_length; ++k)
+      if (js[k * stride_size] == column)
+        return k;
+
+    Assert(false, dealii::ExcMessage("Column index not found in given row"));
+    return -1;
   }
 
 
