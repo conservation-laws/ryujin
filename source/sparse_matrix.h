@@ -86,6 +86,11 @@ namespace ryujin
     void read_in(const SparseMatrix2 &sparse_matrix2,
                  bool locally_indexed = true);
 
+    /**
+     * Return the underlying sparsity pattern.
+     */
+    ACCESSOR_READ_ONLY(sparsity_pattern);
+
     //@}
     /**
      * Memory space access and synchronization:
@@ -155,7 +160,8 @@ namespace ryujin
      */
     //@{
 
-    const SparsityPattern<simd_length> *sparsity_ = nullptr; // FIXME shared_ptr
+    const SparsityPattern<simd_length> *sparsity_pattern_ =
+        nullptr; // FIXME shared_ptr
 
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
     Kokkos::View<Number *, HostSpace> data_host_;
@@ -209,11 +215,15 @@ namespace ryujin
     void reinit(SparseMatrix &sparse_matrix)
       requires(writable != std::is_const_v<SparseMatrix>);
 
+    /**
+     * Return the underlying sparsity pattern view.
+     */
+    ACCESSOR_READ_ONLY(sparsity_pattern);
+
     /* Get scalar or tensor-valued entry: */
 
     /**
-     * Return the (scalar) entry indexed by @p row and @p
-     * position_within_column.
+     * Return the (scalar) entry indexed by @p row and @p column_index.
      *
      * @note If the template argument @a Number2
      * is a vectorized array a specialized, faster access will be performed.
@@ -224,12 +234,11 @@ namespace ryujin
      */
     template <typename Number2 = Number>
     DEAL_II_HOST_DEVICE Number2
-    read_entry(const unsigned int row,
-               const unsigned int position_within_column) const;
+    read_entry(const unsigned int row, const unsigned int column_index) const;
 
     /**
      * Return the tensor-valued entry indexed by @p row and
-     * @p position_within_column. This function performs the same operation
+     * @p column_index. This function performs the same operation
      * as read_entry() except that it always returns the entry as a tensor
      * (even if it is effectively a scalar entry).
      *
@@ -241,14 +250,13 @@ namespace ryujin
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
     DEAL_II_HOST_DEVICE Tensor
-    read_tensor(const unsigned int row,
-                const unsigned int position_within_column) const;
+    read_tensor(const unsigned int row, const unsigned int column_index) const;
 
     /* Get transposed scalar or tensor-valued entry: */
 
     /**
      * Return the transposed (sclar) entry indexed by @p row and
-     * @p position_within_column.
+     * @p column_index.
      *
      * @note If the template argument @a Number2
      * is a vectorized array a specialized, faster access will be performed.
@@ -258,13 +266,12 @@ namespace ryujin
      * @note This function is only available if `n_comp` is equal to 1.
      */
     template <typename Number2 = Number>
-    DEAL_II_HOST_DEVICE Number2
-    read_transposed_entry(const unsigned int row,
-                          const unsigned int position_within_column) const;
+    DEAL_II_HOST_DEVICE Number2 read_transposed_entry(
+        const unsigned int row, const unsigned int column_index) const;
 
     /**
      * Return the transposed tensor-valued entry indexed by @p row and
-     * @a position_within_column. This function performs the same operation
+     * @a column_index. This function performs the same operation
      * as read_entry() except that it always returns the entry as a tensor
      * (even if it is effectively a scalar entry).
      *
@@ -275,15 +282,14 @@ namespace ryujin
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
-    DEAL_II_HOST_DEVICE Tensor
-    read_transposed_tensor(const unsigned int row,
-                           const unsigned int position_within_column) const;
+    DEAL_II_HOST_DEVICE Tensor read_transposed_tensor(
+        const unsigned int row, const unsigned int column_index) const;
 
     /* Write scalar or tensor entry: */
 
     /**
      * Write a (scalar-valued) @p entry to the matrix indexed by @p row
-     * and @p position_within_column.
+     * and @p column_index.
      *
      * @note If the template argument @a Number2
      * is a vectorized array a specialized, faster access will be performed.
@@ -296,13 +302,13 @@ namespace ryujin
     DEAL_II_HOST_DEVICE void
     write_entry(const Number2 entry,
                 const unsigned int row,
-                const unsigned int position_within_column,
+                const unsigned int column_index,
                 const bool do_streaming_store = false) const
       requires(writable);
 
     /**
      * Write a tensor-valued @p entry to the matrix indexed by @p row
-     * and @p position_within_column.
+     * and @p column_index.
      *
      * @note If the template argument @a Number2
      * is a vectorized array a specialized, faster access will be performed.
@@ -314,13 +320,13 @@ namespace ryujin
     DEAL_II_HOST_DEVICE void
     write_tensor(const Tensor &tensor,
                  const unsigned int row,
-                 const unsigned int position_within_column,
+                 const unsigned int column_index,
                  const bool do_streaming_store = false) const
       requires(writable);
 
     /**
      * Add a (scalar-valued) @p entry to the matrix indexed by @p row
-     * and @p position_within_column.
+     * and @p column_index.
      *
      * @note If the template argument @a Number2
      * is a vectorized array a specialized, faster access will be performed.
@@ -330,15 +336,14 @@ namespace ryujin
      * @note This function is only available if `n_comp` is equal to 1.
      */
     template <typename Number2 = Number>
-    DEAL_II_HOST_DEVICE void
-    add_entry(const Number2 entry,
-              const unsigned int row,
-              const unsigned int position_within_column) const
+    DEAL_II_HOST_DEVICE void add_entry(const Number2 entry,
+                                       const unsigned int row,
+                                       const unsigned int column_index) const
       requires(writable);
 
     /**
      * Add a tensor-valued @p entry to the matrix indexed by @p row and @p
-     * position_within_column.
+     * column_index.
      *
      * @note If the template argument @a Number2
      * is a vectorized array a specialized, faster access will be performed.
@@ -347,10 +352,9 @@ namespace ryujin
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
-    DEAL_II_HOST_DEVICE void
-    add_tensor(const Tensor &tensor,
-               const unsigned int row,
-               const unsigned int position_within_column) const
+    DEAL_II_HOST_DEVICE void add_tensor(const Tensor &tensor,
+                                        const unsigned int row,
+                                        const unsigned int column_index) const
       requires(writable);
 
 
@@ -374,7 +378,7 @@ namespace ryujin
   private:
     using SM = SparseMatrix<Number, n_comp, simd_length>;
     std::conditional_t<writable, SM *, const SM *> sparse_matrix_;
-    SparsityPatternView<simd_length, MemorySpace> sparsity_;
+    SparsityPatternView<simd_length, MemorySpace> sparsity_pattern_;
     Kokkos::View<Number *, MemorySpace> data_;
   };
 
@@ -389,7 +393,7 @@ namespace ryujin
 
   template <typename Number, int n_components, int simd_length>
   SparseMatrix<Number, n_components, simd_length>::SparseMatrix()
-      : sparsity_(nullptr)
+      : sparsity_pattern_(nullptr)
       , host_space_active_(true)
   {
   }
@@ -407,7 +411,7 @@ namespace ryujin
   void SparseMatrix<Number, n_components, simd_length>::reinit(
       const SparsityPattern<simd_length> &sparsity)
   {
-    this->sparsity_ = &sparsity;
+    this->sparsity_pattern_ = &sparsity;
     this->host_space_active_ = true;
 
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
@@ -455,8 +459,8 @@ namespace ryujin
       constexpr unsigned int stride_size = get_stride_size<T>;
       static_assert(stride_size == 1 || stride_size == simd_length);
 
-      const unsigned int row_length = sparsity_->row_length(i);
-      const unsigned int *js = sparsity_->columns(i);
+      const unsigned int row_length = sparsity_pattern_->row_length(i);
+      const unsigned int *js = sparsity_pattern_->columns(i);
 
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
@@ -472,8 +476,8 @@ namespace ryujin
                 temp[d][k] = sparse_matrix[d](i + k, js[k]);
               else
                 temp[d][k] = sparse_matrix[d].el(
-                    sparsity_->partitioner()->local_to_global(i + k),
-                    sparsity_->partitioner()->local_to_global(js[k]));
+                    sparsity_pattern_->partitioner()->local_to_global(i + k),
+                    sparsity_pattern_->partitioner()->local_to_global(js[k]));
 
           this->template write_tensor<T>(temp, i, col_idx, true);
 
@@ -483,8 +487,8 @@ namespace ryujin
               temp[d] = sparse_matrix[d](i, js[0]);
             else
               temp[d] = sparse_matrix[d].el(
-                  sparsity_->partitioner()->local_to_global(i),
-                  sparsity_->partitioner()->local_to_global(js[0]));
+                  sparsity_pattern_->partitioner()->local_to_global(i),
+                  sparsity_pattern_->partitioner()->local_to_global(js[0]));
           this->template write_tensor<T>(temp, i, col_idx);
         }
       }
@@ -493,8 +497,8 @@ namespace ryujin
     cpu_simd_loop<Number>("sparse_matrix_read_in",
                           body,
                           0,
-                          sparsity_->n_internal_dofs(),
-                          sparsity_->n_locally_owned_dofs());
+                          sparsity_pattern_->n_internal_dofs(),
+                          sparsity_pattern_->n_locally_owned_dofs());
   }
 
 
@@ -519,8 +523,8 @@ namespace ryujin
       constexpr unsigned int stride_size = get_stride_size<T>;
       static_assert(stride_size == 1 || stride_size == simd_length);
 
-      const unsigned int row_length = sparsity_->row_length(i);
-      const unsigned int *js = sparsity_->columns(i);
+      const unsigned int row_length = sparsity_pattern_->row_length(i);
+      const unsigned int *js = sparsity_pattern_->columns(i);
 
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
@@ -534,8 +538,8 @@ namespace ryujin
               temp[k] = sparse_matrix(i + k, js[k]);
             else
               temp[k] = sparse_matrix.el(
-                  sparsity_->partitioner()->local_to_global(i + k),
-                  sparsity_->partitioner()->local_to_global(js[k]));
+                  sparsity_pattern_->partitioner()->local_to_global(i + k),
+                  sparsity_pattern_->partitioner()->local_to_global(js[k]));
 
           this->template write_entry<T>(temp, i, col_idx, true);
 
@@ -543,8 +547,9 @@ namespace ryujin
           temp = locally_indexed
                      ? sparse_matrix(i, js[0])
                      : sparse_matrix.el(
-                           sparsity_->partitioner()->local_to_global(i),
-                           sparsity_->partitioner()->local_to_global(js[0]));
+                           sparsity_pattern_->partitioner()->local_to_global(i),
+                           sparsity_pattern_->partitioner()->local_to_global(
+                               js[0]));
           this->template write_entry<T>(temp, i, col_idx);
         }
       }
@@ -553,8 +558,8 @@ namespace ryujin
     cpu_simd_loop<Number>("sparse_matrix_read_in",
                           body,
                           0,
-                          sparsity_->n_internal_dofs(),
-                          sparsity_->n_locally_owned_dofs());
+                          sparsity_pattern_->n_internal_dofs(),
+                          sparsity_pattern_->n_locally_owned_dofs());
   }
 
 
@@ -641,8 +646,10 @@ namespace ryujin
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
 
-    const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
-    const auto end_offset = sparsity_->n_nonzero_elements() * n_components;
+    const auto ghost_offset =
+        sparsity_pattern_->template ghost_offset<n_components>();
+    const auto end_offset =
+        sparsity_pattern_->n_nonzero_elements() * n_components;
     std::fill(data_host_.data() + ghost_offset,
               data_host_.data() + end_offset,
               Number{});
@@ -663,9 +670,9 @@ namespace ryujin
     Assert(is_active_memory_space<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not active."));
 
-    const auto &receive_targets = sparsity_->receive_targets();
-    const auto &send_targets = sparsity_->send_targets();
-    const auto &entries_to_be_sent = sparsity_->entries_to_be_sent();
+    const auto &receive_targets = sparsity_pattern_->receive_targets();
+    const auto &send_targets = sparsity_pattern_->send_targets();
+    const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
 
     const unsigned int mpi_tag =
         dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
@@ -677,7 +684,8 @@ namespace ryujin
         receive_targets.size() + send_targets.size();
     std::vector<MPI_Request> requests(n_requests);
 
-    const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
+    const auto ghost_offset =
+        sparsity_pattern_->template ghost_offset<n_components>();
 
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
       const auto receive_offset =
@@ -699,16 +707,16 @@ namespace ryujin
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     receive_targets[p].first,
                     mpi_tag,
-                    sparsity_->partitioner()->get_mpi_communicator(),
+                    sparsity_pattern_->partitioner()->get_mpi_communicator(),
                     &requests[p]);
       AssertThrowMPI(ierr);
     }
 
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
-      const auto &[row, position_within_column] = entries_to_be_sent[c];
+      const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset = sparsity_->template offset<n_components>(
-            row, position_within_column, d);
+        const auto offset = sparsity_pattern_->template offset<n_components>(
+            row, column_index, d);
         exchange_buffer_host_(n_components * c + d) = data_host_(offset);
       }
     }
@@ -733,7 +741,7 @@ namespace ryujin
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     send_targets[p].first,
                     mpi_tag,
-                    sparsity_->partitioner()->get_mpi_communicator(),
+                    sparsity_pattern_->partitioner()->get_mpi_communicator(),
                     &requests[receive_targets.size() + p]);
       AssertThrowMPI(ierr);
     }
@@ -767,9 +775,9 @@ namespace ryujin
     Assert(is_active_memory_space<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not active."));
 
-    const auto &receive_targets = sparsity_->receive_targets();
-    const auto &send_targets = sparsity_->send_targets();
-    const auto &entries_to_be_sent = sparsity_->entries_to_be_sent();
+    const auto &receive_targets = sparsity_pattern_->receive_targets();
+    const auto &send_targets = sparsity_pattern_->send_targets();
+    const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
 
     const unsigned int mpi_tag =
         dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
@@ -806,12 +814,13 @@ namespace ryujin
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     send_targets[p].first,
                     mpi_tag,
-                    sparsity_->partitioner()->get_mpi_communicator(),
+                    sparsity_pattern_->partitioner()->get_mpi_communicator(),
                     &requests[p]);
       AssertThrowMPI(ierr);
     }
 
-    const auto ghost_offset = sparsity_->template ghost_offset<n_components>();
+    const auto ghost_offset =
+        sparsity_pattern_->template ghost_offset<n_components>();
 
     /*
      * Note: For the compress() operation we send our ghost range to the
@@ -838,7 +847,7 @@ namespace ryujin
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     receive_targets[p].first,
                     mpi_tag,
-                    sparsity_->partitioner()->get_mpi_communicator(),
+                    sparsity_pattern_->partitioner()->get_mpi_communicator(),
                     &requests[send_targets.size() + p]);
       AssertThrowMPI(ierr);
     }
@@ -855,10 +864,10 @@ namespace ryujin
     /* Add back contributions and clear ghost range: */
 
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
-      const auto &[row, position_within_column] = entries_to_be_sent[c];
+      const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset = sparsity_->template offset<n_components>(
-            row, position_within_column, d);
+        const auto offset = sparsity_pattern_->template offset<n_components>(
+            row, column_index, d);
         data_host_(offset) += exchange_buffer_host_(n_components * c + d);
       }
     }
@@ -920,7 +929,8 @@ namespace ryujin
       data_ = sparse_matrix.data_default_;
     }
 
-    sparsity_ = sparse_matrix.sparsity_->template get_view<MemorySpace>();
+    sparsity_pattern_ =
+        sparse_matrix.sparsity_pattern_->template get_view<MemorySpace>();
   }
 
 
@@ -932,14 +942,13 @@ namespace ryujin
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_entry(const unsigned int row,
-                 const unsigned int position_within_column) const
+      read_entry(const unsigned int row, const unsigned int column_index) const
   {
     static_assert(
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
-    const auto result = read_tensor<Number2>(row, position_within_column);
+    const auto result = read_tensor<Number2>(row, column_index);
     return result[0];
   }
 
@@ -952,14 +961,13 @@ namespace ryujin
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_tensor(const unsigned int row,
-                  const unsigned int position_within_column) const
+      read_tensor(const unsigned int row, const unsigned int column_index) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
 
-    AssertIndexRange(row, sparsity_.n_rows());
-    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+    AssertIndexRange(row, sparsity_pattern_.n_rows());
+    AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
     Tensor result;
 
@@ -970,7 +978,7 @@ namespace ryujin
        * [0,n_internal), index must be divisible by simd_length
        */
 
-      Assert(row < sparsity_.n_internal_dofs(),
+      Assert(row < sparsity_pattern_.n_internal_dofs(),
              dealii::ExcMessage(
                  "Vectorized access only possible in vectorized part"));
       Assert(row % simd_length == 0,
@@ -978,8 +986,8 @@ namespace ryujin
                  "Access only supported for rows at the SIMD granularity"));
 
       const Number *load_pos = data_.data();
-      load_pos += sparsity_.template offset_internal<n_comp>(
-          row, position_within_column);
+      load_pos +=
+          sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
       for (unsigned int d = 0; d < n_comp; ++d)
         result[d].load(load_pos + d * simd_length);
@@ -991,7 +999,7 @@ namespace ryujin
 
       for (unsigned int d = 0; d < n_comp; ++d) {
         const auto offset =
-            sparsity_.template offset<n_comp>(row, position_within_column, d);
+            sparsity_pattern_.template offset<n_comp>(row, column_index, d);
         result[d] = data_(offset);
       }
     }
@@ -1009,14 +1017,13 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       read_transposed_entry(const unsigned int row,
-                            const unsigned int position_within_column) const
+                            const unsigned int column_index) const
   {
     static_assert(
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
-    const auto result =
-        read_transposed_tensor<Number2>(row, position_within_column);
+    const auto result = read_transposed_tensor<Number2>(row, column_index);
     return result[0];
   }
 
@@ -1030,13 +1037,13 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       read_transposed_tensor(const unsigned int row,
-                             const unsigned int position_within_column) const
+                             const unsigned int column_index) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
 
-    AssertIndexRange(row, sparsity_.n_rows());
-    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+    AssertIndexRange(row, sparsity_pattern_.n_rows());
+    AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
     dealii::Tensor<1, n_comp, Number2> result;
 
@@ -1047,15 +1054,16 @@ namespace ryujin
        * [0,n_internal), index must be divisible by simd_length
        */
 
-      Assert(row < sparsity_.n_internal_dofs(),
+      Assert(row < sparsity_pattern_.n_internal_dofs(),
              dealii::ExcMessage(
                  "Vectorized access only possible in vectorized part"));
       Assert(row % simd_length == 0,
              dealii::ExcMessage(
                  "Access only supported for rows at the SIMD granularity"));
 
-      const auto offsets = sparsity_.template transposed_offset_internal<1>(
-          row, position_within_column);
+      const auto offsets =
+          sparsity_pattern_.template transposed_offset_internal<1>(
+              row, column_index);
       result[0].gather(data_.data(), offsets);
 
     } else if constexpr (std::is_same_v<VA, Number2> && (n_comp != 1)) {
@@ -1072,8 +1080,9 @@ namespace ryujin
        */
 
       for (unsigned int d = 0; d < n_comp; ++d) {
-        const auto offset = sparsity_.template transposed_offset<n_comp>(
-            row, position_within_column, d);
+        const auto offset =
+            sparsity_pattern_.template transposed_offset<n_comp>(
+                row, column_index, d);
         result[d] = data_(offset);
       }
     }
@@ -1092,7 +1101,7 @@ namespace ryujin
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       write_entry(const Number2 entry,
                   const unsigned int row,
-                  const unsigned int position_within_column,
+                  const unsigned int column_index,
                   const bool do_streaming_store) const
     requires(writable)
   {
@@ -1100,14 +1109,13 @@ namespace ryujin
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
-    AssertIndexRange(row, sparsity_.n_rows());
-    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+    AssertIndexRange(row, sparsity_pattern_.n_rows());
+    AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
     dealii::Tensor<1, n_comp, Number2> tensor;
     tensor[0] = entry;
 
-    write_tensor<Number2>(
-        tensor, row, position_within_column, do_streaming_store);
+    write_tensor<Number2>(tensor, row, column_index, do_streaming_store);
   }
 
 
@@ -1121,12 +1129,12 @@ namespace ryujin
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       write_tensor(const Tensor &tensor,
                    const unsigned int row,
-                   const unsigned int position_within_column,
+                   const unsigned int column_index,
                    const bool do_streaming_store) const
     requires(writable)
   {
-    AssertIndexRange(row, sparsity_.n_rows());
-    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+    AssertIndexRange(row, sparsity_pattern_.n_rows());
+    AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
     using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<VA, Number2>) {
@@ -1135,7 +1143,7 @@ namespace ryujin
        * index must be divisible by simd_length:
        */
 
-      Assert(row < sparsity_.n_internal_dofs(),
+      Assert(row < sparsity_pattern_.n_internal_dofs(),
              dealii::ExcMessage(
                  "Vectorized access only possible in vectorized part"));
       Assert(row % simd_length == 0,
@@ -1143,8 +1151,8 @@ namespace ryujin
                  "Access only supported for rows at the SIMD granularity"));
 
       Number *store_pos = data_.data();
-      store_pos += sparsity_.template offset_internal<n_comp>(
-          row, position_within_column);
+      store_pos +=
+          sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
       if (do_streaming_store)
         for (unsigned int d = 0; d < n_comp; ++d)
@@ -1160,7 +1168,7 @@ namespace ryujin
 
       for (unsigned int d = 0; d < n_comp; ++d) {
         const auto offset =
-            sparsity_.template offset<n_comp>(row, position_within_column, d);
+            sparsity_pattern_.template offset<n_comp>(row, column_index, d);
         data_(offset) = tensor[d];
       }
     }
@@ -1177,20 +1185,20 @@ namespace ryujin
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       add_entry(const Number2 entry,
                 const unsigned int row,
-                const unsigned int position_within_column) const
+                const unsigned int column_index) const
     requires(writable)
   {
     static_assert(
         n_comp == 1,
         "Attempted to write a scalar value into a tensor-valued matrix entry");
 
-    AssertIndexRange(row, sparsity_.n_rows());
-    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+    AssertIndexRange(row, sparsity_pattern_.n_rows());
+    AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
     dealii::Tensor<1, n_comp, Number2> tensor;
     tensor[0] = entry;
 
-    add_tensor<Number2>(tensor, row, position_within_column);
+    add_tensor<Number2>(tensor, row, column_index);
   }
 
 
@@ -1204,11 +1212,11 @@ namespace ryujin
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
       add_tensor(const Tensor &tensor,
                  const unsigned int row,
-                 const unsigned int position_within_column) const
+                 const unsigned int column_index) const
     requires(writable)
   {
-    AssertIndexRange(row, sparsity_.n_rows());
-    AssertIndexRange(position_within_column, sparsity_.row_length(row));
+    AssertIndexRange(row, sparsity_pattern_.n_rows());
+    AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
     using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<VA, Number2>) {
@@ -1217,7 +1225,7 @@ namespace ryujin
        * index must be divisible by simd_length:
        */
 
-      Assert(row < sparsity_.n_internal_dofs(),
+      Assert(row < sparsity_pattern_.n_internal_dofs(),
              dealii::ExcMessage(
                  "Vectorized access only possible in vectorized part"));
       Assert(row % simd_length == 0,
@@ -1225,8 +1233,8 @@ namespace ryujin
                  "Access only supported for rows at the SIMD granularity"));
 
       Number *store_pos = data_.data();
-      store_pos += sparsity_.template offset_internal<n_comp>(
-          row, position_within_column);
+      store_pos +=
+          sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
       for (unsigned int d = 0; d < n_comp; ++d) {
         auto temp = tensor[d];
@@ -1242,7 +1250,7 @@ namespace ryujin
 
       for (unsigned int d = 0; d < n_comp; ++d) {
         const auto offset =
-            sparsity_.template offset<n_comp>(row, position_within_column, d);
+            sparsity_pattern_.template offset<n_comp>(row, column_index, d);
         data_(offset) += tensor[d]; /*add*/
         ;
       }
