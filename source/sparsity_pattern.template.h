@@ -60,15 +60,10 @@ namespace ryujin
         const auto global_column = it->column();
         const auto j = partitioner->global_to_local(global_column);
         dsp_local.add(i, j);
-      }
-    }
 
-    if (symmetrize_ghost_range) {
-      for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i) {
-        for (auto it = dsp_local.begin(i); it != dsp_local.end(i); ++it) {
-          const auto j = it->column();
+        if (symmetrize_ghost_range && //
+            i < n_locally_owned_dofs_ && j >= n_locally_owned_dofs_)
           dsp_local.add(j, i);
-        }
       }
     }
 
