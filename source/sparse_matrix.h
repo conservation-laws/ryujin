@@ -656,10 +656,10 @@ namespace ryujin
   template <typename MemorySpace>
   void
   SparseMatrix<Number, n_components, simd_length>::compress_on_memory_space(
-      dealii::VectorOperation::values operation)
+      dealii::VectorOperation::values operation [[maybe_unused]])
   {
-    Assert(operation == dealii::VectorOperation::add,
-           dealii::ExcNotImplemented());
+    AssertThrow(operation == dealii::VectorOperation::add,
+                dealii::ExcNotImplemented());
 
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
     using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
