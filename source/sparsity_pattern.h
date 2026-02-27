@@ -47,7 +47,7 @@ namespace ryujin
   {
   public:
     /**
-     * Constructor, initialization, access.
+     * @name Constructor, initialization, access.
      */
     //@{
 
@@ -95,7 +95,7 @@ namespace ryujin
 
     /**
      * Array listing all (locally owned) entries as a pair {row,
-     * position_within_column}, potentially duplicated, and arranged
+     * column_index}, potentially duplicated, and arranged
      * consecutively by send targets.
      */
     ACCESSOR_READ_ONLY(entries_to_be_sent);
@@ -168,17 +168,55 @@ namespace ryujin
   class SparsityPatternView
   {
   public:
+    /**
+     * @name Constructor, initialization.
+     */
+    //@{
+
     SparsityPatternView() = default;
 
     SparsityPatternView(const SparsityPattern<simd_length> &sparsity_pattern);
 
     void reinit(const SparsityPattern<simd_length> &sparsity_pattern);
 
+    //@}
+    /**
+     * @name General information about the sparsity pattern.
+     */
+    //@{
+
+    /**
+     * The number of locally internal rows of the sparsity pattern that are
+     * stored in optimized "array-of-struct-of-array" format.
+     */
     DEAL_II_HOST_DEVICE
     unsigned int n_internal_dofs() const;
 
+    /**
+     * The number of locally owned rows of the sparsity pattern.
+     */
     DEAL_II_HOST_DEVICE
     unsigned int n_locally_owned_dofs() const;
+
+    /**
+     * The total number of rows of the given sparsity pattern. This number
+     * comprises all locally owned rows and the ghost row range and is
+     * equal to n_locally_relevant.
+     */
+    DEAL_II_HOST_DEVICE
+    unsigned int n_rows() const;
+
+    /**
+     * The total number of nonzero elements of the given sparsity pattern.
+     */
+    DEAL_II_HOST_DEVICE
+    unsigned int n_nonzero_elements() const;
+
+    //@}
+    /**
+     * @name Properties of a row.
+     */
+    //@{
 
     /**
      * Return the "stride size" of a given row index. The function returns
@@ -192,10 +230,10 @@ namespace ryujin
      * Return a pointer to the array of column indices for the given row,
      * i.e., for a given row index i:
      * ```
-     *   const unsigned int *js = sparsity_simd.columns(i);
+     * const unsigned int *js = sparsity_pattern.columns(i);
      * ```
-     * is a pointer to the column index j (or column indices *js when
-     * SIMD vectorized).
+     * is a pointer to the column index j (or column indices *js when SIMD
+     * vectorized).
      */
     DEAL_II_HOST_DEVICE
     const unsigned int *columns(const unsigned int row) const;
@@ -207,16 +245,19 @@ namespace ryujin
     unsigned int row_length(const unsigned int row) const;
 
     /**
-     * The total number of rows of the given sparsity pattern.
+     * Given a row index @p row and a column index @p column return the
+     * corresponding column index, i.e., the position of the column in the
+     * stencil of nonzero row entries.
      */
     DEAL_II_HOST_DEVICE
-    unsigned int n_rows() const;
+    unsigned int column_index(const unsigned int row,
+                              const unsigned int column) const;
 
+    //@}
     /**
-     * The total number of nonzero elements of the given sparsity pattern.
+     * @name Offset calculation
      */
-    DEAL_II_HOST_DEVICE
-    unsigned int n_nonzero_elements() const;
+    //@{
 
     /**
      * Given a row index, an index for the column (within [0,
@@ -226,7 +267,7 @@ namespace ryujin
     template <unsigned int n_components = 1>
     DEAL_II_HOST_DEVICE unsigned int
     offset(const unsigned int row,
-           const unsigned int position_within_column,
+           const unsigned int column_index,
            const unsigned int component = 0) const;
 
     /**
@@ -239,7 +280,7 @@ namespace ryujin
     template <unsigned int n_components = 1>
     DEAL_II_HOST_DEVICE unsigned int
     offset_internal(const unsigned int row,
-                    const unsigned int position_within_column) const;
+                    const unsigned int column_index) const;
 
     /**
      * Given a row index, an index for the column (within [0,
@@ -249,7 +290,7 @@ namespace ryujin
     template <unsigned int n_components = 1>
     DEAL_II_HOST_DEVICE unsigned int
     transposed_offset(const unsigned int row,
-                      const unsigned int position_within_column,
+                      const unsigned int column_index,
                       const unsigned int component = 0) const;
 
     /**
@@ -262,7 +303,7 @@ namespace ryujin
     template <unsigned int n_components = 1>
     DEAL_II_HOST_DEVICE const unsigned int *
     transposed_offset_internal(const unsigned int row,
-                               const unsigned int position_within_column) const;
+                               const unsigned int column_index) const;
 
     /**
      * Return an offset pointing to the first element of the ghost range,
@@ -276,6 +317,12 @@ namespace ryujin
     template <unsigned int n_components = 1>
     DEAL_II_HOST_DEVICE unsigned int ghost_offset() const;
 
+    //@}
+    /**
+     * @name Internal fields, methods, and friends
+     */
+    //@{
+
   private:
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
@@ -283,6 +330,7 @@ namespace ryujin
     Kokkos::View<const unsigned int *, MemorySpace> row_starts_;
     Kokkos::View<const unsigned int *, MemorySpace> column_indices_;
     Kokkos::View<const unsigned int *, MemorySpace> indices_transposed_;
+    //@}
   };
 
 
@@ -355,6 +403,26 @@ namespace ryujin
 
   template <int simd_length, typename MemorySpace>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  SparsityPatternView<simd_length, MemorySpace>::n_rows() const
+  {
+    Assert(row_starts_.size() > 0, dealii::ExcNotInitialized());
+
+    return row_starts_.size() - 1;
+  }
+
+
+  template <int simd_length, typename MemorySpace>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  SparsityPatternView<simd_length, MemorySpace>::n_nonzero_elements() const
+  {
+    Assert(row_starts_.size() > 0, dealii::ExcNotInitialized());
+
+    return row_starts_(row_starts_.size() - 1);
+  }
+
+
+  template <int simd_length, typename MemorySpace>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
   SparsityPatternView<simd_length, MemorySpace>::stride_of_row(
       const unsigned int row) const
   {
@@ -400,21 +468,21 @@ namespace ryujin
 
   template <int simd_length, typename MemorySpace>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
-  SparsityPatternView<simd_length, MemorySpace>::n_rows() const
+  SparsityPatternView<simd_length, MemorySpace>::column_index(
+      const unsigned int row, const unsigned int column) const
   {
-    Assert(row_starts_.size() > 0, dealii::ExcNotInitialized());
+    const auto &row_length = this->row_length(row);
+    const auto &stride_size = this->stride_of_row(row);
 
-    return row_starts_.size() - 1;
-  }
+    // FIXME: with C++23 use std::views::stride and binary search instead...
 
+    const unsigned int *js = columns(row);
+    for (unsigned int k = 0; k < row_length; ++k)
+      if (js[k * stride_size] == column)
+        return k;
 
-  template <int simd_length, typename MemorySpace>
-  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
-  SparsityPatternView<simd_length, MemorySpace>::n_nonzero_elements() const
-  {
-    Assert(row_starts_.size() > 0, dealii::ExcNotInitialized());
-
-    return row_starts_(row_starts_.size() - 1);
+    Assert(false, dealii::ExcMessage("Column index not found in given row"));
+    return -1;
   }
 
 
@@ -423,11 +491,11 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
   SparsityPatternView<simd_length, MemorySpace>::offset(
       const unsigned int row,
-      const unsigned int position_within_column,
+      const unsigned int column_index,
       const unsigned int comp) const
   {
     AssertIndexRange(row, n_rows());
-    AssertIndexRange(position_within_column, row_length(row));
+    AssertIndexRange(column_index, row_length(row));
     AssertIndexRange(comp, n_components);
 
     const unsigned int simd_row = row / simd_length;
@@ -435,12 +503,11 @@ namespace ryujin
 
     if (row < n_internal_dofs_) {
       const unsigned int scalar_offset =
-          row_starts_(simd_row) + position_within_column * simd_length;
+          row_starts_(simd_row) + column_index * simd_length;
       return scalar_offset * n_components + comp * simd_length + simd_offset;
 
     } else {
-      const unsigned int scalar_offset =
-          row_starts_(row) + position_within_column;
+      const unsigned int scalar_offset = row_starts_(row) + column_index;
 
       return scalar_offset * n_components + comp;
     }
@@ -452,25 +519,25 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
   SparsityPatternView<simd_length, MemorySpace>::transposed_offset(
       const unsigned int row,
-      const unsigned int position_within_column,
+      const unsigned int column_index,
       const unsigned int component) const
   {
     AssertIndexRange(row, n_rows());
-    AssertIndexRange(position_within_column, row_length(row));
+    AssertIndexRange(column_index, row_length(row));
     AssertIndexRange(component, n_components);
 
     // Compute the transposed index from the (scalar) numbering stored in
     // the sparsity pattern...
-    const unsigned int scalar_offset = offset(row, position_within_column);
+    const unsigned int scalar_offset = offset(row, column_index);
     const unsigned int transposed_scalar_offset =
         indices_transposed_(scalar_offset);
 
     // ... and reconstruct the proper index for a view with n_components:
-    const unsigned int column_index = column_indices_(scalar_offset);
+    const unsigned int j = column_indices_(scalar_offset);
 
     unsigned int transposed_offset = transposed_scalar_offset;
     if constexpr (n_components > 1) {
-      if (column_index < n_internal_dofs_) {
+      if (j < n_internal_dofs_) {
         transposed_offset = //
             transposed_offset / simd_length * simd_length * n_components +
             transposed_offset % simd_length;
@@ -493,10 +560,10 @@ namespace ryujin
   template <unsigned int n_components>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
   SparsityPatternView<simd_length, MemorySpace>::offset_internal(
-      const unsigned int row, const unsigned int position_within_column) const
+      const unsigned int row, const unsigned int column_index) const
   {
     AssertIndexRange(row, n_rows());
-    AssertIndexRange(position_within_column, row_length(row));
+    AssertIndexRange(column_index, row_length(row));
     AssertIndexRange(row, n_internal_dofs_);
 
     const unsigned int simd_row = row / simd_length;
@@ -506,7 +573,7 @@ namespace ryujin
                "Access only supported for rows at the SIMD granularity"));
 
     const unsigned int scalar_offset =
-        row_starts_(simd_row) + position_within_column * simd_length;
+        row_starts_(simd_row) + column_index * simd_length;
 
     return scalar_offset * n_components;
   }
@@ -516,13 +583,13 @@ namespace ryujin
   template <unsigned int n_components>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE const unsigned int *
   SparsityPatternView<simd_length, MemorySpace>::transposed_offset_internal(
-      const unsigned int row, const unsigned int position_within_column) const
+      const unsigned int row, const unsigned int column_index) const
   {
     static_assert(n_components == 1,
                   "Vectorized transposed access to multiple components is not "
                   "yet implemented.");
     AssertIndexRange(row, row_starts_.size() - 1);
-    AssertIndexRange(position_within_column, row_length(row));
+    AssertIndexRange(column_index, row_length(row));
     AssertIndexRange(row, n_internal_dofs_);
 
     const unsigned int simd_row = row / simd_length;
@@ -532,7 +599,7 @@ namespace ryujin
                "Access only supported for rows at the SIMD granularity"));
 
     const unsigned int scalar_offset =
-        row_starts_(simd_row) + position_within_column * simd_length;
+        row_starts_(simd_row) + column_index * simd_length;
 
     // n_components == 1
     return indices_transposed_.data() + scalar_offset;
