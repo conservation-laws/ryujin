@@ -129,7 +129,6 @@ configuration options here:
   - `DEBUG_SANITIZER`: enable address and UBSAN sanitizers for DEBUG build (defaults to OFF)
   - `DEBUG_SYMMETRY_CHECK`: Debug: enable debug code paths that verify d_ij, c_ij, m_ij for (anti)symmetry (defaults to OFF)
   - `DENORMALS_ARE_ZERO`: disable floating point denormals (defaults to ON)
-  - `FORCE_DEAL_II_SPARSE_MATRIX`: prefer deal.II sparse matrix for preliminary assembly instead of Trilinos
   - `WITH_DOXYGEN`: enable support for doxygen and build documentation
   - `WITH_EOSPAC`: enable support for the EOSPAC6/Sesame tabulated equation of state database (autodetection)
   - `WITH_LIKWID`: enable support for Likwid stetoscope mode (library for Intel performance counters, defaults to OFF)

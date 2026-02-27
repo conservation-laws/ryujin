@@ -7,9 +7,11 @@
 
 #include "discretization.h"
 #include "local_index_handling.h"
+#include "loop.h"
 #include "multicomponent_vector.h"
 #include "offline_data.h"
 #include "scratch_data.h"
+#include "simd.h"
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>
@@ -21,13 +23,6 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
-#ifdef DEAL_II_WITH_TRILINOS
-#include <deal.II/lac/trilinos_sparse_matrix.h>
-#endif
-
-#ifdef FORCE_DEAL_II_SPARSE_MATRIX
-#undef DEAL_II_WITH_TRILINOS
-#endif
 
 namespace ryujin
 {
@@ -297,13 +292,6 @@ namespace ryujin
           DoFTools::make_hanging_node_constraints(dof_handler,
                                                   affine_constraints);
 
-#ifndef DEAL_II_WITH_TRILINOS
-          AssertThrow(
-              affine_constraints.n_constraints() == 0,
-              ExcMessage("ryujin was built without Trilinos support - no "
-                         "hanging node support available"));
-#endif
-
           /*
            * Enforce periodic boundary conditions. We assume that the mesh is in
            * "normal configuration."
@@ -368,9 +356,8 @@ namespace ryujin
         };
 
     populate_affine_constraints(*dof_handler_cg_, affine_constraints_cg_);
-    /* FIXME for dG the affine constraints object will be empty. */
+    /* Note: for dG the affine constraints object will be empty. */
     populate_affine_constraints(*dof_handler_dg_, affine_constraints_dg_);
-
 
     /*
      * Next, set up the (hyperbolic) sparsity pattern:
@@ -403,19 +390,8 @@ namespace ryujin
       /*
        * Create cG sparsity pattern:
        */
-#ifdef DEAL_II_WITH_TRILINOS
       DoFTools::make_sparsity_pattern(
           dof_handler, sparsity_pattern_, affine_constraints, false);
-#else
-      /*
-       * In case we use dealii::SparseMatrix<Number> for assembly we need a
-       * sparsity pattern that also includes the full locally relevant -
-       * locally relevant coupling block. This gets thrown out again later,
-       * but nevertheless we have to add it.
-       */
-      DoFTools::make_extended_sparsity_pattern(
-          dof_handler, sparsity_pattern_, affine_constraints, false);
-#endif
     }
 
     /*
@@ -562,89 +538,13 @@ namespace ryujin
       incidence_matrix_.reinit(sparsity_pattern_simd_);
 
     /*
-     * Then, assemble:
+     * Now, assemble all matrices:
      */
 
     const auto &dof_handler = this->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
 
     measure_of_omega_ = 0.;
-
-#ifdef DEAL_II_WITH_TRILINOS
-    /* Variant using TrilinosWrappers::SparseMatrix with global numbering */
-
-    AffineConstraints<double> affine_constraints_assembly;
-    /* This small dance is necessary to translate from Number to double: */
-#if DEAL_II_VERSION_GTE(9, 6, 0)
-    affine_constraints_assembly.reinit(affine_constraints.get_local_lines(),
-                                       affine_constraints.get_local_lines());
-#else
-    affine_constraints_assembly.reinit(affine_constraints.get_local_lines());
-#endif
-    for (auto line : affine_constraints.get_lines()) {
-      affine_constraints_assembly.add_line(line.index);
-      for (auto entry : line.entries)
-        affine_constraints_assembly.add_entry(
-            line.index, entry.first, entry.second);
-      affine_constraints_assembly.set_inhomogeneity(line.index,
-                                                    line.inhomogeneity);
-    }
-    affine_constraints_assembly.close();
-
-    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-    TrilinosWrappers::SparsityPattern trilinos_sparsity_pattern;
-    trilinos_sparsity_pattern.reinit(locally_owned,
-                                     sparsity_pattern_,
-                                     mpi_ensemble_.ensemble_communicator());
-
-    TrilinosWrappers::SparseMatrix mass_matrix_tmp;
-    TrilinosWrappers::SparseMatrix mass_matrix_inverse_tmp;
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_tmp.reinit(trilinos_sparsity_pattern);
-
-    TrilinosWrappers::SparseMatrix betaij_matrix_tmp;
-    std::array<TrilinosWrappers::SparseMatrix, dim> cij_matrix_tmp;
-
-    mass_matrix_tmp.reinit(trilinos_sparsity_pattern);
-    betaij_matrix_tmp.reinit(trilinos_sparsity_pattern);
-    for (auto &matrix : cij_matrix_tmp)
-      matrix.reinit(trilinos_sparsity_pattern);
-
-#else
-    /* Variant using deal.II SparseMatrix with local numbering */
-
-    AffineConstraints<Number> affine_constraints_assembly;
-    affine_constraints_assembly.copy_from(affine_constraints);
-    transform_to_local_range(*scalar_partitioner_, affine_constraints_assembly);
-
-    dealii::SparsityPattern sparsity_pattern_assembly;
-    {
-      DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
-      for (const auto &entry : sparsity_pattern_) {
-        const auto i = scalar_partitioner_->global_to_local(entry.row());
-        const auto j = scalar_partitioner_->global_to_local(entry.column());
-        dsp.add(i, j);
-      }
-      sparsity_pattern_assembly.copy_from(dsp);
-    }
-
-    dealii::SparseMatrix<Number> mass_matrix_tmp;
-    dealii::SparseMatrix<Number> mass_matrix_inverse_tmp;
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_tmp.reinit(sparsity_pattern_assembly);
-
-    dealii::SparseMatrix<Number> betaij_matrix_tmp;
-    std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
-
-    mass_matrix_tmp.reinit(sparsity_pattern_assembly);
-    betaij_matrix_tmp.reinit(sparsity_pattern_assembly);
-    for (auto &matrix : cij_matrix_tmp)
-      matrix.reinit(sparsity_pattern_assembly);
-#endif
-
-    /*
-     * Now, assemble all matrices:
-     */
 
     /* The local, per-cell assembly routine: */
     const auto local_assemble_system = [&](const auto &cell,
@@ -667,17 +567,7 @@ namespace ryujin
       auto &hp_fe_face_values = scratch.hp_fe_face_values_;
       auto &hp_fe_neighbor_face_values = scratch.hp_fe_neighbor_face_values_;
 
-#ifdef DEAL_II_WITH_TRILINOS
-      is_locally_owned = cell->is_locally_owned();
-#else
-      /*
-       * When using a local dealii::SparseMatrix<Number> we don not
-       * have a compress(VectorOperation::add) available. In this case
-       * we assemble contributions over all locally relevant (non
-       * artificial) cells.
-       */
-      is_locally_owned = !cell->is_artificial();
-#endif
+      is_locally_owned = cell->is_locally_owned(); /* stored in copy object */
       if (!is_locally_owned)
         return;
 
@@ -850,18 +740,8 @@ namespace ryujin
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
-#ifdef DEAL_II_WITH_TRILINOS
-      const auto &local_dof_indices = copy.local_dof_indices_;
-      const auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
-#else
-      /*
-       * We have to transform indices to the local index range
-       * [0, n_locally_relevant_) when using the dealii::SparseMatrix.
-       * Thus, copy all index vectors:
-       */
-      auto local_dof_indices = copy.local_dof_indices_;
-      auto neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
-#endif
+      const auto &dof_indices = copy.local_dof_indices_;
+      const auto &neighbor_dof_indices = copy.neighbor_local_dof_indices_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_mass_matrix_inverse = copy.cell_mass_matrix_inverse_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
@@ -872,44 +752,36 @@ namespace ryujin
       if (!is_locally_owned)
         return;
 
-#ifndef DEAL_II_WITH_TRILINOS
-      transform_to_local_range(*scalar_partitioner_, local_dof_indices);
-      for (auto &indices : neighbor_local_dof_indices)
-        transform_to_local_range(*scalar_partitioner_, indices);
-#endif
+      distribute_local_to_global(
+          cell_mass_matrix, dof_indices, affine_constraints, mass_matrix_);
 
-      affine_constraints_assembly.distribute_local_to_global(
-          cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
+      distribute_local_to_global(
+          cell_cij_matrix, dof_indices, affine_constraints, cij_matrix_);
 
-      for (int k = 0; k < dim; ++k) {
-        affine_constraints_assembly.distribute_local_to_global(
-            cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
-
-        /*
-         * Workaround: We need to catch the case local_dof_incdices.size() == 0
-         * because deal.II reports the wrong size in the matrix object.
-         */
-        if (local_dof_indices.size() != 0) {
-          for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
-            if (neighbor_local_dof_indices[f_index].size() != 0) {
-              affine_constraints_assembly.distribute_local_to_global(
-                  interface_cij_matrix[f_index][k],
-                  local_dof_indices,
-                  neighbor_local_dof_indices[f_index],
-                  cij_matrix_tmp[k]);
-            }
+      /*
+       * Workaround: We need to catch the case local_dof_indices.size() == 0
+       * because deal.II reports the wrong size in the matrix object.
+       */
+      if (dof_indices.size() != 0) {
+        for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
+          if (neighbor_dof_indices[f_index].size() != 0) {
+            distribute_local_to_global(interface_cij_matrix[f_index],
+                                       dof_indices,
+                                       neighbor_dof_indices[f_index],
+                                       affine_constraints,
+                                       cij_matrix_);
           }
         }
       }
 
-      affine_constraints_assembly.distribute_local_to_global(
-          cell_betaij_matrix, local_dof_indices, betaij_matrix_tmp);
+      distribute_local_to_global(
+          cell_betaij_matrix, dof_indices, affine_constraints, betaij_matrix_);
 
       if (discretization_->have_discontinuous_ansatz())
-        affine_constraints_assembly.distribute_local_to_global(
-            cell_mass_matrix_inverse,
-            local_dof_indices,
-            mass_matrix_inverse_tmp);
+        distribute_local_to_global(cell_mass_matrix_inverse,
+                                   dof_indices,
+                                   affine_constraints,
+                                   mass_matrix_inverse_);
 
       measure_of_omega_ += cell_measure;
     };
@@ -919,36 +791,18 @@ namespace ryujin
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<dim>(*discretization_),
-#ifdef DEAL_II_WITH_TRILINOS
-                    AssemblyCopyData<dim, double>());
-#else
                     AssemblyCopyData<dim, Number>());
-#endif
 
-#ifdef DEAL_II_WITH_TRILINOS
-    betaij_matrix_tmp.compress(VectorOperation::add);
-    mass_matrix_tmp.compress(VectorOperation::add);
-    for (auto &it : cij_matrix_tmp)
-      it.compress(VectorOperation::add);
-
-    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ false);
-    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_.read_in(mass_matrix_inverse_tmp, /*loc_ind*/ false);
-    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
-#else
-    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ true);
-    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_.read_in(mass_matrix_inverse_tmp, /*loc_ind*/ true);
-    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
-#endif
-
-    betaij_matrix_.update_ghost_rows();
+    mass_matrix_.compress(VectorOperation::add);
     mass_matrix_.update_ghost_rows();
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_.update_ghost_rows();
+    cij_matrix_.compress(VectorOperation::add);
     cij_matrix_.update_ghost_rows();
+    betaij_matrix_.compress(VectorOperation::add);
+    betaij_matrix_.update_ghost_rows();
+    if (discretization_->have_discontinuous_ansatz()) {
+      mass_matrix_inverse_.compress(VectorOperation::add);
+      mass_matrix_inverse_.update_ghost_rows();
+    }
 
     measure_of_omega_ = Utilities::MPI::sum(
         measure_of_omega_, mpi_ensemble_.ensemble_communicator());
@@ -958,38 +812,33 @@ namespace ryujin
      */
 
     {
-#ifdef DEAL_II_WITH_TRILINOS
-      using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-      ScalarHostVector one(scalar_partitioner_);
-      one = 1.;
-      affine_constraints_assembly.set_zero(one);
+      const auto body = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+        constexpr unsigned int stride_size = get_stride_size<T>;
 
-      ScalarHostVector local_lumped_mass_matrix(scalar_partitioner_);
-      mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
-      local_lumped_mass_matrix.compress(VectorOperation::add);
-#else
-      /*
-       * Work around the little detail that dealii::SparseMatrix does not
-       * allow vmult() with a distributed vector. On a globally refined
-       * grid, contracting the mass matrix in this manner still works
-       * without knowledge of the ghost range.
-       */
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+        if (row_length == 1)
+          return;
 
-      dealii::Vector<Number> one(mass_matrix_tmp.m());
-      one = 1.;
-      affine_constraints_assembly.set_zero(one);
+        T m_i{};
 
-      dealii::Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
-      mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
-#endif
+        const unsigned int *js = sparsity_pattern_simd_.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length;
+             ++col_idx, js += stride_size) {
 
-      lumped_mass_matrix_.insert_component(local_lumped_mass_matrix, 0);
+          const auto m_ij = mass_matrix_.template read_entry<T>(i, col_idx);
+          m_i += m_ij;
+        }
+
+        lumped_mass_matrix_.template write_entry<T>(m_i, i);
+        lumped_mass_matrix_inverse_. //
+            template write_entry<T>(Number(1.) / m_i, i);
+      };
+
+      cpu_simd_loop<Number>("", body, 0, n_locally_internal_, n_locally_owned_);
+
       lumped_mass_matrix_.update_ghost_values();
-
-      lumped_mass_matrix_inverse_.insert_component(
-          local_lumped_mass_matrix, 0, [](const Number &value) {
-            return Number(1.) / value;
-          });
       lumped_mass_matrix_inverse_.update_ghost_values();
     }
 
@@ -998,14 +847,6 @@ namespace ryujin
      */
 
     if (discretization_->have_discontinuous_ansatz()) {
-#ifdef DEAL_II_WITH_TRILINOS
-      TrilinosWrappers::SparseMatrix incidence_matrix_tmp;
-      incidence_matrix_tmp.reinit(trilinos_sparsity_pattern);
-#else
-      dealii::SparseMatrix<Number> incidence_matrix_tmp;
-      incidence_matrix_tmp.reinit(sparsity_pattern_assembly);
-#endif
-
       /* The local, per-cell assembly routine: */
       const auto local_assemble_system = [&](const auto &cell,
                                              auto &scratch,
@@ -1020,11 +861,7 @@ namespace ryujin
         auto &hp_fe_neighbor_face_values_nodal =
             scratch.hp_fe_neighbor_face_values_nodal_;
 
-#ifdef DEAL_II_WITH_TRILINOS
-        is_locally_owned = cell->is_locally_owned();
-#else
-        is_locally_owned = !cell->is_artificial();
-#endif
+        is_locally_owned = cell->is_locally_owned(); /* stored in copy object */
         if (!is_locally_owned)
           return;
 
@@ -1144,43 +981,26 @@ namespace ryujin
 
       const auto copy_local_to_global = [&](const auto &copy) {
         const auto &is_locally_owned = copy.is_locally_owned_;
-#ifdef DEAL_II_WITH_TRILINOS
-        const auto &local_dof_indices = copy.local_dof_indices_;
-        const auto &neighbor_local_dof_indices =
-            copy.neighbor_local_dof_indices_;
-#else
-        /*
-         * We have to transform indices to the local index range
-         * [0, n_locally_relevant_) when using the dealii::SparseMatrix.
-         * Thus, copy all index vectors:
-         */
-        auto local_dof_indices = copy.local_dof_indices_;
-        auto neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
-#endif
+        const auto &dof_indices = copy.local_dof_indices_;
+        const auto &neighbor_dof_indices = copy.neighbor_local_dof_indices_;
         const auto &interface_incidence_matrix =
             copy.interface_incidence_matrix_;
 
         if (!is_locally_owned)
           return;
 
-#ifndef DEAL_II_WITH_TRILINOS
-        transform_to_local_range(*scalar_partitioner_, local_dof_indices);
-        for (auto &indices : neighbor_local_dof_indices)
-          transform_to_local_range(*scalar_partitioner_, indices);
-#endif
-
         /*
-         * Workaround: We need to catch the case local_dof_incdices.size() == 0
+         * Workaround: We need to catch the case dof_indices.size() == 0
          * because deal.II reports the wrong size in the matrix object.
          */
-        if (local_dof_indices.size() != 0) {
+        if (dof_indices.size() != 0) {
           for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
-            if (neighbor_local_dof_indices[f_index].size() != 0) {
-              affine_constraints_assembly.distribute_local_to_global(
-                  interface_incidence_matrix[f_index],
-                  local_dof_indices,
-                  neighbor_local_dof_indices[f_index],
-                  incidence_matrix_tmp);
+            if (neighbor_dof_indices[f_index].size() != 0) {
+              distribute_local_to_global(interface_incidence_matrix[f_index],
+                                         dof_indices,
+                                         neighbor_dof_indices[f_index],
+                                         affine_constraints,
+                                         incidence_matrix_);
             }
           }
         }
@@ -1191,18 +1011,9 @@ namespace ryujin
                       local_assemble_system,
                       copy_local_to_global,
                       AssemblyScratchData<dim>(*discretization_),
-#ifdef DEAL_II_WITH_TRILINOS
-                      AssemblyCopyData<dim, double>());
-#else
                       AssemblyCopyData<dim, Number>());
-#endif
 
-#ifdef DEAL_II_WITH_TRILINOS
-      incidence_matrix_.read_in(incidence_matrix_tmp, /*locally_indexe*/ false);
-#else
-      incidence_matrix_.read_in(incidence_matrix_tmp, /*locally_indexed*/ true);
-#endif
-      incidence_matrix_.update_ghost_rows();
+      incidence_matrix_.compress(VectorOperation::add);
     }
 
     /*

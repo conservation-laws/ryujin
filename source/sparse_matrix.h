@@ -7,15 +7,12 @@
 
 #include <compile_time_options.h>
 
-#include "loop.h"
-#include "simd.h"
 #include "sparsity_pattern.h"
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/partitioner.h>
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/sparse_matrix.h>
 
 #include <type_traits>
 
@@ -69,21 +66,6 @@ namespace ryujin
      * sparsity pattern. The locally owned and ghost ranges are zeroed.
      */
     void reinit(const SparsityPattern<simd_length> &sparsity);
-
-    /**
-     * Read in values from a given vector of (scalar) sparse matrices that
-     * describe our (vector valued) matrix entries.
-     */
-    template <typename SparseMatrix2>
-    void read_in(const std::array<SparseMatrix2, n_comp> &sparse_matrix,
-                 bool locally_indexed = true);
-
-    /**
-     * Variant of above function for a scalar matrix with n_comp == 1.
-     */
-    template <typename SparseMatrix2>
-    void read_in(const SparseMatrix2 &sparse_matrix2,
-                 bool locally_indexed = true);
 
     /**
      * Return the underlying sparsity pattern.
@@ -476,132 +458,6 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
-  template <typename SparseMatrix2>
-  void SparseMatrix<Number, n_components, simd_length>::read_in(
-      const std::array<SparseMatrix2, n_components> &sparse_matrix,
-      bool locally_indexed /*= true*/)
-  {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    Assert(is_active_memory_space<HostSpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
-
-    /*
-     * We use the indirect (and slow) access via operator()(i, j) into the
-     * sparse matrix we are copying from. This allows for significantly
-     * increased flexibility with respect to the sparsity pattern used in
-     * the sparse_matrix object.
-     */
-
-    const auto body = [&](auto sentinel, unsigned int i) {
-      using T = decltype(sentinel);
-      constexpr unsigned int stride_size = get_stride_size<T>;
-      static_assert(stride_size == 1 || stride_size == simd_length);
-
-      const unsigned int row_length = sparsity_pattern_->row_length(i);
-      const unsigned int *js = sparsity_pattern_->columns(i);
-
-      for (unsigned int col_idx = 0; col_idx < row_length;
-           ++col_idx, js += stride_size) {
-
-        dealii::Tensor<1, n_components, T> temp;
-
-        using VA = dealii::VectorizedArray<Number, simd_length>;
-        if constexpr (std::is_same_v<T, VA>) {
-          /* Special access for VectorizedArray: */
-          for (unsigned int k = 0; k < simd_length; ++k)
-            for (unsigned int d = 0; d < n_components; ++d)
-              if (locally_indexed)
-                temp[d][k] = sparse_matrix[d](i + k, js[k]);
-              else
-                temp[d][k] = sparse_matrix[d].el(
-                    sparsity_pattern_->partitioner()->local_to_global(i + k),
-                    sparsity_pattern_->partitioner()->local_to_global(js[k]));
-
-          this->template write_tensor<T>(temp, i, col_idx, true);
-
-        } else {
-          for (unsigned int d = 0; d < n_components; ++d)
-            if (locally_indexed)
-              temp[d] = sparse_matrix[d](i, js[0]);
-            else
-              temp[d] = sparse_matrix[d].el(
-                  sparsity_pattern_->partitioner()->local_to_global(i),
-                  sparsity_pattern_->partitioner()->local_to_global(js[0]));
-          this->template write_tensor<T>(temp, i, col_idx);
-        }
-      }
-    };
-
-    cpu_simd_loop<Number>("sparse_matrix_read_in",
-                          body,
-                          0,
-                          sparsity_pattern_->n_internal_dofs(),
-                          sparsity_pattern_->n_locally_owned_dofs());
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  template <typename SparseMatrix2>
-  void SparseMatrix<Number, n_components, simd_length>::read_in(
-      const SparseMatrix2 &sparse_matrix, bool locally_indexed /*= true*/)
-  {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    Assert(is_active_memory_space<HostSpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
-
-    /*
-     * We use the indirect (and slow) access via operator()(i, j) into the
-     * sparse matrix we are copying from. This allows for significantly
-     * increased flexibility with respect to the sparsity pattern used in
-     * the sparse_matrix object.
-     */
-
-    const auto body = [&](auto sentinel, unsigned int i) {
-      using T = decltype(sentinel);
-      constexpr unsigned int stride_size = get_stride_size<T>;
-      static_assert(stride_size == 1 || stride_size == simd_length);
-
-      const unsigned int row_length = sparsity_pattern_->row_length(i);
-      const unsigned int *js = sparsity_pattern_->columns(i);
-
-      for (unsigned int col_idx = 0; col_idx < row_length;
-           ++col_idx, js += stride_size) {
-
-        auto temp = T{};
-
-        using VA = dealii::VectorizedArray<Number, simd_length>;
-        if constexpr (std::is_same_v<T, VA>) {
-          for (unsigned int k = 0; k < simd_length; ++k)
-            if (locally_indexed)
-              temp[k] = sparse_matrix(i + k, js[k]);
-            else
-              temp[k] = sparse_matrix.el(
-                  sparsity_pattern_->partitioner()->local_to_global(i + k),
-                  sparsity_pattern_->partitioner()->local_to_global(js[k]));
-
-          this->template write_entry<T>(temp, i, col_idx, true);
-
-        } else {
-          temp = locally_indexed
-                     ? sparse_matrix(i, js[0])
-                     : sparse_matrix.el(
-                           sparsity_pattern_->partitioner()->local_to_global(i),
-                           sparsity_pattern_->partitioner()->local_to_global(
-                               js[0]));
-          this->template write_entry<T>(temp, i, col_idx);
-        }
-      }
-    };
-
-    cpu_simd_loop<Number>("sparse_matrix_read_in",
-                          body,
-                          0,
-                          sparsity_pattern_->n_internal_dofs(),
-                          sparsity_pattern_->n_locally_owned_dofs());
-  }
-
-
   template <typename Number, int n_comp, int simd_length>
   template <typename MemorySpace>
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>
@@ -800,10 +656,10 @@ namespace ryujin
   template <typename MemorySpace>
   void
   SparseMatrix<Number, n_components, simd_length>::compress_on_memory_space(
-      dealii::VectorOperation::values operation)
+      dealii::VectorOperation::values operation [[maybe_unused]])
   {
-    Assert(operation == dealii::VectorOperation::add,
-           dealii::ExcNotImplemented());
+    AssertThrow(operation == dealii::VectorOperation::add,
+                dealii::ExcNotImplemented());
 
     using HostSpace = dealii::MemorySpace::Host::kokkos_space;
     using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
