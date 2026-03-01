@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "hyperbolic_system.h"
+
 #include <initial_state_library.h>
 #include <iostream>
 
@@ -14,8 +16,10 @@ namespace ryujin
 {
   namespace MultiSpeciesEulerInitialStates
   {
+    using namespace MultiSpeciesEuler;
+
     /**
-     * An initial state that simulates an "intertial confinement fusion" like
+     * An initial state that simulates an "inertial confinement fusion" like
      * problem. The set up consists of three regions: (i) a low density state
      * inside a perturbed interface; (ii) a high density state outside the
      * interface; (iii) an incoming shock wave characterized by its Mach number
@@ -34,29 +38,33 @@ namespace ryujin
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
 
+      static constexpr unsigned int primitive_dim = n_species + 2;
+      using primitive_state_type = dealii::Tensor<1, primitive_dim, Number>;
+
       ICFLike(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
           : InitialState<Description, dim, Number>("icf like", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-
-        temp_inside_[0] = 0.5;
-        temp_inside_[1] = 1.0;
-        temp_inside_[2] = 0.0;
-        temp_inside_[3] = 1.0;
+        for (unsigned int k = 0; k < n_species - 1; ++k)
+          temp_inside_[k] = Number(1.) / Number(n_species);
+        temp_inside_[n_species - 1] = 1.0;
+        temp_inside_[n_species] = 0.0;
+        temp_inside_[n_species + 1] = 1.0;
         this->add_parameter("primitive state inside",
                             temp_inside_,
-                            "Initial primitive state (Y_0, rho, u, p) inside "
-                            "perturbed interface");
+                            "Initial primitive state (Y_0, ..., Y_{n-2}, rho, "
+                            "u, p) inside perturbed interface");
 
-        temp_outside_[0] = 0.5;
-        temp_outside_[1] = 1.0;
-        temp_outside_[2] = 0.0;
-        temp_outside_[3] = 1.0;
+        for (unsigned int k = 0; k < n_species - 1; ++k)
+          temp_outside_[k] = Number(1.) / Number(n_species);
+        temp_outside_[n_species - 1] = 1.0;
+        temp_outside_[n_species] = 0.0;
+        temp_outside_[n_species + 1] = 1.0;
         this->add_parameter("primitive state outside",
                             temp_outside_,
-                            "Initial primitive state (Y_0, rho, u, p) outside "
-                            "perturbed interface");
+                            "Initial primitive state (Y_0, ..., Y_{n-2}, rho, "
+                            "u, p) outside perturbed interface");
 
         interface_radius_ = 1.0;
         this->add_parameter(
@@ -65,11 +73,11 @@ namespace ryujin
         num_modes_ = 8.0;
         this->add_parameter("number of modes",
                             num_modes_,
-                            "Number of modes for pertburation of interface");
+                            "Number of modes for perturbation of interface");
 
         amplitude_ = 0.02;
         this->add_parameter(
-            "amplitude", amplitude_, "Amplitude for interface pertburation");
+            "amplitude", amplitude_, "Amplitude for interface perturbation");
 
         mach_number_ = 3.0;
         this->add_parameter(
@@ -81,8 +89,8 @@ namespace ryujin
                             "Radial location of incoming shock front");
 
         const auto convert_states = [&]() {
-          const auto prim_inside = extend(temp_inside_);
-          const auto prim_outside = extend(temp_outside_);
+          const auto prim_inside = extend_primitive(temp_inside_);
+          const auto prim_outside = extend_primitive(temp_outside_);
 
           const auto view = hyperbolic_system_.template view<dim, Number>();
           state_inside_ = view.from_initial_state(prim_inside);
@@ -102,9 +110,9 @@ namespace ryujin
         {
           const auto gamma_ = view.gamma_mixture(state_outside_);
 
-          const auto &rho_R = temp_outside_[1];
-          const auto &u_R = temp_outside_[2];
-          const auto &p_R = temp_outside_[3];
+          const auto &rho_R = temp_outside_[n_species - 1];
+          const auto &u_R = temp_outside_[n_species];
+          const auto &p_R = temp_outside_[n_species + 1];
 
           const Number a_R = std::sqrt(gamma_ * p_R / rho_R);
           const Number mach_R = u_R / a_R;
@@ -123,21 +131,26 @@ namespace ryujin
                              (gamma_ + Number(1.));
 
           state_type primitive_shock_state;
-          const auto Y0_outside = temp_outside_[0];
 
-          primitive_shock_state[0] = Y0_outside * rho_L;
-          primitive_shock_state[1] = (1. - Y0_outside) * rho_L;
+          /* Compute partial densities from mass fractions */
+          Number Y_sum = Number(0.);
+          for (unsigned int k = 0; k < n_species - 1; ++k) {
+            primitive_shock_state[k] = temp_outside_[k] * rho_L;
+            Y_sum += temp_outside_[k];
+          }
+          primitive_shock_state[n_species - 1] = (Number(1.) - Y_sum) * rho_L;
 
+          /* Set radial velocity */
           for (unsigned int i = 0; i < dim; ++i) {
-            primitive_shock_state[i + 2] = 0.;
+            primitive_shock_state[n_species + i] = Number(0.);
           }
 
           if (point.norm() > 0.) {
             for (unsigned int i = 0; i < dim; ++i) {
-              primitive_shock_state[i + 2] = -u_L * r_hat[i];
+              primitive_shock_state[n_species + i] = -u_L * r_hat[i];
             }
           }
-          primitive_shock_state[2 + dim] = p_L;
+          primitive_shock_state[n_species + dim] = p_L;
 
           conserved_shock_state =
               view.from_initial_state(primitive_shock_state);
@@ -174,10 +187,8 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      Number gamma_;
-
-      dealii::Tensor<1, 4, Number> temp_inside_;
-      dealii::Tensor<1, 4, Number> temp_outside_;
+      primitive_state_type temp_inside_;
+      primitive_state_type temp_outside_;
 
       state_type state_inside_;
       state_type state_outside_;
@@ -188,18 +199,6 @@ namespace ryujin
       double shock_radius_;
       double mach_number_;
 
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 4, Number>
-      extend(dealii::Tensor<1, 4, Number> &temp_in) const
-      {
-        dealii::Tensor<1, 4, Number> result;
-        result[0] = temp_in[0] * temp_in[1];        // = alpha_0 rho_0;
-        result[1] = (1. - temp_in[0]) * temp_in[1]; // = alpha_1 rho_1;
-
-        for (unsigned int i = 2; i < 4; ++i)
-          result[i] = temp_in[i];
-
-        return result;
-      }
     };
 
 

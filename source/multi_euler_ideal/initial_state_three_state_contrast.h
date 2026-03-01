@@ -6,12 +6,16 @@
 
 #pragma once
 
+#include "hyperbolic_system.h"
+
 #include <initial_state_library.h>
 
 namespace ryujin
 {
   namespace MultiSpeciesEulerInitialStates
   {
+    using namespace MultiSpeciesEuler;
+
     /**
      * An initial state formed by two contrasts of given "left", "middle"
      * and "right" primitive states. The user defines the lengths of the left
@@ -34,56 +38,66 @@ namespace ryujin
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
 
+      /* 1D primitive state: (Y_0, ..., Y_{n-2}, rho, u, p) */
+      static constexpr unsigned int primitive_dim = n_species + 2;
+      using primitive_state_type = dealii::Tensor<1, primitive_dim, Number>;
+
       ThreeStateContrast(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection)
           : InitialState<Description, dim, Number>("three state contrast",
                                                    subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-
-        temp_left_[0] = 0.5;
-        temp_left_[1] = 1.;
-        temp_left_[2] = 0.;
-        temp_left_[3] = 1.e3;
+        /* Default: equal mass fractions */
+        for (unsigned int k = 0; k < n_species - 1; ++k)
+          temp_left_[k] = Number(1.) / Number(n_species);
+        temp_left_[n_species - 1] = 1.;     /* rho */
+        temp_left_[n_species] = 0.;         /* u */
+        temp_left_[n_species + 1] = 1.e3;   /* p */
         this->add_parameter(
             "primitive state left",
             temp_left_,
-            "Initial 1d primitive state (Y_0, rho, u, p) on the left");
+            "Initial 1d primitive state (Y_0, ..., Y_{n-2}, rho, u, p) on the "
+            "left");
 
         left_length_ = 0.1;
         this->add_parameter("left region length",
                             left_length_,
                             "The length of the left region");
 
-        temp_middle_[0] = 0.5;
-        temp_middle_[1] = 1.;
-        temp_middle_[2] = 0.;
-        temp_middle_[3] = 1.e-2;
+        for (unsigned int k = 0; k < n_species - 1; ++k)
+          temp_middle_[k] = Number(1.) / Number(n_species);
+        temp_middle_[n_species - 1] = 1.;    /* rho */
+        temp_middle_[n_species] = 0.;        /* u */
+        temp_middle_[n_species + 1] = 1.e-2; /* p */
         this->add_parameter(
             "primitive state middle",
             temp_middle_,
-            "Initial 1d primitive state (Y_0, rho, u, p) in the middle");
+            "Initial 1d primitive state (Y_0, ..., Y_{n-2}, rho, u, p) in the "
+            "middle");
 
         middle_length_ = 0.8;
         this->add_parameter("middle region length",
                             middle_length_,
                             "The length of the middle region");
 
-        temp_right_[0] = 0.5;
-        temp_right_[1] = 1.;
-        temp_right_[2] = 0.;
-        temp_right_[3] = 1.e2;
+        for (unsigned int k = 0; k < n_species - 1; ++k)
+          temp_right_[k] = Number(1.) / Number(n_species);
+        temp_right_[n_species - 1] = 1.;    /* rho */
+        temp_right_[n_species] = 0.;        /* u */
+        temp_right_[n_species + 1] = 1.e2;  /* p */
         this->add_parameter(
             "primitive state right",
             temp_right_,
-            "Initial 1d primitive state (Y_0, rho, u, p) on the right");
+            "Initial 1d primitive state (Y_0, ..., Y_{n-2}, rho, u, p) on the "
+            "right");
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
 
-          const auto primitive_left_ = extend(temp_left_);
-          const auto primitive_middle_ = extend(temp_middle_);
-          const auto primitive_right_ = extend(temp_right_);
+          const auto primitive_left_ = extend_primitive(temp_left_);
+          const auto primitive_middle_ = extend_primitive(temp_middle_);
+          const auto primitive_right_ = extend_primitive(temp_right_);
 
           state_left_ = view.from_initial_state(primitive_left_);
           state_middle_ = view.from_initial_state(primitive_middle_);
@@ -106,26 +120,14 @@ namespace ryujin
       Number left_length_;
       Number middle_length_;
 
-      dealii::Tensor<1, 4, Number> temp_left_;
-      dealii::Tensor<1, 4, Number> temp_middle_;
-      dealii::Tensor<1, 4, Number> temp_right_;
+      primitive_state_type temp_left_;
+      primitive_state_type temp_middle_;
+      primitive_state_type temp_right_;
 
       state_type state_left_;
       state_type state_middle_;
       state_type state_right_;
 
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 4, Number>
-      extend(dealii::Tensor<1, 4, Number> &temp_in) const
-      {
-        dealii::Tensor<1, 4, Number> result;
-        result[0] = temp_in[0] * temp_in[1];        // = alpha_0 rho_0;
-        result[1] = (1. - temp_in[0]) * temp_in[1]; // = alpha_1 rho_1;
-
-        for (unsigned int i = 2; i < 4; ++i)
-          result[i] = temp_in[i];
-
-        return result;
-      }
     };
   } // namespace MultiSpeciesEulerInitialStates
 } // namespace ryujin

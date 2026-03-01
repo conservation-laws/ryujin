@@ -1,20 +1,29 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Copyright (C) 2023 - 2024 by the ryujin authors
+// Copyright (C) 2025 by Triad National Security, LLC
 //
 
 #pragma once
+
+#include "hyperbolic_system.h"
 
 #include <initial_state_library.h>
 
 #include <deal.II/base/function_parser.h>
 
+#include <array>
+
 namespace ryujin
 {
   namespace MultiSpeciesEulerInitialStates
   {
+    using namespace MultiSpeciesEuler;
+
     /**
-     * Returns an initial state defined by a set of user specified function.
+     * Returns an initial state defined by a set of user specified functions.
+     * Supports n_species mass fractions, where the last species mass fraction
+     * is computed as Y_{n-1} = 1 - sum(Y_k) for k=0,...,n-2.
      *
      * @ingroup MultiSpeciesEulerEquations
      */
@@ -32,11 +41,16 @@ namespace ryujin
           : InitialState<Description, dim, Number>("function", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-        Y0_expression_ = "1.0";
-        this->add_parameter("Y_0 expression",
-                            Y0_expression_,
-                            "A function expression describing the mass "
-                            "fraction for species 1");
+        /* Initialize mass fraction expressions for species 0 to n-2 */
+        for (unsigned int k = 0; k < n_species - 1; ++k) {
+          Y_expressions_[k] =
+              std::to_string(Number(1.) / Number(n_species)); /* default */
+          this->add_parameter(
+              "Y_" + std::to_string(k) + " expression",
+              Y_expressions_[k],
+              "A function expression describing the mass fraction for species " +
+                  std::to_string(k));
+        }
 
         density_expression_ = "1.4";
         this->add_parameter("density expression",
@@ -81,7 +95,9 @@ namespace ryujin
            * parser with support for a time-dependent description involving
            * a variable »t«:
            */
-          Y0_function_ = std::make_unique<FP>(Y0_expression_);
+          for (unsigned int k = 0; k < n_species - 1; ++k)
+            Y_functions_[k] = std::make_unique<FP>(Y_expressions_[k]);
+
           density_function_ = std::make_unique<FP>(density_expression_);
           velocity_x_function_ = std::make_unique<FP>(velocity_x_expression_);
           if constexpr (dim > 1)
@@ -101,29 +117,36 @@ namespace ryujin
 
         state_type full_primitive_state;
 
-        Y0_function_->set_time(t);
         density_function_->set_time(t);
+        const Number rho = density_function_->value(point);
 
-        full_primitive_state[0] = Y0_function_->value(point);
-        full_primitive_state[0] *= density_function_->value(point);
-
-        full_primitive_state[1] = 1. - Y0_function_->value(point);
-        full_primitive_state[1] *= density_function_->value(point);
+        /* Compute partial densities for species 0 to n-2 */
+        Number Y_sum = Number(0.);
+        for (unsigned int k = 0; k < n_species - 1; ++k) {
+          Y_functions_[k]->set_time(t);
+          const Number Y_k = Y_functions_[k]->value(point);
+          full_primitive_state[k] = Y_k * rho;
+          Y_sum += Y_k;
+        }
+        /* Last species gets the remaining mass fraction */
+        full_primitive_state[n_species - 1] = (Number(1.) - Y_sum) * rho;
 
         velocity_x_function_->set_time(t);
-        full_primitive_state[2] = velocity_x_function_->value(point);
+        full_primitive_state[n_species] = velocity_x_function_->value(point);
 
         if constexpr (dim > 1) {
           velocity_y_function_->set_time(t);
-          full_primitive_state[3] = velocity_y_function_->value(point);
+          full_primitive_state[n_species + 1] =
+              velocity_y_function_->value(point);
         }
         if constexpr (dim > 2) {
           velocity_z_function_->set_time(t);
-          full_primitive_state[4] = velocity_z_function_->value(point);
+          full_primitive_state[n_species + 2] =
+              velocity_z_function_->value(point);
         }
 
         pressure_function_->set_time(t);
-        full_primitive_state[2 + dim] = pressure_function_->value(point);
+        full_primitive_state[n_species + dim] = pressure_function_->value(point);
 
         return view.from_primitive_state(full_primitive_state);
       }
@@ -131,14 +154,15 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      std::string Y0_expression_;
+      std::array<std::string, n_species - 1> Y_expressions_;
       std::string density_expression_;
       std::string velocity_x_expression_;
       std::string velocity_y_expression_;
       std::string velocity_z_expression_;
       std::string pressure_expression_;
 
-      std::unique_ptr<dealii::FunctionParser<dim>> Y0_function_;
+      std::array<std::unique_ptr<dealii::FunctionParser<dim>>, n_species - 1>
+          Y_functions_;
       std::unique_ptr<dealii::FunctionParser<dim>> density_function_;
       std::unique_ptr<dealii::FunctionParser<dim>> velocity_x_function_;
       std::unique_ptr<dealii::FunctionParser<dim>> velocity_y_function_;

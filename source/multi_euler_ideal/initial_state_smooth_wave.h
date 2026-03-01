@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "hyperbolic_system.h"
+
 #include <initial_state_library.h>
 #include <simd.h>
 
@@ -12,11 +14,16 @@ namespace ryujin
 {
   namespace MultiSpeciesEulerInitialStates
   {
+    using namespace MultiSpeciesEuler;
+
     /**
      * This is a generalization of the "Smooth traveling wave" problem first
      * proposed in Section 5.2 of @cite GuermondEtAl2018 for ideal gas EOS.
      * The details for extending to multi-species Euler Equations with each
      * species following an ideal gas is soon to be documented.
+     *
+     * For n_species > 2, the first species has mass fraction Y_0, and the
+     * remaining mass (1 - Y_0) is distributed equally among the other species.
      *
      * @note This class returns the analytic solution as a function of time
      * @p t and position @p x.
@@ -34,6 +41,10 @@ namespace ryujin
 
       using ScalarNumber = typename View::ScalarNumber;
 
+      /* 1D primitive state for from_initial_state */
+      static constexpr unsigned int primitive_dim = n_species + 2;
+      using primitive_state_type = dealii::Tensor<1, primitive_dim, Number>;
+
       SmoothWave(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("smooth wave", subsection)
@@ -42,7 +53,9 @@ namespace ryujin
         mass_fraction_ = 0.5;
         this->add_parameter("mass fraction",
                             mass_fraction_,
-                            "The mass fraction of first species");
+                            "The mass fraction of first species (Y_0). "
+                            "Remaining mass is split equally among other "
+                            "species.");
 
         density_ref_ = 1.;
         this->add_parameter("reference density",
@@ -82,13 +95,22 @@ namespace ryujin
         if (left_ <= point_bar[0] && point_bar[0] <= right_)
           rho = density_ref_ + polynomial;
 
-        state_type initial_state;
-        {
-          initial_state[0] = mass_fraction_ * rho;        // alpha_1 rho_1
-          initial_state[1] = (1. - mass_fraction_) * rho; // alpha_2 rho_2
-          initial_state[2] = mach_number_;
-          initial_state[3] = pressure_ref_;
+        /* Build the primitive state for from_initial_state */
+        primitive_state_type initial_state;
+
+        /* Species 0 gets mass_fraction_, the rest share (1 - mass_fraction_) */
+        initial_state[0] = mass_fraction_ * rho;
+        if constexpr (n_species == 2) {
+          initial_state[1] = (Number(1.) - mass_fraction_) * rho;
+        } else {
+          const Number remaining_fraction =
+              (Number(1.) - mass_fraction_) / Number(n_species - 1);
+          for (unsigned int k = 1; k < n_species; ++k)
+            initial_state[k] = remaining_fraction * rho;
         }
+
+        initial_state[n_species] = mach_number_;      /* u */
+        initial_state[n_species + 1] = pressure_ref_; /* p */
 
         return view.from_initial_state(initial_state);
       }

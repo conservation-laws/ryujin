@@ -125,9 +125,10 @@ namespace ryujin
       //
       //@{
       /**
-       * The number of stored entries in the bounds array.
+       * The number of stored entries in the bounds array:
+       * 2 * n_species (min/max per species) + 1 (rho_e_min) + 1 (s_min)
        */
-      static constexpr unsigned int n_bounds = 6;
+      static constexpr unsigned int n_bounds = 2 * n_species + 2;
 
       /**
        * Array type used to store accumulated bounds.
@@ -252,8 +253,7 @@ namespace ryujin
 
       Bounds bounds_;
 
-      Number alpha_rho_0_relaxation_numerator;
-      Number alpha_rho_1_relaxation_numerator;
+      dealii::Tensor<1, n_species, Number> rho_relaxation_numerator;
       Number rho_relaxation_denominator;
       Number rho_e_interp_max;
       Number s_interp_max;
@@ -281,18 +281,18 @@ namespace ryujin
       const auto &[rho_i, p_i, gamma_min_i, s_i, harten_i] =
           precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
-      const auto alpha_rho_0 = view.partial_density_0(U_i);
-      const auto alpha_rho_1 = view.partial_density_1(U_i);
+      Bounds result;
+      /* Partial density bounds: [rho_k_min, rho_k_max] for each species */
+      for (unsigned int k = 0; k < n_species; ++k) {
+        const auto alpha_rho_k = view.partial_density(U_i, k);
+        result[2 * k] = alpha_rho_k;     /* min */
+        result[2 * k + 1] = alpha_rho_k; /* max */
+      }
+      /* Internal energy and entropy bounds */
+      result[2 * n_species] = view.internal_energy(U_i); /* rho_e_min */
+      result[2 * n_species + 1] = s_i;                   /* s_min */
 
-      const auto rho_e = view.internal_energy(U_i);
-
-      return {/*alpha_rho_0_min*/
-              alpha_rho_0,
-              /*alpha_rho_0_max*/ alpha_rho_0,
-              /*alpha_rho_1_min*/ alpha_rho_1,
-              /*alpha_rho_1_min*/ alpha_rho_1,
-              /*rho_e*/ rho_e,
-              /*s_min*/ s_i};
+      return result;
     }
 
 
@@ -300,25 +300,20 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto Limiter<dim, Number>::combine_bounds(
         const Bounds &bounds_left, const Bounds &bounds_right) const -> Bounds
     {
-      const auto &[alpha_rho_0_min_l,
-                   alpha_rho_0_max_l,
-                   alpha_rho_1_min_l,
-                   alpha_rho_1_max_l,
-                   rho_e_min_l,
-                   s_min_l] = bounds_left;
-      const auto &[alpha_rho_0_min_r,
-                   alpha_rho_0_max_r,
-                   alpha_rho_1_min_r,
-                   alpha_rho_1_max_r,
-                   rho_e_min_r,
-                   s_min_r] = bounds_right;
+      Bounds result;
+      /* Combine partial density bounds for each species */
+      for (unsigned int k = 0; k < n_species; ++k) {
+        result[2 * k] = std::min(bounds_left[2 * k], bounds_right[2 * k]);
+        result[2 * k + 1] =
+            std::max(bounds_left[2 * k + 1], bounds_right[2 * k + 1]);
+      }
+      /* Combine internal energy and entropy bounds */
+      result[2 * n_species] =
+          std::min(bounds_left[2 * n_species], bounds_right[2 * n_species]);
+      result[2 * n_species + 1] = std::min(bounds_left[2 * n_species + 1],
+                                           bounds_right[2 * n_species + 1]);
 
-      return {std::min(alpha_rho_0_min_l, alpha_rho_0_min_r),
-              std::max(alpha_rho_0_max_l, alpha_rho_0_max_r),
-              std::min(alpha_rho_1_min_l, alpha_rho_1_min_r),
-              std::max(alpha_rho_1_max_l, alpha_rho_1_max_r),
-              std::min(rho_e_min_l, rho_e_min_r),
-              std::min(s_min_l, s_min_r)};
+      return result;
     }
 
 
@@ -328,12 +323,6 @@ namespace ryujin
                                              const Number &hd) const -> Bounds
     {
       auto relaxed_bounds = bounds;
-      auto &[alpha_rho_0_min_relaxed,
-             alpha_rho_0_max_relaxed,
-             alpha_rho_1_min_relaxed,
-             alpha_rho_1_max_relaxed,
-             rho_e_min_relaxed,
-             s_min_relaxed] = relaxed_bounds;
 
       /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -346,14 +335,17 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      alpha_rho_0_min_relaxed *= std::max(Number(1.) - r, Number(eps));
-      alpha_rho_0_max_relaxed *= (Number(1.) + r);
+      /* Relax partial density bounds for each species */
+      for (unsigned int k = 0; k < n_species; ++k) {
+        relaxed_bounds[2 * k] *= std::max(Number(1.) - r, Number(eps));
+        relaxed_bounds[2 * k + 1] *= (Number(1.) + r);
+      }
 
-      alpha_rho_1_min_relaxed *= std::max(Number(1.) - r, Number(eps));
-      alpha_rho_1_max_relaxed *= (Number(1.) + r);
+      /* Relax internal energy bound */
+      relaxed_bounds[2 * n_species] *= std::max(Number(1.) - r, Number(eps));
 
-      rho_e_min_relaxed *= std::max(Number(1.) - r, Number(eps));
-
+      /* Relax entropy bound */
+      auto &s_min_relaxed = relaxed_bounds[2 * n_species + 1];
       const Number scaled_ent = std::exp(s_min_relaxed / cv_i);
       s_min_relaxed = cv_i * std::log((Number(1.) - r) * scaled_ent);
 
@@ -363,7 +355,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::reset(const unsigned int i,
+    Limiter<dim, Number>::reset(const unsigned int /* i */,
                                 const state_type &new_U_i,
                                 const flux_contribution_type &new_flux_i)
     {
@@ -374,29 +366,18 @@ namespace ryujin
 
       cv_i = view.cv_mixture(new_U_i);
 
-      /* Bounds: */
-
-      auto &[alpha_rho_0_min,
-             alpha_rho_0_max,
-             alpha_rho_1_min,
-             alpha_rho_1_max,
-             rho_e_min,
-             s_min] = bounds_;
-
-      alpha_rho_0_min = Number(std::numeric_limits<ScalarNumber>::max());
-      alpha_rho_0_max = Number(0.);
-
-      alpha_rho_1_min = Number(std::numeric_limits<ScalarNumber>::max());
-      alpha_rho_1_max = Number(0.);
-
-      rho_e_min = Number(std::numeric_limits<ScalarNumber>::max());
-      s_min = Number(std::numeric_limits<ScalarNumber>::max());
-
+      /* Initialize bounds for each species */
+      for (unsigned int k = 0; k < n_species; ++k) {
+        bounds_[2 * k] = Number(std::numeric_limits<ScalarNumber>::max());
+        bounds_[2 * k + 1] = Number(0.);
+      }
+      bounds_[2 * n_species] = Number(std::numeric_limits<ScalarNumber>::max());
+      bounds_[2 * n_species + 1] =
+          Number(std::numeric_limits<ScalarNumber>::max());
 
       /* Relaxation: */
-
-      alpha_rho_0_relaxation_numerator = Number(0.);
-      alpha_rho_1_relaxation_numerator = Number(0.);
+      for (unsigned int k = 0; k < n_species; ++k)
+        rho_relaxation_numerator[k] = Number(0.);
       rho_relaxation_denominator = Number(0.);
 
       rho_e_interp_max = Number(0.);
@@ -421,20 +402,6 @@ namespace ryujin
 
       const auto view = hyperbolic_system.view<dim, Number>();
 
-      /* Bounds: */
-      auto &[alpha_rho_0_min,
-             alpha_rho_0_max,
-             alpha_rho_1_min,
-             alpha_rho_1_max,
-             rho_e_min,
-             s_min] = bounds_;
-
-      const auto alpha_rho_0_i = view.partial_density_0(U_i);
-      const auto alpha_rho_0_j = view.partial_density_0(U_j);
-
-      const auto alpha_rho_1_i = view.partial_density_1(U_i);
-      const auto alpha_rho_1_j = view.partial_density_1(U_j);
-
       const auto rho_e_j = view.internal_energy(U_j);
 
       const auto [rho_j, p_j, gamma_min_j, s_j, harten_j] =
@@ -446,30 +413,25 @@ namespace ryujin
           ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij) +
           affine_shift;
 
-      const auto alpha_rho_0_ij_bar = view.partial_density_0(U_ij_bar);
-      const auto alpha_rho_1_ij_bar = view.partial_density_1(U_ij_bar);
-
       const auto rho_e_ij_bar = view.internal_energy(U_ij_bar);
 
-      /* Density bounds: */
-
-      alpha_rho_0_min = std::min(alpha_rho_0_min, alpha_rho_0_ij_bar);
-      alpha_rho_0_max = std::max(alpha_rho_0_max, alpha_rho_0_ij_bar);
-
-      alpha_rho_1_min = std::min(alpha_rho_1_min, alpha_rho_1_ij_bar);
-      alpha_rho_1_max = std::max(alpha_rho_1_max, alpha_rho_1_ij_bar);
-
-      /* Density relaxation: */
-
-      /* Use a uniform weight. */
+      /* Density bounds and relaxation for each species: */
       const auto beta_ij = Number(1.);
-      alpha_rho_0_relaxation_numerator +=
-          beta_ij * (alpha_rho_0_i + alpha_rho_0_j);
-      alpha_rho_1_relaxation_numerator +=
-          beta_ij * (alpha_rho_1_i + alpha_rho_1_j);
+      for (unsigned int k = 0; k < n_species; ++k) {
+        const auto alpha_rho_k_i = view.partial_density(U_i, k);
+        const auto alpha_rho_k_j = view.partial_density(U_j, k);
+        const auto alpha_rho_k_ij_bar = view.partial_density(U_ij_bar, k);
+
+        bounds_[2 * k] = std::min(bounds_[2 * k], alpha_rho_k_ij_bar);
+        bounds_[2 * k + 1] = std::max(bounds_[2 * k + 1], alpha_rho_k_ij_bar);
+
+        rho_relaxation_numerator[k] +=
+            beta_ij * (alpha_rho_k_i + alpha_rho_k_j);
+      }
       rho_relaxation_denominator += std::abs(beta_ij);
 
       /* Internal energy bounds and relaxation */
+      auto &rho_e_min = bounds_[2 * n_species];
       rho_e_min = std::min(rho_e_min, rho_e_j);
       rho_e_min = std::min(rho_e_min, rho_e_ij_bar);
 
@@ -478,7 +440,7 @@ namespace ryujin
       rho_e_interp_max = std::max(rho_e_interp_max, rho_e_interp);
 
       /* Entropy bounds and relaxation: */
-
+      auto &s_min = bounds_[2 * n_species + 1];
       const auto s_ij_bar = view.specific_entropy(U_ij_bar);
 
       const Number s_interp =
@@ -494,54 +456,37 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      const auto &[alpha_rho_0_min,
-                   alpha_rho_0_max,
-                   alpha_rho_1_min,
-                   alpha_rho_1_max,
-                   rho_e_min,
-                   s_min] = bounds_;
-
       auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
-      auto &[alpha_rho_0_min_relaxed,
-             alpha_rho_0_max_relaxed,
-             alpha_rho_1_min_relaxed,
-             alpha_rho_1_max_relaxed,
-             rho_e_min_relaxed,
-             s_min_relaxed] = relaxed_bounds;
 
       /* Apply a stricter window: */
-
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const auto alpha_rho_0_relaxation =
-          ScalarNumber(2. * parameters.relaxation_factor()) *
-          std::abs(alpha_rho_0_relaxation_numerator) /
-          (std::abs(rho_relaxation_denominator) + Number(eps));
+      /* Apply stricter bounds for each species */
+      for (unsigned int k = 0; k < n_species; ++k) {
+        const auto rho_k_relaxation =
+            ScalarNumber(2. * parameters.relaxation_factor()) *
+            std::abs(rho_relaxation_numerator[k]) /
+            (std::abs(rho_relaxation_denominator) + Number(eps));
 
-      const auto alpha_rho_1_relaxation =
-          ScalarNumber(2. * parameters.relaxation_factor()) *
-          std::abs(alpha_rho_1_relaxation_numerator) /
-          (std::abs(rho_relaxation_denominator) + Number(eps));
+        relaxed_bounds[2 * k] =
+            std::max(relaxed_bounds[2 * k], bounds_[2 * k] - rho_k_relaxation);
+        relaxed_bounds[2 * k + 1] = std::min(
+            relaxed_bounds[2 * k + 1], bounds_[2 * k + 1] + rho_k_relaxation);
+      }
+
+      /* Apply stricter bounds for internal energy and entropy */
+      const auto &rho_e_min = bounds_[2 * n_species];
+      const auto &s_min = bounds_[2 * n_species + 1];
 
       const auto int_relaxation =
           parameters.relaxation_factor() * (rho_e_interp_max - rho_e_min);
-
       const auto entropy_relaxation =
           parameters.relaxation_factor() * (s_interp_max - s_min);
 
-      alpha_rho_0_min_relaxed = std::max(
-          alpha_rho_0_min_relaxed, alpha_rho_0_min - alpha_rho_0_relaxation);
-      alpha_rho_0_max_relaxed = std::min(
-          alpha_rho_0_max_relaxed, alpha_rho_0_max + alpha_rho_0_relaxation);
-
-      alpha_rho_1_min_relaxed = std::max(
-          alpha_rho_1_min_relaxed, alpha_rho_1_min - alpha_rho_1_relaxation);
-      alpha_rho_1_max_relaxed = std::min(
-          alpha_rho_1_max_relaxed, alpha_rho_1_max + alpha_rho_1_relaxation);
-
-      rho_e_min_relaxed =
-          std::max(rho_e_min_relaxed, rho_e_min - int_relaxation);
-      s_min_relaxed = std::max(s_min_relaxed, s_min - entropy_relaxation);
+      relaxed_bounds[2 * n_species] =
+          std::max(relaxed_bounds[2 * n_species], rho_e_min - int_relaxation);
+      relaxed_bounds[2 * n_species + 1] = std::max(
+          relaxed_bounds[2 * n_species + 1], s_min - entropy_relaxation);
 
       return relaxed_bounds;
     }

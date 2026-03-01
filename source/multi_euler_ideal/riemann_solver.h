@@ -69,14 +69,14 @@ namespace ryujin
       using state_type = typename View::state_type;
 
       /**
-       * Number of components in a "riemann data" state, we store \f$[\rho, v,
-       * p, a, gamma]\f$, thus, 5.
+       * Number of components in a "riemann data" state, we store
+       * \f$[\rho, u, p, \gamma, a]\f$, thus, 5.
        */
       static constexpr unsigned int riemann_data_size = 5;
 
       /**
        * The array type to store the expanded "riemann data" state for the
-       * Riemann solver \f$[\rho, v, p, a]\f$
+       * Riemann solver \f$[\rho, u, p, \gamma, a]\f$.
        */
       using primitive_type = typename std::array<Number, riemann_data_size>;
 

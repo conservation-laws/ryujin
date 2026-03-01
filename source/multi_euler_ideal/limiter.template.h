@@ -34,20 +34,17 @@ namespace ryujin
       const ScalarNumber relax = ScalarNumber(1. + large * eps);
 
       /*
-       * First limit the fractional density alpha_rho_0.
+       * Limit the partial densities for each species.
        *
        * See [Guermond, Nazarov, Popov, Thomas] (4.8):
        */
 
-      {
-        /* Be careful with the variable names. Not really rho here but
-         * alpha_0 * rho_0.
-         */
-        const auto &rho_U = view.partial_density_0(U);
-        const auto &rho_P = view.partial_density_0(P);
+      for (unsigned int k = 0; k < n_species; ++k) {
+        const auto rho_U = view.partial_density(U, k);
+        const auto rho_P = view.partial_density(P, k);
 
-        const auto &rho_min = std::get<0>(bounds);
-        const auto &rho_max = std::get<1>(bounds);
+        const auto &rho_min = bounds[2 * k];
+        const auto &rho_max = bounds[2 * k + 1];
 
         /*
          * Verify that rho_U is within bounds. This property might be
@@ -60,14 +57,14 @@ namespace ryujin
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout
-              << "Bounds violation: low-order [species 0] density (critical)!"
-              << "\n\t\trho min:         " << rho_min
-              << "\n\t\trho min (delta): " << negative_part(rho_U - rho_min)
-              << "\n\t\trho:             " << rho_U
-              << "\n\t\trho max (delta): " << positive_part(rho_U - rho_max)
-              << "\n\t\trho max:         " << rho_max << "\n"
-              << std::endl;
+          std::cout << "Bounds violation: low-order [species " << k
+                    << "] density (critical)!"
+                    << "\n\t\trho min:         " << rho_min
+                    << "\n\t\trho min (delta): " << negative_part(rho_U - rho_min)
+                    << "\n\t\trho:             " << rho_U
+                    << "\n\t\trho max (delta): " << positive_part(rho_U - rho_max)
+                    << "\n\t\trho max:         " << rho_max << "\n"
+                    << std::endl;
 #endif
           success = false;
         }
@@ -113,7 +110,7 @@ namespace ryujin
         /*
          * Verify that the new state is within bounds:
          */
-        const auto rho_new = view.partial_density_0(U + t_r * P);
+        const auto rho_new = view.partial_density(U + t_r * P, k);
         const auto test_new_min = view.filter_vacuum_density(
             std::max(Number(0.), rho_new - relax * rho_max));
         const auto test_new_max = view.filter_vacuum_density(
@@ -121,7 +118,8 @@ namespace ryujin
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: high-order [species 0] density!"
+          std::cout << "Bounds violation: high-order [species " << k
+                    << "] density!"
                     << "\n\t\trho min:         " << rho_min
                     << "\n\t\trho min (delta): "
                     << negative_part(rho_new - rho_min)
@@ -134,128 +132,19 @@ namespace ryujin
           success = false;
         }
 #endif
-      }
-
-      /*
-       * Then limit the fractional density alpha_rho_1.
-       *
-       * See [Guermond, Nazarov, Popov, Thomas] (4.8):
-       */
-      {
-        /* Be careful with the variable names. Not really rho here but
-         * alpha_1 * rho_1.
-         */
-        auto t_q = t_r;
-
-        const auto &rho_U = view.partial_density_1(U);
-        const auto &rho_P = view.partial_density_1(P);
-
-        const auto &rho_min = std::get<2>(bounds);
-        const auto &rho_max = std::get<3>(bounds);
-
-        /*
-         * Verify that rho_U is within bounds. This property might be
-         * violated for relative CFL numbers larger than 1.
-         */
-        const auto test_min = view.filter_vacuum_density(
-            std::max(Number(0.), rho_U - relax * rho_max));
-        const auto test_max = view.filter_vacuum_density(
-            std::max(Number(0.), rho_min - relax * rho_U));
-        if (!(test_min == Number(0.) && test_max == Number(0.))) {
-#ifdef DEBUG_OUTPUT
-          std::cout << std::fixed << std::setprecision(16);
-          std::cout
-              << "Bounds violation: low-order [species 1] density (critical)!"
-              << "\n\t\trho min:         " << rho_min
-              << "\n\t\trho min (delta): " << negative_part(rho_U - rho_min)
-              << "\n\t\trho:             " << rho_U
-              << "\n\t\trho max (delta): " << positive_part(rho_U - rho_max)
-              << "\n\t\trho max:         " << rho_max << "\n"
-              << std::endl;
-#endif
-          success = false;
-        }
-
-        const Number denominator =
-            ScalarNumber(1.) / (std::abs(rho_P) + eps * rho_max + min);
-
-        t_q = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            rho_max,
-            rho_U + t_q * rho_P,
-            /*
-             * rho_P is positive.
-             *
-             * Note: Do not take an absolute value here. If we are out of
-             * bounds we have to ensure that t_r is set to t_min.
-             */
-            (rho_max - rho_U) * denominator,
-            t_q);
-
-        t_q = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            rho_U + t_q * rho_P,
-            rho_min,
-            /*
-             * rho_P is negative.
-             *
-             * Note: Do not take an absolute value here. If we are out of
-             * bounds we have to ensure that t_r is set to t_min.
-             */
-            (rho_U - rho_min) * denominator,
-            t_q);
-
-        /*
-         * Ensure that t_min <= t <= t_max. This might not be the case if
-         * rho_U is outside the interval [rho_min, rho_max]. Furthermore,
-         * the quotient we take above is prone to numerical cancellation in
-         * particular in the second pass of the limiter when rho_P might be
-         * small.
-         */
-        t_r = std::min(t_q, t_r);
-        t_r = std::min(t_r, t_max);
-        t_r = std::max(t_r, t_min);
-
-#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-        /*
-         * Verify that the new state is within bounds:
-         */
-        const auto rho_new = view.partial_density_1(U + t_r * P);
-        const auto test_new_min = view.filter_vacuum_density(
-            std::max(Number(0.), rho_new - relax * rho_max));
-        const auto test_new_max = view.filter_vacuum_density(
-            std::max(Number(0.), rho_min - relax * rho_new));
-        if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
-#ifdef DEBUG_OUTPUT
-          std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: high-order [species 1] density!"
-                    << "\n\t\trho min:         " << rho_min
-                    << "\n\t\trho min (delta): "
-                    << negative_part(rho_new - rho_min)
-                    << "\n\t\trho:             " << rho_new
-                    << "\n\t\trho max (delta): "
-                    << positive_part(rho_new - rho_max)
-                    << "\n\t\trho max:         " << rho_max << "\n"
-                    << std::endl;
-#endif
-          success = false;
-        }
-#endif
-      }
+      } /* end loop over species */
 
       /*
        * Then limit the internal energy. Unfortunately, limiting on the
        * "mixture" specific entropy does not guarantee positivity of the mixture
        * internal energy, so have to do this.
-       *
-       * Note that t_r is given by limiting on partial densities. This
-       * implementation might not be the most efficient, but we can optimize
-       * later.
        */
 
       {
         Number t_l = t_min; // good state
         Number t_q = t_r;   // potentially bad state
 
-        const auto &rho_e_min = std::get<4>(bounds);
+        const auto &rho_e_min = bounds[2 * n_species];
 
         const auto U_l = U + t_l * P;
         const auto rho_e_l = view.internal_energy(U_l);
@@ -345,7 +234,7 @@ namespace ryujin
       Number t_l = t_min; // good state
 
       {
-        const auto &s_min = std::get<5>(bounds);
+        const auto &s_min = bounds[2 * n_species + 1];
 
 #ifdef DEBUG_OUTPUT_LIMITER
         std::cout << std::endl;

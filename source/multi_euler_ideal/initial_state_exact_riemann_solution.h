@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "hyperbolic_system.h"
+
 #include <cmath>
 #include <deal.II/base/tensor.h>
 
@@ -17,12 +19,17 @@ namespace ryujin
 {
   namespace MultiSpeciesEulerInitialStates
   {
+    using namespace MultiSpeciesEuler;
+
     /**
      * The exact Riemann solution.
      *
      * This initial class computes the analytic solution for the
      * compressible multi-species Euler equations with an ideal gas equation of
      * state for each species.
+     *
+     * @note This class is currently only implemented for exactly 2 species.
+     * A compile-time assertion will fail if n_species != 2.
      *
      * @note This class returns the analytic solution as a function of time
      * @p t and position @p x.
@@ -43,6 +50,9 @@ namespace ryujin
 
       using ScalarNumber = typename View::ScalarNumber;
 
+      /* Primitive state for 2 species: (Y_0, rho, u, p) */
+      static constexpr unsigned int primitive_dim = 4;
+      using primitive_state_type = dealii::Tensor<1, primitive_dim, Number>;
 
       ExactRiemannSolution(const HyperbolicSystem &hyperbolic_system,
                            const std::string subsection)
@@ -50,6 +60,10 @@ namespace ryujin
                                                    subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
+        Assert(n_species == 2,
+               dealii::ExcMessage(
+                   "ExactRiemannSolution is only implemented for 2 species"));
+
         primitive_left_[0] = 0.5;
         primitive_left_[1] = 1.4;
         primitive_left_[2] = 0.0;
@@ -122,7 +136,7 @@ namespace ryujin
 
         const Number xi = x / t;
 
-        dealii::Tensor<1, 4, Number> primitive_state;
+        primitive_state_type primitive_state;
 
         if (t < 1.e-14 && x < 0.) {
           primitive_state = primitive_left_;
@@ -201,8 +215,8 @@ namespace ryujin
        */
       //@{
 
-      dealii::Tensor<1, 4, Number> primitive_left_;
-      dealii::Tensor<1, 4, Number> primitive_right_;
+      primitive_state_type primitive_left_;
+      primitive_state_type primitive_right_;
 
       //@}
       /**
@@ -226,10 +240,10 @@ namespace ryujin
       //@{
 
       // Used to transform data to (alpha_rho_0, alpha_rho_1, u, p)
-      dealii::Tensor<1, 4, Number>
-      transform(dealii::Tensor<1, 4, Number> &temp_in) const
+      primitive_state_type
+      transform(primitive_state_type &temp_in) const
       {
-        dealii::Tensor<1, 4, Number> result;
+        primitive_state_type result;
         result[0] = temp_in[0] * temp_in[1];        // = alpha_0 rho_0;
         result[1] = (1. - temp_in[0]) * temp_in[1]; // = alpha_1 rho_1;
 
@@ -240,7 +254,7 @@ namespace ryujin
       }
 
       Number fZofP(const Number &p_in,
-                   const dealii::Tensor<1, 4, Number> &data_in) const
+                   const primitive_state_type &data_in) const
       {
         // Need hyperbolic system for particular quantities
         const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -270,7 +284,7 @@ namespace ryujin
 
 
       Number dfZofP(const Number &p_in,
-                    const dealii::Tensor<1, 4, Number> &data_in) const
+                    const primitive_state_type &data_in) const
       {
         // Need hyperbolic system for particular quantities
         const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -305,16 +319,16 @@ namespace ryujin
 
 
       Number dphi(const Number &p_in,
-                  const dealii::Tensor<1, 4, Number> &data_left,
-                  const dealii::Tensor<1, 4, Number> &data_right) const
+                  const primitive_state_type &data_left,
+                  const primitive_state_type &data_right) const
       {
         return dfZofP(p_in, data_left) + dfZofP(p_in, data_right);
       }
 
 
       Number phi(const Number &p_in,
-                 const dealii::Tensor<1, 4, Number> &data_left,
-                 const dealii::Tensor<1, 4, Number> &data_right) const
+                 const primitive_state_type &data_left,
+                 const primitive_state_type &data_right) const
       {
         const Number u_L = data_left[2];
         const Number u_R = data_right[2];
@@ -324,7 +338,7 @@ namespace ryujin
 
 
       Number lambda(const Number &p_in,
-                    const dealii::Tensor<1, 4, Number> &data_in,
+                    const primitive_state_type &data_in,
                     const Number &sign) const
       {
         // Need hyperbolic system for particular quantities
@@ -347,7 +361,7 @@ namespace ryujin
 
 
       Number lambda_intermediate(const Number &p_in,
-                                 const dealii::Tensor<1, 4, Number> &data_in,
+                                 const primitive_state_type &data_in,
                                  const Number &sign) const
       {
         // Need hyperbolic system for particular quantities
@@ -378,10 +392,10 @@ namespace ryujin
       }
 
 
-      dealii::Tensor<1, 4, Number>
+      primitive_state_type
       cstar_solution(const Number &p_star,
                      const Number &u_star,
-                     const dealii::Tensor<1, 4, Number> &data_in) const
+                     const primitive_state_type &data_in) const
       {
         // Need hyperbolic system for particular quantities
         const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -411,10 +425,10 @@ namespace ryujin
       }
 
 
-      dealii::Tensor<1, 4, Number>
+      primitive_state_type
       expansion_solution(const Number & /*p_star*/,
                          const Number &xi,
-                         const dealii::Tensor<1, 4, Number> &data_in,
+                         const primitive_state_type &data_in,
                          const Number &sign) const
       {
         // Need hyperbolic system for particular quantities
@@ -460,8 +474,8 @@ namespace ryujin
        */
       double compute_pstar(double p_1,
                            double p_2,
-                           dealii::Tensor<1, 4, Number> data_1,
-                           dealii::Tensor<1, 4, Number> data_2)
+                           primitive_state_type data_1,
+                           primitive_state_type data_2)
       {
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
 

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "species_parameters.h"
+
 #include <compile_time_options.h>
 
 #include <convenience_macros.h>
@@ -41,6 +43,40 @@ namespace ryujin
 
       return std::max(numerator, Number(0.)) /
              std::max(denominator, Number(min));
+    }
+
+
+    /**
+     * Convert from user-friendly primitive format
+     *   (Y_0, ..., Y_{n-2}, rho, u, p)
+     * to internal primitive format
+     *   (alpha_0*rho_0, ..., alpha_{n-1}*rho_{n-1}, u, p)
+     *
+     * The last species' partial density is computed from the constraint
+     * that mass fractions sum to one.
+     */
+    template <typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_species + 2, Number>
+    extend_primitive(
+        const dealii::Tensor<1, n_species + 2, Number> &primitive_in)
+    {
+      dealii::Tensor<1, n_species + 2, Number> result;
+
+      const auto rho = primitive_in[n_species - 1];
+      Number Y_sum = Number(0.);
+
+      /* Convert mass fractions to partial densities */
+      for (unsigned int k = 0; k < n_species - 1; ++k) {
+        result[k] = primitive_in[k] * rho;
+        Y_sum += primitive_in[k];
+      }
+      result[n_species - 1] = (Number(1.) - Y_sum) * rho;
+
+      /* Copy velocity and pressure */
+      result[n_species] = primitive_in[n_species];
+      result[n_species + 1] = primitive_in[n_species + 1];
+
+      return result;
     }
 
 
@@ -92,7 +128,6 @@ namespace ryujin
      *   \varepsilon(\mathbf{u}) > 0,\; s(\mathbf{u}) \geq s_{\min} \}.
      * \f]
      *
-     * @note Currently hardcoded for 2 species (\f$n_s = 2\f$).
      *
      * @ingroup MultiSpeciesEulerEquations
      */
@@ -143,10 +178,10 @@ namespace ryujin
        */
       //@{
 
-      dealii::Tensor<1, /* num_species = */ 2, double> cp_for_each_species_;
-      dealii::Tensor<1, /* num_species = */ 2, double> cv_for_each_species_;
-      dealii::Tensor<1, /* num_species = */ 2, double> r_for_each_species_;
-      dealii::Tensor<1, /* num_species = */ 2, double> gamma_for_each_species_;
+      dealii::Tensor<1, n_species, double> cp_for_each_species_;
+      dealii::Tensor<1, n_species, double> cv_for_each_species_;
+      dealii::Tensor<1, n_species, double> r_for_each_species_;
+      dealii::Tensor<1, n_species, double> gamma_for_each_species_;
       double reference_density_;
       double vacuum_state_relaxation_small_;
       double vacuum_state_relaxation_large_;
@@ -206,25 +241,25 @@ namespace ryujin
        */
       //@{
 
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 2, double>
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_species, double>
       cp_for_each_species() const
       {
         return hyperbolic_system_.cp_for_each_species_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 2, double>
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_species, double>
       cv_for_each_species() const
       {
         return hyperbolic_system_.cv_for_each_species_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 2, double>
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_species, double>
       r_for_each_species() const
       {
         return hyperbolic_system_.r_for_each_species_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 2, double>
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_species, double>
       gamma_for_each_species() const
       {
         return hyperbolic_system_.gamma_for_each_species_;
@@ -286,11 +321,10 @@ namespace ryujin
       //@{
 
       /**
-       * The dimension of the state space.
-       * FIXME: Generalize for user-defined number of species.
-       *        This is assuming 2 species only.
+       * The dimension of the state space: n_species partial densities +
+       * dim momentum components + 1 total energy.
        */
-      static constexpr unsigned int problem_dimension = 3 + dim;
+      static constexpr unsigned int problem_dimension = n_species + 1 + dim;
 
       /**
        * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
@@ -325,13 +359,17 @@ namespace ryujin
        */
       static inline const auto component_names =
           []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"alpha_rho_0", "alpha_rho_1", "m", "E"};
-        else if constexpr (dim == 2)
-          return {"alpha_rho_0", "alpha_rho_1", "m_1", "m_2", "E"};
-        else if constexpr (dim == 3)
-          return {"alpha_rho_0", "alpha_rho_1", "m_1", "m_2", "m_3", "E"};
-        __builtin_trap();
+        std::array<std::string, problem_dimension> names;
+        for (unsigned int k = 0; k < n_species; ++k)
+          names[k] = "alpha_rho_" + std::to_string(k);
+        if constexpr (dim == 1) {
+          names[n_species] = "m";
+        } else {
+          for (unsigned int d = 0; d < dim; ++d)
+            names[n_species + d] = "m_" + std::to_string(d + 1);
+        }
+        names[n_species + dim] = "E";
+        return names;
       }();
 
       /**
@@ -340,13 +378,17 @@ namespace ryujin
        */
       static inline const auto primitive_component_names =
           []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"alpha_rho_0", "alpha_rho_1", "v", "p"};
-        else if constexpr (dim == 2)
-          return {"alpha_rho_0", "alpha_rho_1", "v_1", "v_2", "p"};
-        else if constexpr (dim == 3)
-          return {"alpha_rho_0", "alpha_rho_1", "v_1", "v_2", "v_3", "p"};
-        __builtin_trap();
+        std::array<std::string, problem_dimension> names;
+        for (unsigned int k = 0; k < n_species; ++k)
+          names[k] = "alpha_rho_" + std::to_string(k);
+        if constexpr (dim == 1) {
+          names[n_species] = "v";
+        } else {
+          for (unsigned int d = 0; d < dim; ++d)
+            names[n_species + d] = "v_" + std::to_string(d + 1);
+        }
+        names[n_species + dim] = "p";
+        return names;
       }();
 
       /**
@@ -420,20 +462,14 @@ namespace ryujin
       //@{
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, return
-       * the partial density for the first species <code>U[0]</code>.
+       * For a given state vector <code>U</code>, return the partial density
+       * for species <code>k</code>, i.e., <code>U[k]</code>.
        */
-      static Number partial_density_0(const state_type &U);
+      static Number partial_density(const state_type &U, unsigned int k);
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, return
-       * the partial density for the second species <code>U[1]</code>.
-       */
-      static Number partial_density_1(const state_type &U);
-
-      /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, return
-       * the total mixture density obtained by summing partial densities.
+       * For a given state vector <code>U</code>, return the total mixture
+       * density obtained by summing all partial densities.
        */
       static Number density(const state_type &U);
 
@@ -446,25 +482,26 @@ namespace ryujin
       Number filter_vacuum_density(const Number &rho) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, return
-       * the momentum vector <code>[U[2], ..., U[1+dim]]</code>.
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * return the momentum vector
+       * <code>[U[n_species], ..., U[n_species+dim-1]]</code>.
        */
       static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, return
-       * the total energy <code>U[2+dim]</code>
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, return
+       * the total energy <code>U[n_species+dim]</code>
        */
       static Number total_energy(const state_type &U);
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the internal energy \f$\varepsilon = (\rho e)\f$.
        */
       static Number internal_energy(const state_type &U);
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the mixture gamma for the mixture EOS:
        * \f[
        *  \overline{\gamma} = (sum of (alpha_k rho_k) * c_{p, k}) / (sum of
@@ -474,7 +511,7 @@ namespace ryujin
       Number gamma_mixture(const state_type &U) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the mixture specific heat capacity at constant pressure:
        * \f[
        *  \overline{c}_p = (sum of (alpha_k rho_k) / rho * c_{p, k})
@@ -483,7 +520,7 @@ namespace ryujin
       Number cp_mixture(const state_type &U) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the mixture specific heat capacity at constant volume:
        * \f[
        *  \overline{c}_v = (sum of (alpha_k rho_k) / rho * c_{v, k})
@@ -492,7 +529,7 @@ namespace ryujin
       Number cv_mixture(const state_type &U) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the pressure \f$p\f$.
        *
        * We assume that the pressure is given by a mixture ideal EOS
@@ -503,7 +540,7 @@ namespace ryujin
       Number pressure(const state_type &U) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>,
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
        * compute and return the speed of sound \f$c\f$:
        *
        * We assume that the pressure is given by a mixture ideal EOS
@@ -522,7 +559,7 @@ namespace ryujin
       //@{
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the physical specific entropy. Following Eq. (2.8) in
        * [ClaytonDzanicTovar-2025]:
        * \f[
@@ -536,21 +573,21 @@ namespace ryujin
       Number specific_entropy(const state_type &U) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return a surrogate Harten-type entropy. Following Section 4 of
        * [ClaytonDzanicTovar-2025], we use:
        * \f[
-       *   \eta(\mathbf{u}; \gamma_{\min}) = (\rho \varepsilon)^{1/(\gamma_{\min}+1)},
-       * \f]
-       * where \f$\gamma_{\min}\f$ is the minimum surrogate gamma over the
-       * stencil. This entropy is chosen to ensure convexity properties
-       * required by the entropy-viscosity indicator.
+       *   \eta(\mathbf{u}; \gamma_{\min}) = (\rho
+       * \varepsilon)^{1/(\gamma_{\min}+1)}, \f] where \f$\gamma_{\min}\f$ is
+       * the minimum surrogate gamma over the stencil. This entropy is chosen to
+       * ensure convexity properties required by the entropy-viscosity
+       * indicator.
        */
       Number surrogate_harten_entropy(const state_type &U,
                                       const Number &gamma_min) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code>, compute
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative \f$\eta'\f$ of the Harten-type entropy.
        */
       mixture_state_type
@@ -559,7 +596,7 @@ namespace ryujin
                                           const Number &gamma_min) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code> and
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code> and
        * pressure <code>p</code>, compute a surrogate gamma. Following
        * Section 3 of [ClaytonDzanicTovar-2025]:
        * \f[
@@ -573,7 +610,7 @@ namespace ryujin
       Number surrogate_gamma(const state_type &U, const Number &p) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code> and
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code> and
        * gamma <code>gamma</code>, compute a surrogate pressure:
        * \f[
        *   p(\rho, e, \gamma) = (\gamma - 1) (\rho e)
@@ -584,7 +621,7 @@ namespace ryujin
       Number surrogate_pressure(const state_type &U, const Number &gamma) const;
 
       /**
-       * For a given (3+dim dimensional) state vector <code>U</code> and
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code> and
        * gamma <code>gamma</code>, compute a surrogate speed of sound.
        */
       Number surrogate_speed_of_sound(const state_type &U,
@@ -762,9 +799,10 @@ namespace ryujin
       state_type expand_state(const ST &state) const;
 
       /**
-       * Given an initial state [alpha_0 rho_0, alpha_1 rho_1, u_1, ..., u_d, p]
-       * return a conserved state [alpha_0 rho_0, alpha_1 rho_1, m_1, ..., m_d,
-       * E].
+       * Given an initial state
+       * [alpha_0 rho_0, ..., alpha_{n-1} rho_{n-1}, u_1, ..., u_d, p]
+       * return a conserved state
+       * [alpha_0 rho_0, ..., alpha_{n-1} rho_{n-1}, m_1, ..., m_d, E].
        *
        * @note This function is used to conveniently convert (user
        * provided) primitive initial states with pressure values to a
@@ -825,11 +863,11 @@ namespace ryujin
                     reference_density_,
                     "Problem specific density reference");
 
-      cp_for_each_species_[0] = 1.4;
-      cv_for_each_species_[0] = 1.0;
-
-      cp_for_each_species_[1] = 1.67;
-      cv_for_each_species_[1] = 1.0;
+      /* Set default values for species parameters */
+      for (unsigned int k = 0; k < n_species; ++k) {
+        cp_for_each_species_[k] = 1.4 + 0.27 * k; /* Default: 1.4, 1.67, ... */
+        cv_for_each_species_[k] = 1.0;
+      }
 
       add_parameter(
           "c_p for each species",
@@ -855,15 +893,12 @@ namespace ryujin
        * And finally populate the r and gamma values.
        */
       const auto populate_values = [this]() {
-        r_for_each_species_[0] =
-            cp_for_each_species_[0] - cv_for_each_species_[0];
-        r_for_each_species_[1] =
-            cp_for_each_species_[1] - cv_for_each_species_[1];
-
-        gamma_for_each_species_[0] =
-            cp_for_each_species_[0] / cv_for_each_species_[0];
-        gamma_for_each_species_[1] =
-            cp_for_each_species_[1] / cv_for_each_species_[1];
+        for (unsigned int k = 0; k < n_species; ++k) {
+          r_for_each_species_[k] =
+              cp_for_each_species_[k] - cv_for_each_species_[k];
+          gamma_for_each_species_[k] =
+              cp_for_each_species_[k] / cv_for_each_species_[k];
+        }
       };
 
       ParameterAcceptor::parse_parameters_call_back.connect(populate_values);
@@ -950,23 +985,21 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::partial_density_0(const state_type &U)
+    HyperbolicSystemView<dim, Number>::partial_density(const state_type &U,
+                                                       unsigned int k)
     {
-      return U[0];
-    }
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::partial_density_1(const state_type &U)
-    {
-      return U[1];
+      AssertIndexRange(k, n_species);
+      return U[k];
     }
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     HyperbolicSystemView<dim, Number>::density(const state_type &U)
     {
-      return partial_density_0(U) + partial_density_1(U);
+      auto result = Number(0.);
+      for (unsigned int k = 0; k < n_species; ++k)
+        result += partial_density(U, k);
+      return result;
     }
 
 
@@ -990,7 +1023,7 @@ namespace ryujin
     {
       dealii::Tensor<1, dim, Number> result;
       for (unsigned int i = 0; i < dim; ++i)
-        result[i] = U[2 + i];
+        result[i] = U[n_species + i];
       return result;
     }
 
@@ -999,7 +1032,7 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     HyperbolicSystemView<dim, Number>::total_energy(const state_type &U)
     {
-      return U[2 + dim];
+      return U[n_species + dim];
     }
 
 
@@ -1023,8 +1056,8 @@ namespace ryujin
       Number result = 0.;
       const Number rho = density(U);
 
-      for (unsigned int i = 0; i < 2; ++i) {
-        result += U[i] / rho * ScalarNumber(cp_for_each_species()[i]);
+      for (unsigned int k = 0; k < n_species; ++k) {
+        result += U[k] / rho * ScalarNumber(cp_for_each_species()[k]);
       }
       return result;
     }
@@ -1036,8 +1069,8 @@ namespace ryujin
       Number result = 0.;
       const Number rho = density(U);
 
-      for (unsigned int i = 0; i < 2; ++i) {
-        result += U[i] / rho * ScalarNumber(cv_for_each_species()[i]);
+      for (unsigned int k = 0; k < n_species; ++k) {
+        result += U[k] / rho * ScalarNumber(cv_for_each_species()[k]);
       }
       return result;
     }
@@ -1083,22 +1116,22 @@ namespace ryujin
       Number cv_bar = 0.;
       Number r_bar = 0.;
 
-      for (unsigned int i = 0; i < 2; ++i) {
-        const auto Y_i = U[i] * rho_inverse;
-        r_bar += Y_i * Number(r_for_each_species()[i]);
-        cv_bar += Y_i * Number(cv_for_each_species()[i]);
+      for (unsigned int k = 0; k < n_species; ++k) {
+        const auto Y_k = U[k] * rho_inverse;
+        r_bar += Y_k * Number(r_for_each_species()[k]);
+        cv_bar += Y_k * Number(cv_for_each_species()[k]);
       }
 
       Number K_factor = 0.;
-      for (unsigned int i = 0; i < 2; ++i) {
-        const auto Y_i = U[i] * rho_inverse;
-        const auto cv_i = Number(cv_for_each_species()[i]);
-        const auto r_i = Number(r_for_each_species()[i]);
-        const auto gm1 = Number(gamma_for_each_species()[i] - 1.);
+      for (unsigned int k = 0; k < n_species; ++k) {
+        const auto Y_k = U[k] * rho_inverse;
+        const auto cv_k = Number(cv_for_each_species()[k]);
+        const auto r_k = Number(r_for_each_species()[k]);
+        const auto gm1 = Number(gamma_for_each_species()[k] - 1.);
 
-        const auto K_i =
-            cv_i * std::log(cv_i / cv_bar * ryujin::pow(r_i / r_bar, gm1));
-        K_factor += Y_i * K_i;
+        const auto K_k =
+            cv_k * std::log(cv_k / cv_bar * ryujin::pow(r_k / r_bar, gm1));
+        K_factor += Y_k * K_k;
       }
 
       const auto s_bar =
@@ -1239,8 +1272,10 @@ namespace ryujin
        */
 
       const auto rho = density(U);
-      const auto Y_0 = partial_density_0(U) / rho;
-      const auto Y_1 = partial_density_1(U) / rho;
+      /* Store mass fractions Y_k = (alpha_k rho_k) / rho */
+      dealii::Tensor<1, n_species, Number> Y;
+      for (unsigned int k = 0; k < n_species; ++k)
+        Y[k] = partial_density(U, k) / rho;
 
       const auto m = momentum(U);
       const auto vn = m * normal / rho;
@@ -1357,13 +1392,13 @@ namespace ryujin
 
       state_type U_new;
 
-      U_new[0] = Y_0 * rho_new;
-      U_new[1] = Y_1 * rho_new;
+      for (unsigned int k = 0; k < n_species; ++k)
+        U_new[k] = Y[k] * rho_new;
       for (unsigned int d = 0; d < dim; ++d) {
-        U_new[2 + d] = rho_new * (vn_new * normal + vperp)[d];
+        U_new[n_species + d] = rho_new * (vn_new * normal + vperp)[d];
       }
 
-      U_new[2 + dim] =
+      U_new[n_species + dim] =
           rho_e_new + 0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
 
       return U_new;
@@ -1387,18 +1422,18 @@ namespace ryujin
       } else if (id == Boundary::dirichlet_momentum) {
         /* Only enforce Dirichlet conditions on the momentum: */
         auto m_dirichlet = momentum(get_dirichlet_data());
-        for (unsigned int k = 0; k < dim; ++k)
-          result[k + 2] = m_dirichlet[k];
+        for (unsigned int d = 0; d < dim; ++d)
+          result[n_species + d] = m_dirichlet[d];
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
         m -= 1. * (m * normal) * normal;
-        for (unsigned int k = 0; k < dim; ++k)
-          result[k + 2] = m[k];
+        for (unsigned int d = 0; d < dim; ++d)
+          result[n_species + d] = m[d];
 
       } else if (id == Boundary::no_slip) {
-        for (unsigned int k = 0; k < dim; ++k)
-          result[k + 2] = Number(0.);
+        for (unsigned int d = 0; d < dim; ++d)
+          result[n_species + d] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
         /*
@@ -1470,12 +1505,12 @@ namespace ryujin
       flux_type result;
 
       for (unsigned int i = 0; i < dim; ++i) {
-        result[0][i] = U[0] * (m[i] * rho_inverse);
-        result[1][i] = U[1] * (m[i] * rho_inverse);
-        result[2 + i] = m * (m[i] * rho_inverse);
-        result[2 + i][i] += p;
+        for (unsigned int k = 0; k < n_species; ++k)
+          result[k][i] = U[k] * (m[i] * rho_inverse);
+        result[n_species + i] = m * (m[i] * rho_inverse);
+        result[n_species + i][i] += p;
       }
-      result[dim + 2] = m * (rho_inverse * (E + p));
+      result[n_species + dim] = m * (rho_inverse * (E + p));
 
       return result;
     }
@@ -1550,17 +1585,20 @@ namespace ryujin
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
 
-      constexpr auto dim2 = ST::dimension - 3;
+      constexpr auto dim2 = ST::dimension - n_species - 1;
       static_assert(dim >= dim2,
                     "the space dimension of the argument state must not be "
                     "larger than the one of the target state");
 
       state_type result;
-      result[0] = state[0];
-      result[1] = state[1];
-      result[dim + 2] = state[dim2 + 2];
-      for (unsigned int i = 2; i < dim2 + 2; ++i)
-        result[i] = state[i];
+      /* Copy partial densities */
+      for (unsigned int k = 0; k < n_species; ++k)
+        result[k] = state[k];
+      /* Copy total energy */
+      result[n_species + dim] = state[n_species + dim2];
+      /* Copy momentum components (and zero-fill extra dimensions) */
+      for (unsigned int i = 0; i < dim2; ++i)
+        result[n_species + i] = state[n_species + i];
 
       return result;
     }
@@ -1585,17 +1623,17 @@ namespace ryujin
       const auto rho = density(primitive_state);
       /* extract velocity: */
       const auto u = /*SIC!*/ momentum(primitive_state);
-      /* extract specific internal energy: */
-      const auto &p = primitive_state[dim + 2];
+      /* extract pressure: */
+      const auto &p = primitive_state[n_species + dim];
 
       auto state = primitive_state;
       /* Fix up momentum: */
-      for (unsigned int i = 2; i < dim + 2; ++i)
+      for (unsigned int i = n_species; i < n_species + dim; ++i)
         state[i] *= rho;
 
       /* Compute total energy: */
       const Number gamma_bar = gamma_mixture(primitive_state);
-      state[dim + 2] =
+      state[n_species + dim] =
           p / (gamma_bar - Number(1.)) + ScalarNumber(0.5) * rho * u * u;
 
       return state;
@@ -1613,10 +1651,10 @@ namespace ryujin
 
       auto primitive_state = state;
       /* Fix up velocity: */
-      for (unsigned int i = 2; i < dim + 2; ++i)
+      for (unsigned int i = n_species; i < n_species + dim; ++i)
         primitive_state[i] *= rho_inverse;
       /* Set pressure: */
-      primitive_state[dim + 2] = p;
+      primitive_state[n_species + dim] = p;
 
       return primitive_state;
     }
@@ -1630,7 +1668,7 @@ namespace ryujin
       auto result = state;
       const auto M = lambda(momentum(state));
       for (unsigned int d = 0; d < dim; ++d)
-        result[2 + d] = M[d];
+        result[n_species + d] = M[d];
       return result;
     }
   } // namespace MultiSpeciesEuler

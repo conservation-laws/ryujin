@@ -30,7 +30,7 @@ namespace ryujin
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
                       evc_factor_,
-                      "Factor for scaling the entropy viscocity commuator");
+                      "Factor for scaling the entropy viscosity commutator");
       }
 
       ACCESSOR_READ_ONLY(evc_factor);
@@ -247,7 +247,7 @@ namespace ryujin
           (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
 
       left += entropy_flux;
-      for (unsigned int k = 0; k < problem_dimension - 1; ++k) {
+      for (unsigned int k = 0; k < 2 + dim; ++k) {
         const auto component = (f_j[k] - f_i[k]) * c_ij;
         right[k] += component;
       }
@@ -262,7 +262,7 @@ namespace ryujin
 
       Number numerator = left;
       Number denominator = std::abs(left);
-      for (unsigned int k = 0; k < problem_dimension - 1; ++k) {
+      for (unsigned int k = 0; k < 2 + dim; ++k) {
         numerator -= d_eta_i[k] * right[k];
         denominator += std::abs(d_eta_i[k] * right[k]);
       }
