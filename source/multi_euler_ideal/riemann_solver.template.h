@@ -643,10 +643,10 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
       const auto &[rho_i, p_i, dont_use_i, s_i, harten_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       const auto &[rho_j, p_j, dont_use_j, s_j, harten_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values.template read_tensor<Number, precomputed_type>(js);
 
       const auto riemann_data_i =
           riemann_data_from_state(U_i, p_i, rho_i, n_ij);

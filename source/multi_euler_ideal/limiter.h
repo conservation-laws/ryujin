@@ -279,7 +279,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[rho_i, p_i, gamma_min_i, s_i, harten_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values.template read_tensor<Number, precomputed_type>(i);
 
       Bounds result;
       /* Partial density bounds: [rho_k_min, rho_k_max] for each species */
@@ -405,7 +405,7 @@ namespace ryujin
       const auto rho_e_j = view.internal_energy(U_j);
 
       const auto [rho_j, p_j, gamma_min_j, s_j, harten_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values.template read_tensor<Number, precomputed_type>(js);
 
       /* bar state shifted by an affine shift: */
       const auto U_ij_bar =

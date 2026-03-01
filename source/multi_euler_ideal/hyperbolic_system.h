@@ -6,12 +6,11 @@
 
 #pragma once
 
-#include "species_parameters.h"
-
 #include <compile_time_options.h>
 
 #include <convenience_macros.h>
 #include <discretization.h>
+#include <loop.h>
 #include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>
@@ -26,6 +25,17 @@ namespace ryujin
 {
   namespace MultiSpeciesEuler
   {
+    /**
+     * Compile-time parameter specifying the number of species in the
+     * multi-species Euler equations. Change this value and recompile to
+     * use a different number of species.
+     *
+     * The state vector dimension will be: n_species + dim + 1
+     * (n_species partial densities + dim momentum components + 1 total energy)
+     */
+    constexpr unsigned int n_species = 2;
+    static_assert(n_species >= 1 && n_species <= 3,
+                  "n_species must be between 1 and 3");
     /*
      * For various divisions in the multi-species module we have a
      * mathematical guarantee that the numerator and denominator are
@@ -931,7 +941,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
+        const auto U_i = U.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto rho_i = view.density(U_i);
         const auto p_i = view.pressure(U_i);
@@ -957,8 +967,8 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template get_tensor<T>(i);
-        auto prec_i = precomputed.template get_tensor<T, PT>(i);
+        const auto U_i = U.template read_tensor<T>(i);
+        auto prec_i = precomputed.template read_tensor<T, PT>(i);
         auto &[rho_i, p_i, gamma_min_i, s_i, harten_i] = prec_i;
 
         const auto view = this->view<dim, T>();
@@ -968,8 +978,8 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = U.template get_tensor<T>(js);
-          const auto prec_j = precomputed.template get_tensor<T, PT>(js);
+          const auto U_j = U.template read_tensor<T>(js);
+          const auto prec_j = precomputed.template read_tensor<T, PT>(js);
           const auto p_j = std::get<1>(prec_j);
           const auto gamma_j = view.surrogate_gamma(U_j, p_j);
           gamma_min_i = std::min(gamma_min_i, gamma_j);
@@ -1547,7 +1557,7 @@ namespace ryujin
         const state_type &U_i) const -> flux_contribution_type
     {
       const auto &[rho_i, p_i, surrogate_gamma_i, s_i, surrogate_harten_i] =
-          pv.template get_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
       return f(U_i, p_i);
     }
 
@@ -1561,7 +1571,7 @@ namespace ryujin
         const state_type &U_j) const -> flux_contribution_type
     {
       const auto &[rho_j, p_j, surrogate_gamma_j, s_j, surrogate_harten_j] =
-          pv.template get_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
       return f(U_j, p_j);
     }
 
