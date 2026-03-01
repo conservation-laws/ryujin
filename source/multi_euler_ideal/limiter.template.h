@@ -60,9 +60,11 @@ namespace ryujin
           std::cout << "Bounds violation: low-order [species " << k
                     << "] density (critical)!"
                     << "\n\t\trho min:         " << rho_min
-                    << "\n\t\trho min (delta): " << negative_part(rho_U - rho_min)
+                    << "\n\t\trho min (delta): "
+                    << negative_part(rho_U - rho_min)
                     << "\n\t\trho:             " << rho_U
-                    << "\n\t\trho max (delta): " << positive_part(rho_U - rho_max)
+                    << "\n\t\trho max (delta): "
+                    << positive_part(rho_U - rho_max)
                     << "\n\t\trho max:         " << rho_max << "\n"
                     << std::endl;
 #endif

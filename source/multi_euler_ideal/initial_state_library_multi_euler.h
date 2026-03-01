@@ -41,8 +41,8 @@ namespace ryujin
 
       /* ExactRiemannSolution only supports 2 species */
       if constexpr (n_species == 2)
-        add(std::make_unique<ExactRiemannSolution<Description, dim, Number>>(h,
-                                                                             s));
+        add(std::make_unique<ExactRiemannSolution<Description, dim, Number>>(
+            h, s));
 
       add(std::make_unique<Function<Description, dim, Number>>(h, s));
       add(std::make_unique<ICFLike<Description, dim, Number>>(h, s));

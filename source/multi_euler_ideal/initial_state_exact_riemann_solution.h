@@ -240,8 +240,7 @@ namespace ryujin
       //@{
 
       // Used to transform data to (alpha_rho_0, alpha_rho_1, u, p)
-      primitive_state_type
-      transform(primitive_state_type &temp_in) const
+      primitive_state_type transform(primitive_state_type &temp_in) const
       {
         primitive_state_type result;
         result[0] = temp_in[0] * temp_in[1];        // = alpha_0 rho_0;

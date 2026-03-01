@@ -45,11 +45,11 @@ namespace ryujin
         for (unsigned int k = 0; k < n_species - 1; ++k) {
           Y_expressions_[k] =
               std::to_string(Number(1.) / Number(n_species)); /* default */
-          this->add_parameter(
-              "Y_" + std::to_string(k) + " expression",
-              Y_expressions_[k],
-              "A function expression describing the mass fraction for species " +
-                  std::to_string(k));
+          this->add_parameter("Y_" + std::to_string(k) + " expression",
+                              Y_expressions_[k],
+                              "A function expression describing the mass "
+                              "fraction for species " +
+                                  std::to_string(k));
         }
 
         density_expression_ = "1.4";
@@ -146,7 +146,8 @@ namespace ryujin
         }
 
         pressure_function_->set_time(t);
-        full_primitive_state[n_species + dim] = pressure_function_->value(point);
+        full_primitive_state[n_species + dim] =
+            pressure_function_->value(point);
 
         return view.from_primitive_state(full_primitive_state);
       }

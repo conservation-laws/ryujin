@@ -122,8 +122,8 @@ namespace ryujin
      * \f$\bar{c}_p = \sum_k Y_k c_{p,k}\f$ and
      * \f$\bar{c}_v = \sum_k Y_k c_{v,k}\f$.
      *
-     * The mixture specific entropy is (see Eq. (2.8) in @cite
-     * ClaytonDzanicTovar-2025):
+     * The mixture specific entropy is (see Eq. (2.8) in
+     * @cite ClaytonDzanicTovar-2025):
      * \f[
      *   s(\mathbf{u}) = \bar{c}_v \log\left(\frac{\rho e}{\rho^{\bar{\gamma}}}
      *   \right) + K(\mathbf{Y}),
@@ -499,21 +499,20 @@ namespace ryujin
       static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, return
-       * the total energy <code>U[n_species+dim]</code>
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * return the total energy <code>U[n_species+dim]</code>
        */
       static Number total_energy(const state_type &U);
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the internal energy \f$\varepsilon = (\rho e)\f$.
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the internal energy \f$\varepsilon = (\rho e)\f$.
        */
       static Number internal_energy(const state_type &U);
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the mixture gamma for the mixture EOS:
-       * \f[
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the mixture gamma for the mixture EOS: \f[
        *  \overline{\gamma} = (sum of (alpha_k rho_k) * c_{p, k}) / (sum of
        * (alpha_k rho_k) * c_{v, k})
        * \f]
@@ -521,26 +520,24 @@ namespace ryujin
       Number gamma_mixture(const state_type &U) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the mixture specific heat capacity at constant pressure:
-       * \f[
-       *  \overline{c}_p = (sum of (alpha_k rho_k) / rho * c_{p, k})
-       * \f]
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the mixture specific heat capacity at constant
+       * pressure: \f[ \overline{c}_p = (sum of (alpha_k rho_k) / rho * c_{p,
+       * k}) \f]
        */
       Number cp_mixture(const state_type &U) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the mixture specific heat capacity at constant volume:
-       * \f[
-       *  \overline{c}_v = (sum of (alpha_k rho_k) / rho * c_{v, k})
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the mixture specific heat capacity at constant
+       * volume: \f[ \overline{c}_v = (sum of (alpha_k rho_k) / rho * c_{v, k})
        * \f]
        */
       Number cv_mixture(const state_type &U) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the pressure \f$p\f$.
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the pressure \f$p\f$.
        *
        * We assume that the pressure is given by a mixture ideal EOS
        * \f[
@@ -569,11 +566,10 @@ namespace ryujin
       //@{
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the physical specific entropy. Following Eq. (2.8) in
-       * [ClaytonDzanicTovar-2025]:
-       * \f[
-       *   s(\mathbf{u}) = \bar{r} \log(\rho^{-1}) + \bar{c}_v \log(e)
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the physical specific entropy. Following Eq. (2.8)
+       * in [ClaytonDzanicTovar-2025]: \f[ s(\mathbf{u}) = \bar{r}
+       * \log(\rho^{-1}) + \bar{c}_v \log(e)
        *   + K(\mathbf{Y}),
        * \f]
        * where \f$\bar{r} = \sum_k Y_k r_k\f$, \f$\bar{c}_v = \sum_k Y_k
@@ -583,22 +579,21 @@ namespace ryujin
       Number specific_entropy(const state_type &U) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return a surrogate Harten-type entropy. Following Section 4 of
-       * [ClaytonDzanicTovar-2025], we use:
-       * \f[
-       *   \eta(\mathbf{u}; \gamma_{\min}) = (\rho
-       * \varepsilon)^{1/(\gamma_{\min}+1)}, \f] where \f$\gamma_{\min}\f$ is
-       * the minimum surrogate gamma over the stencil. This entropy is chosen to
-       * ensure convexity properties required by the entropy-viscosity
-       * indicator.
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return a surrogate Harten-type entropy. Following Section 4
+       * of [ClaytonDzanicTovar-2025], we use: \f[ \eta(\mathbf{u};
+       * \gamma_{\min}) = (\rho \varepsilon)^{1/(\gamma_{\min}+1)}, \f] where
+       * \f$\gamma_{\min}\f$ is the minimum surrogate gamma over the stencil.
+       * This entropy is chosen to ensure convexity properties required by the
+       * entropy-viscosity indicator.
        */
       Number surrogate_harten_entropy(const state_type &U,
                                       const Number &gamma_min) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code>, compute
-       * and return the derivative \f$\eta'\f$ of the Harten-type entropy.
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>,
+       * compute and return the derivative \f$\eta'\f$ of the Harten-type
+       * entropy.
        */
       mixture_state_type
       surrogate_harten_entropy_derivative(const state_type &U,
@@ -606,8 +601,8 @@ namespace ryujin
                                           const Number &gamma_min) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code> and
-       * pressure <code>p</code>, compute a surrogate gamma. Following
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>
+       * and pressure <code>p</code>, compute a surrogate gamma. Following
        * Section 3 of [ClaytonDzanicTovar-2025]:
        * \f[
        *   \gamma(\mathbf{u}, p) = 1 + \frac{p}{\varepsilon(\mathbf{u})}.
@@ -620,19 +615,17 @@ namespace ryujin
       Number surrogate_gamma(const state_type &U, const Number &p) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code> and
-       * gamma <code>gamma</code>, compute a surrogate pressure:
-       * \f[
-       *   p(\rho, e, \gamma) = (\gamma - 1) (\rho e)
-       * \f]
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>
+       * and gamma <code>gamma</code>, compute a surrogate pressure: \f[ p(\rho,
+       * e, \gamma) = (\gamma - 1) (\rho e) \f]
        *
        * This function is the complementary function to surrogate_gamma().
        */
       Number surrogate_pressure(const state_type &U, const Number &gamma) const;
 
       /**
-       * For a given (n_species+1+dim dimensional) state vector <code>U</code> and
-       * gamma <code>gamma</code>, compute a surrogate speed of sound.
+       * For a given (n_species+1+dim dimensional) state vector <code>U</code>
+       * and gamma <code>gamma</code>, compute a surrogate speed of sound.
        */
       Number surrogate_speed_of_sound(const state_type &U,
                                       const Number &gamma) const;

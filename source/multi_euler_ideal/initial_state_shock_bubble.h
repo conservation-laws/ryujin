@@ -164,7 +164,6 @@ namespace ryujin
       double radius_;
       double mach_number_;
       double shock_location_;
-
     };
 
 

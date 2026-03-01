@@ -198,7 +198,6 @@ namespace ryujin
       double amplitude_;
       double shock_radius_;
       double mach_number_;
-
     };
 
 

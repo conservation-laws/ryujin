@@ -50,9 +50,9 @@ namespace ryujin
         /* Default: equal mass fractions */
         for (unsigned int k = 0; k < n_species - 1; ++k)
           temp_left_[k] = Number(1.) / Number(n_species);
-        temp_left_[n_species - 1] = 1.4;  /* rho */
-        temp_left_[n_species] = 0.0;      /* u */
-        temp_left_[n_species + 1] = 1.0;  /* p */
+        temp_left_[n_species - 1] = 1.4; /* rho */
+        temp_left_[n_species] = 0.0;     /* u */
+        temp_left_[n_species + 1] = 1.0; /* p */
         this->add_parameter(
             "primitive state left",
             temp_left_,
@@ -61,9 +61,9 @@ namespace ryujin
 
         for (unsigned int k = 0; k < n_species - 1; ++k)
           temp_right_[k] = Number(1.) / Number(n_species);
-        temp_right_[n_species - 1] = 1.4;  /* rho */
-        temp_right_[n_species] = 0.0;      /* u */
-        temp_right_[n_species + 1] = 1.0;  /* p */
+        temp_right_[n_species - 1] = 1.4; /* rho */
+        temp_right_[n_species] = 0.0;     /* u */
+        temp_right_[n_species + 1] = 1.0; /* p */
         this->add_parameter(
             "primitive state right",
             temp_right_,
@@ -96,7 +96,6 @@ namespace ryujin
 
       state_type state_left_;
       state_type state_right_;
-
     };
   } // namespace MultiSpeciesEulerInitialStates
 } // namespace ryujin
