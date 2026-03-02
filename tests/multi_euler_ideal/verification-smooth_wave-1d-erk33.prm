@@ -1,0 +1,50 @@
+subsection A - TimeLoop
+  set basename                  = test-smooth-wave
+
+  set enable compute error      = true
+  set error normalize           = true
+  set error quantities          = alpha_rho_0, alpha_rho_1, m, E
+
+  set final time                = 0.6
+  set enforce final time        = true
+
+  set timer granularity         = 0.6
+  set terminal update interval  = 0
+end
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = multi species euler
+  set c_p for each species = 1005., 4041.4
+  set c_v for each species = 718., 2420.
+end
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+  set geometry              = rectangular domain
+  set mesh refinement       = 4
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 1
+    set subdivisions x           = 100
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = smooth wave
+  set position      = 0.
+
+  subsection smooth wave
+    set mass fraction = 0.75
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
