@@ -27,7 +27,7 @@ namespace ryujin
   template <typename Number,
             int n_comp,
             int simd_length,
-            typename MemorySpace = dealii::MemorySpace::Host::kokkos_space,
+            typename MemorySpace = dealii::MemorySpace::Host,
             bool writable = true>
   class SparseMatrixView;
 
@@ -82,14 +82,14 @@ namespace ryujin
      * Return a writable view on the sparse matrix for the selected memory
      * space.
      */
-    template <typename MemorySpace = dealii::MemorySpace::Host::kokkos_space>
+    template <typename MemorySpace = dealii::MemorySpace::Host>
     SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true> get_view();
 
     /**
      * Return a read-only view on the sparse matrix for the selected memory
      * space.
      */
-    template <typename MemorySpace = dealii::MemorySpace::Host::kokkos_space>
+    template <typename MemorySpace = dealii::MemorySpace::Host>
     SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
     get_view() const;
 
@@ -144,13 +144,13 @@ namespace ryujin
     const SparsityPattern<simd_length> *sparsity_pattern_ =
         nullptr; // FIXME shared_ptr
 
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    Kokkos::View<Number *, HostSpace> data_host_;
-    Kokkos::View<Number *, HostSpace> exchange_buffer_host_;
+    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
+    Kokkos::View<Number *, KokkosHost> data_host_;
+    Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
 
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
-    Kokkos::View<Number *, DefaultSpace> data_default_;
-    Kokkos::View<Number *, DefaultSpace> exchange_buffer_default_;
+    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
+    Kokkos::View<Number *, KokkosDefault> data_default_;
+    Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
 
     bool host_space_active_ = true;
 
@@ -359,8 +359,11 @@ namespace ryujin
   private:
     using SM = SparseMatrix<Number, n_comp, simd_length>;
     std::conditional_t<writable, SM *, const SM *> sparse_matrix_;
+
     SparsityPatternView<simd_length, MemorySpace> sparsity_pattern_;
-    Kokkos::View<Number *, MemorySpace> data_;
+
+    using KokkosSpace = typename MemorySpace::kokkos_space;
+    Kokkos::View<Number *, KokkosSpace> data_;
   };
 
 
@@ -427,23 +430,23 @@ namespace ryujin
     this->sparsity_pattern_ = &sparsity;
     this->host_space_active_ = true;
 
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
+    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
-    data_host_ = Kokkos::View<Number *, HostSpace, Aligned>(
+    data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_data", sparsity.n_nonzero_elements() * n_components);
 
     data_default_ = Kokkos::create_mirror_view(
-        typename DefaultSpace::execution_space(), data_host_);
+        typename KokkosDefault::execution_space(), data_host_);
 
     const std::size_t n_indices = sparsity.entries_to_be_sent().size();
 
-    exchange_buffer_host_ = Kokkos::View<Number *, HostSpace, Aligned>(
+    exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_exchange_buffer", n_components * n_indices);
 
     exchange_buffer_default_ = Kokkos::create_mirror_view(
-        typename DefaultSpace::execution_space(), exchange_buffer_host_);
+        typename KokkosDefault::execution_space(), exchange_buffer_host_);
 
     /* reinitialize the view: */
     SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
@@ -481,11 +484,11 @@ namespace ryujin
   bool SparseMatrix<Number, n_components, simd_length>::is_active_memory_space()
       const
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected Kokkos memory space");
+                  "Unexpected memory space");
 
     return host_space_active_ == std::is_same_v<MemorySpace, HostSpace>;
   }
@@ -495,11 +498,11 @@ namespace ryujin
   template <typename MemorySpace>
   void SparseMatrix<Number, n_components, simd_length>::move_to_memory_space()
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected Kokkos memory space");
+                  "Unexpected memory space");
 
     if (is_active_memory_space<MemorySpace>())
       return;
@@ -524,8 +527,8 @@ namespace ryujin
   void SparseMatrix<Number, n_components, simd_length>::
       zero_out_ghost_rows_on_memory_space()
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     Assert(is_active_memory_space<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not active."));
@@ -548,8 +551,8 @@ namespace ryujin
   void SparseMatrix<Number, n_components, simd_length>::
       update_ghost_rows_on_memory_space()
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
@@ -653,8 +656,8 @@ namespace ryujin
     AssertThrow(operation == dealii::VectorOperation::add,
                 dealii::ExcNotImplemented());
 
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
@@ -801,8 +804,8 @@ namespace ryujin
       SparseMatrix &sparse_matrix)
     requires(writable != std::is_const_v<SparseMatrix>)
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -1154,8 +1157,8 @@ namespace ryujin
       zero_out_ghost_rows() const
     requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -1177,8 +1180,8 @@ namespace ryujin
       update_ghost_rows() const
     requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -1200,8 +1203,8 @@ namespace ryujin
       compress(dealii::VectorOperation::values operation) const
     requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,

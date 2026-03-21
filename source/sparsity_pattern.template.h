@@ -86,19 +86,19 @@ namespace ryujin
 
     /* Allocate memory: */
 
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
+    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
-    row_starts_host_ = Kokkos::View<unsigned int *, HostSpace, Aligned>(
+    row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
         "sparsity_pattern_row_starts", sparsity.n_rows() + 1);
 
-    column_indices_host_ = Kokkos::View<unsigned int *, HostSpace, Aligned>(
+    column_indices_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
         "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
 
-    indices_transposed_host_ = Kokkos::View<unsigned int *, HostSpace, Aligned>(
-        "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
-
+    indices_transposed_host_ =
+        Kokkos::View<unsigned int *, KokkosHost, Aligned>(
+            "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
 
     /* Vectorized part: */
 
@@ -390,13 +390,13 @@ namespace ryujin
      */
 
     row_starts_default_ = Kokkos::create_mirror_view_and_copy(
-        typename DefaultSpace::execution_space(), row_starts_host_);
+        typename KokkosDefault::execution_space(), row_starts_host_);
 
     column_indices_default_ = Kokkos::create_mirror_view_and_copy(
-        typename DefaultSpace::execution_space(), column_indices_host_);
+        typename KokkosDefault::execution_space(), column_indices_host_);
 
     indices_transposed_default_ = Kokkos::create_mirror_view_and_copy(
-        typename DefaultSpace::execution_space(), indices_transposed_host_);
+        typename KokkosDefault::execution_space(), indices_transposed_host_);
 
     SparsityPatternView<simd_length>::reinit(*this);
   }
