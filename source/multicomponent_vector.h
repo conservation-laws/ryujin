@@ -467,7 +467,8 @@ namespace ryujin
       std::conditional_t<writable, MCV *, const MCV *> multi_component_vector_;
 
       Number *data_;
-
+      unsigned int n_locally_owned_;
+      unsigned int n_locally_relevant_;
       //@}
     };
 
@@ -762,9 +763,21 @@ namespace ryujin
       multi_component_vector_ = &multi_component_vector;
 
       if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        data_ = multi_component_vector_->host_vector_.begin();
+        auto &vector = multi_component_vector_->host_vector_;
+        const auto &partitioner = vector.get_partitioner();
+
+        data_ = vector.begin();
+        n_locally_owned_ = partitioner->locally_owned_size();
+        n_locally_relevant_ = n_locally_owned_ + partitioner->n_ghost_indices();
+
       } else {
-        data_ = multi_component_vector_->default_vector_.begin();
+
+        auto &vector = multi_component_vector_->default_vector_;
+        const auto &partitioner = vector.get_partitioner();
+
+        data_ = vector.begin();
+        n_locally_owned_ = partitioner->locally_owned_size();
+        n_locally_relevant_ = n_locally_owned_ + partitioner->n_ghost_indices();
       }
     }
 
@@ -845,39 +858,50 @@ namespace ryujin
         this->local_element(i * n_comp + component) =
             functor(scalar_vector[i]);
     }
+#endif
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2>
-    DEAL_II_ALWAYS_INLINE inline Number2
-    MultiComponentVector<Number, n_comp, simd_length>::read_entry(
-        const unsigned int i) const
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::read_entry(const unsigned int i) const
     {
       static_assert(
           n_comp == 1,
           "Attempted to read a scalar value from a tensor-valued vector entry");
 
-      AssertIndexRange(i,
-                       this->get_partitioner()->locally_owned_size() +
-                           this->get_partitioner()->n_ghost_indices());
+      AssertIndexRange(i, n_locally_relevant_);
 
       const auto result = read_tensor<Number2>(i);
       return result[0];
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2, typename Tensor>
-    DEAL_II_ALWAYS_INLINE inline Tensor
-    MultiComponentVector<Number, n_comp, simd_length>::read_tensor(
-        const unsigned int i) const
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::read_tensor(const unsigned int i) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
 
-      AssertIndexRange(i,
-                       this->get_partitioner()->locally_owned_size() +
-                           this->get_partitioner()->n_ghost_indices());
+      AssertIndexRange(i, n_locally_relevant_);
 
       Tensor tensor;
 
@@ -885,32 +909,38 @@ namespace ryujin
       if constexpr (n_comp == 0)
         return tensor;
 
-      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      using VA = dealii::VectorizedArray<Number>;
+      if constexpr (std::is_same_v<VA, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
-        std::array<unsigned int, VectorizedArray::size()> indices;
-        for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        std::array<unsigned int, VA::size()> indices;
+        for (unsigned int k = 0; k < VA::size(); ++k)
           indices[k] = k * n_comp;
 
-        dealii::vectorized_load_and_transpose(n_comp,
-                                              this->begin() + i * n_comp,
-                                              indices.data(),
-                                              &tensor[0]);
+        dealii::vectorized_load_and_transpose(
+            n_comp, data_ + i * n_comp, indices.data(), &tensor[0]);
+
       } else {
         /* Non-vectorized sequential access. */
-
         for (unsigned int d = 0; d < n_comp; ++d)
-          tensor[d] = this->local_element(i * n_comp + d);
+          tensor[d] = data_[i * n_comp + d];
       }
 
       return tensor;
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2>
-    DEAL_II_ALWAYS_INLINE inline Number2
-    MultiComponentVector<Number, n_comp, simd_length>::read_entry(
-        const unsigned int *js) const
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::read_entry(const unsigned int *js) const
     {
       static_assert(
           n_comp == 1,
@@ -921,62 +951,75 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2, typename Tensor>
-    DEAL_II_ALWAYS_INLINE inline Tensor
-    MultiComponentVector<Number, n_comp, simd_length>::read_tensor(
-        const unsigned int *js) const
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::read_tensor(const unsigned int *js)
+        const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
+
       Tensor tensor;
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)
         return tensor;
 
-      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      using VA = dealii::VectorizedArray<Number>;
+      if constexpr (std::is_same_v<VA, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
-        std::array<unsigned int, VectorizedArray::size()> indices;
-        for (unsigned int k = 0; k < VectorizedArray::size(); ++k) {
-          AssertIndexRange(js[k],
-                           this->get_partitioner()->locally_owned_size() +
-                               this->get_partitioner()->n_ghost_indices());
+        std::array<unsigned int, VA::size()> indices;
+        for (unsigned int k = 0; k < VA::size(); ++k) {
+          AssertIndexRange(js[k], n_locally_relevant_);
           indices[k] = js[k] * n_comp;
         }
 
         dealii::vectorized_load_and_transpose(
-            n_comp, this->begin(), indices.data(), &tensor[0]);
+            n_comp, data_, indices.data(), &tensor[0]);
 
       } else {
         /* Non-vectorized sequential access. */
 
-        AssertIndexRange(*js,
-                         this->get_partitioner()->locally_owned_size() +
-                             this->get_partitioner()->n_ghost_indices());
+        AssertIndexRange(*js, n_locally_relevant_);
 
         for (unsigned int d = 0; d < n_comp; ++d)
-          tensor[d] = this->local_element(js[0] * n_comp + d);
+          tensor[d] = data_[js[0] * n_comp + d];
       }
 
       return tensor;
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2>
-    DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_comp, simd_length>::write_entry(
-        const Number2 &entry, const unsigned int i)
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::write_entry(const Number2 &entry,
+                                                    const unsigned int i) const
+      requires writable
     {
       static_assert(n_comp == 1,
                     "Attempted to write a scalar value into a tensor-valued "
                     "vector entry");
 
-      AssertIndexRange(i,
-                       this->get_partitioner()->locally_owned_size() +
-                           this->get_partitioner()->n_ghost_indices());
+      AssertIndexRange(i, n_locally_relevant_);
 
       dealii::Tensor<1, n_comp, Number2> tensor;
       tensor[0] = entry;
@@ -985,59 +1028,73 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2, typename Tensor>
-    DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_comp, simd_length>::write_tensor(
-        const Tensor &tensor, const unsigned int i)
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::write_tensor(const Tensor &tensor,
+                                                     const unsigned int i) const
+      requires writable
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
 
-      AssertIndexRange(i,
-                       this->get_partitioner()->locally_owned_size() +
-                           this->get_partitioner()->n_ghost_indices());
+      AssertIndexRange(i, n_locally_relevant_);
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)
         return;
 
-      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      using VA = dealii::VectorizedArray<Number>;
+      if constexpr (std::is_same_v<VA, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
-        std::array<unsigned int, VectorizedArray::size()> indices;
-        for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        std::array<unsigned int, VA::size()> indices;
+        for (unsigned int k = 0; k < VA::size(); ++k)
           indices[k] = k * n_comp;
 
         dealii::vectorized_transpose_and_store(/*add into*/ false,
                                                n_comp,
                                                &tensor[0],
                                                indices.data(),
-                                               this->begin() +
-                                                   i * n_comp);
+                                               data_ + i * n_comp);
 
       } else {
         /* Non-vectorized sequential access. */
 
         for (unsigned int d = 0; d < n_comp; ++d)
-          this->local_element(i * n_comp + d) = tensor[d];
+          data_[i * n_comp + d] = tensor[d];
       }
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2>
-    DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_comp, simd_length>::add_entry(
-        const Number2 &entry, const unsigned int i)
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::add_entry(const Number2 &entry,
+                                                  const unsigned int i) const
+      requires writable
     {
       static_assert(n_comp == 1,
                     "Attempted to write a scalar value into a tensor-valued "
                     "matrix entry");
 
-      AssertIndexRange(i,
-                       this->get_partitioner()->locally_owned_size() +
-                           this->get_partitioner()->n_ghost_indices());
+      AssertIndexRange(i, n_locally_relevant_);
 
       dealii::Tensor<1, n_comp, Number2> tensor;
       tensor[0] = entry;
@@ -1046,46 +1103,52 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Number2, typename Tensor>
-    DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_comp, simd_length>::add_tensor(
-        const Tensor &tensor, const unsigned int i)
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    MultiComponentVectorView<Number,
+                             n_comp,
+                             simd_length,
+                             MemorySpace,
+                             writable>::add_tensor(const Tensor &tensor,
+                                                   const unsigned int i) const
+      requires writable
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                     "type mismatch");
 
-      AssertIndexRange(i,
-                       this->get_partitioner()->locally_owned_size() +
-                           this->get_partitioner()->n_ghost_indices());
+      AssertIndexRange(i, n_locally_relevant_);
 
       /* Special case of a zero component vector */
       if constexpr (n_comp == 0)
         return;
 
-      if constexpr (std::is_same_v<VectorizedArray, Number2>) {
+      using VA = dealii::VectorizedArray<Number>;
+      if constexpr (std::is_same_v<VA, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
 
-        std::array<unsigned int, VectorizedArray::size()> indices;
-        for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        std::array<unsigned int, VA::size()> indices;
+        for (unsigned int k = 0; k < VA::size(); ++k)
           indices[k] = k * n_comp;
 
         dealii::vectorized_transpose_and_store(/*add into*/ true,
                                                n_comp,
                                                &tensor[0],
                                                indices.data(),
-                                               this->begin() +
-                                                   i * n_comp);
+                                               data_ + i * n_comp);
 
       } else {
         /* Non-vectorized sequential access. */
 
         for (unsigned int d = 0; d < n_comp; ++d)
-          this->local_element(i * n_comp + d) += tensor[d];
+          data_[i * n_comp + d] += tensor[d];
       }
     }
 
-#endif
 
     template <typename Number,
               int n_comp,
