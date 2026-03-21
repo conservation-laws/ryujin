@@ -20,7 +20,7 @@ namespace ryujin
      * This function takes a scalar MPI partitioner @p scalar_partitioner as
      * argument and returns a shared pointer to a new "vector" multicomponent
      * partitioner that defines storage and MPI synchronization for a vector
-     * consisting of @p n_components components. The vector partitioner is
+     * consisting of @p n_comp components. The vector partitioner is
      * intended to efficiently store non-scalar vectors such as the state
      * vectors U. Let (U_i)_k denote the k-th component of a state vector
      * element U_i, we then store
@@ -39,52 +39,36 @@ namespace ryujin
     create_vector_partitioner(
         const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
             &scalar_partitioner,
-        const unsigned int n_components);
+        const unsigned int n_comp);
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_length = dealii::VectorizedArray<Number>::size(),
+              typename MemorySpace = dealii::MemorySpace::Host,
+              bool writable = true>
+    class MultiComponentVectorView;
 
 
     /**
      * A wrapper around dealii::LinearAlgebra::distributed::Vector<Number>
-     * that stores a vector element of @p n_components components per entry
+     * that stores a vector element of @p n_comp components per entry
      * (instead of a scalar value).
      *
      * @ingroup SIMD
      */
     template <typename Number,
-              int n_components,
+              int n_comp,
               int simd_length = dealii::VectorizedArray<Number>::size()>
     class MultiComponentVector
-        : private dealii::LinearAlgebra::distributed::Vector<Number>
+        : public MultiComponentVectorView<Number, n_comp, simd_length>
     {
     public:
       /**
-       * @name Typedefs and constexpr constants
+       * @name Constructor, reinitialization, assignment
        */
       //@{
 
-      /**
-       * Shorthand typedef for the underlying dealii::VectorizedArray type
-       * used to insert and extract SIMD packed values from the
-       * MultiComponentVector.
-       */
-      using VectorizedArray = dealii::VectorizedArray<Number, simd_length>;
-
-      /**
-       * Shorthand typedef for the underlying scalar
-       * dealii::LinearAlgebra::distributed::Vector<Number> used to insert
-       * and extract a single component of the MultiComponentVector.
-       */
-      using ScalarHostVector =
-          dealii::LinearAlgebra::distributed::Vector<Number>;
-
-      //@}
-      /**
-       * @name Constructor and reinitialization
-       */
-      //@{
-
-      /**
-       * Default constructor
-       */
       MultiComponentVector() = default;
 
       /**
@@ -106,8 +90,138 @@ namespace ryujin
 
       //@}
       /**
-       * @name Extracting and inserting a single component stored in a
-       * ScalarHostVector
+       * Memory space access and synchronization:
+       */
+      //@{
+
+      /**
+       * Return a writable view on the sparse matrix for the selected memory
+       * space.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host>
+      MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
+      get_view();
+
+      /**
+       * Return a read-only view on the sparse matrix for the selected memory
+       * space.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host>
+      MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
+      get_view() const;
+
+      /**
+       * Returns true if the templated memory space is the currently active
+       * memory space.
+       */
+      template <typename MemorySpace>
+      bool is_active_memory_space() const;
+
+      /**
+       * Move internal data from the currently active memory space to the
+       * templated memory space.
+       */
+      template <typename MemorySpace>
+      void move_to_memory_space();
+
+      //@}
+
+      //@}
+      /**
+       * MPI synchronization.
+       */
+      //@{
+
+      /**
+       * MPI synchronization: Zero out all ghost rows.
+       */
+      template <typename MemorySpace>
+      void zero_out_ghost_values_on_memory_space();
+
+      /**
+       * MPI synchronization: Import all ghost values from neighboring MPI
+       * ranks on the templated memory space.
+       */
+      template <typename MemorySpace>
+      void update_ghost_values_on_memory_space();
+
+      /**
+       * MPI synchronization: Copy the data that has accumulated in the
+       * ghost range to the owning processor. This function operates on the
+       * templated memory space.
+       */
+      template <typename MemorySpace>
+      void compress_on_memory_space(dealii::VectorOperation::values operation);
+
+    private:
+      //@}
+      /**
+       * @name Internal fields, methods, and friends
+       */
+      //@{
+
+      dealii::LinearAlgebra::distributed::Vector<Number,
+                                                 dealii::MemorySpace::Host>
+          host_vector_;
+
+      dealii::LinearAlgebra::distributed::Vector<Number,
+                                                 dealii::MemorySpace::Default>
+          default_vector_;
+
+      bool host_space_active_ = true;
+
+      template <typename, int, int, typename, bool>
+      friend class MultiComponentVectorView;
+
+      //@}
+    };
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
+    class MultiComponentVectorView
+    {
+    public:
+      /**
+       * @name Constructor and reinitialization
+       */
+      //@{
+
+      MultiComponentVectorView() = default;
+
+      MultiComponentVectorView(MultiComponentVector<Number, n_comp, simd_length>
+                                   &multi_component_vector)
+        requires(writable);
+
+      MultiComponentVectorView(
+          const MultiComponentVector<Number, n_comp, simd_length>
+              &multi_component_vector)
+        requires(!writable);
+
+      template <typename MultiComponentVector>
+      void reinit(MultiComponentVector &multi_component_vector)
+        requires(writable != std::is_const_v<MultiComponentVector>);
+
+      //@}
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Shorthand typedef for the underlying scalar
+       * dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> used to
+       * insert and extract a single component of the MultiComponentVector.
+       */
+      using ScalarVector =
+          dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace>;
+
+      //@}
+      /**
+       * @name Extracting and inserting components, scaled addition
        */
       //@{
 
@@ -130,7 +244,7 @@ namespace ryujin
        * vectors).
        */
       template <typename Functor = std::identity>
-      void extract_component(ScalarHostVector &scalar_vector,
+      void extract_component(ScalarVector &scalar_vector,
                              unsigned int component,
                              const Functor &functor = std::identity{}) const;
 
@@ -152,9 +266,10 @@ namespace ryujin
        * single scalar vectors by deal.II interpolation functions.
        */
       template <typename Functor = std::identity>
-      void insert_component(const ScalarHostVector &scalar_vector,
+      void insert_component(const ScalarVector &scalar_vector,
                             unsigned int component,
-                            const Functor &functor = std::identity{});
+                            const Functor &functor = std::identity{})
+        requires writable;
 
       /**
        * Variant of the method above that reads values out of a
@@ -163,7 +278,16 @@ namespace ryujin
       template <typename Functor = std::identity>
       void insert_component(const dealii::Vector<Number> &scalar_vector,
                             unsigned int component,
-                            const Functor &functor = std::identity{});
+                            const Functor &functor = std::identity{})
+        requires writable;
+
+      /**
+       * Scaled addition of the given vector $U$ and the argument vector
+       * $V$: $U\leftarrow s\,U+a\,V$.
+       */
+      void
+      sadd(const Number s, const Number a, const MultiComponentVectorView &V)
+        requires writable;
 
       //@}
       /**
@@ -177,26 +301,26 @@ namespace ryujin
        *
        * If the template parameter @a Number2 is a VectorizedArray then
        * the function returns a SIMD vectorized dealii::Tensor populated with
-       * entries from the @p n_components component vectors stored at
+       * entries from the @p n_comp component vectors stored at
        * indices i, i+1, ..., i+simd_length-1.
        *
-       * @note This function is only available if `n_components` is equal to 1.
+       * @note This function is only available if `n_comp` is equal to 1.
        */
       template <typename Number2 = Number>
-      Number2 read_entry(const unsigned int i) const;
+      DEAL_II_HOST_DEVICE Number2 read_entry(const unsigned int i) const;
 
       /**
        * Variant of above function.
        *
        * Returns a SIMD vectorized dealii::Tensor populated with entries from
-       * the @p n_components component vectors stored at indices *(js), *(js+1),
+       * the @p n_comp component vectors stored at indices *(js), *(js+1),
        * ..., *(js+simd_length-1), i.e., @p js has to point to an array of
        * size @p simd_length containing all indices.
        *
-       * @note This function is only available if `n_components` is equal to 1.
+       * @note This function is only available if `n_comp` is equal to 1.
        */
       template <typename Number2 = Number>
-      Number2 read_entry(const unsigned int *js) const;
+      DEAL_II_HOST_DEVICE Number2 read_entry(const unsigned int *js) const;
 
       /**
        * Return the tensor-valued entry indexed by @p i.
@@ -207,42 +331,44 @@ namespace ryujin
        * indices i, i+1, ..., i+simd_length-1.
        */
       template <typename Number2 = Number,
-                typename Tensor = dealii::Tensor<1, n_components, Number2>>
-      Tensor read_tensor(const unsigned int i) const;
+                typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+      DEAL_II_HOST_DEVICE Tensor read_tensor(const unsigned int i) const;
 
       /**
        * Variant of above function.
        *
        * Returns a SIMD vectorized dealii::Tensor populated with entries from
-       * the @p n_components component vectors stored at indices *(js), *(js+1),
+       * the @p n_comp component vectors stored at indices *(js), *(js+1),
        * ..., *(js+simd_length-1), i.e., @p js has to point to an array of
        * size @p simd_length containing all indices.
        */
       template <typename Number2 = Number,
-                typename Tensor = dealii::Tensor<1, n_components, Number2>>
-      Tensor read_tensor(const unsigned int *js) const;
+                typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+      DEAL_II_HOST_DEVICE Tensor read_tensor(const unsigned int *js) const;
 
       /**
        * Write a (scalar valued) @p entry to the vector at position by @p i.
        *
        * If the template parameter @a Number2 is a VectorizedArray then
        * the function takes a SIMD vectorized @p tensor as argument instead
-       * and updates the values of the @p n_components component vectors at
+       * and updates the values of the @p n_comp component vectors at
        * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
        * tensor.
        *
-       * @note This function is only available if `n_components` is equal to 1.
+       * @note This function is only available if `n_comp` is equal to 1.
        */
       template <typename Number2 = Number>
-      void write_entry(const Number2 &entry, const unsigned int i);
+      DEAL_II_HOST_DEVICE void write_entry(const Number2 &entry,
+                                           const unsigned int i) const
+        requires writable;
 
       /**
-       * Update the values of the @p n_components component vector at index
+       * Update the values of the @p n_comp component vector at index
        * @p i with the values supplied by @p tensor.
        *
        * If the template parameter @a Number2 is a VectorizedArray then
        * the function takes a SIMD vectorized @p tensor as argument instead
-       * and updates the values of the @p n_components component vectors at
+       * and updates the values of the @p n_comp component vectors at
        * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
        * tensor.
        *
@@ -251,33 +377,37 @@ namespace ryujin
        * Number, and has a type trait `value_type`.
        */
       template <typename Number2 = Number,
-                typename Tensor = dealii::Tensor<1, n_components, Number2>>
-      void write_tensor(const Tensor &tensor, const unsigned int i);
+                typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+      DEAL_II_HOST_DEVICE void write_tensor(const Tensor &tensor,
+                                            const unsigned int i) const
+        requires writable;
 
       /**
        * Add a (scalar valued) @p entry to the vector at position @p i.
-       * Update the values of the @p n_components component vector at index @p i
+       * Update the values of the @p n_comp component vector at index @p i
        * by adding the values supplied by @p tensor.
        *
        * If the template parameter @a Number2 is a VectorizedArray then
        * the function takes a SIMD vectorized @p tensor as argument instead
-       * and updates the values of the @p n_components component vectors at
+       * and updates the values of the @p n_comp component vectors at
        * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
        * tensor.
        *
-       * @note This function is only available if `n_components` is equal to 1.
+       * @note This function is only available if `n_comp` is equal to 1.
        */
 
       template <typename Number2 = Number>
-      void add_entry(const Number2 &entry, const unsigned int i);
+      DEAL_II_HOST_DEVICE void add_entry(const Number2 &entry,
+                                         const unsigned int i) const
+        requires writable;
 
       /**
-       * Update the values of the @p n_components component vector at index @p i
+       * Update the values of the @p n_comp component vector at index @p i
        * by adding the values supplied by @p tensor.
        *
        * If the template parameter @a Number2 is a VectorizedArray then
        * the function takes a SIMD vectorized @p tensor as argument instead
-       * and updates the values of the @p n_components component vectors at
+       * and updates the values of the @p n_comp component vectors at
        * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
        * tensor.
        *
@@ -286,27 +416,49 @@ namespace ryujin
        * Number, and has a type trait `value_type`.
        */
       template <typename Number2 = Number,
-                typename Tensor = dealii::Tensor<1, n_components, Number2>>
-      void add_tensor(const Tensor &tensor, const unsigned int i);
+                typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+      DEAL_II_HOST_DEVICE void add_tensor(const Tensor &tensor,
+                                          const unsigned int i) const
+        requires writable;
 
       //@}
       /**
-       * @name Vector interface
+       * MPI synchronization.
        */
       //@{
 
-      void sadd(const Number s,
-                const Number a,
-                const MultiComponentVector<Number, n_components> &V)
-      {
-        ScalarHostVector::sadd(s, a, V);
-      }
+      /**
+       * MPI synchronization: Zero out all ghost rows.
+       */
+      void zero_out_ghost_values() const
+        requires(writable);
 
-      using ScalarHostVector::update_ghost_values;
+      /**
+       * MPI synchronization: Import all ghost values from neighboring MPI
+       * ranks on the templated memory space.
+       */
+      void update_ghost_values() const
+        requires(writable);
 
-      using ScalarHostVector::zero_out_ghost_values;
+      /**
+       * MPI synchronization: Copy the data that has accumulated in the
+       * ghost range to the owning processor. This function operates on the
+       * templated memory space.
+       */
+      void compress(dealii::VectorOperation::values operation) const
+        requires(writable);
 
-      using ScalarHostVector::compress;
+    private:
+      //@}
+      /**
+       * Internal data fields:
+       */
+      //@{
+
+      MultiComponentVector<Number, n_comp, simd_length>
+          *multi_component_vector_;
+
+      Number *data_;
 
       //@}
     };
@@ -320,54 +472,118 @@ namespace ryujin
      */
 
 
-    template <typename Number, int n_components, int simd_length>
-    void MultiComponentVector<Number, n_components, simd_length>::
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        MultiComponentVectorView(MultiComponentVector<Number, n_comp, simd_l>
+                                     &multi_component_vector)
+      requires(writable)
+    {
+      reinit(multi_component_vector);
+    }
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        MultiComponentVectorView(
+            const MultiComponentVector<Number, n_comp, simd_l>
+                &multi_component_vector)
+      requires(!writable)
+    {
+      reinit(multi_component_vector);
+    }
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    template <typename MultiComponentVector>
+    void
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        reinit(MultiComponentVector &multi_component_vector)
+      requires(writable != std::is_const_v<MultiComponentVector>)
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      multi_component_vector_ = &multi_component_vector;
+
+      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+        data_ = multi_component_vector_->data();
+      } else {
+        data_ = multi_component_vector_->data();
+      }
+    }
+
+
+#if 0
+    /*
+     * -------------------------------------------------------------------------
+     * Inline function definitions
+     * -------------------------------------------------------------------------
+     */
+
+    template <typename Number, int n_comp, int simd_length>
+    void MultiComponentVector<Number, n_comp, simd_length>::
         reinit_with_vector_partitioner(
             const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
                 &vector_partitioner)
     {
       /* Special case of a zero component vector */
-      if (n_components == 0)
+      if (n_comp == 0)
         return;
 
       ScalarHostVector::reinit(vector_partitioner);
     }
 
-    template <typename Number, int n_components, int simd_length>
-    void MultiComponentVector<Number, n_components, simd_length>::
+    template <typename Number, int n_comp, int simd_length>
+    void MultiComponentVector<Number, n_comp, simd_length>::
         reinit_with_scalar_partitioner(
             const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
                 &scalar_partitioner)
     {
       /* Special case of a zero component vector: */
-      if (n_components == 0)
+      if (n_comp == 0)
         return;
 
       /* Special case of a scalar vector: */
-      if (n_components == 1)
+      if (n_comp == 1)
         ScalarHostVector::reinit(scalar_partitioner);
 
       auto vector_partitioner =
-          create_vector_partitioner(scalar_partitioner, n_components);
+          create_vector_partitioner(scalar_partitioner, n_comp);
 
       ScalarHostVector::reinit(vector_partitioner);
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Functor>
     void
-    MultiComponentVector<Number, n_components, simd_length>::extract_component(
+    MultiComponentVector<Number, n_comp, simd_length>::extract_component(
         ScalarHostVector &scalar_vector,
         unsigned int component,
         const Functor &functor) const
     {
-      Assert(n_components > 0,
+      Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot extract from a vector with zero components."));
-      AssertIndexRange(component, n_components);
+      AssertIndexRange(component, n_comp);
 
-      Assert(n_components *
+      Assert(n_comp *
                      scalar_vector.get_partitioner()->locally_owned_size() ==
                  this->get_partitioner()->locally_owned_size(),
              dealii::ExcMessage("Called with a scalar_vector argument that has "
@@ -376,25 +592,25 @@ namespace ryujin
           scalar_vector.get_partitioner()->locally_owned_size();
       for (unsigned int i = 0; i < local_size; ++i)
         scalar_vector.local_element(i) =
-            functor(this->local_element(i * n_components + component));
+            functor(this->local_element(i * n_comp + component));
       scalar_vector.update_ghost_values();
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Functor>
     void
-    MultiComponentVector<Number, n_components, simd_length>::insert_component(
+    MultiComponentVector<Number, n_comp, simd_length>::insert_component(
         const ScalarHostVector &scalar_vector,
         unsigned int component,
         const Functor &functor)
     {
-      Assert(n_components > 0,
+      Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot insert into a vector with zero components."));
-      AssertIndexRange(component, n_components);
+      AssertIndexRange(component, n_comp);
 
-      Assert(n_components *
+      Assert(n_comp *
                      scalar_vector.get_partitioner()->locally_owned_size() ==
                  this->get_partitioner()->locally_owned_size(),
              dealii::ExcMessage("Called with a scalar_vector argument that has "
@@ -402,43 +618,43 @@ namespace ryujin
       const auto local_size =
           scalar_vector.get_partitioner()->locally_owned_size();
       for (unsigned int i = 0; i < local_size; ++i)
-        this->local_element(i * n_components + component) =
+        this->local_element(i * n_comp + component) =
             functor(scalar_vector.local_element(i));
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Functor>
     void
-    MultiComponentVector<Number, n_components, simd_length>::insert_component(
+    MultiComponentVector<Number, n_comp, simd_length>::insert_component(
         const dealii::Vector<Number> &scalar_vector,
         unsigned int component,
         const Functor &functor)
     {
-      Assert(n_components > 0,
+      Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot insert into a vector with zero components."));
-      AssertIndexRange(component, n_components);
+      AssertIndexRange(component, n_comp);
 
-      Assert(n_components * scalar_vector.size() >=
+      Assert(n_comp * scalar_vector.size() >=
                  this->get_partitioner()->locally_owned_size(),
              dealii::ExcMessage("Called with a scalar_vector argument that has "
                                 "incompatible local range."));
       const auto local_size = scalar_vector.size();
       for (unsigned int i = 0; i < local_size; ++i)
-        this->local_element(i * n_components + component) =
+        this->local_element(i * n_comp + component) =
             functor(scalar_vector[i]);
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline Number2
-    MultiComponentVector<Number, n_components, simd_length>::read_entry(
+    MultiComponentVector<Number, n_comp, simd_length>::read_entry(
         const unsigned int i) const
     {
       static_assert(
-          n_components == 1,
+          n_comp == 1,
           "Attempted to read a scalar value from a tensor-valued vector entry");
 
       AssertIndexRange(i,
@@ -450,10 +666,10 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2, typename Tensor>
     DEAL_II_ALWAYS_INLINE inline Tensor
-    MultiComponentVector<Number, n_components, simd_length>::read_tensor(
+    MultiComponentVector<Number, n_comp, simd_length>::read_tensor(
         const unsigned int i) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -466,38 +682,38 @@ namespace ryujin
       Tensor tensor;
 
       /* Special case of a zero component vector */
-      if constexpr (n_components == 0)
+      if constexpr (n_comp == 0)
         return tensor;
 
       if constexpr (std::is_same_v<VectorizedArray, Number2>) {
         /* Vectorized fast access. index must be divisible by simd_length */
         std::array<unsigned int, VectorizedArray::size()> indices;
         for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-          indices[k] = k * n_components;
+          indices[k] = k * n_comp;
 
-        dealii::vectorized_load_and_transpose(n_components,
-                                              this->begin() + i * n_components,
+        dealii::vectorized_load_and_transpose(n_comp,
+                                              this->begin() + i * n_comp,
                                               indices.data(),
                                               &tensor[0]);
       } else {
         /* Non-vectorized sequential access. */
 
-        for (unsigned int d = 0; d < n_components; ++d)
-          tensor[d] = this->local_element(i * n_components + d);
+        for (unsigned int d = 0; d < n_comp; ++d)
+          tensor[d] = this->local_element(i * n_comp + d);
       }
 
       return tensor;
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline Number2
-    MultiComponentVector<Number, n_components, simd_length>::read_entry(
+    MultiComponentVector<Number, n_comp, simd_length>::read_entry(
         const unsigned int *js) const
     {
       static_assert(
-          n_components == 1,
+          n_comp == 1,
           "Attempted to read a scalar value from a tensor-valued vector entry");
 
       const auto result = read_tensor<Number2>(js);
@@ -505,10 +721,10 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2, typename Tensor>
     DEAL_II_ALWAYS_INLINE inline Tensor
-    MultiComponentVector<Number, n_components, simd_length>::read_tensor(
+    MultiComponentVector<Number, n_comp, simd_length>::read_tensor(
         const unsigned int *js) const
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -516,7 +732,7 @@ namespace ryujin
       Tensor tensor;
 
       /* Special case of a zero component vector */
-      if constexpr (n_components == 0)
+      if constexpr (n_comp == 0)
         return tensor;
 
       if constexpr (std::is_same_v<VectorizedArray, Number2>) {
@@ -527,11 +743,11 @@ namespace ryujin
           AssertIndexRange(js[k],
                            this->get_partitioner()->locally_owned_size() +
                                this->get_partitioner()->n_ghost_indices());
-          indices[k] = js[k] * n_components;
+          indices[k] = js[k] * n_comp;
         }
 
         dealii::vectorized_load_and_transpose(
-            n_components, this->begin(), indices.data(), &tensor[0]);
+            n_comp, this->begin(), indices.data(), &tensor[0]);
 
       } else {
         /* Non-vectorized sequential access. */
@@ -540,21 +756,21 @@ namespace ryujin
                          this->get_partitioner()->locally_owned_size() +
                              this->get_partitioner()->n_ghost_indices());
 
-        for (unsigned int d = 0; d < n_components; ++d)
-          tensor[d] = this->local_element(js[0] * n_components + d);
+        for (unsigned int d = 0; d < n_comp; ++d)
+          tensor[d] = this->local_element(js[0] * n_comp + d);
       }
 
       return tensor;
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_components, simd_length>::write_entry(
+    MultiComponentVector<Number, n_comp, simd_length>::write_entry(
         const Number2 &entry, const unsigned int i)
     {
-      static_assert(n_components == 1,
+      static_assert(n_comp == 1,
                     "Attempted to write a scalar value into a tensor-valued "
                     "vector entry");
 
@@ -562,17 +778,17 @@ namespace ryujin
                        this->get_partitioner()->locally_owned_size() +
                            this->get_partitioner()->n_ghost_indices());
 
-      dealii::Tensor<1, n_components, Number2> tensor;
+      dealii::Tensor<1, n_comp, Number2> tensor;
       tensor[0] = entry;
 
       write_tensor<Number2>(tensor, i);
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2, typename Tensor>
     DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_components, simd_length>::write_tensor(
+    MultiComponentVector<Number, n_comp, simd_length>::write_tensor(
         const Tensor &tensor, const unsigned int i)
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -583,7 +799,7 @@ namespace ryujin
                            this->get_partitioner()->n_ghost_indices());
 
       /* Special case of a zero component vector */
-      if constexpr (n_components == 0)
+      if constexpr (n_comp == 0)
         return;
 
       if constexpr (std::is_same_v<VectorizedArray, Number2>) {
@@ -591,31 +807,31 @@ namespace ryujin
 
         std::array<unsigned int, VectorizedArray::size()> indices;
         for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-          indices[k] = k * n_components;
+          indices[k] = k * n_comp;
 
         dealii::vectorized_transpose_and_store(/*add into*/ false,
-                                               n_components,
+                                               n_comp,
                                                &tensor[0],
                                                indices.data(),
                                                this->begin() +
-                                                   i * n_components);
+                                                   i * n_comp);
 
       } else {
         /* Non-vectorized sequential access. */
 
-        for (unsigned int d = 0; d < n_components; ++d)
-          this->local_element(i * n_components + d) = tensor[d];
+        for (unsigned int d = 0; d < n_comp; ++d)
+          this->local_element(i * n_comp + d) = tensor[d];
       }
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2>
     DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_components, simd_length>::add_entry(
+    MultiComponentVector<Number, n_comp, simd_length>::add_entry(
         const Number2 &entry, const unsigned int i)
     {
-      static_assert(n_components == 1,
+      static_assert(n_comp == 1,
                     "Attempted to write a scalar value into a tensor-valued "
                     "matrix entry");
 
@@ -623,17 +839,17 @@ namespace ryujin
                        this->get_partitioner()->locally_owned_size() +
                            this->get_partitioner()->n_ghost_indices());
 
-      dealii::Tensor<1, n_components, Number2> tensor;
+      dealii::Tensor<1, n_comp, Number2> tensor;
       tensor[0] = entry;
 
       add_tensor<Number2>(tensor, i);
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int n_comp, int simd_length>
     template <typename Number2, typename Tensor>
     DEAL_II_ALWAYS_INLINE inline void
-    MultiComponentVector<Number, n_components, simd_length>::add_tensor(
+    MultiComponentVector<Number, n_comp, simd_length>::add_tensor(
         const Tensor &tensor, const unsigned int i)
     {
       static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -644,7 +860,7 @@ namespace ryujin
                            this->get_partitioner()->n_ghost_indices());
 
       /* Special case of a zero component vector */
-      if constexpr (n_components == 0)
+      if constexpr (n_comp == 0)
         return;
 
       if constexpr (std::is_same_v<VectorizedArray, Number2>) {
@@ -652,21 +868,100 @@ namespace ryujin
 
         std::array<unsigned int, VectorizedArray::size()> indices;
         for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-          indices[k] = k * n_components;
+          indices[k] = k * n_comp;
 
         dealii::vectorized_transpose_and_store(/*add into*/ true,
-                                               n_components,
+                                               n_comp,
                                                &tensor[0],
                                                indices.data(),
                                                this->begin() +
-                                                   i * n_components);
+                                                   i * n_comp);
 
       } else {
         /* Non-vectorized sequential access. */
 
-        for (unsigned int d = 0; d < n_components; ++d)
-          this->local_element(i * n_components + d) += tensor[d];
+        for (unsigned int d = 0; d < n_comp; ++d)
+          this->local_element(i * n_comp + d) += tensor[d];
       }
+    }
+
+#endif
+
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    void
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        zero_out_ghost_values() const
+      requires(writable)
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      Assert(multi_component_vector_
+                 ->template is_active_memory_space<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not active."));
+
+      multi_component_vector_
+          ->template zero_out_ghost_values_on_memory_space<MemorySpace>();
+    }
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    void
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        update_ghost_values() const
+      requires(writable)
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      Assert(multi_component_vector_
+                 ->template is_active_memory_space<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not active."));
+
+      multi_component_vector_
+          ->template update_ghost_values_on_memory_space<MemorySpace>();
+    }
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    void
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        compress(dealii::VectorOperation::values operation) const
+      requires(writable)
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      Assert(multi_component_vector_
+                 ->template is_active_memory_space<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not active."));
+
+      multi_component_vector_->template compress_on_memory_space<MemorySpace>(
+          operation);
     }
 
 #endif
