@@ -71,6 +71,10 @@ namespace ryujin
 
       MultiComponentVector() = default;
 
+      MultiComponentVector(const MultiComponentVector &other);
+
+      MultiComponentVector(MultiComponentVector &&other) noexcept;
+
       /**
        * Reinitializes the MultiComponentVector with a vector MPI partitioner
        * that was created first with create_vector_partitioner().
@@ -87,6 +91,12 @@ namespace ryujin
       void reinit_with_scalar_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &scalar_partitioner);
+
+      MultiComponentVector &
+      operator=(const MultiComponentVector &other);
+
+      MultiComponentVector &
+      operator=(MultiComponentVector &&other) noexcept;
 
       //@}
       /**
@@ -472,6 +482,93 @@ namespace ryujin
      */
 
 
+    template <typename Number, int n_comp, int simd_length>
+    MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
+        const MultiComponentVector &other)
+    {
+      *this = other;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
+        MultiComponentVector &&other) noexcept
+    {
+      *this = other;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    void MultiComponentVector<Number, n_comp, simd_length>::
+        reinit_with_vector_partitioner(
+            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+                &vector_partitioner)
+    {
+      /* Special case of a zero component vector */
+      if (n_comp == 0)
+        return;
+
+      host_vector_.reinit(vector_partitioner);
+
+      /* Reinitialize view to point to the correct vector data: */
+      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    void MultiComponentVector<Number, n_comp, simd_length>::
+        reinit_with_scalar_partitioner(
+            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+                &scalar_partitioner)
+    {
+      /* Special case of a zero component vector: */
+      if (n_comp == 0)
+        return;
+
+      /* Special case of a scalar vector: */
+      if (n_comp == 1)
+        host_vector_.reinit(scalar_partitioner);
+
+      auto vector_partitioner =
+          create_vector_partitioner(scalar_partitioner, n_comp);
+
+      host_vector_.reinit(vector_partitioner);
+
+      /* Reinitialize view to point to the correct vector data: */
+      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    auto MultiComponentVector<Number, n_comp, simd_length>::operator=(
+        const MultiComponentVector &other) -> MultiComponentVector &
+    {
+      host_vector_ = other.host_vector_;
+      default_vector_ = other.default_vector_;
+      host_space_active_ = other.host_space_active_;
+
+      /* Reinitialize view to point to the correct vector data: */
+      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+
+      return *this;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    auto MultiComponentVector<Number, n_comp, simd_length>::operator=(
+        MultiComponentVector &&other) noexcept -> MultiComponentVector &
+    {
+      host_vector_ = std::move(other.host_vector_);
+      default_vector_ = std::move(other.default_vector_);
+      host_space_active_ = other.host_space_active_;
+
+      /* Reinitialize view to point to the correct vector data: */
+      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+
+      return *this;
+    }
+
+
     template <typename Number,
               int n_comp,
               int simd_l,
@@ -522,54 +619,14 @@ namespace ryujin
       multi_component_vector_ = &multi_component_vector;
 
       if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        data_ = multi_component_vector_->data();
+        data_ = multi_component_vector_->host_vector_.begin();
       } else {
-        data_ = multi_component_vector_->data();
+        data_ = multi_component_vector_->default_vector_.begin();
       }
     }
 
 
 #if 0
-    /*
-     * -------------------------------------------------------------------------
-     * Inline function definitions
-     * -------------------------------------------------------------------------
-     */
-
-    template <typename Number, int n_comp, int simd_length>
-    void MultiComponentVector<Number, n_comp, simd_length>::
-        reinit_with_vector_partitioner(
-            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &vector_partitioner)
-    {
-      /* Special case of a zero component vector */
-      if (n_comp == 0)
-        return;
-
-      ScalarHostVector::reinit(vector_partitioner);
-    }
-
-    template <typename Number, int n_comp, int simd_length>
-    void MultiComponentVector<Number, n_comp, simd_length>::
-        reinit_with_scalar_partitioner(
-            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &scalar_partitioner)
-    {
-      /* Special case of a zero component vector: */
-      if (n_comp == 0)
-        return;
-
-      /* Special case of a scalar vector: */
-      if (n_comp == 1)
-        ScalarHostVector::reinit(scalar_partitioner);
-
-      auto vector_partitioner =
-          create_vector_partitioner(scalar_partitioner, n_comp);
-
-      ScalarHostVector::reinit(vector_partitioner);
-    }
-
-
     template <typename Number, int n_comp, int simd_length>
     template <typename Functor>
     void
