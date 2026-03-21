@@ -92,11 +92,9 @@ namespace ryujin
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &scalar_partitioner);
 
-      MultiComponentVector &
-      operator=(const MultiComponentVector &other);
+      MultiComponentVector &operator=(const MultiComponentVector &other);
 
-      MultiComponentVector &
-      operator=(MultiComponentVector &&other) noexcept;
+      MultiComponentVector &operator=(MultiComponentVector &&other) noexcept;
 
       //@}
       /**
@@ -465,8 +463,8 @@ namespace ryujin
        */
       //@{
 
-      MultiComponentVector<Number, n_comp, simd_length>
-          *multi_component_vector_;
+      using MCV = MultiComponentVector<Number, n_comp, simd_length>;
+      std::conditional_t<writable, MCV *, const MCV *> multi_component_vector_;
 
       Number *data_;
 
@@ -510,6 +508,11 @@ namespace ryujin
 
       host_vector_.reinit(vector_partitioner);
 
+      using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
+      using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
+      if (!std::is_same_v<KokkosHost, KokkosDefault>)
+        default_vector_.reinit(vector_partitioner);
+
       /* Reinitialize view to point to the correct vector data: */
       MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
@@ -533,6 +536,11 @@ namespace ryujin
           create_vector_partitioner(scalar_partitioner, n_comp);
 
       host_vector_.reinit(vector_partitioner);
+
+      using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
+      using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
+      if (!std::is_same_v<KokkosHost, KokkosDefault>)
+        default_vector_.reinit(vector_partitioner);
 
       /* Reinitialize view to point to the correct vector data: */
       MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
@@ -566,6 +574,141 @@ namespace ryujin
       MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
 
       return *this;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
+    MultiComponentVector<Number, n_comp, simd_length>::get_view()
+    {
+      Assert(is_active_memory_space<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not active."));
+
+      return MultiComponentVectorView<Number,
+                                      n_comp,
+                                      simd_length,
+                                      MemorySpace,
+                                      true>(*this);
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
+    MultiComponentVector<Number, n_comp, simd_length>::get_view() const
+    {
+      Assert(is_active_memory_space<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not active."));
+
+      return MultiComponentVectorView<Number,
+                                      n_comp,
+                                      simd_length,
+                                      MemorySpace,
+                                      false>(*this);
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    bool
+    MultiComponentVector<Number, n_comp, simd_length>::is_active_memory_space()
+        const
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected Kokkos memory space");
+
+      return host_space_active_ == std::is_same_v<MemorySpace, HostSpace>;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    void
+    MultiComponentVector<Number, n_comp, simd_length>::move_to_memory_space()
+    {
+      using HostSpace = dealii::MemorySpace::Host::kokkos_space;
+      using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected Kokkos memory space");
+
+      if (is_active_memory_space<MemorySpace>())
+        return;
+
+      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+        host_vector_.import_elements(default_vector_,
+                                     dealii::VectorOperation::insert);
+        host_space_active_ = true;
+
+      } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
+        default_vector_.import_elements(host_vector_,
+                                        dealii::VectorOperation::insert);
+        host_space_active_ = false;
+      }
+    }
+
+
+    template <typename Number, int n_components, int simd_length>
+    template <typename MemorySpace>
+    void MultiComponentVector<Number, n_components, simd_length>::
+        zero_out_ghost_values_on_memory_space()
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+        host_vector_.zero_out_ghost_values();
+      } else {
+        default_vector_.zero_out_ghost_values();
+      }
+    }
+
+
+    template <typename Number, int n_components, int simd_length>
+    template <typename MemorySpace>
+    void MultiComponentVector<Number, n_components, simd_length>::
+        update_ghost_values_on_memory_space()
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+        host_vector_.update_ghost_values();
+      } else {
+        default_vector_.update_ghost_values();
+      }
+    }
+
+
+    template <typename Number, int n_components, int simd_length>
+    template <typename MemorySpace>
+    void MultiComponentVector<Number, n_components, simd_length>::
+        compress_on_memory_space(dealii::VectorOperation::values operation)
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
+
+      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                        std::is_same_v<MemorySpace, DefaultSpace>,
+                    "Unexpected memory space");
+
+      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+        host_vector_.compress(operation);
+      } else {
+        default_vector_.compress(operation);
+      }
     }
 
 
