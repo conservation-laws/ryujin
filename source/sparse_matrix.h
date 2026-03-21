@@ -54,7 +54,7 @@ namespace ryujin
     /**
      * Default constructor.
      */
-    SparseMatrix();
+    SparseMatrix() = default;
 
     /**
      * Constructor taking a SIMD sparsity pattern as an argument.
@@ -152,7 +152,7 @@ namespace ryujin
     Kokkos::View<Number *, DefaultSpace> data_default_;
     Kokkos::View<Number *, DefaultSpace> exchange_buffer_default_;
 
-    bool host_space_active_;
+    bool host_space_active_ = true;
 
     std::vector<MPI_Request> requests_;
 
@@ -410,14 +410,6 @@ namespace ryujin
    * Inline function definitions
    * -------------------------------------------------------------------------
    */
-
-
-  template <typename Number, int n_components, int simd_length>
-  SparseMatrix<Number, n_components, simd_length>::SparseMatrix()
-      : sparsity_pattern_(nullptr)
-      , host_space_active_(true)
-  {
-  }
 
 
   template <typename Number, int n_components, int simd_length>
