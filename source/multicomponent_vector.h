@@ -293,8 +293,9 @@ namespace ryujin
        * Scaled addition of the given vector $U$ and the argument vector
        * $V$: $U\leftarrow s\,U+a\,V$.
        */
-      void
-      sadd(const Number s, const Number a, const MultiComponentVectorView &V)
+      void sadd(const Number s,
+                const Number a,
+                const MultiComponentVectorView &v) const
         requires writable;
 
       //@}
@@ -631,11 +632,11 @@ namespace ryujin
     void
     MultiComponentVector<Number, n_comp, simd_length>::move_to_memory_space()
     {
-      using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-      using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+      using HostSpace = dealii::MemorySpace::Host;
+      using DefaultSpace = dealii::MemorySpace::Default;
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
-                    "Unexpected Kokkos memory space");
+                    "Unexpected memory space");
 
       if (is_active_memory_space<MemorySpace>())
         return;
@@ -889,6 +890,26 @@ namespace ryujin
 
       for (unsigned int i = 0; i < local_size; ++i)
         data_[i * n_comp + component] = functor(scalar_vector[i]);
+    }
+
+
+    template <typename Num, int n_comp, int simd_l, typename MS, bool writable>
+    void MultiComponentVectorView<Num, n_comp, simd_l, MS, writable>::sadd(
+        const Num s, const Num a, const MultiComponentVectorView &v) const
+      requires writable
+    {
+      using HS = dealii::MemorySpace::Host;
+      using DS = dealii::MemorySpace::Default;
+      static_assert(std::is_same_v<MS, HS> || std::is_same_v<MS, DS>,
+                    "Unexpected memory space");
+
+      if constexpr (std::is_same_v<MS, HS>) {
+        const auto &other = v.multi_component_vector_->host_vector_;
+        multi_component_vector_->host_vector_.sadd(s, a, other);
+      } else if constexpr (std::is_same_v<MS, DS>) {
+        const auto &other = v.multi_component_vector_->default_vector_;
+        multi_component_vector_->default_vector_.sadd(s, a, other);
+      }
     }
 
 
