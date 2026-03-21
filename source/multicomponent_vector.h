@@ -485,6 +485,7 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
         const MultiComponentVector &other)
+        : MultiComponentVectorView<Number, n_comp, simd_length>()
     {
       *this = other;
     }
@@ -493,6 +494,7 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
         MultiComponentVector &&other) noexcept
+        : MultiComponentVectorView<Number, n_comp, simd_length>()
     {
       *this = other;
     }
