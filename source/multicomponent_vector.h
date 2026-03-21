@@ -276,7 +276,7 @@ namespace ryujin
       template <typename Functor = std::identity>
       void insert_component(const ScalarVector &scalar_vector,
                             unsigned int component,
-                            const Functor &functor = std::identity{})
+                            const Functor &functor = std::identity{}) const
         requires writable;
 
       /**
@@ -286,7 +286,7 @@ namespace ryujin
       template <typename Functor = std::identity>
       void insert_component(const dealii::Vector<Number> &scalar_vector,
                             unsigned int component,
-                            const Functor &functor = std::identity{})
+                            const Functor &functor = std::identity{}) const
         requires writable;
 
       /**
@@ -782,83 +782,114 @@ namespace ryujin
     }
 
 
-#if 0
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Functor>
-    void
-    MultiComponentVector<Number, n_comp, simd_length>::extract_component(
-        ScalarHostVector &scalar_vector,
-        unsigned int component,
-        const Functor &functor) const
+    void MultiComponentVectorView<
+        Number,
+        n_comp,
+        simd_length,
+        MemorySpace,
+        writable>::extract_component(ScalarVector &scalar_vector,
+                                     unsigned int component,
+                                     const Functor &functor) const
     {
+      using HostSpace = dealii::MemorySpace::Host;
+      AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
+                  dealii::ExcNotImplemented());
+
       Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot extract from a vector with zero components."));
       AssertIndexRange(component, n_comp);
 
-      Assert(n_comp *
-                     scalar_vector.get_partitioner()->locally_owned_size() ==
-                 this->get_partitioner()->locally_owned_size(),
-             dealii::ExcMessage("Called with a scalar_vector argument that has "
-                                "incompatible local range."));
       const auto local_size =
           scalar_vector.get_partitioner()->locally_owned_size();
+
+      Assert(n_comp * local_size == n_locally_owned_,
+             dealii::ExcMessage("Called with a scalar_vector argument that has "
+                                "incompatible local range."));
+
       for (unsigned int i = 0; i < local_size; ++i)
-        scalar_vector.local_element(i) =
-            functor(this->local_element(i * n_comp + component));
+        scalar_vector.local_element(i) = functor(data_[i * n_comp + component]);
       scalar_vector.update_ghost_values();
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Functor>
-    void
-    MultiComponentVector<Number, n_comp, simd_length>::insert_component(
-        const ScalarHostVector &scalar_vector,
-        unsigned int component,
-        const Functor &functor)
+    void MultiComponentVectorView<
+        Number,
+        n_comp,
+        simd_length,
+        MemorySpace,
+        writable>::insert_component(const ScalarVector &scalar_vector,
+                                    unsigned int component,
+                                    const Functor &functor) const
+      requires writable
     {
+      using HostSpace = dealii::MemorySpace::Host;
+      AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
+                  dealii::ExcNotImplemented());
+
       Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot insert into a vector with zero components."));
       AssertIndexRange(component, n_comp);
 
-      Assert(n_comp *
-                     scalar_vector.get_partitioner()->locally_owned_size() ==
-                 this->get_partitioner()->locally_owned_size(),
-             dealii::ExcMessage("Called with a scalar_vector argument that has "
-                                "incompatible local range."));
       const auto local_size =
           scalar_vector.get_partitioner()->locally_owned_size();
+
+      Assert(n_comp * local_size == n_locally_owned_,
+             dealii::ExcMessage("Called with a scalar_vector argument that has "
+                                "incompatible local range."));
+
       for (unsigned int i = 0; i < local_size; ++i)
-        this->local_element(i * n_comp + component) =
-            functor(scalar_vector.local_element(i));
+        data_[i * n_comp + component] = functor(scalar_vector.local_element(i));
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number,
+              int n_comp,
+              int simd_length,
+              typename MemorySpace,
+              bool writable>
     template <typename Functor>
-    void
-    MultiComponentVector<Number, n_comp, simd_length>::insert_component(
-        const dealii::Vector<Number> &scalar_vector,
-        unsigned int component,
-        const Functor &functor)
+    void MultiComponentVectorView<
+        Number,
+        n_comp,
+        simd_length,
+        MemorySpace,
+        writable>::insert_component(const dealii::Vector<Number> &scalar_vector,
+                                    unsigned int component,
+                                    const Functor &functor) const
+      requires writable
     {
+      using HostSpace = dealii::MemorySpace::Host;
+      AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
+                  dealii::ExcInternalError());
+
       Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot insert into a vector with zero components."));
       AssertIndexRange(component, n_comp);
 
-      Assert(n_comp * scalar_vector.size() >=
-                 this->get_partitioner()->locally_owned_size(),
+      const auto local_size = scalar_vector.size();
+
+      Assert(n_comp * local_size >= n_locally_owned_,
              dealii::ExcMessage("Called with a scalar_vector argument that has "
                                 "incompatible local range."));
-      const auto local_size = scalar_vector.size();
+
       for (unsigned int i = 0; i < local_size; ++i)
-        this->local_element(i * n_comp + component) =
-            functor(scalar_vector[i]);
+        data_[i * n_comp + component] = functor(scalar_vector[i]);
     }
-#endif
 
 
     template <typename Number,
