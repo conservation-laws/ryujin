@@ -172,6 +172,14 @@ namespace ryujin
                                                  dealii::MemorySpace::Host>
           host_vector_;
 
+      /*
+       * We avoid setting up the default_vector_ if default and host happen
+       * to be the same memory space.
+       */
+      static constexpr bool have_separate_memory_spaces =
+          !std::is_same_v<dealii::MemorySpace::Host::kokkos_space,
+                          dealii::MemorySpace::Default::kokkos_space>;
+
       dealii::LinearAlgebra::distributed::Vector<Number,
                                                  dealii::MemorySpace::Default>
           default_vector_;
@@ -511,10 +519,7 @@ namespace ryujin
         return;
 
       host_vector_.reinit(vector_partitioner);
-
-      using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-      using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
-      if (!std::is_same_v<KokkosHost, KokkosDefault>)
+      if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(vector_partitioner);
 
       /* Reinitialize view to point to the correct vector data: */
@@ -540,10 +545,7 @@ namespace ryujin
           create_vector_partitioner(scalar_partitioner, n_comp);
 
       host_vector_.reinit(vector_partitioner);
-
-      using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-      using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
-      if (!std::is_same_v<KokkosHost, KokkosDefault>)
+      if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(vector_partitioner);
 
       /* Reinitialize view to point to the correct vector data: */
@@ -556,7 +558,8 @@ namespace ryujin
         const MultiComponentVector &other) -> MultiComponentVector &
     {
       host_vector_ = other.host_vector_;
-      default_vector_ = other.default_vector_;
+      if constexpr (have_separate_memory_spaces)
+        default_vector_ = other.default_vector_;
       host_space_active_ = other.host_space_active_;
 
       /* Reinitialize view to point to the correct vector data: */
@@ -571,7 +574,8 @@ namespace ryujin
         MultiComponentVector &&other) noexcept -> MultiComponentVector &
     {
       host_vector_ = std::move(other.host_vector_);
-      default_vector_ = std::move(other.default_vector_);
+      if constexpr (have_separate_memory_spaces)
+        default_vector_ = std::move(other.default_vector_);
       host_space_active_ = other.host_space_active_;
 
       /* Reinitialize view to point to the correct vector data: */
@@ -623,7 +627,7 @@ namespace ryujin
       using DefaultSpace = dealii::MemorySpace::Default;
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
-                    "Unexpected Kokkos memory space");
+                    "Unexpected memory space");
 
       return host_space_active_ == std::is_same_v<MemorySpace, HostSpace>;
     }
@@ -644,13 +648,15 @@ namespace ryujin
         return;
 
       if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        host_vector_.import_elements(default_vector_,
-                                     dealii::VectorOperation::insert);
+        if constexpr (have_separate_memory_spaces)
+          host_vector_.import_elements(default_vector_,
+                                       dealii::VectorOperation::insert);
         host_space_active_ = true;
 
       } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
-        default_vector_.import_elements(host_vector_,
-                                        dealii::VectorOperation::insert);
+        if constexpr (have_separate_memory_spaces)
+          default_vector_.import_elements(host_vector_,
+                                          dealii::VectorOperation::insert);
         host_space_active_ = false;
       }
     }
@@ -663,15 +669,15 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
-      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        host_vector_.zero_out_ghost_values();
-      } else {
+      if constexpr (have_separate_memory_spaces &&
+                    !std::is_same_v<MemorySpace, HostSpace>) {
         default_vector_.zero_out_ghost_values();
+      } else {
+        host_vector_.zero_out_ghost_values();
       }
     }
 
@@ -683,15 +689,15 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
-      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        host_vector_.update_ghost_values();
-      } else {
+      if constexpr (have_separate_memory_spaces &&
+                    !std::is_same_v<MemorySpace, HostSpace>) {
         default_vector_.update_ghost_values();
+      } else {
+        host_vector_.update_ghost_values();
       }
     }
 
@@ -703,15 +709,15 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
-      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        host_vector_.compress(operation);
-      } else {
+      if constexpr (have_separate_memory_spaces &&
+                    !std::is_same_v<MemorySpace, HostSpace>) {
         default_vector_.compress(operation);
+      } else {
+        host_vector_.compress(operation);
       }
     }
 
@@ -758,15 +764,19 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
       multi_component_vector_ = &multi_component_vector;
 
-      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        auto &vector = multi_component_vector_->host_vector_;
+      constexpr bool have_separate_memory_spaces =
+          ::ryujin::Vectors::MultiComponentVector<Number, n_comp, simd_l>::
+              have_separate_memory_spaces;
+
+      if constexpr (have_separate_memory_spaces &&
+                    !std::is_same_v<MemorySpace, HostSpace>) {
+        auto &vector = multi_component_vector_->default_vector_;
         const auto &partitioner = vector.get_partitioner();
 
         data_ = vector.begin();
@@ -774,8 +784,7 @@ namespace ryujin
         n_locally_relevant_ = n_locally_owned_ + partitioner->n_ghost_indices();
 
       } else {
-
-        auto &vector = multi_component_vector_->default_vector_;
+        auto &vector = multi_component_vector_->host_vector_;
         const auto &partitioner = vector.get_partitioner();
 
         data_ = vector.begin();
@@ -1216,7 +1225,6 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
@@ -1242,7 +1250,6 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
@@ -1268,7 +1275,6 @@ namespace ryujin
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
-
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
