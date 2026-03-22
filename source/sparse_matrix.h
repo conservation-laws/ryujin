@@ -507,17 +507,24 @@ namespace ryujin
     if (is_active_memory_space<MemorySpace>())
       return;
 
+    /* No copy required if default and host are the same memory spaces: */
+    constexpr bool move_required =
+        !std::is_same_v<HostSpace::kokkos_space, DefaultSpace::kokkos_space>;
+
     if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
       host_space_active_ = true;
-      Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
-      Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
-                        /*src*/ exchange_buffer_default_);
-
+      if constexpr (move_required) {
+        Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
+        Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
+                          /*src*/ exchange_buffer_default_);
+      }
     } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
       host_space_active_ = false;
-      Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
-      Kokkos::deep_copy(/*dst*/ exchange_buffer_default_,
-                        /*src*/ exchange_buffer_host_);
+      if constexpr (move_required) {
+        Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
+        Kokkos::deep_copy(/*dst*/ exchange_buffer_default_,
+                          /*src*/ exchange_buffer_host_);
+      }
     }
   }
 
