@@ -15,8 +15,7 @@
 
 namespace ryujin
 {
-  template <int simd_length,
-            typename MemorySpace = dealii::MemorySpace::Host::kokkos_space>
+  template <int simd_length, typename MemorySpace = dealii::MemorySpace::Host>
   class SparsityPatternView;
 
 
@@ -132,15 +131,15 @@ namespace ryujin
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    Kokkos::View<unsigned int *, HostSpace> row_starts_host_;
-    Kokkos::View<unsigned int *, HostSpace> column_indices_host_;
-    Kokkos::View<unsigned int *, HostSpace> indices_transposed_host_;
+    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
+    Kokkos::View<unsigned int *, KokkosHost> row_starts_host_;
+    Kokkos::View<unsigned int *, KokkosHost> column_indices_host_;
+    Kokkos::View<unsigned int *, KokkosHost> indices_transposed_host_;
 
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
-    Kokkos::View<unsigned int *, DefaultSpace> row_starts_default_;
-    Kokkos::View<unsigned int *, DefaultSpace> column_indices_default_;
-    Kokkos::View<unsigned int *, DefaultSpace> indices_transposed_default_;
+    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
+    Kokkos::View<unsigned int *, KokkosDefault> row_starts_default_;
+    Kokkos::View<unsigned int *, KokkosDefault> column_indices_default_;
+    Kokkos::View<unsigned int *, KokkosDefault> indices_transposed_default_;
 
     std::vector<std::pair<unsigned int, unsigned int>> entries_to_be_sent_;
     std::vector<std::pair<unsigned int, unsigned int>> send_targets_;
@@ -327,9 +326,10 @@ namespace ryujin
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 
-    Kokkos::View<const unsigned int *, MemorySpace> row_starts_;
-    Kokkos::View<const unsigned int *, MemorySpace> column_indices_;
-    Kokkos::View<const unsigned int *, MemorySpace> indices_transposed_;
+    using KokkosSpace = typename MemorySpace::kokkos_space;
+    Kokkos::View<const unsigned int *, KokkosSpace> row_starts_;
+    Kokkos::View<const unsigned int *, KokkosSpace> column_indices_;
+    Kokkos::View<const unsigned int *, KokkosSpace> indices_transposed_;
     //@}
   };
 
@@ -366,12 +366,12 @@ namespace ryujin
     n_internal_dofs_ = sparsity_pattern.n_internal_dofs_;
     n_locally_owned_dofs_ = sparsity_pattern.n_locally_owned_dofs_;
 
-    using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-    using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
 
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected Kokkos memory space");
+                  "Unexpected memory space");
 
     if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
       row_starts_ = sparsity_pattern.row_starts_host_;

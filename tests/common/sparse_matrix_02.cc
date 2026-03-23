@@ -36,8 +36,8 @@ int main(int argc, char *argv[])
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);
 
-  using HostSpace = dealii::MemorySpace::Host::kokkos_space;
-  using DefaultSpace = dealii::MemorySpace::Default::kokkos_space;
+  using HostSpace = dealii::MemorySpace::Host;
+  using DefaultSpace = dealii::MemorySpace::Default;
 
   const auto print_status = [&]() {
     std::cout << "HostSpace active == "
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
   print_status();
 
   const auto &view = sparse_matrix.template get_view<DefaultSpace>();
-  using ExecutionSpace = DefaultSpace::execution_space;
+  using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
   const auto exec = ExecutionSpace{};
   Kokkos::parallel_for("test",
                        Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
