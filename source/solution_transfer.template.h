@@ -727,7 +727,7 @@ namespace ryujin
 
     update_new_state_vector();
 
-    const auto &precomputed = std::get<1>(new_state_vector);
+    auto &precomputed = std::get<1>(new_state_vector);
 
     /* The limiter requires valid precomputed values. Therefore, update: */
     const auto update_precomputed_values = [&]() {
