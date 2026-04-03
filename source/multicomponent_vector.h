@@ -445,7 +445,7 @@ namespace ryujin
       //@{
 
       /**
-       * MPI synchronization: Zero out all ghost rows.
+       * MPI synchronization: Zero out all ghost values stored in the vector.
        */
       void zero_out_ghost_values() const
         requires(writable);
