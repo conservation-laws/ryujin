@@ -196,7 +196,7 @@ Contact
 
 For questions either open an
 [issue](https://github.com/conservation-laws/ryujin/issues), or contact
-Matthias Maier (maier@tamu.edu).
+Matthias Maier (tamiko@43-1.org).
 
 Developers
 ----------
