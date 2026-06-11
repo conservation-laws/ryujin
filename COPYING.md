@@ -37,7 +37,7 @@ Contact
 -------
 
 For questions regarding licensing and commercial use please contact
-Matthias Maier <maier@tamu.edu>.
+Matthias Maier <tamiko@43-1.org>.
 
 
 Full license texts
