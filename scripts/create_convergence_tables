@@ -21,10 +21,11 @@ initial refinement 3 up to 7
 Runs the ./ryujin executable via mpirun
 """
 
-import os, sys
+import os, sys, subprocess
 import numpy as np
 from tabulate import tabulate
 import argparse, textwrap, re, time
+from datetime import datetime
 
 #
 # Command line arguments:
@@ -82,7 +83,25 @@ final_refinement = args.final
 script_name = sys.argv[0] # The script name is at index 0
 arguments = sys.argv[1:]  # The actual arguments are from index 1 onwards
 arguments_string = " ".join(arguments)
-script_args = f"\nScript: {script_name}\nArguments: {arguments_string}\n"
+
+git_hash = subprocess.run(
+    ["git", "rev-parse", "--short", "HEAD"],
+    capture_output=True, text=True
+).stdout.strip() or "unknown"
+
+git_branch = subprocess.run(
+    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+    capture_output=True, text=True
+).stdout.strip() or "unknown"
+
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+script_args = (
+    f"\nDate: {timestamp}"
+    f"\nGit:  {git_hash} ({git_branch})"
+    f"\nScript: {script_name}"
+    f"\nArguments: {arguments_string}\n"
+)
 
 
 def main():
@@ -221,7 +240,7 @@ def compute_rates():
     )
 
     # Output table to console
-    print(" ")
+    print(script_args)
     print(text_table)
 
     # Output table to txt file
