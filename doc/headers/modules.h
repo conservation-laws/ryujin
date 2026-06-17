@@ -86,6 +86,14 @@
 
 
 /**
+ * @defgroup MultiSpeciesEulerEquations The Multi-Species Euler Equations
+ *
+ * This module contains classes and functions related to solving the
+ * multi-species compressible Euler equations with ideal gas mixtures.
+ */
+
+
+/**
  * @defgroup SkeletonEquations Minimal equation interface
  *
  * This module contains the minimal necessary interface for defining a
