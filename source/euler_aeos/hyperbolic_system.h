@@ -248,6 +248,46 @@ namespace ryujin
       }
 
       /**
+       * For a given density \f$\rho\f$ and <i>specific</i> internal
+       * energy \f$e\f$ return the specific entropy \f$s\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      eos_specific_entropy(const Number &rho, const Number &e) const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(eos->specific_entropy(rho, e));
+        } else {
+          Number p;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            p[k] = ScalarNumber(eos->specific_entropy(rho[k], e[k]));
+          }
+          return p;
+        }
+      }
+
+      /**
+       * For a given density \f$\rho\f$ return the cold curve bound \f$e\ge
+       * e_{s_0}(\rho)\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      eos_cold_curve_bound(const Number &rho) const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(eos->cold_curve_bound(rho));
+        } else {
+          Number p;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            p[k] = ScalarNumber(eos->cold_curve_bound(rho[k]));
+          }
+          return p;
+        }
+      }
+
+      /**
        * For a given density \f$\rho\f$ and specific internal energy \f$e\f$
        * return the temperature \f$T\f$.
        */
@@ -290,10 +330,10 @@ namespace ryujin
       /**
        * Return the interpolatory covolume \f$b_{\text{interp}}\f$.
        */
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_b() const
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_covolume_constant() const
       {
         const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-        return ScalarNumber(eos->interpolation_b());
+        return ScalarNumber(eos->covolume_constant());
       }
 
       /**
@@ -322,7 +362,7 @@ namespace ryujin
       //@{
 
       static constexpr bool have_gamma = false;
-      static constexpr bool have_eos_interpolation_b = true;
+      static constexpr bool have_covolume_constant = true;
       static constexpr bool have_energy_equation = true;
 
       //@}
@@ -1031,7 +1071,7 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_specific_entropy(
         const state_type &U, const Number &gamma_min) const
     {
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1051,7 +1091,7 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_harten_entropy(
         const state_type &U, const Number &gamma_min) const
     {
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1093,7 +1133,7 @@ namespace ryujin
        *          factor * shift * (gamma - 1) * b * [1, 0, 0]^T
        *
        */
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1134,7 +1174,7 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_gamma(const state_type &U,
                                                        const Number &p) const
     {
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1153,7 +1193,7 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_pressure(
         const state_type &U, const Number &gamma) const
     {
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1172,7 +1212,7 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_speed_of_sound(
         const state_type &U, const Number &gamma) const
     {
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1191,7 +1231,7 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline bool
     HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
     {
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 
@@ -1233,7 +1273,7 @@ namespace ryujin
       static_assert(component == 1 || component == 2,
                     "component has to be 1 or 2");
 
-      const auto b = Number(eos_interpolation_b());
+      const auto b = Number(eos_covolume_constant());
       const auto pinf = Number(eos_interpolation_pinfty());
       const auto q = Number(eos_interpolation_q());
 

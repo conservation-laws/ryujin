@@ -38,20 +38,19 @@ namespace ryujin
           , name_(name)
       {
         /*
-         * If necessary derived EOS can override the covolume b that is
-         * used in the interpolatory NASG eos.
+         * Derived EOS can override the covolume constant b.
          */
-        interpolation_b_ = 0.;
+        covolume_constant_ = 0.;
 
         /*
-         * If necessary derived EOS can override the reference pressure
-         * that is used in the interpolatory NASG eos.
+         * Derived EOS can override the reference pressure that is used in
+         * the interpolatory NASG approach.
          */
         interpolation_pinfty_ = 0.;
 
         /*
-         * If necessary derived EOS can override the reference specific
-         * internal energy q that is used in the interpolatory NASG eos.
+         * Derived EOS can override the reference specific internal energy
+         * q that is used in the interpolatory NASG approach.
          */
         interpolation_q_ = 0.;
       }
@@ -59,31 +58,79 @@ namespace ryujin
       /**
        * Return the pressure given density @p rho and specific internal
        * energy @p e.
+       *
+       * @note This function is implemented for every equation of state.
        */
       virtual double pressure(double rho, double e) const = 0;
 
       /**
        * Return the specific internal energy @p e for a given density @p
        * rho and pressure @p p.
+       *
+       * @note This function is implemented for every equation of state.
        */
       virtual double specific_internal_energy(double rho, double p) const = 0;
 
       /**
+       * Return the specific entropy @p s for a given density @p rho and
+       * specific internal energy @p e.
+       *
+       * @note This function might not be implemented for a given equation
+       * of state.
+       */
+      virtual double specific_entropy(double /*rho*/, double /*e*/) const
+      {
+        AssertThrow(false, dealii::ExcNotImplemented());
+        __builtin_trap();
+        return 0;
+      }
+
+      /**
+       * Return the cold curve bound \f$e\ge e_{s_0}(\rho)\f$ that defines
+       * the admissible set.
+       *
+       * @note This function might not be implemented for a given equation
+       * of state.
+       */
+      virtual double cold_curve_bound(double /*rho*/) const
+      {
+        AssertThrow(false, dealii::ExcNotImplemented());
+        __builtin_trap();
+        return 0;
+      }
+
+      /**
        * Return the temperature @p T for a given density @p
        * rho and specific internal energy @p e.
+       *
+       * @note This function might not be implemented for a given equation
+       * of state.
        */
-      virtual double temperature(double rho, double e) const = 0;
+      virtual double temperature(double /*rho*/, double /*e*/) const
+      {
+        AssertThrow(false, dealii::ExcNotImplemented());
+        __builtin_trap();
+        return 0;
+      }
 
       /**
        * Return the sound speed @p c for a given density @p rho and
-       * specific internal energy  @p e.
+       * specific internal energy @p e.
+       *
+       * @note This function might not be implemented for a given equation
+       * of state.
        */
-      virtual double speed_of_sound(double rho, double e) const = 0;
+      virtual double speed_of_sound(double /*rho*/, double /*e*/) const
+      {
+        AssertThrow(false, dealii::ExcNotImplemented());
+        __builtin_trap();
+        return 0;
+      }
 
       /**
-       * Return the interpolation covolume constant (b).
+       * Return the covolume constant b.
        */
-      ACCESSOR_READ_ONLY(interpolation_b)
+      ACCESSOR_READ_ONLY(covolume_constant)
 
       /**
        * Return the interpolation reference pressure (pinfty).
@@ -101,7 +148,8 @@ namespace ryujin
       ACCESSOR_READ_ONLY(name)
 
     protected:
-      double interpolation_b_;
+      double covolume_constant_;
+
       double interpolation_pinfty_;
       double interpolation_q_;
 

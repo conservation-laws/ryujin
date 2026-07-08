@@ -60,10 +60,9 @@ namespace ryujin
             "density, rho, and specific internal energy, e: s(rho, e)");
 
         add_parameter(
-            "interpolatory covolume b",
-            this->interpolation_b_,
-            "The interpolatory maximum compressibility constant b used when "
-            "constructing the interpolatory equation of state");
+            "covolume constant",
+            this->covolume_constant_,
+            "The maximum compressibility constant b for the equation of state");
 
         add_parameter("interpolatory reference pressure",
                       this->interpolation_pinfty_,

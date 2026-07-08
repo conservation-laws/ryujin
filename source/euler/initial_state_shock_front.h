@@ -69,8 +69,8 @@ namespace ryujin
           /* Compute post-shock state and S3: */
 
           auto b = Number(0.);
-          if constexpr (View::have_eos_interpolation_b)
-            b = view.eos_interpolation_b();
+          if constexpr (View::have_covolume_constant)
+            b = view.eos_covolume_constant();
 
           const auto &rho_R = primitive_right_[0];
           const auto &u_R = primitive_right_[1];

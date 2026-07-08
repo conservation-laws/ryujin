@@ -333,9 +333,9 @@ namespace ryujin
        */
 
       const auto numerator = (gamma_min + Number(1.)) * rho_max;
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto covolume_b = view.eos_covolume_constant();
       const auto denominator =
-          gamma_min - Number(1.) + ScalarNumber(2.) * interpolation_b * rho_max;
+          gamma_min - Number(1.) + ScalarNumber(2.) * covolume_b * rho_max;
       const auto rho_compressibility_bound = numerator / denominator;
 
       rho_max_relaxed = std::min(rho_compressibility_bound, rho_max_relaxed);

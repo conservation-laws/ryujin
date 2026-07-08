@@ -273,7 +273,7 @@ namespace ryujin
       //@{
 
       static constexpr bool have_gamma = false;
-      static constexpr bool have_eos_interpolation_b = false;
+      static constexpr bool have_covolume_constant = false;
       static constexpr bool have_energy_equation = false;
 
       //@}

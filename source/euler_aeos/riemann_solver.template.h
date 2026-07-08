@@ -85,10 +85,10 @@ namespace ryujin
         const Number &rho, const Number &gamma, const Number &a) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto covolume_b = view.eos_covolume_constant();
 
       const Number numerator =
-          ScalarNumber(2.) * a * (Number(1.) - interpolation_b * rho);
+          ScalarNumber(2.) * a * (Number(1.) - covolume_b * rho);
 
       const Number denominator = gamma - Number(1.);
 
@@ -273,7 +273,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
@@ -288,14 +288,14 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j) + pinf;
 
       const Number radicand_i = safe_division(
-          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_i) * p_max,
+          ScalarNumber(2.) * (Number(1.) - covolume_b * rho_i) * p_max,
           rho_i * ((gamma_i + Number(1.)) * p_max +
                    (gamma_i - Number(1.)) * (p_i + pinf)));
 
       const Number x_i = std::sqrt(radicand_i);
 
       const Number radicand_j = safe_division(
-          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_j) * p_max,
+          ScalarNumber(2.) * (Number(1.) - covolume_b * rho_j) * p_max,
           rho_j * ((gamma_j + Number(1.)) * p_max +
                    (gamma_j - Number(1.)) * (p_j + pinf)));
 
@@ -418,12 +418,12 @@ namespace ryujin
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
 
       const auto view = hyperbolic_system.view<dim, Number>();
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
-      const Number one_minus_b_rho = Number(1.) - interpolation_b * rho;
+      const Number one_minus_b_rho = Number(1.) - covolume_b * rho;
       const Number gamma_minus_one = gamma - Number(1.);
 
       const Number Az =
@@ -471,7 +471,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
@@ -481,7 +481,7 @@ namespace ryujin
 
       const Number radicand_inverse_i =
           safe_division(ScalarNumber(0.5) * rho_i,
-                        Number(1.) - interpolation_b * rho_i) *
+                        Number(1.) - covolume_b * rho_i) *
           ((gamma_i + Number(1.)) * p_max +
            (gamma_i - Number(1.)) * (p_i + pinf));
 
@@ -490,7 +490,7 @@ namespace ryujin
 
       const Number radicand_inverse_j =
           safe_division(ScalarNumber(0.5) * rho_j,
-                        Number(1.) - interpolation_b * rho_j) *
+                        Number(1.) - covolume_b * rho_j) *
           ((gamma_j + Number(1.)) * p_max +
            (gamma_j - Number(1.)) * (p_j + pinf));
 
@@ -570,9 +570,9 @@ namespace ryujin
 
       const auto gamma = view.surrogate_gamma(U, p);
 
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
-      const auto x = Number(1.) - interpolation_b * rho;
+      const auto x = Number(1.) - covolume_b * rho;
       const auto a = std::sqrt(gamma * (p + pinf) / (rho * x));
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
