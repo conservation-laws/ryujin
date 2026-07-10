@@ -50,9 +50,12 @@ namespace ryujin
 
         cv_ = R_ / (gamma_ - 1.);
 
-        /* Update the EOS interpolation parameters on parameter read in: */
+        /* Update the EOS interpolation parameters on parameter read in
+         * and the specific heat at constant volume:
+         */
         ParameterAcceptor::parse_parameters_call_back.connect([this] {
           this->covolume_constant_ = b_;
+          cv_ = R_ / (gamma_ - 1.);
           /*
            * FIXME: The van der Waals EOS allows for negative pressures. We
            * should thus come up with a sensible way of setting
@@ -99,6 +102,30 @@ namespace ryujin
       double temperature(double rho, double e) const final
       {
         return (e + a_ * rho) / cv_;
+      }
+
+      /**
+       * The cold curve bound is given by
+       * \f{align}
+       *   e_cold  = - a \rho
+       * \f}
+       */
+      double cold_curve_bound(double rho) const final
+      {
+        return -a_ * rho;
+      }
+
+      /**
+       * The specific_entropy is given by
+       * \f{align}
+       *   s = cv \ln( (e + a \rho) / cv) + R \ln( 1 / \rho - b)
+       * \f}
+       */
+      double specific_entropy(double rho, double e) const final
+      {
+        const auto first_term = cv_ * std::log((e + a_ * rho) / cv_);
+        const auto second_term = R_ * std::log(1. / rho - b_);
+        return first_term + second_term;
       }
 
       /**
