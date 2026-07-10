@@ -56,11 +56,19 @@ namespace ryujin
         this->add_parameter(
             "reference pressure", pinf_, "The reference pressure p infinity");
 
-        /* Update the EOS interpolation parameters on parameter read in: */
+        s0_ = 0.;
+        this->add_parameter("reference specific entropy",
+                            s0_,
+                            "The reference specific entropy");
+
+        /* Update the EOS interpolation parameters on parameter read in
+         * and specific heat at constant volume:
+         */
         ParameterAcceptor::parse_parameters_call_back.connect([this] {
           this->covolume_constant_ = b_;
           this->interpolation_pinfty_ = pinf_;
           this->interpolation_q_ = q_;
+          cv_ = R_ / (gamma_ - 1.);
         });
       }
 
@@ -102,6 +110,39 @@ namespace ryujin
       }
 
       /**
+       * The cold curve bound is given by
+       * \f{align}
+       *   e_cold = q + p_\infty ( 1 / \rho - b)
+       * \f}
+       */
+      double cold_curve_bound(double rho) const final
+      {
+        return q_ + pinf_ * (1. / rho - b_);
+      }
+
+      /**
+       * The specific entropy is given by
+       * \f{align}
+       *   p + p_\infty =
+       *   (gamma_ - 1)(((e - q) - p_infty (1 / rho - b)) / (1 / rho - b)
+       * \f}
+       * \f{align}
+       *   s = cv \ln(p + p_\infty) -
+       *   cv_ gamma_ \ln(\frac{(gamma - 1) cv}{1 / \rho - b}) +  s0
+       * \f}
+       */
+      double specific_entropy(double rho, double e) const final
+      {
+        const auto covolume_term = 1. / rho - b_;
+        const auto p_plus_pinf =
+            (gamma_ - 1.) * ((e - q_) - pinf_ * covolume_term) / covolume_term;
+        const auto first_term = cv_ * std::log(p_plus_pinf);
+        const auto second_term =
+            cv_ * gamma_ * std::log((gamma_ - 1) * cv_ / covolume_term);
+        return first_term - second_term + s0_;
+      }
+
+      /**
        * Let \f$X = (1 - b \rho)\f$. The speed of sound is given by
        * \f{align}
        *   c^2 = \frac{\gamma (p + p_\infty)}{\rho X}
@@ -124,6 +165,7 @@ namespace ryujin
       double b_;
       double q_;
       double pinf_;
+      double s0_;
     };
   } // namespace EquationOfStateLibrary
 } /* namespace ryujin */
