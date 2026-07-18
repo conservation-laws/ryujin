@@ -53,15 +53,19 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos,
 
     const auto p = eos.pressure(rho, e);
     const auto e_back = eos.specific_internal_energy(rho, p);
-    const auto c = eos.speed_of_sound(rho, e);
+    const auto s = eos.specific_entropy(rho, e);
+    const auto e_min = eos.cold_curve_bound(rho);
     const auto T = eos.temperature(rho, e);
+    const auto c = eos.speed_of_sound(rho, e);
 
     std::cout << "input rho      = " << rho << std::endl    //
               << "input e        = " << e << std::endl      //
               << "output p       = " << p << std::endl      //
               << "check e_back   = " << e_back << std::endl //
-              << "check c        = " << c << std::endl      //
-              << "check T        = " << T << std::endl;
+              << "check s        = " << s << std::endl      //
+              << "check e_min    = " << e_min << std::endl  //
+              << "check T        = " << T << std::endl      //
+              << "check c        = " << c << std::endl;     //
   }
 
   {
