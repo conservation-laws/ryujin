@@ -125,7 +125,7 @@ jobs:
         mkdir build-release
         cd build-release
         cmake \
-          -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument -Wno-pass-failed" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
           -DBUG_COLLECT_PERIODIC_FACES_INSTANTIATION=yes \
           -DWITH_OPENMP=on ..
