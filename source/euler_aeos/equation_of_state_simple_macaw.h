@@ -112,7 +112,7 @@ namespace ryujin
        * Let \f$e_cold = A v_0 ((v / v0)^{-B} + B(v / v0) - (B + 1)\f$, and let
        * \f$\delta_e = e - e_cold\f$. The temperature is given by
        * \f{align}
-       *   c = (\delta_e +
+       *   T = (\delta_e +
        *        \sqrt(\delta_e(\delta_e + 4 cvInf T_0 (v / v0)^{-Gamma_c})) /
        *        (2 cvInf)
        * \f}
@@ -153,7 +153,7 @@ namespace ryujin
        * Let \f$\tau = T * (v / v0)^{\Gamma_c} / T0\f$. The specific entropy is
        * given by
        * \f{align}
-       *   s = cvInf ((\tau / (1 + \tau) + \ln(1 + \tau)
+       *   s = cvInf (\tau / (1 + \tau) + \ln(1 + \tau))
        * \f}
        */
       double specific_entropy(double rho, double e) const final
@@ -175,7 +175,7 @@ namespace ryujin
       }
 
       /**
-       * Let \f$c_cold = A B ((v / v0)^{-(B+1)} -1)\f$, and let
+       * Let \f$c_cold = A B v0 (B+1) (v / v0)^{-B}\f$, and let
        * \f$e_cold = A v_0 ((v / v0)^{-B} + B(v / v0) - (B + 1)\f$.
        * The speed of sound is given by
        * \f{align}

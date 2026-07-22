@@ -218,7 +218,7 @@ namespace ryujin
       double v0_;
 
       /**
-       * The resulsion of ions is given by
+       * The repulsion of ions is given by
        * \f{align}
        *   f_c(v) = k0 * v0 / (N * (N - 1)) *
        *            ((v / v0)^{1 - N} - (N - 1)(1 - v / v0) - 1).

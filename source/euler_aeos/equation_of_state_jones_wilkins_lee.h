@@ -57,11 +57,11 @@ namespace ryujin
         this->add_parameter(
             "c_v", cv_, "The specific heat capacity at constant volume");
 
-        T0_ = 298.15; // [K]
-        this->add_parameter("T0_", T0_, "The reference tempereture");
+        T_0 = 298.15; // [K]
+        this->add_parameter("T_0", T_0, "The reference temperature");
 
-        s0_ = 0; // [J / (Kg * K)]
-        this->add_parameter("s0_", s0_, "The reference specific entropy");
+        s_0 = 0; // [J / (Kg * K)]
+        this->add_parameter("s_0", s_0, "The reference specific entropy");
       }
 
       /**
@@ -126,19 +126,20 @@ namespace ryujin
       /**
        * The cold curve is given by
        * \f{align}
-       *   e_cold = v0 * (A / R1 * exp(-R1 * v) + B / R2 * exp(-R2 * v)) - q0
+       *   e_cold = v_0 * (A / R1 * exp(-R1 \rho_0 / \rho) +
+                    B / R2 * exp(-R2 \rho_0 / \rho) - q0
        * \f}
        */
       double cold_curve_bound(double rho) const final
       {
         /* Using (3b) of LA-UR-15-29536 */
-        const auto v = 1. / rho;
-        const auto v0 = 1. / rho_0;
-        auto c_cold =
-            capA / R1 * std::exp(-R1 * v) + capB / R2 * std::exp(-R2 * v);
-        c_cold *= v0;
+        const auto ratio = rho / rho_0;
+        const auto v_0 = 1. / rho_0;
+        auto e_cold = capA / R1 * std::exp(-R1 / ratio) +
+                      capB / R2 * std::exp(-R2 / ratio);
+        e_cold *= v_0;
 
-        return c_cold - q_0;
+        return e_cold - q_0;
       }
 
       /**
@@ -155,10 +156,10 @@ namespace ryujin
         const auto second_term = capB / R2 * std::exp(-R2 * 1. / ratio);
         const auto temperature =
             (e + q_0 - 1. / rho_0 * (first_term + second_term)) / cv_;
-        auto s = std::log(temperature / T0_) + omega * std::log(1. / ratio);
+        auto s = std::log(temperature / T_0) + omega * std::log(1. / ratio);
         s *= cv_;
 
-        return s + s0_;
+        return s + s_0;
       }
 
       /**
@@ -197,8 +198,8 @@ namespace ryujin
       double rho_0;
       double q_0;
       double cv_;
-      double T0_;
-      double s0_;
+      double T_0;
+      double s_0;
     };
   } // namespace EquationOfStateLibrary
 } // namespace ryujin

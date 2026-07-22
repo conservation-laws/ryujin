@@ -138,7 +138,7 @@ namespace ryujin
             (gamma_ - 1.) * ((e - q_) - pinf_ * covolume_term) / covolume_term;
         const auto first_term = cv_ * std::log(p_plus_pinf);
         const auto second_term =
-            cv_ * gamma_ * std::log((gamma_ - 1) * cv_ / covolume_term);
+            cv_ * gamma_ * std::log((gamma_ - 1.) * cv_ / covolume_term);
         return first_term - second_term + s0_;
       }
 
