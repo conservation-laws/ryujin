@@ -46,7 +46,7 @@ int main()
     result[2] = p;
     result[3] = gamma;
     const double interpolation_b =
-        hyperbolic_system.view<dim, double>().eos_interpolation_b();
+        hyperbolic_system.view<dim, double>().eos_covolume_constant();
     const double x = 1. - interpolation_b * rho;
     result[4] = std::sqrt(gamma * p / (rho * x));
     return result;

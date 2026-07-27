@@ -1,7 +1,9 @@
+#include <equation_of_state_function.h>
+#include <equation_of_state_hayes.h>
 #include <equation_of_state_jones_wilkins_lee.h>
 #include <equation_of_state_noble_abel_stiffened_gas.h>
 #include <equation_of_state_polytropic_gas.h>
-#include <equation_of_state_sesame.h>
+#include <equation_of_state_pressureless.h>
 #include <equation_of_state_simple_macaw.h>
 #include <equation_of_state_van_der_waals.h>
 
@@ -52,15 +54,19 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos,
 
     const auto p = eos.pressure(rho, e);
     const auto e_back = eos.specific_internal_energy(rho, p);
-    const auto c = eos.speed_of_sound(rho, e);
+    const auto s = eos.specific_entropy(rho, e);
+    const auto e_min = eos.cold_curve_bound(rho);
     const auto T = eos.temperature(rho, e);
+    const auto c = eos.speed_of_sound(rho, e);
 
     std::cout << "input rho      = " << rho << std::endl    //
               << "input e        = " << e << std::endl      //
               << "output p       = " << p << std::endl      //
               << "check e_back   = " << e_back << std::endl //
-              << "check c        = " << c << std::endl      //
-              << "check T        = " << T << std::endl;
+              << "check s        = " << s << std::endl      //
+              << "check e_min    = " << e_min << std::endl  //
+              << "check T        = " << T << std::endl      //
+              << "check c        = " << c << std::endl;     //
   }
 
   {
@@ -119,7 +125,13 @@ int main()
   PolytropicGas polytropic_gas("");
   test(polytropic_gas);
 
-  /* Noble Abel stiffened gas */
+  /* function */
+
+  std::cout << "\nFunction (polytropic gas with gamma=1.4)" << std::endl;
+  EquationOfStateLibrary::Function function("");
+  test(function);
+
+  /* noble Abel stiffened gas */
 
   std::cout << "\nNobleAbelStiffenedGas with gamma=1.4, b=0, q=0, pinf=0"
             << std::endl;
@@ -161,7 +173,7 @@ int main()
   }
   test(van_der_waals);
 
-  /* jones wilkins lee */
+  /* Jones Wilkins Lee */
 
   std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.3207e13, B=-4.472e9, "
                "R1=11.3, R2=1.13, rho_0=1895, q_0=0"
@@ -190,6 +202,7 @@ int main()
   test(jones_wilkins_lee);
 
   /* simple macaw */
+
   testValues macaw_values;
   macaw_values.rho_scalar = 1.86;
   macaw_values.e_scalar = 1.49017421e2;
@@ -213,6 +226,38 @@ int main()
     ParameterAcceptor::initialize(parameters);
   }
   test(simple_macaw, macaw_values);
+
+  /* pressureless */
+
+  std::cout << "\nPressureless" << std::endl;
+  Pressureless pressureless("");
+  test(pressureless);
+
+  /* Hayes */
+
+  testValues hayes_values;
+  hayes_values.rho_scalar = 2.0;
+  hayes_values.e_scalar = 0.01;
+  hayes_values.rho_array = {2.1, 2.2, 2.3, 2.4, 2.5};
+  hayes_values.e_array = {0.25, 0.3, 0.35, 0.4, 0.45};
+
+  std::cout << "\nHayes with default parameters" << std::endl;
+  Hayes hayes("");
+  {
+    std::stringstream parameters;
+    parameters << "subsection hayes\n"
+               << "set N                           = 5.6\n"
+               << "set k_0                         = 12.6\n"
+               << "set gamma_0                     = 1.0715848\n"
+               << "set c_v                         = 1.11e-3\n"
+               << "set T_0                         = 298.15\n"
+               << "set rho_0                       = 1.844\n"
+               << "end\n"
+               << std::endl;
+
+    ParameterAcceptor::initialize(parameters);
+  }
+  test(hayes, hayes_values);
 
   return 0;
 }

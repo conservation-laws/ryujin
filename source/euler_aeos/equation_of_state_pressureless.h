@@ -69,6 +69,28 @@ namespace ryujin
       }
 
       /**
+       * The cold curve bound is given by
+       * \f{align}
+       *   e_cold = 0
+       * \f}
+       */
+      double cold_curve_bound(double /*rho*/) const final
+      {
+        return 0.0;
+      }
+
+      /**
+       * The specific entropy is given by
+       * \f{align}
+       *   s = 0
+       * \f}
+       */
+      double specific_entropy(double /*rho*/, double /*e*/) const final
+      {
+        return 0.0;
+      }
+
+      /**
        * The speed of sound is given by
        * \f{align}
        *   c^2 = 0

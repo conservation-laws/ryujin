@@ -25,7 +25,7 @@ void test(const Number gamma)
   std::cout << std::scientific;
 
   std::cout << "interpolatory covolume: "
-            << hyperbolic_system.view<dim, Number>().eos_interpolation_b()
+            << hyperbolic_system.view<dim, Number>().eos_covolume_constant()
             << std::endl;
 
   const auto view = hyperbolic_system.view<dim, Number>();

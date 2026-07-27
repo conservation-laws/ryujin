@@ -145,7 +145,7 @@ namespace ryujin
       const auto &gamma = std::get<3>(bounds) /* = gamma_min*/;
       const Number gm1 = gamma - Number(1.);
 
-      const auto b = Number(view.eos_interpolation_b());
+      const auto b = Number(view.eos_covolume_constant());
       const auto pinf = Number(view.eos_interpolation_pinfty());
       const auto q = Number(view.eos_interpolation_q());
 

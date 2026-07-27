@@ -217,5 +217,6 @@ Contributors
  - Seth Gerberding ([@Gerbeset](https://github.com/Gerbeset)), Texas A&M University, TX, USA
  - Jake Harmon ([@harmonj](https://github.com/harmonj)), Los Alamos National Laboratory, USA
  - Jordan Hoffart ([@jordanhoffart](https://github.com/jordanhoffart)), Texas A&M University, TX, USA
+ - Nichakan Loesatapornpipit ([@nichakanloe](https://github.com/nichakanloe)), Texas A&M University, TX, USA
  - David Pecoraro ([@ChrisPec27](https://github.com/ChrisPec27)), Texas A&M University, TX, USA
  - Madison Sheridan ([@Helblindi](https://github.com/Helblindi)), Texas A&M University, TX, USA

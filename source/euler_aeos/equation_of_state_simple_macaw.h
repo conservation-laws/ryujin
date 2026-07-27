@@ -69,40 +69,62 @@ namespace ryujin
       }
 
       /**
-       * The pressure is given by the formula (19) in reference.
+       * Let \f$p_cold = A B ((v / v0)^{-(B+1)} -1)\f$, and let
+       * \f$e_cold = A v_0 ((v / v0)^{-B} + B(v / v0) - (B + 1)\f$.
+       * The pressure is given by
+       * \f{align}
+       *   p = p_cold + \Gamma_c * \rho * (e - e_cold)
+       * \f}
        */
       double pressure(double rho, double e) const final
       {
         const auto v = 1. / rho;
-
+        const auto ratio = v / v0_;
         const auto p_cold = pressure_cold(v);
-        const auto e_cold = energy_cold(v);
+        const auto e_cold =
+            capA_ * v0_ *
+            (std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.));
 
         return p_cold + Gc_ * rho * (e - e_cold);
       }
 
       /**
-       * The specific internal energy is given by a complicated formula.
+       * Let \f$p_cold = A B ((v / v0)^{-(B+1)} -1)\f$, and let
+       * \f$e_cold = A v_0 ((v / v0)^{-B} + B(v / v0) - (B + 1)\f$.
+       * The specific internal energy is given by
+       * \f{align}
+       *   e = (p - p_cold) / (\rho * \Gamma_c) + e_cold
+       * \f}
        */
       double specific_internal_energy(double rho, double p) const final
       {
         const auto v = 1. / rho;
-
+        const auto ratio = v / v0_;
         const auto p_cold = pressure_cold(v);
-        const auto e_cold = energy_cold(v);
+        const auto e_cold =
+            capA_ * v0_ *
+            (std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.));
 
         return (p - p_cold) / (Gc_ * rho) + e_cold;
       }
 
       /**
-       * The temperature is given by the formla (18) in reference.
+       * Let \f$e_cold = A v_0 ((v / v0)^{-B} + B(v / v0) - (B + 1)\f$, and let
+       * \f$\delta_e = e - e_cold\f$. The temperature is given by
+       * \f{align}
+       *   T = (\delta_e +
+       *        \sqrt(\delta_e(\delta_e + 4 cvInf T_0 (v / v0)^{-Gamma_c})) /
+       *        (2 cvInf)
+       * \f}
        */
       double temperature(double rho, double e) const final
       {
         const auto v = 1. / rho;
         const auto ratio = v / v0_;
-
-        const auto delta_e = e - energy_cold(v);
+        const auto e_cold =
+            capA_ * v0_ *
+            (std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.));
+        const auto delta_e = e - e_cold;
         const auto radicand =
             delta_e * (delta_e + 4. * cvInf_ * T0_ * std::pow(ratio, -Gc_));
         const auto numerator = delta_e + std::sqrt(radicand);
@@ -112,14 +134,62 @@ namespace ryujin
       }
 
       /**
-       * The speed of sound is given by equation (21) in reference.
+       * The cold curve bound is given by
+       * \f{align}
+       *   e_cold = A v0((v / v0)^{-B} + (v / v0) B - (B+1))
+       * \f}
+       */
+      double cold_curve_bound(double rho) const final
+      {
+        const auto v = 1. / rho;
+        const auto ratio = v / v0_;
+        auto e_cold = std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.);
+        e_cold *= capA_ * v0_;
+
+        return e_cold;
+      }
+
+      /**
+       * Let \f$\tau = T * (v / v0)^{\Gamma_c} / T0\f$. The specific entropy is
+       * given by
+       * \f{align}
+       *   s = cvInf (\tau / (1 + \tau) + \ln(1 + \tau))
+       * \f}
+       */
+      double specific_entropy(double rho, double e) const final
+      {
+        const auto v = 1. / rho;
+        const auto ratio = v / v0_;
+        const auto e_cold =
+            capA_ * v0_ *
+            (std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.));
+        const auto delta_e = e - e_cold;
+        const auto radicand =
+            delta_e * (delta_e + 4. * cvInf_ * T0_ * std::pow(ratio, -Gc_));
+        const auto numerator = delta_e + std::sqrt(radicand);
+        const auto denominator = 2. * cvInf_;
+        const auto T = numerator / denominator;
+        const auto tau = T * std::pow(ratio, Gc_) / T0_;
+
+        return cvInf_ * (tau / (1. + tau) + std::log(1. + tau));
+      }
+
+      /**
+       * Let \f$c_cold = A B v0 (B+1) (v / v0)^{-B}\f$, and let
+       * \f$e_cold = A v_0 ((v / v0)^{-B} + B(v / v0) - (B + 1)\f$.
+       * The speed of sound is given by
+       * \f{align}
+       *   c^2 = c_cold + \Gamma_c(\Gamma_c + 1)(e - e_cold)
+       * \f}
        */
       double speed_of_sound(double rho, double e) const final
       {
         const auto v = 1. / rho;
         const auto ratio = v / v0_;
 
-        const auto e_cold = energy_cold(v);
+        const auto e_cold =
+            capA_ * v0_ *
+            (std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.));
 
         // Cold contribution
         const auto c_cold =
@@ -144,24 +214,6 @@ namespace ryujin
         auto cold_curve = std::pow(ratio, -capB_ - 1.) - 1.;
         cold_curve *= capA_ * capB_;
         return cold_curve;
-      }
-
-      double energy_cold(const double v) const
-      {
-        const auto ratio = v / v0_;
-
-        auto e_cold = std::pow(ratio, -capB_) + ratio * capB_ - (capB_ + 1.);
-        e_cold *= capA_ * v0_;
-
-        return e_cold;
-      }
-
-      double specific_entropy(const double v, const double T) const
-      {
-        const auto ratio = v / v0_;
-        const auto theta = T0_ * std::pow(ratio, -Gc_);
-        const auto tau = T / theta;
-        return cvInf_ * (tau / (1. + tau) + std::log(1. + tau));
       }
     };
   } // namespace EquationOfStateLibrary

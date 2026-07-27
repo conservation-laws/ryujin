@@ -45,7 +45,21 @@ namespace ryujin
             "A function expression for the specific internal energy as a "
             "function of density, rho, and pressure, p: e(rho, p)");
 
-        temperature_expression_ = "e / 718.";
+        se_expression_ = "287.052874 / (1.4 - 1.0) * (log((1.4 - 1.0) * rho * "
+                         "e) - 1.4 * log(287.052874 * rho))";
+        add_parameter("specific entropy",
+                      se_expression_,
+                      "A function expression for the specific entropy as a "
+                      "function of density, "
+                      "rho, and specific internal energy, e: s(rho, e)");
+
+        e0_expression_ = "0";
+        add_parameter("cold curve bound",
+                      e0_expression_,
+                      "A function expression for the cold curve bound as a "
+                      "function of density: e_0(rho)");
+
+        temperature_expression_ = "e * (1.4 - 1.0) / 287.052874";
         add_parameter("temperature",
                       temperature_expression_,
                       "A function expression for the temperature as a "
@@ -60,10 +74,9 @@ namespace ryujin
             "density, rho, and specific internal energy, e: s(rho, e)");
 
         add_parameter(
-            "interpolatory covolume b",
-            this->interpolation_b_,
-            "The interpolatory maximum compressibility constant b used when "
-            "constructing the interpolatory equation of state");
+            "covolume constant",
+            this->covolume_constant_,
+            "The maximum compressibility constant b for the equation of state");
 
         add_parameter("interpolatory reference pressure",
                       this->interpolation_pinfty_,
@@ -82,14 +95,25 @@ namespace ryujin
          */
         const auto set_up_muparser = [this] {
           p_function_ = std::make_unique<dealii::FunctionParser<2>>();
-          p_function_->initialize("rho,e", p_expression_, {});
+          p_function_->initialize(
+              "rho,e", p_expression_, {{"b", this->covolume_constant_}});
 
           sie_function_ = std::make_unique<dealii::FunctionParser<2>>();
-          sie_function_->initialize("rho,p", sie_expression_, {});
+          sie_function_->initialize(
+              "rho,p", sie_expression_, {{"b", this->covolume_constant_}});
+
+          se_function_ = std::make_unique<dealii::FunctionParser<2>>();
+          se_function_->initialize(
+              "rho,e", se_expression_, {{"b", this->covolume_constant_}});
+
+          e0_function_ = std::make_unique<dealii::FunctionParser<1>>();
+          e0_function_->initialize(
+              "rho", e0_expression_, {{"b", this->covolume_constant_}});
 
           temperature_function_ = std::make_unique<dealii::FunctionParser<2>>();
-          temperature_function_->initialize(
-              "rho,e", temperature_expression_, {});
+          temperature_function_->initialize("rho,e",
+                                            temperature_expression_,
+                                            {{"b", this->covolume_constant_}});
 
           sos_function_ = std::make_unique<dealii::FunctionParser<2>>();
           sos_function_->initialize("rho,e", sos_expression_, {});
@@ -109,6 +133,16 @@ namespace ryujin
         return sie_function_->value(dealii::Point<2>(rho, p));
       }
 
+      double specific_entropy(double rho, double e) const final
+      {
+        return se_function_->value(dealii::Point<2>(rho, e));
+      }
+
+      double cold_curve_bound(double rho) const final
+      {
+        return e0_function_->value(dealii::Point<1>(rho));
+      }
+
       double temperature(double rho, double e) const final
       {
         return temperature_function_->value(dealii::Point<2>(rho, e));
@@ -122,13 +156,17 @@ namespace ryujin
     private:
       std::string p_expression_;
       std::string sie_expression_;
-      std::string sos_expression_;
+      std::string se_expression_;
+      std::string e0_expression_;
       std::string temperature_expression_;
+      std::string sos_expression_;
 
       std::unique_ptr<dealii::FunctionParser<2>> p_function_;
       std::unique_ptr<dealii::FunctionParser<2>> sie_function_;
-      std::unique_ptr<dealii::FunctionParser<2>> sos_function_;
+      std::unique_ptr<dealii::FunctionParser<2>> se_function_;
+      std::unique_ptr<dealii::FunctionParser<1>> e0_function_;
       std::unique_ptr<dealii::FunctionParser<2>> temperature_function_;
+      std::unique_ptr<dealii::FunctionParser<2>> sos_function_;
     };
   } // namespace EquationOfStateLibrary
 } // namespace ryujin

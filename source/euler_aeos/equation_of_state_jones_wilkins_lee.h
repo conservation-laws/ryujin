@@ -56,6 +56,12 @@ namespace ryujin
         cv_ = 2487. / rho_0; // [J / (Kg * K)]
         this->add_parameter(
             "c_v", cv_, "The specific heat capacity at constant volume");
+
+        T_0 = 298.15; // [K]
+        this->add_parameter("T_0", T_0, "The reference temperature");
+
+        s_0 = 0; // [J / (Kg * K)]
+        this->add_parameter("s_0", s_0, "The reference specific entropy");
       }
 
       /**
@@ -82,7 +88,7 @@ namespace ryujin
       /**
        * The specific internal energy is given by
        * \f{align}
-       *   \omega \rho e = p
+       *   \omega \rho (e + q0) = p
        *   - A(1 - \omega / R_1 \rho / \rho_0) e^{(-R_1 \rho_0 / \rho)}
        *   - B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
        * \f}
@@ -96,7 +102,7 @@ namespace ryujin
         const auto second_term =
             capB * (1. - omega / R2 * ratio) * std::exp(-R2 * 1. / ratio);
 
-        return (p - first_term - second_term) / (rho * omega);
+        return (p - first_term - second_term) / (rho * omega) - q_0;
       }
 
       /**
@@ -118,7 +124,51 @@ namespace ryujin
       }
 
       /**
-       * The speed of sound is given by
+       * The cold curve is given by
+       * \f{align}
+       *   e_cold = v_0 * (A / R1 * exp(-R1 \rho_0 / \rho) +
+                    B / R2 * exp(-R2 \rho_0 / \rho) - q0
+       * \f}
+       */
+      double cold_curve_bound(double rho) const final
+      {
+        /* Using (3b) of LA-UR-15-29536 */
+        const auto ratio = rho / rho_0;
+        const auto v_0 = 1. / rho_0;
+        auto e_cold = capA / R1 * std::exp(-R1 / ratio) +
+                      capB / R2 * std::exp(-R2 / ratio);
+        e_cold *= v_0;
+
+        return e_cold - q_0;
+      }
+
+      /**
+       * The specific entropy is given by
+       * \f{align}
+       *   s = cv * (\ln(T / T_0) + \omega \ln(rho_0 / \rho)) + s_0;
+       * \f}
+       */
+      double specific_entropy(double rho, double e) const final
+      {
+        /* Using (9) of LA-UR-15-29536 */
+        const auto ratio = rho / rho_0;
+        const auto first_term = capA / R1 * std::exp(-R1 * 1. / ratio);
+        const auto second_term = capB / R2 * std::exp(-R2 * 1. / ratio);
+        const auto temperature =
+            (e + q_0 - 1. / rho_0 * (first_term + second_term)) / cv_;
+        auto s = std::log(temperature / T_0) + omega * std::log(1. / ratio);
+        s *= cv_;
+
+        return s + s_0;
+      }
+
+      /**
+       * Let \f$v_r = \rho_0 / \rho\f$. The speed of sound is given by
+       * \f{align}
+       *   c^2 =
+       *   (A / \rho_0) * (R1 v_r^2 - \omega(\omega + 1) / R1) exp(-R1 * v_r) +
+       *   (B / \rho_0) * (R2 v_r^2 - \omega(\omega + 1) / R2) exp(-R2 * v_r) +
+       *   \omega(\omega + 1)(e + q0)
        */
       double speed_of_sound(double rho, double e) const final
       {
@@ -127,14 +177,14 @@ namespace ryujin
         const auto t1 = omega * rho / (R1 * rho_0);
         const auto factor1 = omega * (1. - t1) * (1. + 1. / t1) - t1;
         const auto first_term =
-            capA / rho * factor1 * std::exp(-1. / t1 / omega);
+            capA / rho * factor1 * std::exp(-1. / (t1 / omega));
 
         const auto t2 = omega * rho / (R2 * rho_0);
         const auto factor2 = omega * (1. - t2) * (1. + 1. / t2) - t2;
         const auto second_term =
-            capB / rho * factor2 * std::exp(-1. / t2 / omega);
+            capB / rho * factor2 * std::exp(-1. / (t2 / omega));
 
-        const auto third_term = omega * (omega + 1.) * e;
+        const auto third_term = omega * (omega + 1.) * (e + q_0);
 
         return std::sqrt(first_term + second_term + third_term);
       }
@@ -148,6 +198,8 @@ namespace ryujin
       double rho_0;
       double q_0;
       double cv_;
+      double T_0;
+      double s_0;
     };
   } // namespace EquationOfStateLibrary
 } // namespace ryujin
