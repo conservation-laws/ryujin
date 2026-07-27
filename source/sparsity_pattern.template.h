@@ -333,7 +333,8 @@ namespace ryujin
 
       const unsigned int n_entries_to_be_sent =
           std::accumulate(send_ranges.begin(), send_ranges.end(), 0);
-      std::vector<unsigned int> entries_buffer(2 * n_entries_to_be_sent /*!*/);
+      std::vector<dealii::types::global_dof_index> entries_buffer(
+          2 * n_entries_to_be_sent /*!*/);
 
       {
         /* Index into entries_to_be_sent: */
@@ -342,14 +343,15 @@ namespace ryujin
         for (unsigned int p = 0; p < send_targets_.size(); ++p) {
           const auto n_entries = send_ranges[p];
 
-          const int ierr = MPI_Irecv(
-              entries_buffer.data() + 2 * index /*!*/,
-              2 * n_entries /*!*/,
-              dealii::Utilities::MPI::mpi_type_id_for_type<unsigned int>,
-              import_targets[p].first,
-              mpi_tag,
-              mpi_communicator,
-              &requests[ghost_targets.size() + p]);
+          const int ierr =
+              MPI_Irecv(entries_buffer.data() + 2 * index /*!*/,
+                        2 * n_entries /*!*/,
+                        dealii::Utilities::MPI::mpi_type_id_for_type<
+                            dealii::types::global_dof_index>,
+                        import_targets[p].first,
+                        mpi_tag,
+                        mpi_communicator,
+                        &requests[ghost_targets.size() + p]);
           AssertThrowMPI(ierr);
 
           index += n_entries;
