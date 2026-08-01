@@ -270,12 +270,17 @@ namespace ryujin
     //@{
 
     /**
+     * Return the selected mesh type.
+     */
+    ACCESSOR_READ_ONLY(mesh_type)
+
+    /**
      * Return a read-only const reference to the selected geometry.
      */
     ACCESSOR_READ_ONLY(selected_geometry)
 
     /**
-     * Return a read-only const reference to the finite element ansatz.
+     * Return the selected finite element ansatz.
      */
     ACCESSOR_READ_ONLY(ansatz)
 
