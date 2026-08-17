@@ -44,13 +44,13 @@ namespace ryujin
           ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = EulerAEOS::Indicator<dim, Number>;
+      using Indicator = EulerAEOS::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = EulerAEOS::Limiter<dim, Number>;
+      using Limiter = EulerAEOS::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator = EulerAEOS::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = EulerAEOS::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace EulerAEOS
 } // namespace ryujin
