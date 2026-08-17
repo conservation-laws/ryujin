@@ -30,14 +30,14 @@ namespace ryujin
           EulerPoisson::ParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = EulerBarotropic::Indicator<dim, Number>;
+      using Indicator = EulerBarotropic::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = EulerBarotropic::Limiter<dim, Number>;
+      using Limiter = EulerBarotropic::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
       using WaveSpeedEstimator =
-          EulerBarotropic::WaveSpeedEstimator<dim, Number>;
+          EulerBarotropic::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace EulerPoissonBarotropic
 } // namespace ryujin
