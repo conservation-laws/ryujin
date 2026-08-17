@@ -20,10 +20,10 @@ namespace ryujin
   namespace Euler
   {
     template <typename ScalarNumber = double>
-    class LimiterParameters : public dealii::ParameterAcceptor
+    class Limiter : public dealii::ParameterAcceptor
     {
     public:
-      LimiterParameters(const std::string &subsection = "/Limiter")
+      Limiter(const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
       {
         iterations_ = 2;
@@ -95,7 +95,7 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     template <int dim, typename Number = double>
-    class Limiter
+    class LimiterView
     {
     public:
       /**
@@ -117,7 +117,7 @@ namespace ryujin
 
       using PrecomputedVector = typename View::PrecomputedVector;
 
-      using Parameters = LimiterParameters<ScalarNumber>;
+      using Parameters = Limiter<ScalarNumber>;
 
       //@}
       /**
@@ -138,9 +138,9 @@ namespace ryujin
       /**
        * Constructor taking a HyperbolicSystem instance as argument
        */
-      Limiter(const HyperbolicSystem &hyperbolic_system,
-              const Parameters &parameters,
-              const PrecomputedVector &precomputed_values)
+      LimiterView(const HyperbolicSystem &hyperbolic_system,
+                  const Parameters &parameters,
+                  const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -178,15 +178,16 @@ namespace ryujin
        *
        * Intended usage:
        * ```
-       * Limiter<dim, Number> limiter;
+       * LimiterView<dim, Number> limiter_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter.reset(i, U_i, flux_i);
+       *   limiter_view.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, affine_shift);
+       *     limiter_view.accumulate(js, U_j, flux_j, scaled_c_ij,
+       * affine_shift);
        *   }
-       *   limiter.bounds(hd_i);
+       *   limiter_view.bounds(hd_i);
        * }
        * ```
        */
@@ -269,7 +270,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    Limiter<dim, Number>::projection_bounds_from_state(
+    LimiterView<dim, Number>::projection_bounds_from_state(
         const unsigned int i, const state_type &U_i) const -> Bounds
     {
       const auto view = hyperbolic_system.view<dim, Number>();
@@ -282,7 +283,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto Limiter<dim, Number>::combine_bounds(
+    DEAL_II_ALWAYS_INLINE inline auto LimiterView<dim, Number>::combine_bounds(
         const Bounds &bounds_left, const Bounds &bounds_right) const -> Bounds
     {
       const auto &[rho_min_l, rho_max_l, s_min_l] = bounds_left;
@@ -296,8 +297,9 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    Limiter<dim, Number>::fully_relax_bounds(const Bounds &bounds,
-                                             const Number &hd) const -> Bounds
+    LimiterView<dim, Number>::fully_relax_bounds(const Bounds &bounds,
+                                                 const Number &hd) const
+        -> Bounds
     {
       auto relaxed_bounds = bounds;
       auto &[rho_min, rho_max, s_min] = relaxed_bounds;
@@ -321,10 +323,10 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::reset(const unsigned int /*i*/,
-                                const state_type &new_U_i,
-                                const flux_contribution_type & /*new_flux_i*/)
+    DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::reset(
+        const unsigned int /*i*/,
+        const state_type &new_U_i,
+        const flux_contribution_type & /*new_flux_i*/)
     {
       U_i = new_U_i;
 
@@ -345,7 +347,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
+    DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::accumulate(
         const unsigned int *js,
         const state_type &U_j,
         const flux_contribution_type & /*flux_j*/,
@@ -397,7 +399,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
+    LimiterView<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
       const auto &[rho_min, rho_max, s_min] = bounds_;
 

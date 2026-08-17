@@ -43,13 +43,13 @@ namespace ryujin
           ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = Euler::Indicator<dim, Number>;
+      using Indicator = Euler::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = Euler::Limiter<dim, Number>;
+      using Limiter = Euler::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator = Euler::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = Euler::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace Euler
 } // namespace ryujin
