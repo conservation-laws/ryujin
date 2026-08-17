@@ -21,10 +21,11 @@ namespace ryujin
   namespace ShallowWater
   {
     template <typename ScalarNumber = double>
-    class RiemannSolverParameters : public dealii::ParameterAcceptor
+    class WaveSpeedEstimatorParameters : public dealii::ParameterAcceptor
     {
     public:
-      RiemannSolverParameters(const std::string &subsection = "/RiemannSolver")
+      WaveSpeedEstimatorParameters(
+          const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
       {
       }
@@ -40,7 +41,7 @@ namespace ryujin
      * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number = double>
-    class RiemannSolver
+    class WaveSpeedEstimator
     {
     public:
       /**
@@ -72,7 +73,7 @@ namespace ryujin
 
       using PrecomputedVector = typename View::PrecomputedVector;
 
-      using Parameters = RiemannSolverParameters<ScalarNumber>;
+      using Parameters = WaveSpeedEstimatorParameters<ScalarNumber>;
 
       //@}
       /**
@@ -83,9 +84,9 @@ namespace ryujin
       /**
        * Constructor taking a HyperbolicSystem instance as argument
        */
-      RiemannSolver(const HyperbolicSystem &hyperbolic_system,
-                    const Parameters &parameters,
-                    const PrecomputedVector &precomputed_values)
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const Parameters &parameters,
+                         const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)

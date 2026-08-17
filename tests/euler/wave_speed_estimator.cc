@@ -3,10 +3,10 @@
 
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
-#define DEBUG_RIEMANN_SOLVER
-#include <riemann_solver.h>
-#include <riemann_solver.template.h>
+#define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <simd.h>
+#include <wave_speed_estimator.h>
+#include <wave_speed_estimator.template.h>
 
 #ifndef NEWTON_ITERATIONS
 #define NEWTON_ITERATIONS "0"
@@ -26,7 +26,7 @@ int main()
   using Number = NUMBER;
 
   HyperbolicSystem hyperbolic_system;
-  RiemannSolver<dim, Number>::Parameters riemann_solver_parameters;
+  WaveSpeedEstimator<dim, Number>::Parameters wave_speed_estimator_parameters;
 
   const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
@@ -36,11 +36,11 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  RiemannSolver<dim> riemann_solver(
-      hyperbolic_system, riemann_solver_parameters, dummy);
+  WaveSpeedEstimator<dim> wave_speed_estimator(
+      hyperbolic_system, wave_speed_estimator_parameters, dummy);
 
   std::stringstream parameters;
-  parameters << "subsection RiemannSolver\n"
+  parameters << "subsection WaveSpeedEstimator\n"
              << "set newton max iterations = " NEWTON_ITERATIONS "\n"
              << "end" << std::endl;
   ParameterAcceptor::initialize(parameters);
@@ -64,7 +64,7 @@ int main()
     std::cout << U_j[0] << " " << U_j[1] << " " << U_j[2] << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
-    const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
+    const auto lambda_max = wave_speed_estimator.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
     std::cout << std::endl;
     std::cout << std::endl;

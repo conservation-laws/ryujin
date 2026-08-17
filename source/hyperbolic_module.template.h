@@ -33,7 +33,7 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , indicator_parameters_(subsection + "/indicator")
       , limiter_parameters_(subsection + "/limiter")
-      , riemann_solver_parameters_(subsection + "/riemann solver")
+      , wave_speed_estimator_parameters_(subsection + "/wave speed estimator")
       , mpi_ensemble_(mpi_ensemble)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -345,10 +345,12 @@ namespace ryujin
         using T = decltype(sentinel);
         constexpr unsigned int stride_size = get_stride_size<T>;
 
-        using RiemannSolver =
-            typename Description::template RiemannSolver<dim, T>;
-        RiemannSolver riemann_solver(
-            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
+        using WaveSpeedEstimator =
+            typename Description::template WaveSpeedEstimator<dim, T>;
+        WaveSpeedEstimator wave_speed_estimator(
+            *hyperbolic_system_,
+            wave_speed_estimator_parameters_,
+            old_precomputed);
 
         using Indicator = typename Description::template Indicator<dim, T>;
         Indicator indicator(
@@ -383,7 +385,8 @@ namespace ryujin
 
           const auto norm = c_ij.norm();
           const auto n_ij = c_ij / norm;
-          const auto lambda_max = riemann_solver.compute(U_i, U_j, i, js, n_ij);
+          const auto lambda_max =
+              wave_speed_estimator.compute(U_i, U_j, i, js, n_ij);
           const auto d_ij = norm * lambda_max;
 
           dij_matrix_.write_entry(d_ij, i, col_idx, true);
@@ -426,10 +429,12 @@ namespace ryujin
       const auto body_boundary = [&](const auto &, const unsigned int k) {
         const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
 
-        using RiemannSolver =
-            typename Description::template RiemannSolver<dim, Number>;
-        RiemannSolver riemann_solver(
-            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
+        using WaveSpeedEstimator =
+            typename Description::template WaveSpeedEstimator<dim, Number>;
+        WaveSpeedEstimator wave_speed_estimator(
+            *hyperbolic_system_,
+            wave_speed_estimator_parameters_,
+            old_precomputed);
 
         /*
          * Only work on index pairs "i < j" that point to the upper
@@ -452,7 +457,8 @@ namespace ryujin
 
         const auto d_ij = dij_matrix_.read_entry(i, col_idx);
 
-        const auto lambda_max = riemann_solver.compute(U_j, U_i, j, &i, n_ji);
+        const auto lambda_max =
+            wave_speed_estimator.compute(U_j, U_i, j, &i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
 
         dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
@@ -470,10 +476,12 @@ namespace ryujin
       const auto body = [&](auto, unsigned int i) {
 
 #ifdef DEBUG_SYMMETRY_CHECK
-        using RiemannSolver =
-            typename Description::template RiemannSolver<dim, Number>;
-        RiemannSolver riemann_solver(
-            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
+        using WaveSpeedEstimator =
+            typename Description::template WaveSpeedEstimator<dim, Number>;
+        WaveSpeedEstimator wave_speed_estimator(
+            *hyperbolic_system_,
+            wave_speed_estimator_parameters_,
+            old_precomputed);
 #endif
 
         /* Skip constrained degrees of freedom: */
@@ -505,7 +513,7 @@ namespace ryujin
             const auto n_ij = c_ij / norm_ij;
 
             const auto lambda_max =
-                riemann_solver.compute(U_i, U_j, i, &j, n_ij);
+                wave_speed_estimator.compute(U_i, U_j, i, &j, n_ij);
             const auto d_ij = norm_ij * lambda_max;
 
             Assert(d_ij <= d_ji + 1.0e-12,

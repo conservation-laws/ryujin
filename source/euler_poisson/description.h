@@ -8,7 +8,7 @@
 #include "../euler/hyperbolic_system.h"
 #include "../euler/indicator.h"
 #include "../euler/limiter.h"
-#include "../euler/riemann_solver.h"
+#include "../euler/wave_speed_estimator.h"
 #include "parabolic_module.h"
 #include "parabolic_system.h"
 
@@ -35,7 +35,7 @@ namespace ryujin
       using Limiter = Euler::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = Euler::RiemannSolver<dim, Number>;
+      using WaveSpeedEstimator = Euler::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace EulerPoisson
 } // namespace ryujin

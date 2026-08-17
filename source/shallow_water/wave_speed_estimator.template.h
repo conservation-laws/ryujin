@@ -9,12 +9,12 @@
 
 #include <compile_time_options.h>
 
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 #include <newton.h>
 #include <simd.h>
 
-// #define DEBUG_RIEMANN_SOLVER
+// #define DEBUG_WAVE_SPEED_ESTIMATOR
 
 namespace ryujin
 {
@@ -24,8 +24,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::f(const primitive_type &riemann_data_Z,
-                                  const Number &h) const
+    WaveSpeedEstimator<dim, Number>::f(const primitive_type &riemann_data_Z,
+                                       const Number &h) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
       const ScalarNumber gravity = view.gravity();
@@ -46,14 +46,14 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::phi(const primitive_type &riemann_data_i,
-                                    const primitive_type &riemann_data_j,
-                                    const Number &h) const
+    WaveSpeedEstimator<dim, Number>::phi(const primitive_type &riemann_data_i,
+                                         const primitive_type &riemann_data_j,
+                                         const Number &h) const
     {
       const Number &u_i = riemann_data_i[1];
       const Number &u_j = riemann_data_j[1];
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "f_L --> " << f(riemann_data_i, h) << std::endl;
       std::cout << "f_R --> " << f(riemann_data_j, h) << std::endl;
 #endif
@@ -63,7 +63,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::lambda1_minus(
+    WaveSpeedEstimator<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number h_star) const
     {
       const auto &[h, u, a] = riemann_data;
@@ -78,8 +78,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::lambda3_plus(const primitive_type &riemann_data,
-                                             const Number h_star) const
+    WaveSpeedEstimator<dim, Number>::lambda3_plus(
+        const primitive_type &riemann_data, const Number h_star) const
     {
       const auto &[h, u, a] = riemann_data;
 
@@ -93,7 +93,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::compute_lambda(
+    WaveSpeedEstimator<dim, Number>::compute_lambda(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number h_star) const
@@ -107,7 +107,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::compute_h_star(
+    WaveSpeedEstimator<dim, Number>::compute_h_star(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -121,14 +121,14 @@ namespace ryujin
       const Number h_min = std::min(h_i, h_j);
       const Number h_max = std::max(h_i, h_j);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << h_min << "  <- h_min/max ->  " << h_max << std::endl;
 #endif
 
       const Number a_min = std::sqrt(gravity * h_min);
       const Number a_max = std::sqrt(gravity * h_max);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << a_min << "  <- a_min/max ->  " << a_max << std::endl;
 #endif
 
@@ -139,13 +139,13 @@ namespace ryujin
 
       const Number phi_value_min =
           phi(riemann_data_i, riemann_data_j, x0 * h_min);
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "phi_value_min ->" << phi_value_min << std::endl;
 #endif
 
       const Number phi_value_max =
           phi(riemann_data_i, riemann_data_j, x0 * h_max);
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "phi_value_max ->" << phi_value_max << std::endl;
 #endif
 
@@ -159,7 +159,7 @@ namespace ryujin
       const Number h_star_left =
           ScalarNumber(0.0625) * gravity_inverse * tmp * tmp;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "left: " << h_star_left << std::endl;
 #endif
 
@@ -168,7 +168,7 @@ namespace ryujin
       tmp = Number(1.) + sqrt_two * (u_i - u_j) / (a_min + a_max);
       const Number h_star_middle = std::sqrt(h_min * h_max) * tmp;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "middle: " << h_star_middle << std::endl;
 #endif
 
@@ -186,7 +186,7 @@ namespace ryujin
 
       const Number h_star_right = tmp * tmp;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "right: " << h_star_right << std::endl;
 #endif
 
@@ -206,7 +206,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    RiemannSolver<dim, Number>::riemann_data_from_state(
+    WaveSpeedEstimator<dim, Number>::riemann_data_from_state(
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
@@ -224,7 +224,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    inline Number RiemannSolver<dim, Number>::compute(
+    inline Number WaveSpeedEstimator<dim, Number>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -238,7 +238,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    Number RiemannSolver<dim, Number>::compute(
+    Number WaveSpeedEstimator<dim, Number>::compute(
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int /*i*/,

@@ -3,9 +3,9 @@
 
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
-#define DEBUG_RIEMANN_SOLVER
-#include <riemann_solver.h>
-#include <riemann_solver.template.h>
+#define DEBUG_WAVE_SPEED_ESTIMATOR
+#include <wave_speed_estimator.h>
+#include <wave_speed_estimator.template.h>
 
 #include <iomanip>
 #include <iostream>
@@ -22,7 +22,8 @@ void test(const std::string &expression)
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
-  typename RiemannSolver<dim, Number>::Parameters riemann_solver_parameters;
+  typename WaveSpeedEstimator<dim, Number>::Parameters
+      wave_speed_estimator_parameters;
 
   const auto view = hyperbolic_system.view<dim, Number>();
 
@@ -31,7 +32,7 @@ void test(const std::string &expression)
     parameters << "subsection HyperbolicSystem\n"
                << "set flux = " << expression << "\n"
                << "end\n"
-               << "subsection RiemannSolver\n"
+               << "subsection WaveSpeedEstimator\n"
                << "set use greedy wavespeed = true\n"
                << "set use averaged entropy = true\n"
                << "end\n"
@@ -47,8 +48,8 @@ void test(const std::string &expression)
 
   PrecomputedVector dummy;
 
-  RiemannSolver<dim> riemann_solver(
-      hyperbolic_system, riemann_solver_parameters, dummy);
+  WaveSpeedEstimator<dim> wave_speed_estimator(
+      hyperbolic_system, wave_speed_estimator_parameters, dummy);
 
   std::cout << "\n\ndim = " << dim << std::endl;
   std::cout << "f(u)={" + expression + "}" << std::endl;
@@ -75,24 +76,24 @@ void test(const std::string &expression)
 
   if constexpr (dim == 1) {
     n_ij[0] = 1.;
-    riemann_solver.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
     n_ij[0] = -1.;
-    riemann_solver.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
   } else if constexpr (dim == 2) {
     n_ij[0] = 1.;
     n_ij[1] = 0.;
-    riemann_solver.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
     n_ij[0] = 0.;
     n_ij[1] = 1.;
-    riemann_solver.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
     n_ij[0] = 1.;
     n_ij[1] = 1.;
     n_ij /= n_ij.norm();
-    riemann_solver.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
   }
 }
 

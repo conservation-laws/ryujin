@@ -7,20 +7,20 @@
 
 #include <compile_time_options.h>
 
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 #include <simd.h>
 
 #include <random>
 
-// #define DEBUG_RIEMANN_SOLVER
+// #define DEBUG_WAVE_SPEED_ESTIMATOR
 
 namespace ryujin
 {
   namespace ScalarConservation
   {
     template <int dim, typename Number>
-    Number RiemannSolver<dim, Number>::compute(
+    Number WaveSpeedEstimator<dim, Number>::compute(
         const Number &u_i,
         const Number &u_j,
         const precomputed_type &prec_i,
@@ -37,7 +37,7 @@ namespace ryujin
 
       const auto h2 = Number(2. * view.derivative_approximation_delta());
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "\nu_i  = " << u_i << std::endl;
       std::cout << "u_j  = " << u_j << std::endl;
       std::cout << "f_i  = " << f_i << std::endl;
@@ -62,7 +62,7 @@ namespace ryujin
        */
 
       auto lambda_max = std::abs(f_i - f_j) / std::max(std::abs(u_i - u_j), h2);
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "   Roe average       = " << lambda_max << std::endl;
 #endif
 
@@ -80,7 +80,7 @@ namespace ryujin
             lambda_max,
             /* Approximate derivative in centerpoint: */
             std::abs(ScalarNumber(0.5) * (df_i + df_j)));
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "   interpolated      = "
                   << std::abs(ScalarNumber(0.5) * (df_i + df_j)) << std::endl;
 #endif
@@ -95,7 +95,7 @@ namespace ryujin
          */
         lambda_max = std::max(lambda_max, std::abs(df_i));
         lambda_max = std::max(lambda_max, std::abs(df_j));
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "   left  derivative  = " << std::abs(df_i) << std::endl;
         std::cout << "   right derivative  = " << std::abs(df_j) << std::endl;
 #endif
@@ -134,7 +134,7 @@ namespace ryujin
       const auto enforce_entropy = [&](const Number &k) {
         const Number f_k = view.flux_function(k) * n_ij;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "k    = " << k << std::endl;
         std::cout << "f_k  = " << f_k << std::endl;
 #endif
@@ -164,7 +164,7 @@ namespace ryujin
         const Number lambda_left = std::abs(d + b) / (std::abs(c + a) + h2);
         const Number lambda_right = std::abs(d - b) / (std::abs(c - a) + h2);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "   left  wavespeed   = " << lambda_left << std::endl;
         std::cout << "   right wavespeed   = " << lambda_right << std::endl;
 #endif
@@ -185,7 +185,7 @@ namespace ryujin
         enforce_entropy(k);
       }
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "-> lambda_max        = " << lambda_max << std::endl;
 #endif
       return lambda_max;
@@ -193,7 +193,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
+    DEAL_II_ALWAYS_INLINE inline Number
+    WaveSpeedEstimator<dim, Number>::compute(
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int i,

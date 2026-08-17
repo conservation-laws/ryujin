@@ -8,7 +8,7 @@
 #include "../euler_barotropic/hyperbolic_system.h"
 #include "../euler_barotropic/indicator.h"
 #include "../euler_barotropic/limiter.h"
-#include "../euler_barotropic/riemann_solver.h"
+#include "../euler_barotropic/wave_speed_estimator.h"
 #include "../euler_poisson/parabolic_module.h"
 #include "../euler_poisson/parabolic_system.h"
 
@@ -36,7 +36,8 @@ namespace ryujin
       using Limiter = EulerBarotropic::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = EulerBarotropic::RiemannSolver<dim, Number>;
+      using WaveSpeedEstimator =
+          EulerBarotropic::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace EulerPoissonBarotropic
 } // namespace ryujin

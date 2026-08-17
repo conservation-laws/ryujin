@@ -5,26 +5,26 @@
 
 #pragma once
 
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 #include <newton.h>
 #include <simd.h>
 
-// #define DEBUG_RIEMANN_SOLVER
+// #define DEBUG_WAVE_SPEED_ESTIMATOR
 
 namespace ryujin
 {
   namespace EulerBarotropic
   {
     template <int dim, typename Number>
-    Number RiemannSolver<dim, Number>::compute(
+    Number WaveSpeedEstimator<dim, Number>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
       const auto &[u_i, a_i] = riemann_data_i;
       const auto &[u_j, a_j] = riemann_data_j;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "u_left: " << u_i << std::endl;
       std::cout << "a_left: " << a_i << std::endl;
       std::cout << "u_right: " << u_j << std::endl;
@@ -38,7 +38,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
+    DEAL_II_ALWAYS_INLINE inline Number
+    WaveSpeedEstimator<dim, Number>::compute(
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int i,

@@ -3,10 +3,10 @@
 
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
-#define DEBUG_RIEMANN_SOLVER
-#include <riemann_solver.h>
-#include <riemann_solver.template.h>
+#define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <simd.h>
+#include <wave_speed_estimator.h>
+#include <wave_speed_estimator.template.h>
 
 using namespace ryujin::ShallowWater;
 using namespace ryujin;
@@ -19,7 +19,7 @@ int main()
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
-  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
+  WaveSpeedEstimator<dim, double>::Parameters wave_speed_estimator_parameters;
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, double>::n_precomputed_values;
@@ -27,8 +27,8 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  RiemannSolver<dim> riemann_solver(
-      hyperbolic_system, riemann_solver_parameters, dummy);
+  WaveSpeedEstimator<dim> wave_speed_estimator(
+      hyperbolic_system, wave_speed_estimator_parameters, dummy);
 
   const auto riemann_data = [&](const auto &state) {
     const auto h = hyperbolic_system.view<dim, double>().water_depth_sharp(
@@ -50,8 +50,8 @@ int main()
     const auto rd_j = riemann_data(U_j);
     std::cout << "relaxation: " << rd_i[0] << " " << rd_i[1] << std::endl;
     std::cout << "relaxation: " << rd_j[0] << " " << rd_j[1] << std::endl;
-    const auto h_star = riemann_solver.compute_h_star(rd_i, rd_j);
-    const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
+    const auto h_star = wave_speed_estimator.compute_h_star(rd_i, rd_j);
+    const auto lambda_max = wave_speed_estimator.compute(rd_i, rd_j);
     std::cout << "lambda_max: " << lambda_max << std::endl;
     std::cout << "h_star: " << h_star << std::endl;
     std::cout << std::endl;

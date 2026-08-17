@@ -14,7 +14,7 @@
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 namespace ryujin
 {
@@ -51,7 +51,7 @@ namespace ryujin
       using Limiter = ShallowWater::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = ShallowWater::RiemannSolver<dim, Number>;
+      using WaveSpeedEstimator = ShallowWater::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace ShallowWater
 } // namespace ryujin
