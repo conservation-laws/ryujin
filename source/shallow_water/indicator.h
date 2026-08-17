@@ -22,10 +22,10 @@ namespace ryujin
   namespace ShallowWater
   {
     template <typename ScalarNumber = double>
-    class IndicatorParameters : public dealii::ParameterAcceptor
+    class Indicator : public dealii::ParameterAcceptor
     {
     public:
-      IndicatorParameters(const std::string &subsection = "/Indicator")
+      Indicator(const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
       {
         evc_factor_ = ScalarNumber(1.);
@@ -48,7 +48,7 @@ namespace ryujin
      * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number = double>
-    class Indicator
+    class IndicatorView
     {
     public:
       /**
@@ -70,7 +70,7 @@ namespace ryujin
 
       using PrecomputedVector = typename View::PrecomputedVector;
 
-      using Parameters = IndicatorParameters<ScalarNumber>;
+      using Parameters = Indicator<ScalarNumber>;
 
       //@}
       /**
@@ -78,15 +78,15 @@ namespace ryujin
        *
        * Intended usage:
        * ```
-       * Indicator<dim, Number> indicator;
+       * IndicatorView<dim, Number> indicator_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   indicator.reset(i, U_i);
+       *   indicator_view.reset(i, U_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator.accumulate(js, U_j, c_ij);
+       *     indicator_view.accumulate(js, U_j, c_ij);
        *   }
-       *   indicator.alpha(hd_i);
+       *   indicator_view.alpha(hd_i);
        * }
        * ```
        */
@@ -95,9 +95,9 @@ namespace ryujin
       /**
        * Constructor taking a HyperbolicSystem instance as argument
        */
-      Indicator(const HyperbolicSystem &hyperbolic_system,
-                const Parameters &parameters,
-                const PrecomputedVector &precomputed_values)
+      IndicatorView(const HyperbolicSystem &hyperbolic_system,
+                    const Parameters &parameters,
+                    const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -156,7 +156,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
+    IndicatorView<dim, Number>::reset(const unsigned int i,
+                                      const state_type &U_i)
     {
       /* entropy viscosity commutator: */
 
@@ -177,7 +178,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::accumulate(
+    DEAL_II_ALWAYS_INLINE inline void IndicatorView<dim, Number>::accumulate(
         const unsigned int *js,
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
@@ -203,7 +204,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    Indicator<dim, Number>::alpha(const Number hd_i)
+    IndicatorView<dim, Number>::alpha(const Number hd_i)
     {
       Number my_sum = 0.;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
