@@ -9,7 +9,7 @@
 
 #include <compile_time_options.h>
 
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 #include <newton.h>
 #include <simd.h>
@@ -24,8 +24,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::f(const primitive_type &riemann_data_Z,
-                                  const Number &h) const
+    WaveSpeedEstimator<dim, Number>::f(const primitive_type &riemann_data_Z,
+                                       const Number &h) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
       const ScalarNumber gravity = view.gravity();
@@ -46,9 +46,9 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::phi(const primitive_type &riemann_data_i,
-                                    const primitive_type &riemann_data_j,
-                                    const Number &h) const
+    WaveSpeedEstimator<dim, Number>::phi(const primitive_type &riemann_data_i,
+                                         const primitive_type &riemann_data_j,
+                                         const Number &h) const
     {
       const Number &u_i = riemann_data_i[1];
       const Number &u_j = riemann_data_j[1];
@@ -63,7 +63,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::lambda1_minus(
+    WaveSpeedEstimator<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number h_star) const
     {
       const auto &[h, u, a] = riemann_data;
@@ -78,8 +78,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::lambda3_plus(const primitive_type &riemann_data,
-                                             const Number h_star) const
+    WaveSpeedEstimator<dim, Number>::lambda3_plus(
+        const primitive_type &riemann_data, const Number h_star) const
     {
       const auto &[h, u, a] = riemann_data;
 
@@ -93,7 +93,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::compute_lambda(
+    WaveSpeedEstimator<dim, Number>::compute_lambda(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number h_star) const
@@ -107,7 +107,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::compute_h_star(
+    WaveSpeedEstimator<dim, Number>::compute_h_star(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -206,7 +206,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    RiemannSolver<dim, Number>::riemann_data_from_state(
+    WaveSpeedEstimator<dim, Number>::riemann_data_from_state(
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
@@ -224,7 +224,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    inline Number RiemannSolver<dim, Number>::compute(
+    inline Number WaveSpeedEstimator<dim, Number>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -238,7 +238,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    Number RiemannSolver<dim, Number>::compute(
+    Number WaveSpeedEstimator<dim, Number>::compute(
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int /*i*/,
