@@ -45,13 +45,13 @@ namespace ryujin
           ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = ShallowWater::IndicatorView<dim, Number>;
+      using IndicatorView = ShallowWater::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = ShallowWater::LimiterView<dim, Number>;
+      using LimiterView = ShallowWater::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator =
+      using WaveSpeedEstimatorView =
           ShallowWater::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace ShallowWater

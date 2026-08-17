@@ -47,13 +47,13 @@ namespace ryujin
           ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = EulerBarotropic::IndicatorView<dim, Number>;
+      using IndicatorView = EulerBarotropic::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = EulerBarotropic::LimiterView<dim, Number>;
+      using LimiterView = EulerBarotropic::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator =
+      using WaveSpeedEstimatorView =
           EulerBarotropic::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace EulerBarotropic

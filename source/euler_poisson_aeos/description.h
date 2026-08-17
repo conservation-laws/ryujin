@@ -29,13 +29,14 @@ namespace ryujin
           EulerPoisson::ParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = EulerAEOS::IndicatorView<dim, Number>;
+      using IndicatorView = EulerAEOS::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = EulerAEOS::LimiterView<dim, Number>;
+      using LimiterView = EulerAEOS::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator = EulerAEOS::WaveSpeedEstimatorView<dim, Number>;
+      using WaveSpeedEstimatorView =
+          EulerAEOS::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace EulerPoissonAEOS
 } // namespace ryujin
