@@ -3,7 +3,7 @@
 
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
-#define DEBUG_RIEMANN_SOLVER
+#define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <wave_speed_estimator.h>
 #include <wave_speed_estimator.template.h>
 

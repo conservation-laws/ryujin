@@ -10,7 +10,7 @@
 #include <newton.h>
 #include <simd.h>
 
-// #define DEBUG_RIEMANN_SOLVER
+// #define DEBUG_WAVE_SPEED_ESTIMATOR
 
 namespace ryujin
 {
@@ -24,7 +24,7 @@ namespace ryujin
       const auto &[u_i, a_i] = riemann_data_i;
       const auto &[u_j, a_j] = riemann_data_j;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "u_left: " << u_i << std::endl;
       std::cout << "a_left: " << a_i << std::endl;
       std::cout << "u_right: " << u_j << std::endl;

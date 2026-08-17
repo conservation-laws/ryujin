@@ -14,7 +14,7 @@
 #include <newton.h>
 #include <simd.h>
 
-// #define DEBUG_RIEMANN_SOLVER
+// #define DEBUG_WAVE_SPEED_ESTIMATOR
 
 namespace ryujin
 {
@@ -53,7 +53,7 @@ namespace ryujin
       const Number &u_i = riemann_data_i[1];
       const Number &u_j = riemann_data_j[1];
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "f_L --> " << f(riemann_data_i, h) << std::endl;
       std::cout << "f_R --> " << f(riemann_data_j, h) << std::endl;
 #endif
@@ -121,14 +121,14 @@ namespace ryujin
       const Number h_min = std::min(h_i, h_j);
       const Number h_max = std::max(h_i, h_j);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << h_min << "  <- h_min/max ->  " << h_max << std::endl;
 #endif
 
       const Number a_min = std::sqrt(gravity * h_min);
       const Number a_max = std::sqrt(gravity * h_max);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << a_min << "  <- a_min/max ->  " << a_max << std::endl;
 #endif
 
@@ -139,13 +139,13 @@ namespace ryujin
 
       const Number phi_value_min =
           phi(riemann_data_i, riemann_data_j, x0 * h_min);
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "phi_value_min ->" << phi_value_min << std::endl;
 #endif
 
       const Number phi_value_max =
           phi(riemann_data_i, riemann_data_j, x0 * h_max);
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "phi_value_max ->" << phi_value_max << std::endl;
 #endif
 
@@ -159,7 +159,7 @@ namespace ryujin
       const Number h_star_left =
           ScalarNumber(0.0625) * gravity_inverse * tmp * tmp;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "left: " << h_star_left << std::endl;
 #endif
 
@@ -168,7 +168,7 @@ namespace ryujin
       tmp = Number(1.) + sqrt_two * (u_i - u_j) / (a_min + a_max);
       const Number h_star_middle = std::sqrt(h_min * h_max) * tmp;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "middle: " << h_star_middle << std::endl;
 #endif
 
@@ -186,7 +186,7 @@ namespace ryujin
 
       const Number h_star_right = tmp * tmp;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "right: " << h_star_right << std::endl;
 #endif
 

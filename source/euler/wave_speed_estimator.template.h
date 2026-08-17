@@ -10,7 +10,7 @@
 #include <newton.h>
 #include <simd.h>
 
-// #define DEBUG_RIEMANN_SOLVER
+// #define DEBUG_WAVE_SPEED_ESTIMATOR
 
 namespace ryujin
 {
@@ -310,7 +310,7 @@ namespace ryujin
       const auto p_1_tilde =
           p_j * ryujin::pow(numerator / denominator, exponent);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "p_star_two_rarefaction = " << p_1_tilde << std::endl;
 #endif
       return p_1_tilde;
@@ -365,7 +365,7 @@ namespace ryujin
                           (ScalarNumber(2.) * a);
       const Number p_2_tilde = base * base;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "p_star_failsafe = " << p_2_tilde << std::endl;
 #endif
       return p_2_tilde;
@@ -456,7 +456,7 @@ namespace ryujin
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "rho_left: " << rho_i << std::endl;
       std::cout << "u_left: " << u_i << std::endl;
       std::cout << "p_left: " << p_i << std::endl;
@@ -483,7 +483,7 @@ namespace ryujin
               p_star_tilde,
               std::min(p_max, p_star_tilde));
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "   p^*_tilde  = " << p_2 << "\n";
       std::cout << "   phi(p_*_t) = "
                 << phi(riemann_data_i, riemann_data_j, p_2) << std::endl;
@@ -497,7 +497,7 @@ namespace ryujin
         const auto lambda_max =
             compute_lambda(riemann_data_i, riemann_data_j, p_2);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "-> lambda_max = " << lambda_max << std::endl;
 #endif
         return lambda_max;
@@ -527,7 +527,7 @@ namespace ryujin
       auto [gap, lambda_max] =
           compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << std::fixed << std::setprecision(16);
       std::cout << "p_1: (start) " << p_1 << std::endl;
       std::cout << "p_2: (start) " << p_2 << std::endl;
@@ -540,7 +540,7 @@ namespace ryujin
         /* We accept our current guess if we reach the tolerance... */
         const Number tolerance(parameters.newton_tolerance());
         if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
           std::cout << "converged after " << i << " iterations." << std::endl;
 #endif
           break;
@@ -560,7 +560,7 @@ namespace ryujin
         gap = gap_new;
         lambda_max = lambda_max_new;
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
         std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
         std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
@@ -572,7 +572,7 @@ namespace ryujin
 #endif
       }
 
-#ifdef DEBUG_RIEMANN_SOLVER
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "-> lambda_max = " << lambda_max << std::endl;
 #endif
 
