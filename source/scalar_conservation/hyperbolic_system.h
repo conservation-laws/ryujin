@@ -377,7 +377,7 @@ namespace ryujin
        *
        * Intended usage:
        * ```
-       * Indicator<dim, Number> indicator;
+       * IndicatorView<dim, Number> indicator_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
        *   const auto flux_i = flux_contribution(precomputed..., i, U_i);

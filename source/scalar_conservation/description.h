@@ -48,14 +48,14 @@ namespace ryujin
           ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = ScalarConservation::Indicator<dim, Number>;
+      using Indicator = ScalarConservation::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = ScalarConservation::Limiter<dim, Number>;
+      using Limiter = ScalarConservation::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
       using WaveSpeedEstimator =
-          ScalarConservation::WaveSpeedEstimator<dim, Number>;
+          ScalarConservation::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace ScalarConservation
 } // namespace ryujin
