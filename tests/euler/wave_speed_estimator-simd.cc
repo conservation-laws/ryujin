@@ -1,2 +1,2 @@
 #define NUMBER VectorizedArray<double>
-#include "riemann_solver.cc"
+#include "wave_speed_estimator.cc"

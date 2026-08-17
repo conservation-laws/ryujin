@@ -4,9 +4,9 @@
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
 #define DEBUG_RIEMANN_SOLVER
-#include <riemann_solver.h>
-#include <riemann_solver.template.h>
 #include <simd.h>
+#include <wave_speed_estimator.h>
+#include <wave_speed_estimator.template.h>
 
 using namespace ryujin::EulerAEOS;
 using namespace ryujin;
@@ -17,7 +17,7 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
+  WaveSpeedEstimator<dim, double>::Parameters wave_speed_estimator_parameters;
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, double>::n_precomputed_values;
@@ -25,8 +25,8 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  RiemannSolver<dim> riemann_solver(
-      hyperbolic_system, riemann_solver_parameters, dummy);
+  WaveSpeedEstimator<dim> wave_speed_estimator(
+      hyperbolic_system, wave_speed_estimator_parameters, dummy);
 
   std::stringstream parameters;
   parameters << "subsection HyperbolicSystem\n"
@@ -61,7 +61,7 @@ int main()
               << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
-    const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
+    const auto lambda_max = wave_speed_estimator.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
   };
 

@@ -4,9 +4,14 @@
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
 #define DEBUG_RIEMANN_SOLVER
-#include <riemann_solver.h>
-#include <riemann_solver.template.h>
 #include <simd.h>
+#include <wave_speed_estimator.h>
+#include <wave_speed_estimator.template.h>
+
+/*
+ * Test the NASG interpolation for the EulerAEOS::RiemmanSolver. Do this by
+ * simply setting a reference pressure pinfty.
+ */
 
 using namespace ryujin::EulerAEOS;
 using namespace ryujin;
@@ -17,7 +22,7 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
+  WaveSpeedEstimator<dim, double>::Parameters wave_speed_estimator_parameters;
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, double>::n_precomputed_values;
@@ -25,8 +30,8 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  RiemannSolver<dim> riemann_solver(
-      hyperbolic_system, riemann_solver_parameters, dummy);
+  WaveSpeedEstimator<dim> wave_speed_estimator(
+      hyperbolic_system, wave_speed_estimator_parameters, dummy);
 
   std::stringstream parameters;
   parameters << "subsection HyperbolicSystem\n"
@@ -61,7 +66,7 @@ int main()
               << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
-    const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
+    const auto lambda_max = wave_speed_estimator.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
   };
 
@@ -72,9 +77,10 @@ int main()
      */
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"
-               << "set equation of state = van der waals\n"
-               << "subsection van der waals\n"
+               << "set equation of state = noble abel stiffened gas\n"
+               << "subsection noble abel stiffened gas\n"
                << "set covolume b = " << std::to_string(covolume) << "\n"
+               << "set reference pressure = 0.5\n"
                << "end\n"
                << "end\n"
                << std::endl;
@@ -146,12 +152,6 @@ int main()
   set_covolume(0.);
   test({15., 20., 7.3e8, 2.2145329586703819},
        {500., 0., 2.2e9, 1.2899388697970200});
-
-  /*
-   * States with crazy two-rarefaction pressure:
-   */
-
-  test({1., 300., 1, 1.4}, {0.125, -300., 0.1, 1.4});
 
   /*
    * States with crazy gamma values:
