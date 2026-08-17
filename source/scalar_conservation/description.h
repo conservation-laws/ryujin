@@ -12,7 +12,7 @@
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 namespace ryujin
 {
@@ -54,7 +54,7 @@ namespace ryujin
       using Limiter = ScalarConservation::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = ScalarConservation::RiemannSolver<dim, Number>;
+      using RiemannSolver = ScalarConservation::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace ScalarConservation
 } // namespace ryujin

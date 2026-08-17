@@ -7,7 +7,7 @@
 
 #include <compile_time_options.h>
 
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 #include <simd.h>
 
@@ -20,7 +20,7 @@ namespace ryujin
   namespace ScalarConservation
   {
     template <int dim, typename Number>
-    Number RiemannSolver<dim, Number>::compute(
+    Number WaveSpeedEstimator<dim, Number>::compute(
         const Number &u_i,
         const Number &u_j,
         const precomputed_type &prec_i,
@@ -193,7 +193,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
+    DEAL_II_ALWAYS_INLINE inline Number
+    WaveSpeedEstimator<dim, Number>::compute(
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int i,
