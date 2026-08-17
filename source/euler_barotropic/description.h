@@ -12,7 +12,7 @@
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
-#include "riemann_solver.h"
+#include "wave_speed_estimator.h"
 
 namespace ryujin
 {
@@ -53,7 +53,7 @@ namespace ryujin
       using Limiter = EulerBarotropic::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = EulerBarotropic::RiemannSolver<dim, Number>;
+      using RiemannSolver = EulerBarotropic::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace EulerBarotropic
 } // namespace ryujin
