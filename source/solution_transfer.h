@@ -52,12 +52,13 @@ namespace ryujin
      * The number of stored entries in the bounds array.
      */
     static constexpr unsigned int n_bounds =
-        Description::template Limiter<dim, Number>::n_bounds;
+        Description::template LimiterView<dim, Number>::n_bounds;
 
     /**
      * Array type used to store accumulated bounds.
      */
-    using Bounds = typename Description::template Limiter<dim, Number>::Bounds;
+    using Bounds =
+        typename Description::template LimiterView<dim, Number>::Bounds;
 
     //@}
     /**
@@ -155,8 +156,8 @@ namespace ryujin
      */
     //@{
 
-    typename Description::template Limiter<dim, Number>::Parameters
-        limiter_parameters_;
+    typename Description::template LimiterView<dim, Number>::Parameters
+        limiter_;
 
     //@}
     /**
