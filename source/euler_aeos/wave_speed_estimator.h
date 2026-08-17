@@ -19,11 +19,10 @@ namespace ryujin
   namespace EulerAEOS
   {
     template <typename ScalarNumber = double>
-    class WaveSpeedEstimatorParameters : public dealii::ParameterAcceptor
+    class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimatorParameters(
-          const std::string &subsection = "/WaveSpeedEstimator")
+      WaveSpeedEstimator(const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
       {
       }
@@ -40,7 +39,7 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     template <int dim, typename Number = double>
-    class WaveSpeedEstimator
+    class WaveSpeedEstimatorView
     {
     public:
       /**
@@ -72,7 +71,7 @@ namespace ryujin
 
       using PrecomputedVector = typename View::PrecomputedVector;
 
-      using Parameters = WaveSpeedEstimatorParameters<ScalarNumber>;
+      using Parameters = WaveSpeedEstimator<ScalarNumber>;
 
       //@}
       /**
@@ -83,9 +82,9 @@ namespace ryujin
       /**
        * Constructor taking a HyperbolicSystem instance as argument
        */
-      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
-                         const Parameters &parameters,
-                         const PrecomputedVector &precomputed_values)
+      WaveSpeedEstimatorView(const HyperbolicSystem &hyperbolic_system,
+                             const Parameters &parameters,
+                             const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)

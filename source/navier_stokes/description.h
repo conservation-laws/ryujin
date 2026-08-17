@@ -41,13 +41,13 @@ namespace ryujin
       using ParabolicModule = NavierStokes::ParabolicModule<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = Euler::Indicator<dim, Number>;
+      using IndicatorView = Euler::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = Euler::Limiter<dim, Number>;
+      using LimiterView = Euler::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator = Euler::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimatorView = Euler::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace NavierStokes
 } // namespace ryujin

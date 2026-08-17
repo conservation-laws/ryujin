@@ -13,12 +13,12 @@ namespace ryujin
   {
     /* instantiations */
 
-    template class Limiter<1, NUMBER>;
-    template class Limiter<2, NUMBER>;
-    template class Limiter<3, NUMBER>;
+    template class LimiterView<1, NUMBER>;
+    template class LimiterView<2, NUMBER>;
+    template class LimiterView<3, NUMBER>;
 
-    template class Limiter<1, dealii::VectorizedArray<NUMBER>>;
-    template class Limiter<2, dealii::VectorizedArray<NUMBER>>;
-    template class Limiter<3, dealii::VectorizedArray<NUMBER>>;
+    template class LimiterView<1, dealii::VectorizedArray<NUMBER>>;
+    template class LimiterView<2, dealii::VectorizedArray<NUMBER>>;
+    template class LimiterView<3, dealii::VectorizedArray<NUMBER>>;
   } // namespace EulerBarotropic
 } // namespace ryujin

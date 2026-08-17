@@ -24,8 +24,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimator<dim, Number>::f(const primitive_type &riemann_data_Z,
-                                       const Number &h) const
+    WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data_Z,
+                                           const Number &h) const
     {
       const auto view = hyperbolic_system.view<dim, Number>();
       const ScalarNumber gravity = view.gravity();
@@ -46,9 +46,10 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimator<dim, Number>::phi(const primitive_type &riemann_data_i,
-                                         const primitive_type &riemann_data_j,
-                                         const Number &h) const
+    WaveSpeedEstimatorView<dim, Number>::phi(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &h) const
     {
       const Number &u_i = riemann_data_i[1];
       const Number &u_j = riemann_data_j[1];
@@ -63,7 +64,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimator<dim, Number>::lambda1_minus(
+    WaveSpeedEstimatorView<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number h_star) const
     {
       const auto &[h, u, a] = riemann_data;
@@ -78,7 +79,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimator<dim, Number>::lambda3_plus(
+    WaveSpeedEstimatorView<dim, Number>::lambda3_plus(
         const primitive_type &riemann_data, const Number h_star) const
     {
       const auto &[h, u, a] = riemann_data;
@@ -93,7 +94,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimator<dim, Number>::compute_lambda(
+    WaveSpeedEstimatorView<dim, Number>::compute_lambda(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number h_star) const
@@ -107,7 +108,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimator<dim, Number>::compute_h_star(
+    WaveSpeedEstimatorView<dim, Number>::compute_h_star(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -206,7 +207,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    WaveSpeedEstimator<dim, Number>::riemann_data_from_state(
+    WaveSpeedEstimatorView<dim, Number>::riemann_data_from_state(
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
@@ -224,7 +225,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    inline Number WaveSpeedEstimator<dim, Number>::compute(
+    inline Number WaveSpeedEstimatorView<dim, Number>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -238,7 +239,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    Number WaveSpeedEstimator<dim, Number>::compute(
+    Number WaveSpeedEstimatorView<dim, Number>::compute(
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int /*i*/,

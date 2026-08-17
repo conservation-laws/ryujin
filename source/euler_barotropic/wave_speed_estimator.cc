@@ -13,12 +13,12 @@ namespace ryujin
   {
     /* instantiations */
 
-    template class WaveSpeedEstimator<1, NUMBER>;
-    template class WaveSpeedEstimator<2, NUMBER>;
-    template class WaveSpeedEstimator<3, NUMBER>;
+    template class WaveSpeedEstimatorView<1, NUMBER>;
+    template class WaveSpeedEstimatorView<2, NUMBER>;
+    template class WaveSpeedEstimatorView<3, NUMBER>;
 
-    template class WaveSpeedEstimator<1, dealii::VectorizedArray<NUMBER>>;
-    template class WaveSpeedEstimator<2, dealii::VectorizedArray<NUMBER>>;
-    template class WaveSpeedEstimator<3, dealii::VectorizedArray<NUMBER>>;
+    template class WaveSpeedEstimatorView<1, dealii::VectorizedArray<NUMBER>>;
+    template class WaveSpeedEstimatorView<2, dealii::VectorizedArray<NUMBER>>;
+    template class WaveSpeedEstimatorView<3, dealii::VectorizedArray<NUMBER>>;
   } // namespace EulerBarotropic
 } // namespace ryujin

@@ -19,7 +19,7 @@ int main()
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
-  WaveSpeedEstimator<dim, double>::Parameters wave_speed_estimator_parameters;
+  WaveSpeedEstimatorView<dim, double>::Parameters wave_speed_estimator;
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, double>::n_precomputed_values;
@@ -27,8 +27,8 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  WaveSpeedEstimator<dim> wave_speed_estimator(
-      hyperbolic_system, wave_speed_estimator_parameters, dummy);
+  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(
+      hyperbolic_system, wave_speed_estimator, dummy);
 
   const auto riemann_data = [&](const auto &state) {
     const auto h = hyperbolic_system.view<dim, double>().water_depth_sharp(
@@ -50,8 +50,8 @@ int main()
     const auto rd_j = riemann_data(U_j);
     std::cout << "relaxation: " << rd_i[0] << " " << rd_i[1] << std::endl;
     std::cout << "relaxation: " << rd_j[0] << " " << rd_j[1] << std::endl;
-    const auto h_star = wave_speed_estimator.compute_h_star(rd_i, rd_j);
-    const auto lambda_max = wave_speed_estimator.compute(rd_i, rd_j);
+    const auto h_star = wave_speed_estimator_view.compute_h_star(rd_i, rd_j);
+    const auto lambda_max = wave_speed_estimator_view.compute(rd_i, rd_j);
     std::cout << "lambda_max: " << lambda_max << std::endl;
     std::cout << "h_star: " << h_star << std::endl;
     std::cout << std::endl;

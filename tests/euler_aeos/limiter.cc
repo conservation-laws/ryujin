@@ -21,7 +21,7 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  Limiter<dim, double>::Parameters limiter_parameters;
+  LimiterView<dim, double>::Parameters limiter;
 
   const auto set_covolume = [&](const double covolume) {
     /*
@@ -41,7 +41,7 @@ int main()
 
   using state_type = HyperbolicSystemView<dim, double>::state_type;
 
-  using bounds_type = Limiter<dim, double>::Bounds;
+  using bounds_type = LimiterView<dim, double>::Bounds;
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, double>::n_precomputed_values;
@@ -50,7 +50,7 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  Limiter<dim, double> limiter(hyperbolic_system, limiter_parameters, dummy);
+  LimiterView<dim, double> limiter_view(hyperbolic_system, limiter, dummy);
 
   const auto view = hyperbolic_system.template view<dim, double>();
 
@@ -63,7 +63,7 @@ int main()
                   << "\nBounds: " << bounds[0] << " " << bounds[1] << " "
                   << bounds[2] << std::endl;
 
-        const auto &[l, success] = limiter.limit(bounds, U, P);
+        const auto &[l, success] = limiter_view.limit(bounds, U, P);
 
         std::cout << "l: " << l;
         if (success)

@@ -35,7 +35,7 @@ namespace ryujin
       const ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
       : ParameterAcceptor(subsection)
-      , limiter_parameters_(subsection + "/mass transfer limiter")
+      , limiter_(subsection + "/mass transfer limiter")
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
@@ -161,9 +161,10 @@ namespace ryujin
           /* precomputed needs to be valid for bounds computation */
           const auto &precomputed = std::get<1>(old_state_vector);
 
-          using Limiter = typename Description::template Limiter<dim, Number>;
-          const Limiter limiter(
-              *hyperbolic_system_, limiter_parameters_, precomputed);
+          using LimiterView =
+              typename Description::template LimiterView<dim, Number>;
+          const LimiterView limiter_view(
+              *hyperbolic_system_, limiter_, precomputed);
 
           /*
            * Collect state values for packing:
@@ -273,7 +274,8 @@ namespace ryujin
                 const auto U_i = read_tensor(U, global_i);
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
-                bounds = limiter.projection_bounds_from_state(local_i, U_i);
+                bounds =
+                    limiter_view.projection_bounds_from_state(local_i, U_i);
               }
 
               for (auto &it : state_values_quad)
@@ -285,8 +287,8 @@ namespace ryujin
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
                 const auto bounds_i =
-                    limiter.projection_bounds_from_state(local_i, U_i);
-                bounds = limiter.combine_bounds(bounds, bounds_i);
+                    limiter_view.projection_bounds_from_state(local_i, U_i);
+                bounds = limiter_view.combine_bounds(bounds, bounds_i);
 
                 for (unsigned int q = 0; q < quadrature.size(); ++q) {
                   state_values_quad[q] += U_i * fe_values.shape_value(i, q);
@@ -348,7 +350,7 @@ namespace ryujin
 
             /* Step 3: compute low-order update and P_ij matrix: */
 
-            bounds = limiter.fully_relax_bounds(bounds, total_mass);
+            bounds = limiter_view.fully_relax_bounds(bounds, total_mass);
 
             std::vector<state_type> pij_matrix(n_dofs_per_cell *
                                                n_dofs_per_cell);
@@ -376,7 +378,7 @@ namespace ryujin
 
             /* Step 4: compute l_ij matrix and apply limited update: */
 
-            const auto n_iterations = limiter_parameters_.iterations();
+            const auto n_iterations = limiter_.iterations();
             for (unsigned int pass = 0; pass < n_iterations; ++pass) {
 
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
@@ -384,7 +386,8 @@ namespace ryujin
 
                 for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
                   const auto &P_ij = pij_matrix[n_dofs_per_cell * i + j];
-                  const auto &[l_ij, check] = limiter.limit(bounds, U_i, P_ij);
+                  const auto &[l_ij, check] =
+                      limiter_view.limit(bounds, U_i, P_ij);
                   lij_matrix(i, j) = l_ij;
                 }
               }
@@ -735,9 +738,8 @@ namespace ryujin
 
     update_precomputed_values();
 
-    using Limiter = typename Description::template Limiter<dim, Number>;
-    const Limiter limiter(
-        *hyperbolic_system_, limiter_parameters_, precomputed);
+    using LimiterView = typename Description::template LimiterView<dim, Number>;
+    const LimiterView limiter_view(*hyperbolic_system_, limiter_, precomputed);
 
     /*
      * Step 1: compute low-order update P_ij matrix, and bounds:
@@ -763,7 +765,7 @@ namespace ryujin
       const auto U_i_star = projected_state.read_tensor(local_i) / m_i_star;
 
       auto &bounds = bounds_map[local_i]; /* by reference */
-      bounds = limiter.projection_bounds_from_state(local_i, U_i_star);
+      bounds = limiter_view.projection_bounds_from_state(local_i, U_i_star);
 
       /* The value obtained from the affine constraints object: */
       state_type U_i_interp;
@@ -778,8 +780,8 @@ namespace ryujin
         const auto U_k = new_U.read_tensor(local_k);
 
         const auto bounds_k =
-            limiter.projection_bounds_from_state(local_k, U_k);
-        bounds = limiter.combine_bounds(bounds, bounds_k);
+            limiter_view.projection_bounds_from_state(local_k, U_k);
+        bounds = limiter_view.combine_bounds(bounds, bounds_k);
 
         projected_state.add_tensor(c_k * m_i_star * U_i_star, local_k);
         projected_mass.local_element(local_k) += c_k * m_i_star;
@@ -801,7 +803,7 @@ namespace ryujin
 
     /* Step 2: Apply limiter: */
 
-    const auto n_iterations = limiter_parameters_.iterations();
+    const auto n_iterations = limiter_.iterations();
     for (unsigned int pass = 0; pass < n_iterations; ++pass) {
 
       /* Update precomputed values for bounds correction: */
@@ -820,7 +822,7 @@ namespace ryujin
          * without recombining such bounds per (unconstrained) degree of
          * freedom globally. We avoid doing the latter because it would
          * require a custom "VectorOperation" invoking
-         * Limiter::combine_bounds(), which we currently do not have at our
+         * LimiterView::combine_bounds(), which we currently do not have at our
          * disposal.
          *
          * As a simple workaround we simply recompute bounds for the
@@ -834,8 +836,8 @@ namespace ryujin
           const auto local_k = scalar_partitioner->global_to_local(global_k);
           const auto U_k = new_U.read_tensor(local_k);
           const auto bounds_k =
-              limiter.projection_bounds_from_state(local_k, U_k);
-          bounds = limiter.combine_bounds(bounds, bounds_k);
+              limiter_view.projection_bounds_from_state(local_k, U_k);
+          bounds = limiter_view.combine_bounds(bounds, bounds_k);
 
           const auto m_k = projected_mass.local_element(local_k);
           total_mass += m_k;
@@ -845,7 +847,7 @@ namespace ryujin
 
         /* Apply relaxation: */
         const auto relaxed_bounds =
-            limiter.fully_relax_bounds(bounds, total_mass);
+            limiter_view.fully_relax_bounds(bounds, total_mass);
 
         /* Compute limiter values: */
 
@@ -856,7 +858,8 @@ namespace ryujin
           const auto U_k = new_U.read_tensor(local_k);
           const auto P_ik = pik_matrix[{local_i, local_k}] * kappa_k / m_k;
 
-          const auto &[l_k, check] = limiter.limit(relaxed_bounds, U_k, P_ik);
+          const auto &[l_k, check] =
+              limiter_view.limit(relaxed_bounds, U_k, P_ik);
           l = std::min(l, l_k);
         }
 

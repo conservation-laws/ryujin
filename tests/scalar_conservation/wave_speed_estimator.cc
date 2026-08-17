@@ -22,8 +22,7 @@ void test(const std::string &expression)
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
-  typename WaveSpeedEstimator<dim, Number>::Parameters
-      wave_speed_estimator_parameters;
+  typename WaveSpeedEstimatorView<dim, Number>::Parameters wave_speed_estimator;
 
   const auto view = hyperbolic_system.view<dim, Number>();
 
@@ -48,8 +47,8 @@ void test(const std::string &expression)
 
   PrecomputedVector dummy;
 
-  WaveSpeedEstimator<dim> wave_speed_estimator(
-      hyperbolic_system, wave_speed_estimator_parameters, dummy);
+  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(
+      hyperbolic_system, wave_speed_estimator, dummy);
 
   std::cout << "\n\ndim = " << dim << std::endl;
   std::cout << "f(u)={" + expression + "}" << std::endl;
@@ -76,24 +75,24 @@ void test(const std::string &expression)
 
   if constexpr (dim == 1) {
     n_ij[0] = 1.;
-    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator_view.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
     n_ij[0] = -1.;
-    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator_view.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
   } else if constexpr (dim == 2) {
     n_ij[0] = 1.;
     n_ij[1] = 0.;
-    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator_view.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
     n_ij[0] = 0.;
     n_ij[1] = 1.;
-    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator_view.compute(u_i, u_j, prec_i, prec_j, n_ij);
 
     n_ij[0] = 1.;
     n_ij[1] = 1.;
     n_ij /= n_ij.norm();
-    wave_speed_estimator.compute(u_i, u_j, prec_i, prec_j, n_ij);
+    wave_speed_estimator_view.compute(u_i, u_j, prec_i, prec_j, n_ij);
   }
 }
 
