@@ -26,7 +26,7 @@ int main()
   using Number = NUMBER;
 
   HyperbolicSystem hyperbolic_system;
-  WaveSpeedEstimator<dim, Number>::Parameters wave_speed_estimator_parameters;
+  WaveSpeedEstimatorView<dim, Number>::Parameters wave_speed_estimator;
 
   const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
@@ -36,8 +36,8 @@ int main()
       Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  WaveSpeedEstimator<dim> wave_speed_estimator(
-      hyperbolic_system, wave_speed_estimator_parameters, dummy);
+  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(
+      hyperbolic_system, wave_speed_estimator, dummy);
 
   std::stringstream parameters;
   parameters << "subsection WaveSpeedEstimator\n"
@@ -64,7 +64,7 @@ int main()
     std::cout << U_j[0] << " " << U_j[1] << " " << U_j[2] << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
-    const auto lambda_max = wave_speed_estimator.compute(rd_i, rd_j);
+    const auto lambda_max = wave_speed_estimator_view.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
     std::cout << std::endl;
     std::cout << std::endl;
