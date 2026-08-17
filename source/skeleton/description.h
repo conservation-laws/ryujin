@@ -42,13 +42,13 @@ namespace ryujin
           ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
-      using Indicator = Skeleton::Indicator<dim, Number>;
+      using Indicator = Skeleton::IndicatorView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = Skeleton::Limiter<dim, Number>;
+      using Limiter = Skeleton::LimiterView<dim, Number>;
 
       template <int dim, typename Number = double>
-      using WaveSpeedEstimator = Skeleton::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = Skeleton::WaveSpeedEstimatorView<dim, Number>;
     };
   } // namespace Skeleton
 } // namespace ryujin
