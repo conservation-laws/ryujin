@@ -849,7 +849,8 @@ namespace ryujin
           compute_strict_bounds_,
           "Compute strict, but significantly more expensive bounds at various "
           "places: (a) an expensive, but better upper wavespeed estimate in "
-          "the approximate RiemannSolver; (b) entropy viscosity-commutator "
+          "the approximate WaveSpeedEstimator; (b) entropy "
+          "viscosity-commutator "
           "with correct gamma_min over the stencil; (c) mathematically correct "
           "surrogate specific entropy minimum with gamma_min over the "
           "stencil.");
