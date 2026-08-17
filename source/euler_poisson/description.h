@@ -35,7 +35,7 @@ namespace ryujin
       using Limiter = Euler::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = Euler::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = Euler::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace EulerPoisson
 } // namespace ryujin

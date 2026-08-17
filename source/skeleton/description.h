@@ -48,7 +48,7 @@ namespace ryujin
       using Limiter = Skeleton::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = Skeleton::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = Skeleton::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace Skeleton
 } // namespace ryujin

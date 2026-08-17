@@ -366,8 +366,8 @@ namespace ryujin
     typename Description::template Limiter<dim, Number>::Parameters
         limiter_parameters_;
 
-    typename Description::template RiemannSolver<dim, Number>::Parameters
-        riemann_solver_parameters_;
+    typename Description::template WaveSpeedEstimator<dim, Number>::Parameters
+        wave_speed_estimator_parameters_;
 
     //@}
     /**

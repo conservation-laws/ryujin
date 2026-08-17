@@ -54,7 +54,8 @@ namespace ryujin
       using Limiter = ScalarConservation::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = ScalarConservation::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator =
+          ScalarConservation::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace ScalarConservation
 } // namespace ryujin

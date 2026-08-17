@@ -50,7 +50,7 @@ namespace ryujin
       using Limiter = EulerAEOS::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = EulerAEOS::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = EulerAEOS::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace EulerAEOS
 } // namespace ryujin

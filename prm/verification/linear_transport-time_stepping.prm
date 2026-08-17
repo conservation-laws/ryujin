@@ -79,7 +79,7 @@ subsection F - HyperbolicModule
     set iterations        = 2
     set relaxation factor = 1
   end
-  subsection riemann solver
+  subsection wave speed estimator
     set use averaged entropy = false
     set use greedy wavespeed = false
     set random entropies = 0

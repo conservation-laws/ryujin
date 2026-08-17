@@ -61,7 +61,7 @@ end
 
 
 subsection F - HyperbolicModule
-  subsection riemann solver
+  subsection wave speed estimator
     set use averaged entropy = true
     set use greedy wavespeed = true
     set random entropies = 0

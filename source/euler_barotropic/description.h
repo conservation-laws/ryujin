@@ -53,7 +53,8 @@ namespace ryujin
       using Limiter = EulerBarotropic::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = EulerBarotropic::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator =
+          EulerBarotropic::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace EulerBarotropic
 } // namespace ryujin

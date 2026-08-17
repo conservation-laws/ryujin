@@ -51,7 +51,7 @@ namespace ryujin
       using Limiter = ShallowWater::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = ShallowWater::WaveSpeedEstimator<dim, Number>;
+      using WaveSpeedEstimator = ShallowWater::WaveSpeedEstimator<dim, Number>;
     };
   } // namespace ShallowWater
 } // namespace ryujin
