@@ -360,14 +360,15 @@ namespace ryujin
      * @name Run time options
      */
     //@{
-    typename Description::template Indicator<dim, Number>::Parameters
-        indicator_parameters_;
+    typename Description::template IndicatorView<dim, Number>::Parameters
+        indicator_;
 
-    typename Description::template Limiter<dim, Number>::Parameters
-        limiter_parameters_;
+    typename Description::template LimiterView<dim, Number>::Parameters
+        limiter_;
 
-    typename Description::template WaveSpeedEstimator<dim, Number>::Parameters
-        wave_speed_estimator_parameters_;
+    typename Description::template WaveSpeedEstimatorView<dim,
+                                                          Number>::Parameters
+        wave_speed_estimator_;
 
     //@}
     /**
@@ -398,7 +399,7 @@ namespace ryujin
     mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
-        Description::template Limiter<dim, Number>::n_bounds;
+        Description::template LimiterView<dim, Number>::n_bounds;
     mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
 
     using HyperbolicVector =
