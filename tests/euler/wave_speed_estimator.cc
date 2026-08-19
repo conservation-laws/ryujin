@@ -30,14 +30,8 @@ int main()
 
   const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
-  static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystemView<dim, Number>::n_precomputed_values;
-  using precomputed_type =
-      Vectors::MultiComponentVector<double, n_precomputed_values>;
-  precomputed_type dummy;
-
-  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(
-      hyperbolic_system, wave_speed_estimator, dummy);
+  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(hyperbolic_system,
+                                                        wave_speed_estimator);
 
   std::stringstream parameters;
   parameters << "subsection WaveSpeedEstimator\n"
