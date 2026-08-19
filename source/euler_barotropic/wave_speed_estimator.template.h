@@ -47,8 +47,6 @@ namespace ryujin
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[e_i, p_i, a_i] =
           pv.template read_tensor<Number, precomputed_type>(i);
 

@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <observer_pointer.h>
 #include <simd.h>
 
 #include <deal.II/base/point.h>
@@ -18,14 +19,34 @@ namespace ryujin
 {
   namespace EulerBarotropic
   {
+    template <int dim, typename Number = double>
+    class WaveSpeedEstimatorView;
+
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimator(const std::string &subsection = "/WaveSpeedEstimator")
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
       }
+
+      /**
+       * Return a view on the WaveSpeedEstimator for a given dimension @p dim
+       * and choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return WaveSpeedEstimatorView<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
+    private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     };
 
 
@@ -37,7 +58,7 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class WaveSpeedEstimatorView
     {
     public:
@@ -78,11 +99,11 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a
+       * Parameters object as arguments
        */
-      WaveSpeedEstimatorView(const HyperbolicSystem &hyperbolic_system,
-                             const Parameters &parameters)
-          : hyperbolic_system(hyperbolic_system)
+      WaveSpeedEstimatorView(const View &view, const Parameters &parameters)
+          : view(view)
           , parameters(parameters)
       {
       }
@@ -113,7 +134,7 @@ namespace ryujin
       //@{
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const View view;
       const Parameters &parameters;
       //@}
     };
