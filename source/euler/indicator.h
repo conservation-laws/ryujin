@@ -152,8 +152,8 @@ namespace ryujin
        * object as arguments
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
-          : view(view)
-          , indicator(indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -187,16 +187,16 @@ namespace ryujin
        */
       //@{
 
-      const View view;
-      const Indicator<ScalarNumber> &indicator;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
-      Number rho_i_inverse = 0.;
-      Number eta_i = 0.;
-      flux_type f_i;
-      state_type d_eta_i;
+      Number rho_i_inverse_ = 0.;
+      Number eta_i_ = 0.;
+      flux_type f_i_;
+      state_type d_eta_i_;
 
-      Number left = 0.;
-      state_type right;
+      Number left_ = 0.;
+      state_type right_;
 
       //@}
     };
@@ -220,16 +220,16 @@ namespace ryujin
       const auto &[new_s_i, new_eta_i] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
-      const auto rho_i = view.density(U_i);
-      rho_i_inverse = Number(1.) / rho_i;
-      eta_i = new_eta_i;
+      const auto rho_i = view_.density(U_i);
+      rho_i_inverse_ = Number(1.) / rho_i;
+      eta_i_ = new_eta_i;
 
-      d_eta_i = view.harten_entropy_derivative(U_i);
-      d_eta_i[0] -= eta_i * rho_i_inverse;
-      f_i = view.f(U_i);
+      d_eta_i_ = view_.harten_entropy_derivative(U_i);
+      d_eta_i_[0] -= eta_i_ * rho_i_inverse_;
+      f_i_ = view_.f(U_i);
 
-      left = 0.;
-      right = 0.;
+      left_ = 0.;
+      right_ = 0.;
     }
 
 
@@ -245,19 +245,19 @@ namespace ryujin
       const auto &[s_j, eta_j] =
           pv.template read_tensor<Number, precomputed_type>(js);
 
-      const auto rho_j = view.density(U_j);
+      const auto rho_j = view_.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
 
-      const auto m_j = view.momentum(U_j);
-      const auto f_j = view.f(U_j);
+      const auto m_j = view_.momentum(U_j);
+      const auto f_j = view_.f(U_j);
 
       const auto entropy_flux =
-          (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
+          (eta_j * rho_j_inverse - eta_i_ * rho_i_inverse_) * (m_j * c_ij);
 
-      left += entropy_flux;
+      left_ += entropy_flux;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        const auto component = (f_j[k] - f_i[k]) * c_ij;
-        right[k] += component;
+        const auto component = (f_j[k] - f_i_[k]) * c_ij;
+        right_[k] += component;
       }
     }
 
@@ -268,17 +268,17 @@ namespace ryujin
     {
       /* Entropy viscosity commutator: */
 
-      Number numerator = left;
-      Number denominator = std::abs(left);
+      Number numerator = left_;
+      Number denominator = std::abs(left_);
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        numerator -= d_eta_i[k] * right[k];
-        denominator += std::abs(d_eta_i[k] * right[k]);
+        numerator -= d_eta_i_[k] * right_[k];
+        denominator += std::abs(d_eta_i_[k] * right_[k]);
       }
 
       const auto quotient =
-          std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
+          std::abs(numerator) / (denominator + hd_i * std::abs(eta_i_));
 
-      return std::min(Number(1.), indicator.evc_factor() * quotient);
+      return std::min(Number(1.), indicator_.evc_factor() * quotient);
     }
   } // namespace Euler
 } // namespace ryujin

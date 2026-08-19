@@ -107,8 +107,8 @@ namespace ryujin
        * object as arguments
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
-          : view(view)
-          , limiter(limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -225,8 +225,8 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const View view;
-      const Limiter<ScalarNumber> &limiter;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
       Bounds bounds_;
       //@}

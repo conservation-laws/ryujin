@@ -134,8 +134,8 @@ namespace ryujin
       WaveSpeedEstimatorView(
           const View &view,
           const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
-          : view(view)
-          , wave_speed_estimator(wave_speed_estimator)
+          : view_(view)
+          , wave_speed_estimator_(wave_speed_estimator)
       {
       }
 
@@ -162,8 +162,8 @@ namespace ryujin
                      const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const View view;
-      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator;
+      const View view_;
+      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
       //@}
     };
   } // namespace ScalarConservation

@@ -120,8 +120,8 @@ namespace ryujin
        * object as arguments
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
-          : view(view)
-          , indicator(indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -155,14 +155,14 @@ namespace ryujin
        */
       //@{
 
-      const View view;
-      const Indicator<ScalarNumber> &indicator;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
-      Number eta_i = 0.;
-      state_type d_eta_i;
+      Number eta_i_ = 0.;
+      state_type d_eta_i_;
 
-      Number left = 0.;
-      state_type right;
+      Number left_ = 0.;
+      state_type right_;
 
       //@}
     };
@@ -186,14 +186,14 @@ namespace ryujin
       const auto &[e_i, p_i, a_i] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
-      eta_i = view.total_energy(U_i, e_i);
-      d_eta_i = view.total_energy_derivative(U_i, e_i, p_i);
+      eta_i_ = view_.total_energy(U_i, e_i);
+      d_eta_i_ = view_.total_energy_derivative(U_i, e_i, p_i);
 
-      // left = sum_j F(U_j) * c_ij, where F is the mathematical entropy flux
-      left = 0.;
+      // left_ = sum_j F(U_j) * c_ij, where F is the mathematical entropy flux
+      left_ = 0.;
 
-      // right = sum_j f(U_j) * c_ij, where f is the flux of the system
-      right = 0.;
+      // right_ = sum_j f(U_j) * c_ij, where f is the flux of the system
+      right_ = 0.;
     }
 
 
@@ -209,19 +209,19 @@ namespace ryujin
       const auto &[e_j, p_j, a_j] =
           pv.template read_tensor<Number, precomputed_type>(js);
 
-      const auto rho_j = view.density(U_j);
+      const auto rho_j = view_.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
-      const auto eta_j = view.total_energy(U_j, e_j);
+      const auto eta_j = view_.total_energy(U_j, e_j);
 
-      const auto m_j = view.momentum(U_j);
+      const auto m_j = view_.momentum(U_j);
 
-      const auto f_j = view.f(U_j, p_j);
+      const auto f_j = view_.f(U_j, p_j);
 
       const auto entropy_flux = (eta_j + p_j) * rho_j_inverse * (m_j * c_ij);
 
-      left += entropy_flux;
+      left_ += entropy_flux;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        right[k] += f_j[k] * c_ij;
+        right_[k] += f_j[k] * c_ij;
       }
     }
 
@@ -232,17 +232,17 @@ namespace ryujin
     {
       /* Entropy viscosity commutator: */
 
-      Number numerator = left;
-      Number denominator = std::abs(left);
+      Number numerator = left_;
+      Number denominator = std::abs(left_);
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        numerator -= d_eta_i[k] * right[k];
-        denominator += std::abs(d_eta_i[k] * right[k]);
+        numerator -= d_eta_i_[k] * right_[k];
+        denominator += std::abs(d_eta_i_[k] * right_[k]);
       }
 
-      const auto quotient = safe_division(std::abs(numerator),
-                                          denominator + hd_i * std::abs(eta_i));
+      const auto quotient = safe_division(
+          std::abs(numerator), denominator + hd_i * std::abs(eta_i_));
 
-      return std::min(Number(1.), indicator.evc_factor() * quotient);
+      return std::min(Number(1.), indicator_.evc_factor() * quotient);
     }
   } // namespace EulerBarotropic
 } // namespace ryujin

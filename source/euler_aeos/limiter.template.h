@@ -24,8 +24,8 @@ namespace ryujin
       Number t_r = t_max;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const auto small = view.vacuum_state_relaxation_small();
-      const auto large = view.vacuum_state_relaxation_large();
+      const auto small = view_.vacuum_state_relaxation_small();
+      const auto large = view_.vacuum_state_relaxation_large();
       const ScalarNumber relax_small = ScalarNumber(1. + small * eps);
       const ScalarNumber relax = ScalarNumber(1. + large * eps);
 
@@ -36,8 +36,8 @@ namespace ryujin
        */
 
       {
-        const auto &rho_U = view.density(U);
-        const auto &rho_P = view.density(P);
+        const auto &rho_U = view_.density(U);
+        const auto &rho_P = view_.density(P);
 
         const auto &rho_min = std::get<0>(bounds);
         const auto &rho_max = std::get<1>(bounds);
@@ -46,9 +46,9 @@ namespace ryujin
          * Verify that rho_U is within bounds. This property might be
          * violated for relative CFL numbers larger than 1.
          */
-        const auto test_min = view.filter_vacuum_density(
+        const auto test_min = view_.filter_vacuum_density(
             std::max(Number(0.), rho_U - relax * rho_max));
-        const auto test_max = view.filter_vacuum_density(
+        const auto test_max = view_.filter_vacuum_density(
             std::max(Number(0.), rho_min - relax * rho_U));
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
@@ -107,10 +107,10 @@ namespace ryujin
         /*
          * Verify that the new state is within bounds:
          */
-        const auto rho_new = view.density(U + t_r * P);
-        const auto test_new_min = view.filter_vacuum_density(
+        const auto rho_new = view_.density(U + t_r * P);
+        const auto test_new_min = view_.filter_vacuum_density(
             std::max(Number(0.), rho_new - relax * rho_max));
-        const auto test_new_max = view.filter_vacuum_density(
+        const auto test_new_max = view_.filter_vacuum_density(
             std::max(Number(0.), rho_min - relax * rho_new));
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
@@ -143,9 +143,9 @@ namespace ryujin
       const auto &gamma = std::get<3>(bounds) /* = gamma_min*/;
       const Number gm1 = gamma - Number(1.);
 
-      const auto b = Number(view.eos_covolume_constant());
-      const auto pinf = Number(view.eos_interpolation_pinfty());
-      const auto q = Number(view.eos_interpolation_q());
+      const auto b = Number(view_.eos_covolume_constant());
+      const auto pinf = Number(view_.eos_interpolation_pinfty());
+      const auto q = Number(view_.eos_interpolation_q());
 
       {
         /*
@@ -173,14 +173,14 @@ namespace ryujin
         std::cout << "t_r: (start) " << t_r << std::endl;
 #endif
 
-        for (unsigned int n = 0; n < limiter.newton_max_iterations(); ++n) {
+        for (unsigned int n = 0; n < limiter_.newton_max_iterations(); ++n) {
 
           const auto U_r = U + t_r * P;
-          const auto rho_r = view.density(U_r);
+          const auto rho_r = view_.density(U_r);
           const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
           const auto covolume_r = Number(1.) - b * rho_r;
 
-          const auto rho_e_r = view.internal_energy(U_r);
+          const auto rho_e_r = view_.internal_energy(U_r);
           const auto shift_r = rho_e_r - rho_r * q - pinf * covolume_r;
 
           auto psi_r =
@@ -224,10 +224,10 @@ namespace ryujin
 #endif
 
           const auto U_l = U + t_l * P;
-          const auto rho_l = view.density(U_l);
+          const auto rho_l = view_.density(U_l);
           const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
           const auto covolume_l = Number(1.) - b * rho_l;
-          const auto rho_e_l = view.internal_energy(U_l);
+          const auto rho_e_l = view_.internal_energy(U_l);
           const auto shift_l = rho_e_l - rho_l * q - pinf * covolume_l;
 
           auto psi_l =
@@ -265,7 +265,7 @@ namespace ryujin
            * Break if the window between t_l and t_r is within the prescribed
            * tolerance:
            */
-          const Number tolerance(limiter.newton_tolerance());
+          const Number tolerance(limiter_.newton_tolerance());
           if (std::max(Number(0.), t_r - t_l - tolerance) == Number(0.)) {
 #ifdef DEBUG_OUTPUT_LIMITER
             std::cout << "break: t_l and t_r within tolerance" << std::endl;
@@ -279,9 +279,9 @@ namespace ryujin
 
           /* We got unlucky and have to perform a Newton step: */
 
-          const auto drho = view.density(P);
-          const auto drho_e_l = view.internal_energy_derivative(U_l) * P;
-          const auto drho_e_r = view.internal_energy_derivative(U_r) * P;
+          const auto drho = view_.density(P);
+          const auto drho_e_l = view_.internal_energy_derivative(U_l) * P;
+          const auto drho_e_r = view_.internal_energy_derivative(U_r) * P;
 
           const auto q_pinf_term_l =
               ScalarNumber(2.) * rho_l * q +
@@ -322,11 +322,11 @@ namespace ryujin
         {
           const auto U_new = U + t_l * P;
 
-          const auto rho_new = view.density(U_new);
+          const auto rho_new = view_.density(U_new);
           const auto covolume_new = Number(1.) - b * rho_new;
 
           const auto rho_new_gamma = ryujin::pow(rho_new, gamma);
-          const auto rho_e_new = view.internal_energy(U_new);
+          const auto rho_e_new = view_.internal_energy(U_new);
 
           const auto shift_new = rho_e_new - rho_new * q - pinf * covolume_new;
 

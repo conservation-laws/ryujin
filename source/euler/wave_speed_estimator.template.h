@@ -21,7 +21,7 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data,
                                            const Number p_star) const
     {
-      const auto &gamma = view.gamma();
+      const auto &gamma = view_.gamma();
 
       const auto &[rho, u, p, a] = riemann_data;
 
@@ -49,10 +49,10 @@ namespace ryujin
                                             const Number &p_star) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const auto &gamma = view.gamma();
-      const auto &gamma_inverse = view.gamma_inverse();
-      const auto &gamma_minus_one_inverse = view.gamma_minus_one_inverse();
-      const auto &gamma_plus_one_inverse = view.gamma_plus_one_inverse();
+      const auto &gamma = view_.gamma();
+      const auto &gamma_inverse = view_.gamma_inverse();
+      const auto &gamma_minus_one_inverse = view_.gamma_minus_one_inverse();
+      const auto &gamma_plus_one_inverse = view_.gamma_plus_one_inverse();
 
       const auto &[rho, u, p, a] = riemann_data;
 
@@ -122,7 +122,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto &gamma = view.gamma();
+      const auto &gamma = view_.gamma();
 
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
@@ -162,8 +162,8 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      const auto &gamma = view.gamma();
-      const auto &gamma_inverse = view.gamma_inverse();
+      const auto &gamma = view_.gamma();
+      const auto &gamma_inverse = view_.gamma_inverse();
       const auto factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
 
@@ -186,8 +186,8 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::lambda3_plus(
         const primitive_type &primitive_state, const Number p_star) const
     {
-      const auto &gamma = view.gamma();
-      const auto &gamma_inverse = view.gamma_inverse();
+      const auto &gamma = view_.gamma();
+      const auto &gamma_inverse = view_.gamma_inverse();
       const Number factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
 
@@ -271,9 +271,9 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto &gamma = view.gamma();
-      const auto &gamma_inverse = view.gamma_inverse();
-      const auto &gamma_minus_one_inverse = view.gamma_minus_one_inverse();
+      const auto &gamma = view_.gamma();
+      const auto &gamma_inverse = view_.gamma_inverse();
+      const auto &gamma_minus_one_inverse = view_.gamma_minus_one_inverse();
 
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
@@ -326,7 +326,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto &gamma = view.gamma();
+      const auto &gamma = view_.gamma();
 
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
@@ -372,19 +372,19 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const auto rho = view.density(U);
+      const auto rho = view_.density(U);
       const auto rho_inverse = Number(1.0) / rho;
 
-      const auto m = view.momentum(U);
+      const auto m = view_.momentum(U);
       const auto proj_m = n_ij * m;
       const auto perp = m - proj_m * n_ij;
 
-      const auto E =
-          view.total_energy(U) - Number(0.5) * perp.norm_square() * rho_inverse;
+      const auto E = view_.total_energy(U) -
+                     Number(0.5) * perp.norm_square() * rho_inverse;
 
       using state_type_1d =
           typename HyperbolicSystemView<1, Number>::state_type;
-      const auto view_1d = view.template view<1, Number>();
+      const auto view_1d = view_.template view<1, Number>();
 
       const auto state = state_type_1d{{rho, proj_m, E}};
       const auto p = view_1d.pressure(state);
@@ -485,7 +485,7 @@ namespace ryujin
        * If we do no Newton iteration, cut it short:
        */
 
-      if (wave_speed_estimator.newton_max_iterations() == 0) {
+      if (wave_speed_estimator_.newton_max_iterations() == 0) {
         const auto lambda_max =
             compute_lambda(riemann_data_i, riemann_data_j, p_2);
 
@@ -527,11 +527,12 @@ namespace ryujin
       std::cout << "l_m: (start) " << lambda_max << std::endl;
 #endif
 
-      for (unsigned int i = 0; i < wave_speed_estimator.newton_max_iterations();
+      for (unsigned int i = 0;
+           i < wave_speed_estimator_.newton_max_iterations();
            ++i) {
 
         /* We accept our current guess if we reach the tolerance... */
-        const Number tolerance(wave_speed_estimator.newton_tolerance());
+        const Number tolerance(wave_speed_estimator_.newton_tolerance());
         if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
           std::cout << "converged after " << i << " iterations." << std::endl;

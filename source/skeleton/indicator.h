@@ -107,8 +107,8 @@ namespace ryujin
        * object as arguments
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
-          : view(view)
-          , indicator(indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -151,8 +151,8 @@ namespace ryujin
        */
       //@{
 
-      const View view;
-      const Indicator<ScalarNumber> &indicator;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
       //@}
     };

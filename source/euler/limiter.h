@@ -164,8 +164,8 @@ namespace ryujin
        * object as arguments
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
-          : view(view)
-          , limiter(limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -270,16 +270,16 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const View view;
-      const Limiter<ScalarNumber> &limiter;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
-      state_type U_i;
+      state_type U_i_;
 
       Bounds bounds_;
 
-      Number rho_relaxation_numerator;
-      Number rho_relaxation_denominator;
-      Number s_interp_max;
+      Number rho_relaxation_numerator_;
+      Number rho_relaxation_denominator_;
+      Number s_interp_max_;
 
       //@}
     };
@@ -299,7 +299,7 @@ namespace ryujin
         const unsigned int i,
         const state_type &U_i) const -> Bounds
     {
-      const auto rho_i = view.density(U_i);
+      const auto rho_i = view_.density(U_i);
       const auto &[s_i, eta_i] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
@@ -336,7 +336,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter.relaxation_factor();
+      r *= limiter_.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       rho_min *= std::max(Number(1.) - r, Number(eps));
@@ -354,7 +354,7 @@ namespace ryujin
         const state_type &new_U_i,
         const flux_contribution_type & /*new_flux_i*/)
     {
-      U_i = new_U_i;
+      U_i_ = new_U_i;
 
       /* Bounds: */
 
@@ -366,9 +366,9 @@ namespace ryujin
 
       /* Relaxation: */
 
-      rho_relaxation_numerator = Number(0.);
-      rho_relaxation_denominator = Number(0.);
-      s_interp_max = Number(0.);
+      rho_relaxation_numerator_ = Number(0.);
+      rho_relaxation_denominator_ = Number(0.);
+      s_interp_max_ = Number(0.);
     }
 
 
@@ -391,11 +391,11 @@ namespace ryujin
       /* Bounds: */
       auto &[rho_min, rho_max, s_min] = bounds_;
 
-      const auto rho_i = view.density(U_i);
-      const auto m_i = view.momentum(U_i);
-      const auto rho_j = view.density(U_j);
-      const auto m_j = view.momentum(U_j);
-      const auto rho_affine_shift = view.density(affine_shift);
+      const auto rho_i = view_.density(U_i_);
+      const auto m_i = view_.momentum(U_i_);
+      const auto rho_j = view_.density(U_j);
+      const auto m_j = view_.momentum(U_j);
+      const auto rho_affine_shift = view_.density(affine_shift);
 
       /* bar state shifted by an affine shift: */
       const auto rho_ij_bar =
@@ -413,12 +413,12 @@ namespace ryujin
 
       /* Use a uniform weight. */
       const auto beta_ij = Number(1.);
-      rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
-      rho_relaxation_denominator += std::abs(beta_ij);
+      rho_relaxation_numerator_ += beta_ij * (rho_i + rho_j);
+      rho_relaxation_denominator_ += std::abs(beta_ij);
 
       const Number s_interp =
-          view.specific_entropy((U_i + U_j) * ScalarNumber(.5));
-      s_interp_max = std::max(s_interp_max, s_interp);
+          view_.specific_entropy((U_i_ + U_j) * ScalarNumber(.5));
+      s_interp_max_ = std::max(s_interp_max_, s_interp);
     }
 
 
@@ -436,12 +436,12 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto rho_relaxation =
-          ScalarNumber(2. * limiter.relaxation_factor()) *
-          std::abs(rho_relaxation_numerator) /
-          (std::abs(rho_relaxation_denominator) + Number(eps));
+          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          std::abs(rho_relaxation_numerator_) /
+          (std::abs(rho_relaxation_denominator_) + Number(eps));
 
       const auto entropy_relaxation =
-          limiter.relaxation_factor() * (s_interp_max - s_min);
+          limiter_.relaxation_factor() * (s_interp_max_ - s_min);
 
       rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
       rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);

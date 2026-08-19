@@ -121,8 +121,8 @@ namespace ryujin
        * object as arguments
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
-          : view(view)
-          , indicator(indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -156,17 +156,17 @@ namespace ryujin
        */
       //@{
 
-      const View view;
-      const Indicator<ScalarNumber> &indicator;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
-      Number h_i = 0.;
-      Number eta_i = 0.;
-      flux_type f_i;
-      state_type d_eta_i;
-      Number pressure_i = 0.;
+      Number h_i_ = 0.;
+      Number eta_i_ = 0.;
+      flux_type f_i_;
+      state_type d_eta_i_;
+      Number pressure_i_ = 0.;
 
-      Number left = 0.;
-      state_type right;
+      Number left_ = 0.;
+      state_type right_;
       //@}
     };
 
@@ -189,14 +189,14 @@ namespace ryujin
       const auto &[eta_m, h_star] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
-      h_i = view.water_depth(U_i);
-      eta_i = eta_m;
-      d_eta_i = view.mathematical_entropy_derivative(U_i);
-      f_i = view.f(U_i);
-      pressure_i = view.pressure(U_i);
+      h_i_ = view_.water_depth(U_i);
+      eta_i_ = eta_m;
+      d_eta_i_ = view_.mathematical_entropy_derivative(U_i);
+      f_i_ = view_.f(U_i);
+      pressure_i_ = view_.pressure(U_i);
 
-      left = 0.;
-      right = 0.;
+      left_ = 0.;
+      right_ = 0.;
     }
 
 
@@ -213,14 +213,14 @@ namespace ryujin
           pv.template read_tensor<Number, precomputed_type>(js);
 
       const auto velocity_j =
-          view.momentum(U_j) * view.inverse_water_depth_sharp(U_j);
-      const auto f_j = view.f(U_j);
-      const auto pressure_j = view.pressure(U_j);
+          view_.momentum(U_j) * view_.inverse_water_depth_sharp(U_j);
+      const auto f_j = view_.f(U_j);
+      const auto pressure_j = view_.pressure(U_j);
 
-      left += (eta_j + pressure_j) * (velocity_j * c_ij);
+      left_ += (eta_j + pressure_j) * (velocity_j * c_ij);
 
       for (unsigned int k = 0; k < problem_dimension; ++k)
-        right[k] += (f_j[k] - f_i[k]) * c_ij;
+        right_[k] += (f_j[k] - f_i_[k]) * c_ij;
     }
 
 
@@ -230,20 +230,20 @@ namespace ryujin
     {
       Number my_sum = 0.;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        my_sum += d_eta_i[k] * right[k];
+        my_sum += d_eta_i_[k] * right_[k];
       }
 
-      Number numerator = std::abs(left - my_sum);
-      Number denominator = std::abs(left) + std::abs(my_sum);
+      Number numerator = std::abs(left_ - my_sum);
+      Number denominator = std::abs(left_) + std::abs(my_sum);
 
       const auto regularization =
           Number(100. * std::numeric_limits<ScalarNumber>::min());
 
       const auto quotient =
           std::abs(numerator) /
-          (denominator + std::max(hd_i * std::abs(eta_i), regularization));
+          (denominator + std::max(hd_i * std::abs(eta_i_), regularization));
 
-      return std::min(Number(1.), indicator.evc_factor() * quotient);
+      return std::min(Number(1.), indicator_.evc_factor() * quotient);
     }
 
 

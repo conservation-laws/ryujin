@@ -119,8 +119,8 @@ namespace ryujin
        * object as arguments
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
-          : view(view)
-          , limiter(limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -225,16 +225,16 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const View view;
-      const Limiter<ScalarNumber> &limiter;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
-      state_type U_i;
-      flux_contribution_type flux_i;
+      state_type U_i_;
+      flux_contribution_type flux_i_;
 
       Bounds bounds_;
 
-      Number rho_relaxation_numerator;
-      Number rho_relaxation_denominator;
+      Number rho_relaxation_numerator_;
+      Number rho_relaxation_denominator_;
 
       //@}
     };
@@ -254,7 +254,7 @@ namespace ryujin
         const unsigned int /*i*/,
         const state_type &U_i) const -> Bounds
     {
-      const auto rho_i = view.density(U_i);
+      const auto rho_i = view_.density(U_i);
       return {/*rho_min*/ rho_i, /*rho_max*/ rho_i};
     }
 
@@ -286,7 +286,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter.relaxation_factor();
+      r *= limiter_.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       rho_min_relaxed *= std::max(Number(1.) - r, Number(eps));
@@ -303,8 +303,8 @@ namespace ryujin
                                     const state_type &new_U_i,
                                     const flux_contribution_type &new_flux_i)
     {
-      U_i = new_U_i;
-      flux_i = new_flux_i;
+      U_i_ = new_U_i;
+      flux_i_ = new_flux_i;
 
       /* Bounds: */
 
@@ -315,8 +315,8 @@ namespace ryujin
 
       /* Relaxation: */
 
-      rho_relaxation_numerator = Number(0.);
-      rho_relaxation_denominator = Number(0.);
+      rho_relaxation_numerator_ = Number(0.);
+      rho_relaxation_denominator_ = Number(0.);
     }
 
 
@@ -339,16 +339,16 @@ namespace ryujin
       /* Bounds: */
       auto &[rho_min, rho_max] = bounds_;
 
-      const auto rho_i = view.density(U_i);
-      const auto rho_j = view.density(U_j);
+      const auto rho_i = view_.density(U_i_);
+      const auto rho_j = view_.density(U_j);
 
       /* bar state shifted by an affine shift: */
       const auto U_ij_bar =
-          ScalarNumber(0.5) * (U_i + U_j) -
-          ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij) +
+          ScalarNumber(0.5) * (U_i_ + U_j) -
+          ScalarNumber(0.5) * contract(add(flux_j, -flux_i_), scaled_c_ij) +
           affine_shift;
 
-      const auto rho_ij_bar = view.density(U_ij_bar);
+      const auto rho_ij_bar = view_.density(U_ij_bar);
 
       /* Density bounds: */
 
@@ -359,8 +359,8 @@ namespace ryujin
 
       /* Use a uniform weight. */
       const auto beta_ij = Number(1.);
-      rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
-      rho_relaxation_denominator += std::abs(beta_ij);
+      rho_relaxation_numerator_ += beta_ij * (rho_i + rho_j);
+      rho_relaxation_denominator_ += std::abs(beta_ij);
     }
 
 
@@ -378,9 +378,9 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto rho_relaxation =
-          ScalarNumber(2. * limiter.relaxation_factor()) *
-          std::abs(rho_relaxation_numerator) /
-          (std::abs(rho_relaxation_denominator) + Number(eps));
+          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          std::abs(rho_relaxation_numerator_) /
+          (std::abs(rho_relaxation_denominator_) + Number(eps));
 
       rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
       rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);

@@ -29,8 +29,8 @@ namespace ryujin
 
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const auto small = view.dry_state_relaxation_small();
-      const auto large = view.dry_state_relaxation_large();
+      const auto small = view_.dry_state_relaxation_small();
+      const auto large = view_.dry_state_relaxation_large();
       const auto relax_small = ScalarNumber(1. + small * eps);
       const auto relax = ScalarNumber(1. + large * eps);
 
@@ -41,12 +41,12 @@ namespace ryujin
        */
 
       {
-        auto h_U = view.water_depth(U);
-        const auto &h_P = view.water_depth(P);
+        auto h_U = view_.water_depth(U);
+        const auto &h_P = view_.water_depth(P);
 
-        const auto test_min = view.filter_dry_water_depth(
+        const auto test_min = view_.filter_dry_water_depth(
             std::max(Number(0.), h_U - relax * h_max));
-        const auto test_max = view.filter_dry_water_depth(
+        const auto test_max = view_.filter_dry_water_depth(
             std::max(Number(0.), h_min - relax * h_U));
 
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
@@ -107,10 +107,10 @@ namespace ryujin
         /*
          * Verify that the new state is within bounds:
          */
-        const auto h_new = view.water_depth(U + t_r * P);
-        const auto test_new_min = view.filter_dry_water_depth(
+        const auto h_new = view_.water_depth(U + t_r * P);
+        const auto test_new_min = view_.filter_dry_water_depth(
             std::max(Number(0.), h_new - relax * h_max));
-        const auto test_new_max = view.filter_dry_water_depth(
+        const auto test_new_max = view_.filter_dry_water_depth(
             std::max(Number(0.), h_min - relax * h_new));
 
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
@@ -144,8 +144,8 @@ namespace ryujin
         /* We first check if t_r is a good state */
 
         const auto U_r = U + t_r * P;
-        const auto h_r = view.water_depth(U_r);
-        const auto q_r = view.momentum(U_r);
+        const auto h_r = view_.water_depth(U_r);
+        const auto q_r = view_.momentum(U_r);
 
         const auto psi_r = relax_small * h_r * h_r * v2_max - q_r.norm_square();
 
@@ -170,8 +170,8 @@ namespace ryujin
 #endif
 
         const auto U_l = U + t_l * P;
-        const auto h_l = view.water_depth(U_l);
-        const auto q_l = view.momentum(U_l);
+        const auto h_l = view_.water_depth(U_l);
+        const auto q_l = view_.momentum(U_l);
 
         const auto psi_l = relax_small * h_l * h_l * v2_max - q_l.norm_square();
 
@@ -183,7 +183,7 @@ namespace ryujin
          * negative so that we do not accidentally trigger in "perfect" dry
          * states with h_l equal to zero.
          */
-        const auto filtered_h_l = view.filter_dry_water_depth(h_l);
+        const auto filtered_h_l = view_.filter_dry_water_depth(h_l);
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * filtered_h_l * v2_max -
             ScalarNumber(100.) * eps;
@@ -201,7 +201,7 @@ namespace ryujin
          * Skip the quadratic Newton step if the window between t_l and t_r
          * is within the prescribed tolerance:
          */
-        const Number tolerance(limiter.newton_tolerance());
+        const Number tolerance(limiter_.newton_tolerance());
         if (!(std::max(Number(0.), t_r - t_l - tolerance) == Number(0.))) {
           /*
            * If the bound is not satisfied, we need to find the root of a
@@ -220,10 +220,10 @@ namespace ryujin
            * case of a quadratic function psi(t) both polynomials will coincide
            * so that (up to round-off error) t_l = t_r.
            */
-          const auto &h_U = view.water_depth(U);
-          const auto &h_P = view.water_depth(P);
-          const auto &q_U = view.momentum(U);
-          const auto &q_P = view.momentum(P);
+          const auto &h_U = view_.water_depth(U);
+          const auto &h_P = view_.water_depth(P);
+          const auto &q_U = view_.momentum(U);
+          const auto &q_P = view_.momentum(P);
 
           const auto dpsi_l =
               (h_U + t_l * h_P) * h_P * v2_max -
@@ -253,8 +253,8 @@ namespace ryujin
          */
         {
           const auto U_new = U + t_l * P;
-          const auto h_new = view.water_depth(U_new);
-          const auto q_new = view.momentum(U_new);
+          const auto h_new = view_.water_depth(U_new);
+          const auto q_new = view_.momentum(U_new);
 
           const auto psi_new =
               relax_small * h_new * h_new * v2_max - q_new.norm_square();

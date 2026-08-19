@@ -53,14 +53,14 @@ namespace ryujin
       const auto &[e_j, p_j, a_j] =
           pv.template read_tensor<Number, precomputed_type>(js);
 
-      const auto rho_i = view.density(U_i);
+      const auto rho_i = view_.density(U_i);
       const auto rho_i_inverse = Number(1.0) / rho_i;
-      const auto m_i = view.momentum(U_i);
+      const auto m_i = view_.momentum(U_i);
       const auto u_i = rho_i_inverse * n_ij * m_i;
 
-      const auto rho_j = view.density(U_j);
+      const auto rho_j = view_.density(U_j);
       const auto rho_j_inverse = Number(1.0) / rho_j;
-      const auto m_j = view.momentum(U_j);
+      const auto m_j = view_.momentum(U_j);
       const auto u_j = rho_j_inverse * n_ij * m_j;
 
       return compute(primitive_type{u_i, a_i}, primitive_type{u_j, a_j});

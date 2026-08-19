@@ -119,8 +119,8 @@ namespace ryujin
        * object as arguments
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
-          : view(view)
-          , limiter(limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -213,16 +213,16 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const View view;
-      const Limiter<ScalarNumber> &limiter;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
-      state_type U_i;
-      flux_contribution_type flux_i;
+      state_type U_i_;
+      flux_contribution_type flux_i_;
 
       Bounds bounds_;
 
-      Number u_relaxation_numerator;
-      Number u_relaxation_denominator;
+      Number u_relaxation_numerator_;
+      Number u_relaxation_denominator_;
       //@}
     };
 
@@ -241,7 +241,7 @@ namespace ryujin
         const unsigned int /*i*/,
         const state_type &U_i) const -> Bounds
     {
-      const auto u_i = view.state(U_i);
+      const auto u_i = view_.state(U_i);
       return {/*u_min*/ u_i, /*u_max*/ u_i};
     }
 
@@ -273,7 +273,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter.relaxation_factor();
+      r *= limiter_.relaxation_factor();
 
       u_min = std::min((Number(1.) - r) * u_min, (Number(1.) + r) * u_min);
       u_max = std::max((Number(1.) + r) * u_max, (Number(1.) - r) * u_max);
@@ -289,8 +289,8 @@ namespace ryujin
                                     const state_type &new_U_i,
                                     const flux_contribution_type &new_flux_i)
     {
-      U_i = new_U_i;
-      flux_i = new_flux_i;
+      U_i_ = new_U_i;
+      flux_i_ = new_flux_i;
 
       /* Bounds: */
 
@@ -301,8 +301,8 @@ namespace ryujin
 
       /* Relaxation: */
 
-      u_relaxation_numerator = Number(0.);
-      u_relaxation_denominator = Number(0.);
+      u_relaxation_numerator_ = Number(0.);
+      u_relaxation_denominator_ = Number(0.);
     }
 
 
@@ -318,15 +318,15 @@ namespace ryujin
       /* Bounds: */
       auto &[u_min, u_max] = bounds_;
 
-      const auto u_i = view.state(U_i);
-      const auto u_j = view.state(U_j);
+      const auto u_i = view_.state(U_i_);
+      const auto u_j = view_.state(U_j);
 
       const auto U_ij_bar =
-          ScalarNumber(0.5) * (U_i + U_j) -
-          ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij) +
+          ScalarNumber(0.5) * (U_i_ + U_j) -
+          ScalarNumber(0.5) * contract(add(flux_j, -flux_i_), scaled_c_ij) +
           affine_shift;
 
-      const auto u_ij_bar = view.state(U_ij_bar);
+      const auto u_ij_bar = view_.state(U_ij_bar);
 
       /* Bounds: */
 
@@ -337,8 +337,8 @@ namespace ryujin
 
       /* Use a uniform weight. */
       const auto beta_ij = Number(1.);
-      u_relaxation_numerator += beta_ij * (u_i + u_j);
-      u_relaxation_denominator += std::abs(beta_ij);
+      u_relaxation_numerator_ += beta_ij * (u_i + u_j);
+      u_relaxation_denominator_ += std::abs(beta_ij);
     }
 
 
@@ -356,9 +356,9 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const Number u_relaxation =
-          ScalarNumber(2. * limiter.relaxation_factor()) *
-          std::abs(u_relaxation_numerator) /
-          (std::abs(u_relaxation_denominator) + Number(eps));
+          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          std::abs(u_relaxation_numerator_) /
+          (std::abs(u_relaxation_denominator_) + Number(eps));
 
       u_min_relaxed = std::max(u_min_relaxed, u_min - u_relaxation);
       u_max_relaxed = std::min(u_max_relaxed, u_max + u_relaxation);

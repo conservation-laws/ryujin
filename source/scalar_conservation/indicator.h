@@ -120,8 +120,8 @@ namespace ryujin
        * object as arguments
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
-          : view(view)
-          , indicator(indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -155,14 +155,14 @@ namespace ryujin
        */
       //@{
 
-      const View view;
-      const Indicator<ScalarNumber> &indicator;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
-      Number u_i;
-      Number u_abs_max;
-      dealii::Tensor<1, dim, Number> f_i;
-      Number left;
-      Number right;
+      Number u_i_;
+      Number u_abs_max_;
+      dealii::Tensor<1, dim, Number> f_i_;
+      Number left_;
+      Number right_;
       //@}
     };
 
@@ -184,11 +184,11 @@ namespace ryujin
 
       const auto prec_i = pv.template read_tensor<Number, precomputed_type>(i);
 
-      u_i = view.state(U_i);
-      u_abs_max = std::abs(u_i);
-      f_i = view.construct_flux_tensor(prec_i);
-      left = 0.;
-      right = 0.;
+      u_i_ = view_.state(U_i);
+      u_abs_max_ = std::abs(u_i_);
+      f_i_ = view_.construct_flux_tensor(prec_i);
+      left_ = 0.;
+      right_ = 0.;
     }
 
 
@@ -203,13 +203,13 @@ namespace ryujin
 
       const auto prec_j = pv.template read_tensor<Number, precomputed_type>(js);
 
-      const auto u_j = view.state(U_j);
-      u_abs_max = std::max(u_abs_max, std::abs(u_j));
-      const auto d_eta_j = view.kruzkov_entropy_derivative(u_i, u_j);
-      const auto f_j = view.construct_flux_tensor(prec_j);
+      const auto u_j = view_.state(U_j);
+      u_abs_max_ = std::max(u_abs_max_, std::abs(u_j));
+      const auto d_eta_j = view_.kruzkov_entropy_derivative(u_i_, u_j);
+      const auto f_j = view_.construct_flux_tensor(prec_j);
 
-      left += d_eta_j * (f_j * c_ij);
-      right += d_eta_j * (f_i * c_ij);
+      left_ += d_eta_j * (f_j * c_ij);
+      right_ += d_eta_j * (f_i_ * c_ij);
     }
 
 
@@ -217,17 +217,17 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     IndicatorView<dim, Number>::alpha(const Number hd_i) const
     {
-      Number numerator = left - right;
-      Number denominator = std::abs(left) + std::abs(right);
+      Number numerator = left_ - right_;
+      Number denominator = std::abs(left_) + std::abs(right_);
 
       const auto regularization =
           Number(100. * std::numeric_limits<ScalarNumber>::min());
 
       const auto quotient =
           std::abs(numerator) /
-          (denominator + std::max(hd_i * std::abs(u_abs_max), regularization));
+          (denominator + std::max(hd_i * std::abs(u_abs_max_), regularization));
 
-      return std::min(Number(1.), indicator.evc_factor() * quotient);
+      return std::min(Number(1.), indicator_.evc_factor() * quotient);
     }
 
   } // namespace ScalarConservation

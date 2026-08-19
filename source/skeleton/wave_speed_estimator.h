@@ -95,8 +95,8 @@ namespace ryujin
       WaveSpeedEstimatorView(
           const View &view,
           const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
-          : view(view)
-          , wave_speed_estimator(wave_speed_estimator)
+          : view_(view)
+          , wave_speed_estimator_(wave_speed_estimator)
       {
       }
 
@@ -115,8 +115,8 @@ namespace ryujin
       }
 
     private:
-      const View view;
-      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator;
+      const View view_;
+      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
       //@}
     };
   } // namespace Skeleton

@@ -137,8 +137,8 @@ namespace ryujin
        * object as arguments
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
-          : view(view)
-          , limiter(limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -233,18 +233,18 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const View view;
-      const Limiter<ScalarNumber> &limiter;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
-      state_type U_i;
+      state_type U_i_;
 
       Bounds bounds_;
 
       /* for relaxation */
 
-      Number h_relaxation_numerator;
-      Number v2_relaxation_numerator;
-      Number relaxation_denominator;
+      Number h_relaxation_numerator_;
+      Number v2_relaxation_numerator_;
+      Number relaxation_denominator_;
 
       //@}
     };
@@ -264,9 +264,9 @@ namespace ryujin
         const unsigned int /*i*/,
         const state_type &U_i) const -> Bounds
     {
-      const auto h_i = view.water_depth(U_i);
+      const auto h_i = view_.water_depth(U_i);
       const auto v_i =
-          view.momentum(U_i) * view.inverse_water_depth_mollified(U_i);
+          view_.momentum(U_i) * view_.inverse_water_depth_mollified(U_i);
       const auto v2_i = v_i.norm_square();
 
       return {/*h_min*/ h_i, /*h_max*/ h_i, /*v2_max*/ v2_i};
@@ -302,7 +302,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter.relaxation_factor();
+      r *= limiter_.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       h_min *= std::max((Number(1.) - r), Number(eps));
@@ -320,7 +320,7 @@ namespace ryujin
         const state_type &new_U_i,
         const flux_contribution_type & /*new_flux_i*/)
     {
-      U_i = new_U_i;
+      U_i_ = new_U_i;
 
       auto &[h_min, h_max, v2_max] = bounds_;
 
@@ -328,9 +328,9 @@ namespace ryujin
       h_max = Number(0.);
       v2_max = Number(0.);
 
-      h_relaxation_numerator = Number(0.);
-      v2_relaxation_numerator = Number(0.);
-      relaxation_denominator = Number(0.);
+      h_relaxation_numerator_ = Number(0.);
+      v2_relaxation_numerator_ = Number(0.);
+      relaxation_denominator_ = Number(0.);
     }
 
 
@@ -345,8 +345,8 @@ namespace ryujin
     {
       /* The bar states: */
 
-      const auto f_star_ij = view.f(U_star_ij);
-      const auto f_star_ji = view.f(U_star_ji);
+      const auto f_star_ij = view_.f(U_star_ij);
+      const auto f_star_ji = view_.f(U_star_ji);
 
       /* bar state shifted by an affine shift: */
       const auto U_ij_bar =
@@ -359,12 +359,12 @@ namespace ryujin
 
       auto &[h_min, h_max, v2_max] = bounds_;
 
-      const auto h_bar_ij = view.water_depth(U_ij_bar);
+      const auto h_bar_ij = view_.water_depth(U_ij_bar);
       h_min = std::min(h_min, h_bar_ij);
       h_max = std::max(h_max, h_bar_ij);
 
-      const auto v_bar_ij = view.momentum(U_ij_bar) *
-                            view.inverse_water_depth_mollified(U_ij_bar);
+      const auto v_bar_ij = view_.momentum(U_ij_bar) *
+                            view_.inverse_water_depth_mollified(U_ij_bar);
       const auto v2_bar_ij = v_bar_ij.norm_square();
       v2_max = std::max(v2_max, v2_bar_ij);
 
@@ -373,17 +373,17 @@ namespace ryujin
       /* Use a uniform weight. */
       const auto beta_ij = Number(1.);
 
-      relaxation_denominator += std::abs(beta_ij);
+      relaxation_denominator_ += std::abs(beta_ij);
 
-      const auto h_i = view.water_depth(U_i);
-      const auto h_j = view.water_depth(U_j);
-      h_relaxation_numerator += beta_ij * (h_i + h_j);
+      const auto h_i = view_.water_depth(U_i_);
+      const auto h_j = view_.water_depth(U_j);
+      h_relaxation_numerator_ += beta_ij * (h_i + h_j);
 
       const auto vel_i =
-          view.momentum(U_i) * view.inverse_water_depth_mollified(U_i);
+          view_.momentum(U_i_) * view_.inverse_water_depth_mollified(U_i_);
       const auto vel_j =
-          view.momentum(U_j) * view.inverse_water_depth_mollified(U_j);
-      v2_relaxation_numerator +=
+          view_.momentum(U_j) * view_.inverse_water_depth_mollified(U_j);
+      v2_relaxation_numerator_ +=
           beta_ij * (-vel_i.norm_square() + vel_j.norm_square());
     }
 
@@ -401,13 +401,14 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_relaxed = ScalarNumber(2. * limiter.relaxation_factor()) *
-                               std::abs(h_relaxation_numerator) /
-                               (relaxation_denominator + Number(eps));
+      const Number h_relaxed = ScalarNumber(2. * limiter_.relaxation_factor()) *
+                               std::abs(h_relaxation_numerator_) /
+                               (relaxation_denominator_ + Number(eps));
 
-      const Number v2_relaxed = ScalarNumber(2. * limiter.relaxation_factor()) *
-                                std::abs(v2_relaxation_numerator) /
-                                (relaxation_denominator + Number(eps));
+      const Number v2_relaxed =
+          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          std::abs(v2_relaxation_numerator_) /
+          (relaxation_denominator_ + Number(eps));
 
       h_min_relaxed = std::max(h_min_relaxed, h_min - h_relaxed);
       h_max_relaxed = std::min(h_max_relaxed, h_max + h_relaxed);
