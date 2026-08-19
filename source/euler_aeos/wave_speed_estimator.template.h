@@ -86,7 +86,6 @@ namespace ryujin
                                                const Number &gamma,
                                                const Number &a) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto covolume_b = view.eos_covolume_constant();
 
       const Number numerator =
@@ -104,7 +103,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
@@ -220,7 +218,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
@@ -274,7 +271,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
 
@@ -330,7 +326,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
@@ -419,7 +414,6 @@ namespace ryujin
     {
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
 
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
 
@@ -473,7 +467,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto covolume_b = view.eos_covolume_constant();
       const auto pinf = view.eos_interpolation_pinfty();
 
@@ -509,7 +502,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
@@ -528,7 +520,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::lambda3_plus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
@@ -563,8 +554,6 @@ namespace ryujin
         const Number &p,
         const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto rho = view.density(U);
       const auto rho_inverse = ScalarNumber(1.0) / rho;
 
@@ -604,7 +593,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto pinf = view.eos_interpolation_pinfty();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
