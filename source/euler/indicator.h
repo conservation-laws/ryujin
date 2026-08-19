@@ -99,7 +99,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       using Parameters = Indicator<ScalarNumber>;
 
@@ -112,10 +112,10 @@ namespace ryujin
        * IndicatorView<dim, Number> indicator_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   indicator_view.reset(i, U_i);
+       *   indicator_view.reset(pv, i, U_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator_view.accumulate(js, U_j, c_ij);
+       *     indicator_view.accumulate(pv, js, U_j, c_ij);
        *   }
        *   indicator_view.alpha(hd_i);
        * }
@@ -127,11 +127,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       IndicatorView(const HyperbolicSystem &hyperbolic_system,
-                    const Parameters &parameters,
-                    const PrecomputedVector &precomputed_values)
+                    const Parameters &parameters)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
-          , precomputed_values(precomputed_values)
       {
       }
 
@@ -139,13 +137,16 @@ namespace ryujin
        * Reset temporary storage and initialize for a new row corresponding
        * to state vector U_i.
        */
-      void reset(const unsigned int i, const state_type &U_i);
+      void reset(const PrecomputedVectorView &pv,
+                 const unsigned int i,
+                 const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int *js,
+      void accumulate(const PrecomputedVectorView &pv,
+                      const unsigned int *js,
                       const state_type &U_j,
                       const dealii::Tensor<1, dim, Number> &c_ij);
 
@@ -164,7 +165,6 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
 
       Number rho_i_inverse = 0.;
       Number eta_i = 0.;
@@ -187,7 +187,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    IndicatorView<dim, Number>::reset(const unsigned int i,
+    IndicatorView<dim, Number>::reset(const PrecomputedVectorView &pv,
+                                      const unsigned int i,
                                       const state_type &U_i)
     {
       /* Entropy viscosity commutator: */
@@ -195,7 +196,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[new_s_i, new_eta_i] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
       const auto rho_i = view.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
@@ -212,6 +213,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void IndicatorView<dim, Number>::accumulate(
+        const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
@@ -221,7 +223,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[s_j, eta_j] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
 
       const auto rho_j = view.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
