@@ -211,7 +211,7 @@ namespace ryujin
 
       //@}
       /**
-       * constexpr booleans used in the EulerInitialStates namespace
+       * @name Constexpr booleans used in the EulerInitialStates namespace
        */
       //@{
 

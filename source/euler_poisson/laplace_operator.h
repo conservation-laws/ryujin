@@ -567,7 +567,6 @@ namespace ryujin
     }
 
   private:
-    //@}
     /**
      * @name Internal data
      */

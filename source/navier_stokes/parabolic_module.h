@@ -165,7 +165,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Functons for performing explicit time steps
+       * @name Functions for performing explicit time steps
        */
       //@{
 

@@ -212,8 +212,10 @@ namespace ryujin
        */
       Bounds bounds(const Number hd_i) const;
 
-      //*}
-      /** @name Convex limiter */
+      //@}
+      /**
+       * @name Convex limiter
+       */
       //@{
 
       /**
@@ -230,7 +232,9 @@ namespace ryujin
 
     private:
       //@}
-      /** @name Arguments and internal fields */
+      /**
+       * @name Arguments and internal fields
+       */
       //@{
 
       const View view_;

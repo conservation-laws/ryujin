@@ -147,7 +147,7 @@ namespace ryujin
 
     private:
       /**
-       * @name
+       * @name Internal data
        */
       //@{
 

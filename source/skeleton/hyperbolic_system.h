@@ -430,6 +430,7 @@ namespace ryujin
         return state;
       }
 
+      //@}
     }; /* HyperbolicSystemView */
   }    // namespace Skeleton
 } // namespace ryujin

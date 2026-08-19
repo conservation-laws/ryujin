@@ -201,8 +201,10 @@ namespace ryujin
         return relaxed_bounds;
       }
 
-      //*}
-      /** @name Convex limiter */
+      //@}
+      /**
+       * @name Convex limiter
+       */
       //@{
 
       /**
@@ -222,7 +224,9 @@ namespace ryujin
 
     private:
       //@}
-      /** @name Arguments and internal fields */
+      /**
+       * @name Arguments and internal fields
+       */
       //@{
 
       const View view_;

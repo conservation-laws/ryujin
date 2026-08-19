@@ -513,6 +513,7 @@ namespace ryujin
         return state;
       }
 
+      //@}
     }; /* HyperbolicSystemView */
 
 

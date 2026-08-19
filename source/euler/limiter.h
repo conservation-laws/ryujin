@@ -147,7 +147,6 @@ namespace ryujin
       /**
        * @name Computation and manipulation of bounds
        */
-      //
       //@{
       /**
        * The number of stored entries in the bounds array.
@@ -240,8 +239,10 @@ namespace ryujin
        */
       Bounds bounds(const Number hd_i) const;
 
-      //*}
-      /** @name Convex limiter */
+      //@}
+      /**
+       * @name Convex limiter
+       */
       //@{
 
       /**
@@ -267,7 +268,9 @@ namespace ryujin
 
     private:
       //@}
-      /** @name Arguments and internal fields */
+      /**
+       * @name Arguments and internal fields
+       */
       //@{
 
       const View view_;

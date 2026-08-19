@@ -156,8 +156,6 @@ namespace ryujin
       using state_type = typename View::state_type;
 
       //@}
-
-      //@}
       /**
        * @name Constructor and setup
        */
@@ -184,7 +182,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Functons for performing explicit time steps
+       * @name Functions for performing explicit time steps
        */
       //@{
 

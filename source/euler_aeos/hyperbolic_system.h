@@ -364,7 +364,7 @@ namespace ryujin
 
       //@}
       /**
-       * constexpr booleans used in the EulerInitialStates namespace
+       * @name Constexpr booleans used in the EulerInitialStates namespace
        */
       //@{
 
@@ -771,6 +771,7 @@ namespace ryujin
           const flux_contribution_type &flux_j,
           const dealii::Tensor<1, dim, Number> &c_ij) const = delete;
 
+      //@}
       /**
        * @name Computing stencil source terms
        */

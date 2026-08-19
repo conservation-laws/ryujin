@@ -36,6 +36,9 @@ namespace ryujin
     class ExactRiemannSolution : public InitialState<Description, dim, Number>
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
       //@{
 
       using HyperbolicSystem = typename Description::HyperbolicSystem;
@@ -210,7 +213,7 @@ namespace ryujin
     private:
       //@}
       /**
-       * Runtime parameters
+       * @name Run time options
        */
       //@{
 
@@ -221,7 +224,7 @@ namespace ryujin
 
       //@}
       /**
-       * Private fields
+       * @name Internal data
        */
       //@{
 
@@ -236,7 +239,7 @@ namespace ryujin
 
       //@}
       /**
-       * Internal helper functions for solving the exact Riemann problem
+       * @name Internal methods
        */
       //@{
 

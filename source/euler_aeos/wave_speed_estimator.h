@@ -140,7 +140,9 @@ namespace ryujin
       //@}
 
     protected:
-      /** @name Internal functions used in the Riemann solver */
+      /**
+       * @name Internal functions used in the Riemann solver
+       */
       //@{
 
       /**

@@ -638,6 +638,7 @@ namespace ryujin
       state_type apply_galilei_transform(const state_type &state,
                                          const Lambda &lambda) const;
 
+      //@}
     }; /* HyperbolicSystemView */
 
 
