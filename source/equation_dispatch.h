@@ -265,6 +265,8 @@ namespace ryujin
   /**
    * A small Dispatch struct templated in Description that registers the
    * callbacks.
+   *
+   * @ingroup TimeLoop
    */
   template <typename Description, typename Number>
   struct Dispatch {

@@ -33,7 +33,7 @@ namespace ryujin
      * @note This function is used to efficiently set up a single vector
      * partitioner in OfflineData used in all MultiComponentVector instances.
      *
-     * @ingroup SIMD
+     * @ingroup LinearAlgebra
      */
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
     create_vector_partitioner(
@@ -55,7 +55,7 @@ namespace ryujin
      * that stores a vector element of @p n_comp components per entry
      * (instead of a scalar value).
      *
-     * @ingroup SIMD
+     * @ingroup LinearAlgebra
      */
     template <typename Number,
               int n_comp,
@@ -193,6 +193,20 @@ namespace ryujin
     };
 
 
+    /**
+     * A "view" of a MultiComponentVector that lives in the host or device
+     * memory space. It provides a number of methods for reading and
+     * writing scalar and tensor-valued entries.
+     *
+     * @note This class is designed to be captured by value in computation
+     * loops with access to either the host or device memory space. As such
+     * we do not store a reference to the underlying MultiComponentVector
+     * but rather raw pointers into the corresponding memory. The view is
+     * only valid as long as the underlying MultiComponentVector object is
+     * not modified.
+     *
+     * @ingroup LinearAlgebra
+     */
     template <typename Number,
               int n_comp,
               int simd_length,

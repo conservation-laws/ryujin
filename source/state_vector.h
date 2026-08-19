@@ -22,7 +22,7 @@ namespace ryujin
   /**
    * A namespace for various vector type aliases.
    *
-   * @ingroup Mesh
+   * @ingroup LinearAlgebra
    */
   namespace Vectors
   {

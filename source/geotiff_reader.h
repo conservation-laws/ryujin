@@ -23,6 +23,12 @@
 
 namespace ryujin
 {
+  /**
+   * Controls how the height information read in from a GeoTIFF image is
+   * normalized.
+   *
+   * @ingroup ShallowWaterEquations
+   */
   enum class HeightNormalization {
     /** do not normalize the height: **/
     none,

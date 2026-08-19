@@ -30,6 +30,8 @@ namespace ryujin
    *  realizations that are already MPIEnsemble "aware" we should fall back
    *  to only creating one instance - possibly by checking for and calling
    *  a modified constructor that takes an mpi_ensemble as an argument.
+   *
+   * @ingroup Miscellaneous
    */
   template <typename T>
   class MPIEnsembleContainer

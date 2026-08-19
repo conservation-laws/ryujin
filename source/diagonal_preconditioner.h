@@ -17,7 +17,7 @@ namespace ryujin
    * A preconditioner implementing a diagonal scaling used for the
    * non-multigrid CG iteration.
    *
-   * @ingroup ParabolicModule
+   * @ingroup LinearAlgebra
    */
   template <typename Number>
   class DiagonalPreconditioner

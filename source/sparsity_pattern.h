@@ -40,6 +40,8 @@ namespace ryujin
    * For the non-vectorized row index region [n_internal_dofs,
    * n_locally_relevant_dofs) we store the matrix in CSR format (equivalent
    * to the static dealii::SparsityPattern).
+   *
+   * @ingroup LinearAlgebra
    */
   template <int simd_length>
   class SparsityPattern : public SparsityPatternView<simd_length>
@@ -162,6 +164,8 @@ namespace ryujin
    * rather raw pointers into the corresponding memory. The view is only
    * valid as long as the underlying SparsityPattern object is not
    * modified.
+   *
+   * @ingroup LinearAlgebra
    */
   template <int simd_length, typename MemorySpace>
   class SparsityPatternView

@@ -75,6 +75,8 @@ namespace ryujin
   /**
    * Internal copy data for thread parallelized assembly. See the deal.II
    * Workstream documentation for details.
+   *
+   * @ingroup Mesh
    */
   template <int dim, typename Number = double>
   class AssemblyCopyData
