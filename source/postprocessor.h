@@ -80,7 +80,7 @@ namespace ryujin
 
     /**
      * Prepare Postprocessor. A call to @ref prepare() allocates temporary
-     * storage and is necessary before schedule_output() can be called.
+     * storage and is necessary before compute() can be called.
      *
      * Calling prepare() allocates temporary storage for two additional
      * scalar vectors of type OfflineData::scalar_type.
@@ -114,14 +114,14 @@ namespace ryujin
     }
 
     /**
-     * Given a state vector @p U and a file name prefix @p name, the
-     * current time @p t, and the current output cycle @p cycle) schedule a
-     * solution output.
+     * Given a state vector @p state_vector compute all configured
+     * postprocessed quantities and store the result in the vector returned
+     * by quantities().
      *
-     * The function post-processes quantities synchronously, and (depending
-     * on configuration options) schedules the write-out asynchronously
-     * onto a background worker thread. This implies that @p U can again be
-     * modified once schedule_output() returned.
+     * The normalization bounds are computed on the first invocation and
+     * then reused for all subsequent invocations, unless the
+     * "recompute bounds" run time option is set, or reset_bounds() has been
+     * called in the meantime.
      *
      * The function requires MPI communication and is not reentrant.
      */

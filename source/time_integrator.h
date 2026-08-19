@@ -333,7 +333,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(time_stepping_scheme);
 
     /**
-     * The eficiency of the selected time-stepping scheme expressed as the
+     * The efficiency of the selected time-stepping scheme expressed as the
      * ratio of step size of the combined method to step size of an
      * elementary forward Euler step. For example, SSPRK33 has an
      * efficiency ratio of 1 whereas ERK33 has an efficiency ratio of 3.
@@ -435,10 +435,13 @@ namespace ryujin
     Number
     step_strang_erk_43_cn(StateVector &state_vector, Number t, Number tau_max);
 
-    /** Given a reference to a previous state vector U, performs an
-     * implicit-explicit step IMEX(1,1;1) using a forward euler scheme for the
-     * hyperbolic subproblem and backward euler scheme for the parabolic
-     * subproblem. */
+    /**
+     * Given a reference to a previous state vector U performs an
+     * implicit-explicit IMEX(1,1;1) step using a forward Euler scheme for
+     * the hyperbolic subproblem and a backward Euler scheme for the
+     * parabolic subproblem. The function returns the chosen time step size
+     * tau.
+     */
     Number step_imex_11(StateVector &state_vector, Number t, Number tau_max);
 
     /**

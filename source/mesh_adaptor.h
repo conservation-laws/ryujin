@@ -155,9 +155,9 @@ namespace ryujin
                  unsigned int cycle);
 
     /**
-     * A boolean indicating whether we should perform a mesh adapation step
+     * A boolean indicating whether we should perform a mesh adaptation step
      * in the current cycle. The analyze() method will set this boolean to
-     * true whenever the selected adaptation strategy advices to perform an
+     * true whenever the selected adaptation strategy advises to perform an
      * adaptation cycle.
      */
     ACCESSOR_READ_ONLY(need_mesh_adaptation)

@@ -155,7 +155,7 @@ namespace ryujin
                    Number /* t sum */>;
 
     /**
-     * Associated statistics for The boundary map.
+     * Associated statistics for the boundary map.
      */
     std::map<std::string, boundary_statistic> boundary_statistics_;
     std::map<std::string, std::vector<std::tuple<Number, boundary_value>>>
@@ -195,7 +195,7 @@ namespace ryujin
                    Number /* t sum */>;
 
     /**
-     * Associated statistics for The interior map.
+     * Associated statistics for the interior map.
      */
     std::map<std::string, interior_statistic> interior_statistics_;
     std::map<std::string, std::vector<std::tuple<Number, interior_value>>>

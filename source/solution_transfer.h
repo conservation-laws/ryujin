@@ -20,7 +20,7 @@ namespace ryujin
    * The SolutionTransfer class is an adaptation of the
    * parallel::distributed::SolutionTransfer class and method implemented
    * in deal.II. This class is, in contrast to the deal.II version,
-   * specifically taylored to our needs:
+   * specifically tailored to our needs:
    *  - it uses the MultiComponentVector directly,
    *  - it implements a local mass matrix projection with convex limiting.
    *
@@ -127,9 +127,9 @@ namespace ryujin
     }
 
     /**
-     * Return the handle associated with the call back that was set by
-     * prepare_projection() and the associated data attached to the
-     * triangulation.
+     * Invalidate the currently stored handle. After a call to this function
+     * a new handle can be registered with prepare_projection(), or
+     * set_handle().
      */
     void reset_handle()
     {

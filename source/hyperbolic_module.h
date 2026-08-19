@@ -169,7 +169,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Functons for performing explicit time steps
+     * @name Functions for performing explicit time steps
      */
     //@{
 
@@ -249,7 +249,7 @@ namespace ryujin
      *   \bF^{s,n}_i\;:=\;
      *   \sum_{j\in\Ii}\Big(-(\polf(\bUnis)+\polf(\bUnjs)) \cdot\bc_{ij}\Big).
      * \f}
-     * where \f$\omega_s\f$ denotes the weigths for the given stages
+     * where \f$\omega_s\f$ denotes the weights for the given stages
      * \f$\bU^{s,n}\f$.
      *
      * @note The routine only performs an explicit update step on the
@@ -354,7 +354,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(n_corrections)
 
     /**
-     * The number of ID violation warnings encounterd in the step()
+     * The number of ID violation warnings encountered in the step()
      * function. We issue a warning whenever we encounter an ID violation
      * in the low order update (and throwing a restart is disabled).
      */

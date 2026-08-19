@@ -142,7 +142,7 @@ namespace ryujin
      * ("cG") variant of the selected finite element space in (deal.II
      * typical) global numbering.
      *
-     * @note The affine constraints object is populated with with (a)
+     * @note The affine constraints object is populated with (a)
      * hanging node constraints, and (b) periodicity constraints, that
      * directly affect the chosen ansatz space.
      *
@@ -156,7 +156,7 @@ namespace ryujin
      * discontinuous ("dG") variant of the selected finite element space in
      * (deal.II typical) global numbering.
      *
-     * @note The affine constraints object is populated with with (a)
+     * @note The affine constraints object is populated with (a)
      * hanging node constraints, and (b) periodicity constraints, that
      * directly affect the chosen ansatz space.
      *
@@ -169,7 +169,7 @@ namespace ryujin
      * An AffineConstraints object storing constraints in (deal.II typical)
      * global numbering.
      *
-     * @note The affine constraints object is populated with with (a)
+     * @note The affine constraints object is populated with (a)
      * hanging node constraints, and (b) periodicity constraints, that
      * directly affect the chosen ansatz space.
      */
@@ -230,7 +230,7 @@ namespace ryujin
 
     /**
      * Number of locally relevant degrees of freedom: This number is the
-     * toal number of degrees of freedom we store locally on this MPI rank.
+     * total number of degrees of freedom we store locally on this MPI rank.
      * I.e.,  we can access the half open interval [0, n_locally_relevant_)
      * on this machine.
      */
@@ -361,20 +361,23 @@ namespace ryujin
 
     /**
      * Set up affine constraints and sparsity pattern. Internally used in
-     * setup().
+     * prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */
     void create_constraints_and_sparsity_pattern();
 
     /**
+     * Ensure that the SIMD stride of the renumbered degrees of freedom
+     * remains consistent across all MPI ranks. Internally used in
+     * prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */
     void ensure_simd_stride_consistency();
 
     /**
-     * Create partitioner. Internally used in setup().
+     * Create partitioner. Internally used in prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */

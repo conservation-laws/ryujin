@@ -80,7 +80,7 @@ namespace ryujin
 
     /**
      * Performs a resume operation. Given a @p base_name the function tries
-     * to locate correponding checkpoint files and will read in the saved
+     * to locate corresponding checkpoint files and will read in the saved
      * state @p state_vector at saved time @p t with saved output cycle
      * @p output_cycle.
      */

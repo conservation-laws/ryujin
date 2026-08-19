@@ -395,7 +395,7 @@ namespace ryujin
     ACCESSOR_CONTAINER_READ_ONLY(collection_, quadrature)
 
     /**
-     * Return a read-only const reference to a highe order quadrature rule
+     * Return a read-only const reference to a higher order quadrature rule
      * used for computing errors.
      *
      * @note The accessor returns an QCollection object.
