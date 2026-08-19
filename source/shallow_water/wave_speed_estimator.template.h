@@ -240,6 +240,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     Number WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView & /*pv*/,
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int /*i*/,
