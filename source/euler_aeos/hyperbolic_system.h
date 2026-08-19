@@ -76,6 +76,13 @@ namespace ryujin
       HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
       /**
+       * Alias for the view on the hyperbolic system for a given dimension @p
+       * dim and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = HyperbolicSystemView<dim, Number>;
+
+      /**
        * Return a view on the Hyperbolic System for a given dimension @p
        * dim and choice of number type @p Number (which can be a scalar
        * float, or double, as well as a VectorizedArray holding packed
@@ -84,7 +91,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return HyperbolicSystemView<dim, Number>{*this};
+        return View<dim, Number>{*this};
       }
 
       /**

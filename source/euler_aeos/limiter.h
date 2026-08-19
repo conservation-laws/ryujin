@@ -61,6 +61,13 @@ namespace ryujin
       ACCESSOR_READ_ONLY(relaxation_factor);
 
       /**
+       * Alias for the view on the limiter for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = LimiterView<dim, Number>;
+
+      /**
        * Return a view on the Limiter for a given dimension @p dim and
        * choice of number type @p Number (which can be a scalar float, or
        * double, as well as a VectorizedArray holding packed scalars).
@@ -68,7 +75,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return LimiterView<dim, Number>{
+        return View<dim, Number>{
             hyperbolic_system_->template view<dim, Number>(), *this};
       }
 
@@ -136,8 +143,6 @@ namespace ryujin
 
       using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
-      using Parameters = Limiter<ScalarNumber>;
-
       //@}
       /**
        * @name Computation and manipulation of bounds
@@ -155,10 +160,10 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystemView and a
-       * Parameters object as arguments
+       * Constructor taking a HyperbolicSystemView and a parameters
+       * object as arguments
        */
-      LimiterView(const View &view, const Parameters &parameters)
+      LimiterView(const View &view, const Limiter<ScalarNumber> &parameters)
           : view(view)
           , parameters(parameters)
       {
@@ -266,7 +271,7 @@ namespace ryujin
       //@{
 
       const View view;
-      const Parameters &parameters;
+      const Limiter<ScalarNumber> &parameters;
 
       state_type U_i;
       flux_contribution_type flux_i;

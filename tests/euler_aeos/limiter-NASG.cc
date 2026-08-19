@@ -21,7 +21,7 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  LimiterView<dim, double>::Parameters limiter(hyperbolic_system);
+  Limiter<double> limiter(hyperbolic_system);
 
   const auto set_covolume = [&](const double covolume) {
     /*
