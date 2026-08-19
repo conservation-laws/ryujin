@@ -214,7 +214,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal fields and methods
+     * @name Internal data
      */
     //@{
 

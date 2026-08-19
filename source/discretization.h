@@ -265,7 +265,7 @@ namespace ryujin
     };
 
     /**
-     * @name Accessors to data structures managed by this class.
+     * @name Information and statistics
      */
     //@{
 
@@ -459,7 +459,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal data:
+     * @name Internal data
      */
     //@{
     //

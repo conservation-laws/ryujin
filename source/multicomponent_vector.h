@@ -65,7 +65,7 @@ namespace ryujin
     {
     public:
       /**
-       * @name Constructor, reinitialization, assignment
+       * @name Constructor and initialization
        */
       //@{
 
@@ -98,7 +98,7 @@ namespace ryujin
 
       //@}
       /**
-       * Memory space access and synchronization:
+       * @name Memory space access and synchronization
        */
       //@{
 
@@ -136,7 +136,7 @@ namespace ryujin
 
       //@}
       /**
-       * MPI synchronization.
+       * @name MPI synchronization
        */
       //@{
 
@@ -216,7 +216,7 @@ namespace ryujin
     {
     public:
       /**
-       * @name Constructor and reinitialization
+       * @name Constructor and initialization
        */
       //@{
 
@@ -454,7 +454,7 @@ namespace ryujin
 
       //@}
       /**
-       * MPI synchronization.
+       * @name MPI synchronization
        */
       //@{
 
@@ -482,7 +482,7 @@ namespace ryujin
     private:
       //@}
       /**
-       * Internal data fields:
+       * @name Internal fields
        */
       //@{
 

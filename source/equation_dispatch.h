@@ -151,7 +151,7 @@ namespace ryujin
 
   protected:
     /**
-     * @name Internal data structures:
+     * @name Internal data
      */
     //@{
 
@@ -180,7 +180,7 @@ namespace ryujin
   private:
     //@}
     /**
-     * @name Runtime parameters:
+     * @name Run time options
      */
     //@{
 

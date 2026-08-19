@@ -48,7 +48,7 @@ namespace ryujin
   {
   public:
     /**
-     * @name Constructor, initialization, access.
+     * @name Constructor and initialization
      */
     //@{
 
@@ -172,7 +172,7 @@ namespace ryujin
   {
   public:
     /**
-     * @name Constructor, initialization.
+     * @name Constructor and initialization
      */
     //@{
 
@@ -184,7 +184,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name General information about the sparsity pattern.
+     * @name General information about the sparsity pattern
      */
     //@{
 
@@ -217,7 +217,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Properties of a row.
+     * @name Properties of a row
      */
     //@{
 

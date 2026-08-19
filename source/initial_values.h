@@ -145,7 +145,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal data:
+     * @name Internal data
      */
     //@{
 

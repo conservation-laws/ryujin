@@ -74,7 +74,7 @@ namespace ryujin
 
   protected:
     /**
-     * @name Private methods for run()
+     * @name Internal methods
      */
     //@{
 
@@ -188,7 +188,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal data:
+     * @name Internal data
      */
     //@{
 
