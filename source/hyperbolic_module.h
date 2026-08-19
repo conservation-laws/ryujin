@@ -120,8 +120,14 @@ namespace ryujin
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
+    using View = typename HyperbolicSystem::template View<dim, Number>;
+
+    using Indicator = typename Description::template Indicator<Number>;
+
+    using Limiter = typename Description::template Limiter<Number>;
+
+    using WaveSpeedEstimator =
+        typename Description::template WaveSpeedEstimator<Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
@@ -360,15 +366,11 @@ namespace ryujin
      * @name Run time options
      */
     //@{
-    typename Description::template IndicatorView<dim, Number>::Parameters
-        indicator_;
+    Indicator indicator_;
 
-    typename Description::template LimiterView<dim, Number>::Parameters
-        limiter_;
+    Limiter limiter_;
 
-    typename Description::template WaveSpeedEstimatorView<dim,
-                                                          Number>::Parameters
-        wave_speed_estimator_;
+    WaveSpeedEstimator wave_speed_estimator_;
 
     //@}
     /**
@@ -399,7 +401,7 @@ namespace ryujin
     mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
-        Description::template LimiterView<dim, Number>::n_bounds;
+        Limiter::template View<dim, Number>::n_bounds;
     mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
 
     using HyperbolicVector =

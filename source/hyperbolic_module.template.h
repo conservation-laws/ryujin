@@ -602,8 +602,7 @@ namespace ryujin
                       auto have_discontinuous_ansatz,
                       const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
+        using View = typename HyperbolicSystem::template View<dim, T>;
         using flux_contribution_type = typename View::flux_contribution_type;
         using state_type = typename View::state_type;
 
@@ -875,8 +874,7 @@ namespace ryujin
                       auto have_discontinuous_ansatz,
                       const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
+        using View = typename HyperbolicSystem::template View<dim, T>;
 
         constexpr unsigned int stride_size = get_stride_size<T>;
 
@@ -1024,8 +1022,7 @@ namespace ryujin
 
       auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
+        using View = typename HyperbolicSystem::template View<dim, T>;
 
         auto limiter_view = limiter_.template view<dim, T>();
 
