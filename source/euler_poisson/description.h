@@ -19,23 +19,20 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = Euler::HyperbolicSystem;
 
-      template <int dim, typename Number = double>
-      using HyperbolicSystemView = Euler::HyperbolicSystemView<dim, Number>;
-
       using ParabolicSystem = EulerPoisson::ParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
           EulerPoisson::ParabolicModule<Description, dim, Number>;
 
-      template <int dim, typename Number = double>
-      using IndicatorView = Euler::IndicatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Indicator = Euler::Indicator<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using LimiterView = Euler::LimiterView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Limiter = Euler::Limiter<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using WaveSpeedEstimatorView = Euler::WaveSpeedEstimatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using WaveSpeedEstimator = Euler::WaveSpeedEstimator<ScalarNumber>;
     };
   } // namespace EulerPoisson
 } // namespace ryujin
