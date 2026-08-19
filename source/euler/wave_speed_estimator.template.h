@@ -21,7 +21,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data,
                                            const Number p_star) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto &gamma = view.gamma();
 
       const auto &[rho, u, p, a] = riemann_data;
@@ -49,8 +48,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::df(const primitive_type &riemann_data,
                                             const Number &p_star) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       using ScalarNumber = typename get_value_type<Number>::type;
       const auto &gamma = view.gamma();
       const auto &gamma_inverse = view.gamma_inverse();
@@ -125,7 +122,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto &gamma = view.gamma();
 
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
@@ -166,7 +162,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto &gamma = view.gamma();
       const auto &gamma_inverse = view.gamma_inverse();
       const auto factor =
@@ -191,7 +186,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::lambda3_plus(
         const primitive_type &primitive_state, const Number p_star) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto &gamma = view.gamma();
       const auto &gamma_inverse = view.gamma_inverse();
       const Number factor =
@@ -277,7 +271,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto &gamma = view.gamma();
       const auto &gamma_inverse = view.gamma_inverse();
       const auto &gamma_minus_one_inverse = view.gamma_minus_one_inverse();
@@ -333,7 +326,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto &gamma = view.gamma();
 
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
@@ -380,8 +372,6 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto rho = view.density(U);
       const auto rho_inverse = Number(1.0) / rho;
 
@@ -394,7 +384,7 @@ namespace ryujin
 
       using state_type_1d =
           typename HyperbolicSystemView<1, Number>::state_type;
-      const auto view_1d = hyperbolic_system.view<1, Number>();
+      const auto view_1d = view.template view<1, Number>();
 
       const auto state = state_type_1d{{rho, proj_m, E}};
       const auto p = view_1d.pressure(state);
