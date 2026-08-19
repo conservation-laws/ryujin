@@ -30,8 +30,7 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       ShockFront(const HyperbolicSystem &hyperbolic_system,
@@ -92,8 +91,8 @@ namespace ryujin
                               (gamma_ - Number(1.))) /
                              (gamma_ + Number(1.));
 
-          using state_type_1d = typename Description::
-              template HyperbolicSystemView<1, Number>::state_type;
+          using state_type_1d =
+              typename HyperbolicSystem::template View<1, Number>::state_type;
 
           if constexpr (View::have_energy_equation) {
             state_left_ =

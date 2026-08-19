@@ -45,8 +45,7 @@ namespace ryujin
       };
 
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View =
-          typename Description::template HyperbolicSystemView<1, double>;
+      using View = typename HyperbolicSystem::template View<1, double>;
 
       add(make_unique<AstroJet<Description, dim, Number>>(h, s));
       add(make_unique<BeckerSolution<Description, dim, Number>>(h, s));

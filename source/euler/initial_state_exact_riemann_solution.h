@@ -39,8 +39,7 @@ namespace ryujin
       //@{
 
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       using ScalarNumber = typename View::ScalarNumber;
@@ -197,8 +196,8 @@ namespace ryujin
 #endif
         }
 
-        using state_type_1d = typename Description::
-            template HyperbolicSystemView<1, Number>::state_type;
+        using state_type_1d =
+            typename HyperbolicSystem::template View<1, Number>::state_type;
         static_assert(state_type_1d::dimension <=
                       dealii::Tensor<1, 3, Number>::dimension);
 

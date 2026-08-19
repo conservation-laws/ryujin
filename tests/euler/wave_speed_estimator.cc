@@ -26,8 +26,7 @@ int main()
   using Number = NUMBER;
 
   HyperbolicSystem hyperbolic_system;
-  WaveSpeedEstimatorView<dim, Number>::Parameters wave_speed_estimator(
-      hyperbolic_system);
+  WaveSpeedEstimator<double> wave_speed_estimator(hyperbolic_system);
 
   const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
