@@ -52,7 +52,7 @@ namespace ryujin
 
       using state_type = typename View::state_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       using Parameters = WaveSpeedEstimator<ScalarNumber>;
 
@@ -66,11 +66,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       WaveSpeedEstimatorView(const HyperbolicSystem &hyperbolic_system,
-                             const Parameters &parameters,
-                             const PrecomputedVector &precomputed_values)
+                             const Parameters &parameters)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
-          , precomputed_values(precomputed_values)
       {
       }
 
@@ -78,7 +76,8 @@ namespace ryujin
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
        * compute an estimation of an upper bound for lambda.
        */
-      Number compute(const state_type & /*U_i*/,
+      Number compute(const PrecomputedVectorView & /*pv*/,
+                     const state_type & /*U_i*/,
                      const state_type & /*U_j*/,
                      const unsigned int /*i*/,
                      const unsigned int * /*js*/,
@@ -90,7 +89,6 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
       //@}
     };
   } // namespace Skeleton

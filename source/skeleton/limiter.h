@@ -59,7 +59,7 @@ namespace ryujin
 
       using flux_contribution_type = typename View::flux_contribution_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       using Parameters = Limiter<ScalarNumber>;
 
@@ -82,11 +82,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       LimiterView(const HyperbolicSystem &hyperbolic_system,
-                  const Parameters &parameters,
-                  const PrecomputedVector &precomputed_values)
+                  const Parameters &parameters)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
-          , precomputed_values(precomputed_values)
       {
       }
 
@@ -94,7 +92,8 @@ namespace ryujin
        * Given a state @p U_i and an index @p i return "strict" bounds,
        * i.e., a minimal convex set containing the state.
        */
-      Bounds projection_bounds_from_state(const unsigned int /*i*/,
+      Bounds projection_bounds_from_state(const PrecomputedVectorView & /*pv*/,
+                                          const unsigned int /*i*/,
                                           const state_type & /*U_i*/) const
       {
         return Bounds{};
@@ -131,10 +130,10 @@ namespace ryujin
        * LimiterView<dim, Number> limiter_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter_view.reset(i, U_i, flux_i);
+       *   limiter_view.reset(pv, i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter_view.accumulate(js, U_j, flux_j, scaled_c_ij,
+       *     limiter_view.accumulate(pv, js, U_j, flux_j, scaled_c_ij,
        * affine_shift);
        *   }
        *   limiter_view.bounds(hd_i);
@@ -146,7 +145,8 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int /*i*/,
+      void reset(const PrecomputedVectorView & /*pv*/,
+                 const unsigned int /*i*/,
                  const state_type & /*new_U_i*/,
                  const flux_contribution_type & /*new_flux_i*/)
       {
@@ -157,7 +157,8 @@ namespace ryujin
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int * /*js*/,
+      void accumulate(const PrecomputedVectorView & /*pv*/,
+                      const unsigned int * /*js*/,
                       const state_type & /*U_j*/,
                       const flux_contribution_type & /*flux_j*/,
                       const dealii::Tensor<1, dim, Number> & /*scaled_c_ij*/,
@@ -202,7 +203,6 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
 
       Bounds bounds_;
       //@}
