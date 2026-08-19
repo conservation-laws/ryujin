@@ -35,7 +35,7 @@ namespace ryujin
       const ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
       : ParameterAcceptor(subsection)
-      , limiter_(subsection + "/mass transfer limiter")
+      , limiter_(hyperbolic_system, subsection + "/mass transfer limiter")
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
@@ -161,9 +161,7 @@ namespace ryujin
           /* precomputed needs to be valid for bounds computation */
           const auto &precomputed = std::get<1>(old_state_vector);
 
-          using LimiterView =
-              typename Description::template LimiterView<dim, Number>;
-          const LimiterView limiter_view(*hyperbolic_system_, limiter_);
+          const auto limiter_view = limiter_.template view<dim, Number>();
 
           /*
            * Collect state values for packing:
@@ -737,8 +735,7 @@ namespace ryujin
 
     update_precomputed_values();
 
-    using LimiterView = typename Description::template LimiterView<dim, Number>;
-    const LimiterView limiter_view(*hyperbolic_system_, limiter_);
+    const auto limiter_view = limiter_.template view<dim, Number>();
 
     /*
      * Step 1: compute low-order update P_ij matrix, and bounds:
