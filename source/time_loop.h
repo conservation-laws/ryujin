@@ -73,6 +73,7 @@ namespace ryujin
     void run();
 
   protected:
+    //@}
     /**
      * @name Internal methods
      */

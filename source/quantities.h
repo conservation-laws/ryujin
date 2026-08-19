@@ -48,6 +48,7 @@ namespace ryujin
     /**
      * @name Constructor and setup
      */
+    //@{
 
     /**
      * Constructor.

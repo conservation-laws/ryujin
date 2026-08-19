@@ -187,6 +187,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(smoothness_indicators);
 
   private:
+    //@}
     /**
      * @name Run time options
      */

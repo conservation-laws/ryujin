@@ -133,8 +133,8 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(quantities)
 
-
   private:
+    //@}
     /**
      * @name Run time options
      */

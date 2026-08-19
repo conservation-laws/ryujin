@@ -194,5 +194,7 @@ namespace ryujin
     void add_tensor(HyperbolicVector &U,
                     const state_type &U_i,
                     const dealii::types::global_dof_index global_i);
+
+    //@}
   };
 } // namespace ryujin

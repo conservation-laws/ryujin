@@ -133,8 +133,6 @@ namespace ryujin
       void move_to_memory_space();
 
       //@}
-
-      //@}
       /**
        * @name MPI synchronization
        */

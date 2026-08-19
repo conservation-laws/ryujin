@@ -105,6 +105,7 @@ namespace ryujin
                          bool output_cutplanes = true);
 
   private:
+    //@}
     /**
      * @name Run time options
      */

@@ -479,8 +479,6 @@ namespace ryujin
     Number efficiency_;
 
     //@}
-
-    //@}
     /**
      * @name Internal data
      */
