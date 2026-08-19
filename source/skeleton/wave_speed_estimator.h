@@ -34,6 +34,13 @@ namespace ryujin
       }
 
       /**
+       * Alias for the view on the wave speed estimator for a given dimension @p
+       * dim and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = WaveSpeedEstimatorView<dim, Number>;
+
+      /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
        * and choice of number type @p Number (which can be a scalar float, or
        * double, as well as a VectorizedArray holding packed scalars).
@@ -41,7 +48,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return WaveSpeedEstimatorView<dim, Number>{
+        return View<dim, Number>{
             hyperbolic_system_->template view<dim, Number>(), *this};
       }
 
@@ -75,8 +82,6 @@ namespace ryujin
 
       using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
-      using Parameters = WaveSpeedEstimator<ScalarNumber>;
-
       //@}
       /**
        * @name Compute wavespeed estimates
@@ -84,10 +89,11 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystemView and a
-       * Parameters object as arguments
+       * Constructor taking a HyperbolicSystemView and a parameters
+       * object as arguments
        */
-      WaveSpeedEstimatorView(const View &view, const Parameters &parameters)
+      WaveSpeedEstimatorView(const View &view,
+                             const WaveSpeedEstimator<ScalarNumber> &parameters)
           : view(view)
           , parameters(parameters)
       {
@@ -109,7 +115,7 @@ namespace ryujin
 
     private:
       const View view;
-      const Parameters &parameters;
+      const WaveSpeedEstimator<ScalarNumber> &parameters;
       //@}
     };
   } // namespace Skeleton
