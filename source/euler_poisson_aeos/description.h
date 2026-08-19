@@ -16,6 +16,17 @@ namespace ryujin
 {
   namespace EulerPoissonAEOS
   {
+    /**
+     * A struct that contains all equation specific classes describing the
+     * chosen hyperbolic system, the indicator, the limiter and
+     * (approximate) Riemann solver.
+     *
+     * The compressible Euler equations of gas dynamics for an
+     * arbitrary equation of state, coupled to a Poisson problem for the
+     * electrostatic potential.
+     *
+     * @ingroup EulerPoissonEquations
+     */
     struct Description {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
 

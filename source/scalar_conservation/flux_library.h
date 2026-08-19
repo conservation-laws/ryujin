@@ -19,7 +19,7 @@ namespace ryujin
      * Populate a given container with all fluxes defined in this
      * namespace.
      *
-     * @ingroup ScalarConservation
+     * @ingroup ScalarConservationEquations
      */
     void populate_flux_list(flux_list_type &flux_list,
                             const std::string &subsection);

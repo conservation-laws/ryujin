@@ -52,6 +52,11 @@ namespace ryujin
       e_rho_p = EOS_Ut_DPt,
     };
 
+    /**
+     * A thin RAII wrapper around an eospac table handle.
+     *
+     * @ingroup EulerEquations
+     */
     class Interface
     {
     public:

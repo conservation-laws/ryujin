@@ -16,6 +16,14 @@
 
 
 /**
+ * @defgroup InitialValues Initial Values
+ *
+ * This module contains classes and functions related to prescribing
+ * initial values and (time dependent) Dirichlet boundary data.
+ */
+
+
+/**
  * @defgroup Miscellaneous Miscellaneous
  *
  * Miscellaneous helper functions, macros and classes.
@@ -71,6 +79,15 @@
  *
  * This module contains classes and functions related to solving the
  * compressible Euler equations of gas dynamics.
+ */
+
+
+/**
+ * @defgroup EulerPoissonEquations The Euler-Poisson Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Euler equations coupled to a Poisson problem for the
+ * electrostatic potential.
  */
 
 

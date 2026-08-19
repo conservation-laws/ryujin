@@ -103,6 +103,8 @@ namespace ryujin
      * A view on the HyperbolicSystem for a given dimension @p dim and
      * choice of number type @p Number (which can be a scalar float, or
      * double, as well as a VectorizedArray holding packed scalars.
+     *
+     * @ingroup ScalarConservationEquations
      */
     template <int dim, typename Number>
     class HyperbolicSystemView

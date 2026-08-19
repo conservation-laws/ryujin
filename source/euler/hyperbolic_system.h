@@ -122,6 +122,8 @@ namespace ryujin
      * const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
      * // etc.
      * ```
+     *
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number>
     class HyperbolicSystemView
