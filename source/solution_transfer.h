@@ -27,7 +27,7 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <typename Description, int dim, typename Number = double>
-  class SolutionTransfer : public dealii::ParameterAcceptor
+  class SolutionTransfer final : public dealii::ParameterAcceptor
   {
   public:
     /**

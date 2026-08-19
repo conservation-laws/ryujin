@@ -229,7 +229,7 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <int dim>
-  class Discretization : public dealii::ParameterAcceptor
+  class Discretization final : public dealii::ParameterAcceptor
   {
   public:
     /**

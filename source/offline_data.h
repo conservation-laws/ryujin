@@ -49,7 +49,7 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <int dim, typename Number = double>
-  class OfflineData : public dealii::ParameterAcceptor
+  class OfflineData final : public dealii::ParameterAcceptor
   {
   public:
     /**

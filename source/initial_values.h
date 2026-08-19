@@ -36,7 +36,7 @@ namespace ryujin
    * @ingroup InitialValues
    */
   template <typename Description, int dim, typename Number = double>
-  class InitialValues : public dealii::ParameterAcceptor
+  class InitialValues final : public dealii::ParameterAcceptor
   {
   public:
     /**
