@@ -12,18 +12,24 @@
 #include <compile_time_options.h>
 #include <multicomponent_vector.h>
 #include <newton.h>
+#include <observer_pointer.h>
 #include <simd.h>
 
 namespace ryujin
 {
   namespace Skeleton
   {
+    template <int dim, typename Number = double>
+    class LimiterView;
+
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
-      Limiter(const std::string &subsection = "/Limiter")
+      Limiter(const HyperbolicSystem &hyperbolic_system,
+              const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         iterations_ = 2;
         add_parameter(
@@ -32,7 +38,20 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(iterations);
 
+      /**
+       * Return a view on the Limiter for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return LimiterView<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       unsigned int iterations_;
     };
 
@@ -42,7 +61,7 @@ namespace ryujin
      *
      * @ingroup SkeletonEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class LimiterView
     {
     public:
@@ -79,11 +98,11 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a
+       * Parameters object as arguments
        */
-      LimiterView(const HyperbolicSystem &hyperbolic_system,
-                  const Parameters &parameters)
-          : hyperbolic_system(hyperbolic_system)
+      LimiterView(const View &view, const Parameters &parameters)
+          : view(view)
           , parameters(parameters)
       {
       }
@@ -201,7 +220,7 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const View view;
       const Parameters &parameters;
 
       Bounds bounds_;

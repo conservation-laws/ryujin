@@ -10,6 +10,7 @@
 #include "hyperbolic_system.h"
 
 #include <multicomponent_vector.h>
+#include <observer_pointer.h>
 #include <simd.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -20,14 +21,34 @@ namespace ryujin
 {
   namespace Skeleton
   {
+    template <int dim, typename Number = double>
+    class IndicatorView;
+
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
     public:
-      Indicator(const std::string &subsection = "/Indicator")
+      Indicator(const HyperbolicSystem &hyperbolic_system,
+                const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
       }
+
+      /**
+       * Return a view on the Indicator for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return IndicatorView<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
+    private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     };
 
 
@@ -37,7 +58,7 @@ namespace ryujin
      *
      * @ingroup SkeletonEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class IndicatorView
     {
     public:
@@ -77,11 +98,11 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a
+       * Parameters object as arguments
        */
-      IndicatorView(const HyperbolicSystem &hyperbolic_system,
-                    const Parameters &parameters)
-          : hyperbolic_system(hyperbolic_system)
+      IndicatorView(const View &view, const Parameters &parameters)
+          : view(view)
           , parameters(parameters)
       {
       }
@@ -125,7 +146,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const View view;
       const Parameters &parameters;
 
       //@}
