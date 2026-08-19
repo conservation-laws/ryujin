@@ -231,7 +231,7 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and constexpr constants
+       * @name Typedefs and constexpr constants
        */
       //@{
 

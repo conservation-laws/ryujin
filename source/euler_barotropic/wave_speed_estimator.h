@@ -138,13 +138,20 @@ namespace ryujin
 
     protected:
       /**
-       * @name Internal functions used in the Riemann solver
+       * @name Internal methods
        */
       //@{
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       const View view_;
       const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+
       //@}
     };
   } // namespace EulerBarotropic

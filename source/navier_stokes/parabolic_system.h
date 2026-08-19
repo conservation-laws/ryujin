@@ -54,7 +54,7 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields and methods
+       * @name Runtime parameters, internal fields, methods, and friends
        */
       //@{
 

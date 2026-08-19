@@ -115,8 +115,15 @@ namespace ryujin
       }
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       const View view_;
       const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+
       //@}
     };
   } // namespace Skeleton

@@ -210,7 +210,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Low-level access to the selected equation of state.
+       * @name Low-level access to the selected equation of state
        */
       //@{
 
@@ -384,7 +384,7 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and constexpr constants
+       * @name Typedefs and constexpr constants
        */
       //@{
 

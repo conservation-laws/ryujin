@@ -296,7 +296,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Low-level implementation
+       * @name Internal methods
        */
       //@{
 

@@ -161,7 +161,7 @@ namespace ryujin
 
     protected:
       /**
-       * @name Internal functions used in the Riemann solver
+       * @name Internal methods
        */
       //@{
 
@@ -302,8 +302,15 @@ namespace ryujin
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       const View view_;
       const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+
       //@}
     };
   } // namespace Euler

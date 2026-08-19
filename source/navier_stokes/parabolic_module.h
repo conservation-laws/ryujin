@@ -255,9 +255,8 @@ namespace ryujin
        */
       ACCESSOR_READ_ONLY(n_warnings)
 
-      //@}
-
     private:
+      //@}
       /**
        * @name Run time options
        */
@@ -281,7 +280,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Low-level implementation
+       * @name Internal methods
        */
       //@{
 

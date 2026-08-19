@@ -191,7 +191,7 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and constexpr constants
+       * @name Typedefs and constexpr constants
        */
       //@{
 
@@ -558,7 +558,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Computing source terms
+       * @name Computing stencil source terms
        */
       //@{
 
@@ -586,8 +586,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name State transformations (primitive states, expanding
-       * dimensionality, Galilei transform, etc.)
+       * @name State transformations
        */
       //@{
 

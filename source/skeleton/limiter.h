@@ -225,7 +225,7 @@ namespace ryujin
     private:
       //@}
       /**
-       * @name Arguments and internal fields
+       * @name Internal data
        */
       //@{
 

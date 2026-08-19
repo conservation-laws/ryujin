@@ -150,7 +150,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Low-level access to the flux function parser:
+       * @name Low-level access to the flux function parser
        */
       //@{
 
@@ -178,7 +178,7 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and constexpr constants
+       * @name Typedefs and constexpr constants
        */
       //@{
 

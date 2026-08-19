@@ -147,9 +147,9 @@ namespace ryujin
        */
       Number alpha(const Number h_i) const;
 
-      //@}
 
     private:
+      //@}
       /**
        * @name Internal data
        */

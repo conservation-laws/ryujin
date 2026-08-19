@@ -143,9 +143,9 @@ namespace ryujin
         return Number(0.);
       }
 
-      //@}
 
     private:
+      //@}
       /**
        * @name Internal data
        */
