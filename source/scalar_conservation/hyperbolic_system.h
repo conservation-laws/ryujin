@@ -270,12 +270,27 @@ namespace ryujin
           Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
 
       /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * states:
+       */
+      using PrecomputedVectorView =
+          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+
+      /**
        * MulticomponentVector for storing a vector of precomputed initial
        * states:
        */
       using InitialPrecomputedVector =
           Vectors::MultiComponentVector<ScalarNumber,
                                         n_initial_precomputed_values>;
+
+      /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * initial states:
+       */
+      using InitialPrecomputedVectorView =
+          Vectors::MultiComponentVectorView<ScalarNumber,
+                                            n_initial_precomputed_values>;
 
       //@}
       /**
@@ -392,14 +407,14 @@ namespace ryujin
        * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
       flux_contribution_type
-      flux_contribution(const PrecomputedVector &pv,
-                        const InitialPrecomputedVector & /*piv*/,
+      flux_contribution(const PrecomputedVectorView &pv,
+                        const InitialPrecomputedVectorView & /*piv*/,
                         const unsigned int i,
                         const state_type & /*U_i*/) const;
 
       flux_contribution_type
-      flux_contribution(const PrecomputedVector &pv,
-                        const InitialPrecomputedVector & /*piv*/,
+      flux_contribution(const PrecomputedVectorView &pv,
+                        const InitialPrecomputedVectorView & /*piv*/,
                         const unsigned int *js,
                         const state_type & /*U_j*/) const;
 
@@ -429,12 +444,12 @@ namespace ryujin
       /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
-      state_type nodal_source(const PrecomputedVector &pv,
+      state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const = delete;
 
-      state_type nodal_source(const PrecomputedVector &pv,
+      state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const = delete;
@@ -790,8 +805,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const PrecomputedVector &pv,
-        const InitialPrecomputedVector & /*piv*/,
+        const PrecomputedVectorView &pv,
+        const InitialPrecomputedVectorView & /*piv*/,
         const unsigned int i,
         const state_type & /*U_i*/) const -> flux_contribution_type
     {
@@ -806,8 +821,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const PrecomputedVector &pv,
-        const InitialPrecomputedVector & /*piv*/,
+        const PrecomputedVectorView &pv,
+        const InitialPrecomputedVectorView & /*piv*/,
         const unsigned int *js,
         const state_type & /*U_j*/) const -> flux_contribution_type
     {

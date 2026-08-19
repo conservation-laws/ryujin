@@ -195,6 +195,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView &pv,
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int i,
@@ -208,7 +209,6 @@ namespace ryujin
       const auto u_i = view.state(U_i);
       const auto u_j = view.state(U_j);
 
-      const auto &pv = precomputed_values;
       const auto prec_i = pv.template read_tensor<Number, pst>(i);
       const auto prec_j = pv.template read_tensor<Number, pst>(js);
 

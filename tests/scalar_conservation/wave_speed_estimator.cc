@@ -43,12 +43,8 @@ void test(const std::string &expression)
   using state_type = typename View::state_type;
   using precomputed_type = typename View::precomputed_type;
   static constexpr auto n_precomputed_values = View::n_precomputed_values;
-  using PrecomputedVector = typename View::PrecomputedVector;
-
-  PrecomputedVector dummy;
-
-  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(
-      hyperbolic_system, wave_speed_estimator, dummy);
+  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(hyperbolic_system,
+                                                        wave_speed_estimator);
 
   std::cout << "\n\ndim = " << dim << std::endl;
   std::cout << "f(u)={" + expression + "}" << std::endl;
