@@ -12,6 +12,7 @@
 #include "hyperbolic_system.h"
 
 #include <multicomponent_vector.h>
+#include <observer_pointer.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/vectorization.h>
@@ -21,12 +22,17 @@ namespace ryujin
 {
   namespace ShallowWater
   {
+    template <int dim, typename Number = double>
+    class IndicatorView;
+
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
     public:
-      Indicator(const std::string &subsection = "/Indicator")
+      Indicator(const HyperbolicSystem &hyperbolic_system,
+                const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
@@ -36,7 +42,20 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(evc_factor);
 
+      /**
+       * Return a view on the Indicator for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return IndicatorView<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       ScalarNumber evc_factor_;
     };
 
@@ -47,7 +66,7 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class IndicatorView
     {
     public:
@@ -93,11 +112,11 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a
+       * Parameters object as arguments
        */
-      IndicatorView(const HyperbolicSystem &hyperbolic_system,
-                    const Parameters &parameters)
-          : hyperbolic_system(hyperbolic_system)
+      IndicatorView(const View &view, const Parameters &parameters)
+          : view(view)
           , parameters(parameters)
       {
       }
@@ -132,7 +151,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const View view;
       const Parameters &parameters;
 
       Number h_i = 0.;
@@ -162,8 +181,6 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[eta_m, h_star] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
@@ -186,8 +203,6 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
       /* entropy viscosity commutator: */
-
-      const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[eta_j, h_star_j] =
           pv.template read_tensor<Number, precomputed_type>(js);

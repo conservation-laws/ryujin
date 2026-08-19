@@ -21,8 +21,6 @@ namespace ryujin
                                     const Number t_min /* = Number(0.) */,
                                     const Number t_max /* = Number(1.) */) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       bool success = true;
       Number t_l = t_min;
       Number t_r = t_max;

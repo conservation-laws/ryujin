@@ -27,7 +27,6 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data_Z,
                                            const Number &h) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const ScalarNumber gravity = view.gravity();
 
       const auto &[h_Z, u_Z, a_Z] = riemann_data_Z;
@@ -112,7 +111,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const ScalarNumber gravity = view.gravity();
       const auto gravity_inverse = ScalarNumber(1.) / gravity;
 
@@ -211,8 +209,6 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const Number h = view.water_depth_sharp(U);
       const Number gravity = view.gravity();
 

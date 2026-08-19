@@ -19,10 +19,11 @@ int main()
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
-  WaveSpeedEstimatorView<dim, double>::Parameters wave_speed_estimator;
+  WaveSpeedEstimatorView<dim, double>::Parameters wave_speed_estimator(
+      hyperbolic_system);
 
-  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(hyperbolic_system,
-                                                        wave_speed_estimator);
+  const auto wave_speed_estimator_view =
+      wave_speed_estimator.view<dim, double>();
 
   const auto riemann_data = [&](const auto &state) {
     const auto h = hyperbolic_system.view<dim, double>().water_depth_sharp(
