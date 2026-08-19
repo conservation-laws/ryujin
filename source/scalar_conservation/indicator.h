@@ -42,6 +42,13 @@ namespace ryujin
       ACCESSOR_READ_ONLY(evc_factor);
 
       /**
+       * Alias for the view on the indicator for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = IndicatorView<dim, Number>;
+
+      /**
        * Return a view on the Indicator for a given dimension @p dim and
        * choice of number type @p Number (which can be a scalar float, or
        * double, as well as a VectorizedArray holding packed scalars).
@@ -49,7 +56,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return IndicatorView<dim, Number>{
+        return View<dim, Number>{
             hyperbolic_system_->template view<dim, Number>(), *this};
       }
 
@@ -88,8 +95,6 @@ namespace ryujin
 
       using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
-      using Parameters = Indicator<ScalarNumber>;
-
       //@}
       /**
        * @name Stencil-based computation of indicators
@@ -111,10 +116,10 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystemView and a
-       * Parameters object as arguments
+       * Constructor taking a HyperbolicSystemView and a parameters
+       * object as arguments
        */
-      IndicatorView(const View &view, const Parameters &parameters)
+      IndicatorView(const View &view, const Indicator<ScalarNumber> &parameters)
           : view(view)
           , parameters(parameters)
       {
@@ -151,7 +156,7 @@ namespace ryujin
       //@{
 
       const View view;
-      const Parameters &parameters;
+      const Indicator<ScalarNumber> &parameters;
 
       Number u_i;
       Number u_abs_max;

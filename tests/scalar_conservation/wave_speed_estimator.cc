@@ -22,8 +22,7 @@ void test(const std::string &expression)
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
-  typename WaveSpeedEstimatorView<dim, Number>::Parameters wave_speed_estimator(
-      hyperbolic_system);
+  WaveSpeedEstimator<> wave_speed_estimator(hyperbolic_system);
 
   const auto view = hyperbolic_system.view<dim, Number>();
 
