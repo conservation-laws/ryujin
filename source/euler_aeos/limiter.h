@@ -115,7 +115,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       using Parameters = Limiter<ScalarNumber>;
 
@@ -139,11 +139,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       LimiterView(const HyperbolicSystem &hyperbolic_system,
-                  const Parameters &parameters,
-                  const PrecomputedVector &precomputed_values)
+                  const Parameters &parameters)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
-          , precomputed_values(precomputed_values)
       {
       }
 
@@ -151,7 +149,8 @@ namespace ryujin
        * Given a state @p U_i and an index @p i return "strict" bounds,
        * i.e., a minimal convex set containing the state.
        */
-      Bounds projection_bounds_from_state(const unsigned int i,
+      Bounds projection_bounds_from_state(const PrecomputedVectorView &pv,
+                                          const unsigned int i,
                                           const state_type &U_i) const;
 
       /**
@@ -181,10 +180,10 @@ namespace ryujin
        * LimiterView<dim, Number> limiter_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter_view.reset(i, U_i, flux_i);
+       *   limiter_view.reset(pv, i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter_view.accumulate(js, U_j, flux_j, scaled_c_ij,
+       *     limiter_view.accumulate(pv, js, U_j, flux_j, scaled_c_ij,
        * affine_shift);
        *   }
        *   limiter_view.bounds(hd_i);
@@ -196,7 +195,8 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int i,
+      void reset(const PrecomputedVectorView &pv,
+                 const unsigned int i,
                  const state_type &U_i,
                  const flux_contribution_type &flux_i);
 
@@ -204,7 +204,8 @@ namespace ryujin
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int *js,
+      void accumulate(const PrecomputedVectorView &pv,
+                      const unsigned int *js,
                       const state_type &U_j,
                       const flux_contribution_type &flux_j,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
@@ -247,7 +248,6 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
 
       state_type U_i;
       flux_contribution_type flux_i;
@@ -272,12 +272,14 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     LimiterView<dim, Number>::projection_bounds_from_state(
-        const unsigned int i, const state_type &U_i) const -> Bounds
+        const PrecomputedVectorView &pv,
+        const unsigned int i,
+        const state_type &U_i) const -> Bounds
     {
       const auto view = hyperbolic_system.view<dim, Number>();
       const auto rho_i = view.density(U_i);
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
       return {/*rho_min*/ rho_i,
               /*rho_max*/ rho_i,
@@ -348,7 +350,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    LimiterView<dim, Number>::reset(const unsigned int i,
+    LimiterView<dim, Number>::reset(const PrecomputedVectorView &pv,
+                                    const unsigned int i,
                                     const state_type &new_U_i,
                                     const flux_contribution_type &new_flux_i)
     {
@@ -364,7 +367,7 @@ namespace ryujin
       s_min = Number(std::numeric_limits<ScalarNumber>::max());
 
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
       gamma_min = gamma_min_i;
 
@@ -378,6 +381,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::accumulate(
+        const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
         const flux_contribution_type &flux_j,
@@ -452,8 +456,7 @@ namespace ryujin
          * relaxation as well.
          */
         const auto [p_j, gamma_min_j, s_j, eta_j] =
-            precomputed_values.template read_tensor<Number, precomputed_type>(
-                js);
+            pv.template read_tensor<Number, precomputed_type>(js);
 
         const auto s_ij_bar =
             view.surrogate_specific_entropy(U_ij_bar, gamma_min);

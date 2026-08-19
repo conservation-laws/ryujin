@@ -69,7 +69,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       using Parameters = WaveSpeedEstimator<ScalarNumber>;
 
@@ -83,11 +83,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       WaveSpeedEstimatorView(const HyperbolicSystem &hyperbolic_system,
-                             const Parameters &parameters,
-                             const PrecomputedVector &precomputed_values)
+                             const Parameters &parameters)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
-          , precomputed_values(precomputed_values)
       {
       }
 
@@ -104,7 +102,8 @@ namespace ryujin
        * compute an estimate for an upper bound of the maximum wavespeed
        * lambda.
        */
-      Number compute(const state_type &U_i,
+      Number compute(const PrecomputedVectorView &pv,
+                     const state_type &U_i,
                      const state_type &U_j,
                      const unsigned int i,
                      const unsigned int *js,
@@ -254,7 +253,6 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
       //@}
     };
   } // namespace EulerAEOS
