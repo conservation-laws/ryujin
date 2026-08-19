@@ -19,8 +19,7 @@ int main()
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
-  WaveSpeedEstimatorView<dim, double>::Parameters wave_speed_estimator(
-      hyperbolic_system);
+  WaveSpeedEstimator<double> wave_speed_estimator(hyperbolic_system);
 
   const auto wave_speed_estimator_view =
       wave_speed_estimator.view<dim, double>();

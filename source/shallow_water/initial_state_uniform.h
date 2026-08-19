@@ -29,8 +29,7 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       Uniform(const HyperbolicSystem &hyperbolic_system,

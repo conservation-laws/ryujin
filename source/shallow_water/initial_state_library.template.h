@@ -23,8 +23,7 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
+    using View = typename HyperbolicSystem::template View<dim, Number>;
 
     using initial_state_list_type =
         std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
