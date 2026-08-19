@@ -19,16 +19,14 @@ namespace ryujin
                                     const Number t_min /* = Number(0.) */,
                                     const Number t_max /* = Number(1.) */) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       bool success = true;
       Number t_r = t_max;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       const ScalarNumber relax = ScalarNumber(1. + 10000. * eps);
 
-      const auto &u_U = view.state(U);
-      const auto &u_P = view.state(P);
+      const auto &u_U = view_.state(U);
+      const auto &u_P = view_.state(P);
 
       const auto &u_min = std::get<0>(bounds);
       const auto &u_max = std::get<1>(bounds);
@@ -104,7 +102,7 @@ namespace ryujin
        *
        * u_min, u_U, u_max might be negative, thus relax in both directions.
        */
-      const auto u_new = view.state(U + t_r * P);
+      const auto u_new = view_.state(U + t_r * P);
       const auto test_new_max = std::max(
           Number(0.), std::min(u_new - relax * u_max, relax * u_new - u_max));
       const auto test_new_min = std::max(

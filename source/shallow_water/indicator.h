@@ -12,6 +12,7 @@
 #include "hyperbolic_system.h"
 
 #include <multicomponent_vector.h>
+#include <observer_pointer.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/vectorization.h>
@@ -21,12 +22,17 @@ namespace ryujin
 {
   namespace ShallowWater
   {
+    template <int dim, typename Number = double>
+    class IndicatorView;
+
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
     public:
-      Indicator(const std::string &subsection = "/Indicator")
+      Indicator(const HyperbolicSystem &hyperbolic_system,
+                const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
@@ -36,7 +42,27 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(evc_factor);
 
+      /**
+       * Alias for the view on the indicator for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = IndicatorView<dim, Number>;
+
+      /**
+       * Return a view on the Indicator for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return View<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       ScalarNumber evc_factor_;
     };
 
@@ -47,7 +73,7 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class IndicatorView
     {
     public:
@@ -68,9 +94,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
-
-      using Parameters = Indicator<ScalarNumber>;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       //@}
       /**
@@ -81,10 +105,10 @@ namespace ryujin
        * IndicatorView<dim, Number> indicator_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   indicator_view.reset(i, U_i);
+       *   indicator_view.reset(pv, i, U_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator_view.accumulate(js, U_j, c_ij);
+       *     indicator_view.accumulate(pv, js, U_j, c_ij);
        *   }
        *   indicator_view.alpha(hd_i);
        * }
@@ -93,14 +117,12 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and an Indicator
+       * object as arguments
        */
-      IndicatorView(const HyperbolicSystem &hyperbolic_system,
-                    const Parameters &parameters,
-                    const PrecomputedVector &precomputed_values)
-          : hyperbolic_system(hyperbolic_system)
-          , parameters(parameters)
-          , precomputed_values(precomputed_values)
+      IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -108,13 +130,16 @@ namespace ryujin
        * Reset temporary storage and initialize for a new row corresponding
        * to state vector U_i.
        */
-      void reset(const unsigned int /*i*/, const state_type &U_i);
+      void reset(const PrecomputedVectorView &pv,
+                 const unsigned int /*i*/,
+                 const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int *js,
+      void accumulate(const PrecomputedVectorView &pv,
+                      const unsigned int *js,
                       const state_type &U_j,
                       const dealii::Tensor<1, dim, Number> &c_ij);
 
@@ -131,18 +156,17 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
-      const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
-      Number h_i = 0.;
-      Number eta_i = 0.;
-      flux_type f_i;
-      state_type d_eta_i;
-      Number pressure_i = 0.;
+      Number h_i_ = 0.;
+      Number eta_i_ = 0.;
+      flux_type f_i_;
+      state_type d_eta_i_;
+      Number pressure_i_ = 0.;
 
-      Number left = 0.;
-      state_type right;
+      Number left_ = 0.;
+      state_type right_;
       //@}
     };
 
@@ -156,49 +180,47 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    IndicatorView<dim, Number>::reset(const unsigned int i,
+    IndicatorView<dim, Number>::reset(const PrecomputedVectorView &pv,
+                                      const unsigned int i,
                                       const state_type &U_i)
     {
       /* entropy viscosity commutator: */
 
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[eta_m, h_star] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
-      h_i = view.water_depth(U_i);
-      eta_i = eta_m;
-      d_eta_i = view.mathematical_entropy_derivative(U_i);
-      f_i = view.f(U_i);
-      pressure_i = view.pressure(U_i);
+      h_i_ = view_.water_depth(U_i);
+      eta_i_ = eta_m;
+      d_eta_i_ = view_.mathematical_entropy_derivative(U_i);
+      f_i_ = view_.f(U_i);
+      pressure_i_ = view_.pressure(U_i);
 
-      left = 0.;
-      right = 0.;
+      left_ = 0.;
+      right_ = 0.;
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void IndicatorView<dim, Number>::accumulate(
+        const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
       /* entropy viscosity commutator: */
 
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[eta_j, h_star_j] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
 
       const auto velocity_j =
-          view.momentum(U_j) * view.inverse_water_depth_sharp(U_j);
-      const auto f_j = view.f(U_j);
-      const auto pressure_j = view.pressure(U_j);
+          view_.momentum(U_j) * view_.inverse_water_depth_sharp(U_j);
+      const auto f_j = view_.f(U_j);
+      const auto pressure_j = view_.pressure(U_j);
 
-      left += (eta_j + pressure_j) * (velocity_j * c_ij);
+      left_ += (eta_j + pressure_j) * (velocity_j * c_ij);
 
       for (unsigned int k = 0; k < problem_dimension; ++k)
-        right[k] += (f_j[k] - f_i[k]) * c_ij;
+        right_[k] += (f_j[k] - f_i_[k]) * c_ij;
     }
 
 
@@ -208,20 +230,20 @@ namespace ryujin
     {
       Number my_sum = 0.;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        my_sum += d_eta_i[k] * right[k];
+        my_sum += d_eta_i_[k] * right_[k];
       }
 
-      Number numerator = std::abs(left - my_sum);
-      Number denominator = std::abs(left) + std::abs(my_sum);
+      Number numerator = std::abs(left_ - my_sum);
+      Number denominator = std::abs(left_) + std::abs(my_sum);
 
       const auto regularization =
           Number(100. * std::numeric_limits<ScalarNumber>::min());
 
       const auto quotient =
           std::abs(numerator) /
-          (denominator + std::max(hd_i * std::abs(eta_i), regularization));
+          (denominator + std::max(hd_i * std::abs(eta_i_), regularization));
 
-      return std::min(Number(1.), parameters.evc_factor() * quotient);
+      return std::min(Number(1.), indicator_.evc_factor() * quotient);
     }
 
 

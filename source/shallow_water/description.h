@@ -34,25 +34,20 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = ShallowWater::HyperbolicSystem;
 
-      template <int dim, typename Number = double>
-      using HyperbolicSystemView =
-          ShallowWater::HyperbolicSystemView<dim, Number>;
-
       using ParabolicSystem = ryujin::StubParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
           ryujin::StubParabolicModule<Description, dim, Number>;
 
-      template <int dim, typename Number = double>
-      using IndicatorView = ShallowWater::IndicatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Indicator = ShallowWater::Indicator<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using LimiterView = ShallowWater::LimiterView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Limiter = ShallowWater::Limiter<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using WaveSpeedEstimatorView =
-          ShallowWater::WaveSpeedEstimatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using WaveSpeedEstimator = ShallowWater::WaveSpeedEstimator<ScalarNumber>;
     };
   } // namespace ShallowWater
 } // namespace ryujin

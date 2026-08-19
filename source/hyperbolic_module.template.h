@@ -31,9 +31,10 @@ namespace ryujin
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
-      , indicator_(subsection + "/indicator")
-      , limiter_(subsection + "/limiter")
-      , wave_speed_estimator_(subsection + "/wave speed estimator")
+      , indicator_(hyperbolic_system, subsection + "/indicator")
+      , limiter_(hyperbolic_system, subsection + "/limiter")
+      , wave_speed_estimator_(hyperbolic_system,
+                              subsection + "/wave speed estimator")
       , mpi_ensemble_(mpi_ensemble)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -345,15 +346,10 @@ namespace ryujin
         using T = decltype(sentinel);
         constexpr unsigned int stride_size = get_stride_size<T>;
 
-        using WaveSpeedEstimatorView =
-            typename Description::template WaveSpeedEstimatorView<dim, T>;
-        WaveSpeedEstimatorView wave_speed_estimator_view(
-            *hyperbolic_system_, wave_speed_estimator_, old_precomputed);
+        const auto wave_speed_estimator_view =
+            wave_speed_estimator_.template view<dim, T>();
 
-        using IndicatorView =
-            typename Description::template IndicatorView<dim, T>;
-        IndicatorView indicator_view(
-            *hyperbolic_system_, indicator_, old_precomputed);
+        auto indicator_view = indicator_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -362,7 +358,7 @@ namespace ryujin
 
         const auto U_i = old_U.template read_tensor<T>(i);
 
-        indicator_view.reset(i, U_i);
+        indicator_view.reset(old_precomputed, i, U_i);
 
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
@@ -372,7 +368,7 @@ namespace ryujin
 
           const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
 
-          indicator_view.accumulate(js, U_j, c_ij);
+          indicator_view.accumulate(old_precomputed, js, U_j, c_ij);
 
           /* Skip diagonal. */
           if (col_idx == 0)
@@ -384,8 +380,8 @@ namespace ryujin
 
           const auto norm = c_ij.norm();
           const auto n_ij = c_ij / norm;
-          const auto lambda_max =
-              wave_speed_estimator_view.compute(U_i, U_j, i, js, n_ij);
+          const auto lambda_max = wave_speed_estimator_view.compute(
+              old_precomputed, U_i, U_j, i, js, n_ij);
           const auto d_ij = norm * lambda_max;
 
           dij_matrix_.write_entry(d_ij, i, col_idx, true);
@@ -428,10 +424,8 @@ namespace ryujin
       const auto body_boundary = [&](const auto &, const unsigned int k) {
         const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
 
-        using WaveSpeedEstimatorView =
-            typename Description::template WaveSpeedEstimatorView<dim, Number>;
-        WaveSpeedEstimatorView wave_speed_estimator_view(
-            *hyperbolic_system_, wave_speed_estimator_, old_precomputed);
+        const auto wave_speed_estimator_view =
+            wave_speed_estimator_.template view<dim, Number>();
 
         /*
          * Only work on index pairs "i < j" that point to the upper
@@ -454,8 +448,8 @@ namespace ryujin
 
         const auto d_ij = dij_matrix_.read_entry(i, col_idx);
 
-        const auto lambda_max =
-            wave_speed_estimator_view.compute(U_j, U_i, j, &i, n_ji);
+        const auto lambda_max = wave_speed_estimator_view.compute(
+            old_precomputed, U_j, U_i, j, &i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
 
         dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
@@ -473,10 +467,8 @@ namespace ryujin
       const auto body = [&](auto, unsigned int i) {
 
 #ifdef DEBUG_SYMMETRY_CHECK
-        using WaveSpeedEstimatorView =
-            typename Description::template WaveSpeedEstimatorView<dim, Number>;
-        WaveSpeedEstimatorView wave_speed_estimator_view(
-            *hyperbolic_system_, wave_speed_estimator_, old_precomputed);
+        const auto wave_speed_estimator_view =
+            wave_speed_estimator_.template view<dim, Number>();
 #endif
 
         /* Skip constrained degrees of freedom: */
@@ -507,8 +499,8 @@ namespace ryujin
             const auto norm_ij = c_ij.norm();
             const auto n_ij = c_ij / norm_ij;
 
-            const auto lambda_max =
-                wave_speed_estimator_view.compute(U_i, U_j, i, &j, n_ij);
+            const auto lambda_max = wave_speed_estimator_view.compute(
+                old_precomputed, U_i, U_j, i, &j, n_ij);
             const auto d_ij = norm_ij * lambda_max;
 
             Assert(d_ij <= d_ji + 1.0e-12,
@@ -610,9 +602,7 @@ namespace ryujin
                       auto have_discontinuous_ansatz,
                       const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
-        using LimiterView = typename Description::template LimiterView<dim, T>;
+        using View = typename HyperbolicSystem::template View<dim, T>;
         using flux_contribution_type = typename View::flux_contribution_type;
         using state_type = typename View::state_type;
 
@@ -620,8 +610,7 @@ namespace ryujin
 
         const auto view = hyperbolic_system_->template view<dim, T>();
 
-        LimiterView limiter_view(
-            *hyperbolic_system_, limiter_, old_precomputed);
+        auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -664,7 +653,7 @@ namespace ryujin
           F_iH += m_i * S_iH;
         }
 
-        limiter_view.reset(i, U_i, flux_i);
+        limiter_view.reset(old_precomputed, i, U_i, flux_i);
 
         [[maybe_unused]] state_type affine_shift;
 
@@ -762,8 +751,12 @@ namespace ryujin
             F_iH += d_ijH * (U_star_ji - U_star_ij);
             P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
-            limiter_view.accumulate(
-                U_j, U_star_ij, U_star_ji, scaled_c_ij, affine_shift);
+            limiter_view.accumulate(old_precomputed,
+                                    U_j,
+                                    U_star_ij,
+                                    U_star_ji,
+                                    scaled_c_ij,
+                                    affine_shift);
 
           } else {
 
@@ -771,7 +764,8 @@ namespace ryujin
             F_iH += d_ijH * (U_j - U_i);
             P_ij += (d_ijH - d_ij) * (U_j - U_i);
 
-            limiter_view.accumulate(js, U_j, flux_j, scaled_c_ij, affine_shift);
+            limiter_view.accumulate(
+                old_precomputed, js, U_j, flux_j, scaled_c_ij, affine_shift);
           }
 
           if constexpr (View::have_source_terms) {
@@ -880,14 +874,11 @@ namespace ryujin
                       auto have_discontinuous_ansatz,
                       const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
-        using LimiterView = typename Description::template LimiterView<dim, T>;
+        using View = typename HyperbolicSystem::template View<dim, T>;
 
         constexpr unsigned int stride_size = get_stride_size<T>;
 
-        LimiterView limiter_view(
-            *hyperbolic_system_, limiter_, old_precomputed);
+        auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -1031,12 +1022,9 @@ namespace ryujin
 
       auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
-        using LimiterView = typename Description::template LimiterView<dim, T>;
+        using View = typename HyperbolicSystem::template View<dim, T>;
 
-        LimiterView limiter_view(
-            *hyperbolic_system_, limiter_, old_precomputed);
+        auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);

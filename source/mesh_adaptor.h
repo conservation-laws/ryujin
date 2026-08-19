@@ -114,8 +114,7 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
+    using View = typename HyperbolicSystem::template View<dim, Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 

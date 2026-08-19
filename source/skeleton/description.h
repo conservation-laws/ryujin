@@ -32,24 +32,20 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = Skeleton::HyperbolicSystem;
 
-      template <int dim, typename Number = double>
-      using HyperbolicSystemView = Skeleton::HyperbolicSystemView<dim, Number>;
-
       using ParabolicSystem = ryujin::StubParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
           ryujin::StubParabolicModule<Description, dim, Number>;
 
-      template <int dim, typename Number = double>
-      using IndicatorView = Skeleton::IndicatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Indicator = Skeleton::Indicator<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using LimiterView = Skeleton::LimiterView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Limiter = Skeleton::Limiter<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using WaveSpeedEstimatorView =
-          Skeleton::WaveSpeedEstimatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using WaveSpeedEstimator = Skeleton::WaveSpeedEstimator<ScalarNumber>;
     };
   } // namespace Skeleton
 } // namespace ryujin

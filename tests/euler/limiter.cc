@@ -21,20 +21,13 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  LimiterView<dim, double>::Parameters limiter;
+  Limiter<double> limiter(hyperbolic_system);
 
   using state_type = HyperbolicSystemView<dim, double>::state_type;
 
   using bounds_type = LimiterView<dim, double>::Bounds;
 
-  static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystemView<dim, double>::n_precomputed_values;
-
-  using precomputed_type =
-      Vectors::MultiComponentVector<double, n_precomputed_values>;
-  precomputed_type dummy;
-
-  LimiterView<dim, double> limiter_view(hyperbolic_system, limiter, dummy);
+  const auto limiter_view = limiter.view<dim, double>();
 
   const auto view = hyperbolic_system.template view<dim, double>();
 

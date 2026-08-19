@@ -38,8 +38,11 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
+    using View = typename HyperbolicSystem::template View<dim, Number>;
+
+    using Limiter = typename Description::template Limiter<Number>;
+
+    using LimiterView = typename Limiter::template View<dim, Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
@@ -51,14 +54,12 @@ namespace ryujin
     /**
      * The number of stored entries in the bounds array.
      */
-    static constexpr unsigned int n_bounds =
-        Description::template LimiterView<dim, Number>::n_bounds;
+    static constexpr unsigned int n_bounds = LimiterView::n_bounds;
 
     /**
      * Array type used to store accumulated bounds.
      */
-    using Bounds =
-        typename Description::template LimiterView<dim, Number>::Bounds;
+    using Bounds = typename LimiterView::Bounds;
 
     //@}
     /**
@@ -156,8 +157,7 @@ namespace ryujin
      */
     //@{
 
-    typename Description::template LimiterView<dim, Number>::Parameters
-        limiter_;
+    Limiter limiter_;
 
     //@}
     /**

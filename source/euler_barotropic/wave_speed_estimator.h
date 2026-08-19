@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <observer_pointer.h>
 #include <simd.h>
 
 #include <deal.II/base/point.h>
@@ -18,14 +19,41 @@ namespace ryujin
 {
   namespace EulerBarotropic
   {
+    template <int dim, typename Number = double>
+    class WaveSpeedEstimatorView;
+
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimator(const std::string &subsection = "/WaveSpeedEstimator")
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
       }
+
+      /**
+       * Alias for the view on the wave speed estimator for a given dimension @p
+       * dim and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = WaveSpeedEstimatorView<dim, Number>;
+
+      /**
+       * Return a view on the WaveSpeedEstimator for a given dimension @p dim
+       * and choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return View<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
+    private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     };
 
 
@@ -37,7 +65,7 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class WaveSpeedEstimatorView
     {
     public:
@@ -67,9 +95,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
-
-      using Parameters = WaveSpeedEstimator<ScalarNumber>;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       //@}
       /**
@@ -78,14 +104,14 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a WaveSpeedEstimator
+       * object as arguments
        */
-      WaveSpeedEstimatorView(const HyperbolicSystem &hyperbolic_system,
-                             const Parameters &parameters,
-                             const PrecomputedVector &precomputed_values)
-          : hyperbolic_system(hyperbolic_system)
-          , parameters(parameters)
-          , precomputed_values(precomputed_values)
+      WaveSpeedEstimatorView(
+          const View &view,
+          const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
+          : view_(view)
+          , wave_speed_estimator_(wave_speed_estimator)
       {
       }
 
@@ -102,7 +128,8 @@ namespace ryujin
        * compute an estimate for an upper bound of the maximum wavespeed
        * lambda.
        */
-      Number compute(const state_type &U_i,
+      Number compute(const PrecomputedVectorView &pv,
+                     const state_type &U_i,
                      const state_type &U_j,
                      const unsigned int i,
                      const unsigned int *js,
@@ -114,9 +141,8 @@ namespace ryujin
       //@{
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
-      const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
+      const View view_;
+      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
       //@}
     };
   } // namespace EulerBarotropic

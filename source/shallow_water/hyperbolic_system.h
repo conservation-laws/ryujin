@@ -52,6 +52,13 @@ namespace ryujin
       HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
       /**
+       * Alias for the view on the hyperbolic system for a given dimension @p
+       * dim and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = HyperbolicSystemView<dim, Number>;
+
+      /**
        * Return a view on the Hyperbolic System for a given dimension @p
        * dim and choice of number type @p Number (which can be a scalar
        * float, or double, as well as a VectorizedArray holding packed
@@ -60,7 +67,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return HyperbolicSystemView<dim, Number>{*this};
+        return View<dim, Number>{*this};
       }
 
       /**
@@ -291,12 +298,27 @@ namespace ryujin
           Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
 
       /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * states:
+       */
+      using PrecomputedVectorView =
+          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+
+      /**
        * MulticomponentVector for storing a vector of precomputed initial
        * states:
        */
       using InitialPrecomputedVector =
           Vectors::MultiComponentVector<ScalarNumber,
                                         n_initial_precomputed_values>;
+
+      /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * initial states:
+       */
+      using InitialPrecomputedVectorView =
+          Vectors::MultiComponentVectorView<ScalarNumber,
+                                            n_initial_precomputed_values>;
 
       //@}
       /**
@@ -488,14 +510,14 @@ namespace ryujin
        * bathymetry and return, both, state and bathymetry.
        */
       flux_contribution_type
-      flux_contribution(const PrecomputedVector &pv,
-                        const InitialPrecomputedVector &piv,
+      flux_contribution(const PrecomputedVectorView &pv,
+                        const InitialPrecomputedVectorView &piv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
       flux_contribution_type
-      flux_contribution(const PrecomputedVector &pv,
-                        const InitialPrecomputedVector &piv,
+      flux_contribution(const PrecomputedVectorView &pv,
+                        const InitialPrecomputedVectorView &piv,
                         const unsigned int *js,
                         const state_type &U_j) const;
 
@@ -552,12 +574,12 @@ namespace ryujin
                                   const Number &h_star,
                                   const ScalarNumber tau) const;
 
-      state_type nodal_source(const PrecomputedVector &pv,
+      state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const;
 
-      state_type nodal_source(const PrecomputedVector &pv,
+      state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const;
@@ -1075,8 +1097,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const PrecomputedVector & /*pv*/,
-        const InitialPrecomputedVector &piv,
+        const PrecomputedVectorView & /*pv*/,
+        const InitialPrecomputedVectorView &piv,
         const unsigned int i,
         const state_type &U_i) const -> flux_contribution_type
     {
@@ -1088,8 +1110,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const PrecomputedVector & /*pv*/,
-        const InitialPrecomputedVector &piv,
+        const PrecomputedVectorView & /*pv*/,
+        const InitialPrecomputedVectorView &piv,
         const unsigned int *js,
         const state_type &U_j) const -> flux_contribution_type
     {
@@ -1207,7 +1229,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::nodal_source(
-        const PrecomputedVector &pv,
+        const PrecomputedVectorView &pv,
         const unsigned int i,
         const state_type &U_i,
         const ScalarNumber tau) const -> state_type
@@ -1222,7 +1244,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::nodal_source(
-        const PrecomputedVector &pv,
+        const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
         const ScalarNumber tau) const -> state_type

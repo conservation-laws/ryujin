@@ -37,25 +37,21 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = ScalarConservation::HyperbolicSystem;
 
-      template <int dim, typename Number = double>
-      using HyperbolicSystemView =
-          ScalarConservation::HyperbolicSystemView<dim, Number>;
-
       using ParabolicSystem = ryujin::StubParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
           ryujin::StubParabolicModule<Description, dim, Number>;
 
-      template <int dim, typename Number = double>
-      using IndicatorView = ScalarConservation::IndicatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Indicator = ScalarConservation::Indicator<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using LimiterView = ScalarConservation::LimiterView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Limiter = ScalarConservation::Limiter<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using WaveSpeedEstimatorView =
-          ScalarConservation::WaveSpeedEstimatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using WaveSpeedEstimator =
+          ScalarConservation::WaveSpeedEstimator<ScalarNumber>;
     };
   } // namespace ScalarConservation
 } // namespace ryujin

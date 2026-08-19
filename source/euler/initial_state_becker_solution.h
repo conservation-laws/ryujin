@@ -48,8 +48,7 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       BeckerSolution(const HyperbolicSystem &hyperbolic_system,
@@ -208,8 +207,8 @@ namespace ryujin
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
-        using state_type_1d = typename Description::
-            template HyperbolicSystemView<1, Number>::state_type;
+        using state_type_1d =
+            typename HyperbolicSystem::template View<1, Number>::state_type;
 
         state_type_1d result;
         result[0] = Number(rho);

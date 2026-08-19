@@ -40,28 +40,27 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView &pv,
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int i,
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[e_i, p_i, a_i] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
       const auto &[e_j, p_j, a_j] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
 
-      const auto rho_i = view.density(U_i);
+      const auto rho_i = view_.density(U_i);
       const auto rho_i_inverse = Number(1.0) / rho_i;
-      const auto m_i = view.momentum(U_i);
+      const auto m_i = view_.momentum(U_i);
       const auto u_i = rho_i_inverse * n_ij * m_i;
 
-      const auto rho_j = view.density(U_j);
+      const auto rho_j = view_.density(U_j);
       const auto rho_j_inverse = Number(1.0) / rho_j;
-      const auto m_j = view.momentum(U_j);
+      const auto m_j = view_.momentum(U_j);
       const auto u_j = rho_j_inverse * n_ij * m_j;
 
       return compute(primitive_type{u_i, a_i}, primitive_type{u_j, a_j});

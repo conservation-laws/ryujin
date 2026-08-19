@@ -31,11 +31,10 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
-      using state_type_2d = typename Description::
-          template HyperbolicSystemView<2, Number>::state_type;
+      using state_type_2d =
+          typename HyperbolicSystem::template View<2, Number>::state_type;
 
       FourStateContrast(const HyperbolicSystem &hyperbolic_system,
                         const std::string &subsection)

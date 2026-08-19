@@ -35,7 +35,7 @@ namespace ryujin
       const ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
       : ParameterAcceptor(subsection)
-      , limiter_(subsection + "/mass transfer limiter")
+      , limiter_(hyperbolic_system, subsection + "/mass transfer limiter")
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
@@ -161,10 +161,7 @@ namespace ryujin
           /* precomputed needs to be valid for bounds computation */
           const auto &precomputed = std::get<1>(old_state_vector);
 
-          using LimiterView =
-              typename Description::template LimiterView<dim, Number>;
-          const LimiterView limiter_view(
-              *hyperbolic_system_, limiter_, precomputed);
+          const auto limiter_view = limiter_.template view<dim, Number>();
 
           /*
            * Collect state values for packing:
@@ -274,8 +271,8 @@ namespace ryujin
                 const auto U_i = read_tensor(U, global_i);
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
-                bounds =
-                    limiter_view.projection_bounds_from_state(local_i, U_i);
+                bounds = limiter_view.projection_bounds_from_state(
+                    precomputed, local_i, U_i);
               }
 
               for (auto &it : state_values_quad)
@@ -286,8 +283,8 @@ namespace ryujin
                 const auto U_i = read_tensor(U, global_i);
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
-                const auto bounds_i =
-                    limiter_view.projection_bounds_from_state(local_i, U_i);
+                const auto bounds_i = limiter_view.projection_bounds_from_state(
+                    precomputed, local_i, U_i);
                 bounds = limiter_view.combine_bounds(bounds, bounds_i);
 
                 for (unsigned int q = 0; q < quadrature.size(); ++q) {
@@ -738,8 +735,7 @@ namespace ryujin
 
     update_precomputed_values();
 
-    using LimiterView = typename Description::template LimiterView<dim, Number>;
-    const LimiterView limiter_view(*hyperbolic_system_, limiter_, precomputed);
+    const auto limiter_view = limiter_.template view<dim, Number>();
 
     /*
      * Step 1: compute low-order update P_ij matrix, and bounds:
@@ -765,7 +761,8 @@ namespace ryujin
       const auto U_i_star = projected_state.read_tensor(local_i) / m_i_star;
 
       auto &bounds = bounds_map[local_i]; /* by reference */
-      bounds = limiter_view.projection_bounds_from_state(local_i, U_i_star);
+      bounds = limiter_view.projection_bounds_from_state(
+          precomputed, local_i, U_i_star);
 
       /* The value obtained from the affine constraints object: */
       state_type U_i_interp;
@@ -779,8 +776,8 @@ namespace ryujin
         const auto local_k = scalar_partitioner->global_to_local(global_k);
         const auto U_k = new_U.read_tensor(local_k);
 
-        const auto bounds_k =
-            limiter_view.projection_bounds_from_state(local_k, U_k);
+        const auto bounds_k = limiter_view.projection_bounds_from_state(
+            precomputed, local_k, U_k);
         bounds = limiter_view.combine_bounds(bounds, bounds_k);
 
         projected_state.add_tensor(c_k * m_i_star * U_i_star, local_k);
@@ -835,8 +832,8 @@ namespace ryujin
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
           const auto U_k = new_U.read_tensor(local_k);
-          const auto bounds_k =
-              limiter_view.projection_bounds_from_state(local_k, U_k);
+          const auto bounds_k = limiter_view.projection_bounds_from_state(
+              precomputed, local_k, U_k);
           bounds = limiter_view.combine_bounds(bounds, bounds_k);
 
           const auto m_k = projected_mass.local_element(local_k);

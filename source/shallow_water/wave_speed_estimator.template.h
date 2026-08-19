@@ -27,8 +27,7 @@ namespace ryujin
     WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data_Z,
                                            const Number &h) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-      const ScalarNumber gravity = view.gravity();
+      const ScalarNumber gravity = view_.gravity();
 
       const auto &[h_Z, u_Z, a_Z] = riemann_data_Z;
 
@@ -112,8 +111,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-      const ScalarNumber gravity = view.gravity();
+      const ScalarNumber gravity = view_.gravity();
       const auto gravity_inverse = ScalarNumber(1.) / gravity;
 
       const auto &[h_i, u_i, a_i] = riemann_data_i;
@@ -211,12 +209,10 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
+      const Number h = view_.water_depth_sharp(U);
+      const Number gravity = view_.gravity();
 
-      const Number h = view.water_depth_sharp(U);
-      const Number gravity = view.gravity();
-
-      const auto velocity = view.momentum(U) / h;
+      const auto velocity = view_.momentum(U) / h;
       const auto projected_velocity = n_ij * velocity;
       const auto a = std::sqrt(h * gravity);
 
@@ -240,6 +236,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     Number WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView & /*pv*/,
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int /*i*/,

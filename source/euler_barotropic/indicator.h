@@ -10,6 +10,7 @@
 #include "hyperbolic_system.h"
 
 #include <multicomponent_vector.h>
+#include <observer_pointer.h>
 #include <simd.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -20,12 +21,17 @@ namespace ryujin
 {
   namespace EulerBarotropic
   {
+    template <int dim, typename Number = double>
+    class IndicatorView;
+
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
     public:
-      Indicator(const std::string &subsection = "/Indicator")
+      Indicator(const HyperbolicSystem &hyperbolic_system,
+                const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
@@ -35,7 +41,27 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(evc_factor);
 
+      /**
+       * Alias for the view on the indicator for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = IndicatorView<dim, Number>;
+
+      /**
+       * Return a view on the Indicator for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return View<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       ScalarNumber evc_factor_;
     };
 
@@ -46,7 +72,7 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class IndicatorView
     {
     public:
@@ -67,9 +93,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
-
-      using Parameters = Indicator<ScalarNumber>;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       //@}
       /**
@@ -80,10 +104,10 @@ namespace ryujin
        * IndicatorView<dim, Number> indicator_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   indicator_view.reset(i, U_i);
+       *   indicator_view.reset(pv, i, U_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator_view.accumulate(js, U_j, c_ij);
+       *     indicator_view.accumulate(pv, js, U_j, c_ij);
        *   }
        *   indicator_view.alpha(hd_i);
        * }
@@ -92,14 +116,12 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and an Indicator
+       * object as arguments
        */
-      IndicatorView(const HyperbolicSystem &hyperbolic_system,
-                    const Parameters &parameters,
-                    const PrecomputedVector &precomputed_values)
-          : hyperbolic_system(hyperbolic_system)
-          , parameters(parameters)
-          , precomputed_values(precomputed_values)
+      IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
+          : view_(view)
+          , indicator_(indicator)
       {
       }
 
@@ -107,13 +129,16 @@ namespace ryujin
        * Reset temporary storage and initialize for a new row corresponding
        * to state vector U_i.
        */
-      void reset(const unsigned int i, const state_type &U_i);
+      void reset(const PrecomputedVectorView &pv,
+                 const unsigned int i,
+                 const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int *js,
+      void accumulate(const PrecomputedVectorView &pv,
+                      const unsigned int *js,
                       const state_type &U_j,
                       const dealii::Tensor<1, dim, Number> &c_ij);
 
@@ -130,15 +155,14 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
-      const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
+      const View view_;
+      const Indicator<ScalarNumber> &indicator_;
 
-      Number eta_i = 0.;
-      state_type d_eta_i;
+      Number eta_i_ = 0.;
+      state_type d_eta_i_;
 
-      Number left = 0.;
-      state_type right;
+      Number left_ = 0.;
+      state_type right_;
 
       //@}
     };
@@ -153,53 +177,51 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    IndicatorView<dim, Number>::reset(const unsigned int i,
+    IndicatorView<dim, Number>::reset(const PrecomputedVectorView &pv,
+                                      const unsigned int i,
                                       const state_type &U_i)
     {
       /* Entropy viscosity commutator: */
 
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[e_i, p_i, a_i] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(i);
+          pv.template read_tensor<Number, precomputed_type>(i);
 
-      eta_i = view.total_energy(U_i, e_i);
-      d_eta_i = view.total_energy_derivative(U_i, e_i, p_i);
+      eta_i_ = view_.total_energy(U_i, e_i);
+      d_eta_i_ = view_.total_energy_derivative(U_i, e_i, p_i);
 
-      // left = sum_j F(U_j) * c_ij, where F is the mathematical entropy flux
-      left = 0.;
+      // left_ = sum_j F(U_j) * c_ij, where F is the mathematical entropy flux
+      left_ = 0.;
 
-      // right = sum_j f(U_j) * c_ij, where f is the flux of the system
-      right = 0.;
+      // right_ = sum_j f(U_j) * c_ij, where f is the flux of the system
+      right_ = 0.;
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void IndicatorView<dim, Number>::accumulate(
+        const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
       /* Entropy viscosity commutator: */
 
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       const auto &[e_j, p_j, a_j] =
-          precomputed_values.template read_tensor<Number, precomputed_type>(js);
+          pv.template read_tensor<Number, precomputed_type>(js);
 
-      const auto rho_j = view.density(U_j);
+      const auto rho_j = view_.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
-      const auto eta_j = view.total_energy(U_j, e_j);
+      const auto eta_j = view_.total_energy(U_j, e_j);
 
-      const auto m_j = view.momentum(U_j);
+      const auto m_j = view_.momentum(U_j);
 
-      const auto f_j = view.f(U_j, p_j);
+      const auto f_j = view_.f(U_j, p_j);
 
       const auto entropy_flux = (eta_j + p_j) * rho_j_inverse * (m_j * c_ij);
 
-      left += entropy_flux;
+      left_ += entropy_flux;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        right[k] += f_j[k] * c_ij;
+        right_[k] += f_j[k] * c_ij;
       }
     }
 
@@ -210,17 +232,17 @@ namespace ryujin
     {
       /* Entropy viscosity commutator: */
 
-      Number numerator = left;
-      Number denominator = std::abs(left);
+      Number numerator = left_;
+      Number denominator = std::abs(left_);
       for (unsigned int k = 0; k < problem_dimension; ++k) {
-        numerator -= d_eta_i[k] * right[k];
-        denominator += std::abs(d_eta_i[k] * right[k]);
+        numerator -= d_eta_i_[k] * right_[k];
+        denominator += std::abs(d_eta_i_[k] * right_[k]);
       }
 
-      const auto quotient = safe_division(std::abs(numerator),
-                                          denominator + hd_i * std::abs(eta_i));
+      const auto quotient = safe_division(
+          std::abs(numerator), denominator + hd_i * std::abs(eta_i_));
 
-      return std::min(Number(1.), parameters.evc_factor() * quotient);
+      return std::min(Number(1.), indicator_.evc_factor() * quotient);
     }
   } // namespace EulerBarotropic
 } // namespace ryujin

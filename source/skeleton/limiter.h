@@ -12,18 +12,24 @@
 #include <compile_time_options.h>
 #include <multicomponent_vector.h>
 #include <newton.h>
+#include <observer_pointer.h>
 #include <simd.h>
 
 namespace ryujin
 {
   namespace Skeleton
   {
+    template <int dim, typename Number = double>
+    class LimiterView;
+
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
-      Limiter(const std::string &subsection = "/Limiter")
+      Limiter(const HyperbolicSystem &hyperbolic_system,
+              const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         iterations_ = 2;
         add_parameter(
@@ -32,7 +38,27 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(iterations);
 
+      /**
+       * Alias for the view on the limiter for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = LimiterView<dim, Number>;
+
+      /**
+       * Return a view on the Limiter for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return View<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       unsigned int iterations_;
     };
 
@@ -42,7 +68,7 @@ namespace ryujin
      *
      * @ingroup SkeletonEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class LimiterView
     {
     public:
@@ -59,9 +85,7 @@ namespace ryujin
 
       using flux_contribution_type = typename View::flux_contribution_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
-
-      using Parameters = Limiter<ScalarNumber>;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       //@}
       /**
@@ -79,14 +103,12 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a Limiter
+       * object as arguments
        */
-      LimiterView(const HyperbolicSystem &hyperbolic_system,
-                  const Parameters &parameters,
-                  const PrecomputedVector &precomputed_values)
-          : hyperbolic_system(hyperbolic_system)
-          , parameters(parameters)
-          , precomputed_values(precomputed_values)
+      LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -94,7 +116,8 @@ namespace ryujin
        * Given a state @p U_i and an index @p i return "strict" bounds,
        * i.e., a minimal convex set containing the state.
        */
-      Bounds projection_bounds_from_state(const unsigned int /*i*/,
+      Bounds projection_bounds_from_state(const PrecomputedVectorView & /*pv*/,
+                                          const unsigned int /*i*/,
                                           const state_type & /*U_i*/) const
       {
         return Bounds{};
@@ -131,10 +154,10 @@ namespace ryujin
        * LimiterView<dim, Number> limiter_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter_view.reset(i, U_i, flux_i);
+       *   limiter_view.reset(pv, i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter_view.accumulate(js, U_j, flux_j, scaled_c_ij,
+       *     limiter_view.accumulate(pv, js, U_j, flux_j, scaled_c_ij,
        * affine_shift);
        *   }
        *   limiter_view.bounds(hd_i);
@@ -146,9 +169,10 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int /*i*/,
-                 const state_type & /*new_U_i*/,
-                 const flux_contribution_type & /*new_flux_i*/)
+      void reset(const PrecomputedVectorView & /*pv*/,
+                 const unsigned int /*i*/,
+                 const state_type & /*U_i*/,
+                 const flux_contribution_type & /*flux_i*/)
       {
         // empty
       }
@@ -157,7 +181,8 @@ namespace ryujin
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int * /*js*/,
+      void accumulate(const PrecomputedVectorView & /*pv*/,
+                      const unsigned int * /*js*/,
                       const state_type & /*U_j*/,
                       const flux_contribution_type & /*flux_j*/,
                       const dealii::Tensor<1, dim, Number> & /*scaled_c_ij*/,
@@ -200,9 +225,8 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
-      const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
       Bounds bounds_;
       //@}

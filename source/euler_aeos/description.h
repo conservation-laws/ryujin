@@ -34,24 +34,20 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
 
-      template <int dim, typename Number = double>
-      using HyperbolicSystemView = EulerAEOS::HyperbolicSystemView<dim, Number>;
-
       using ParabolicSystem = ryujin::StubParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
           ryujin::StubParabolicModule<Description, dim, Number>;
 
-      template <int dim, typename Number = double>
-      using IndicatorView = EulerAEOS::IndicatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Indicator = EulerAEOS::Indicator<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using LimiterView = EulerAEOS::LimiterView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using Limiter = EulerAEOS::Limiter<ScalarNumber>;
 
-      template <int dim, typename Number = double>
-      using WaveSpeedEstimatorView =
-          EulerAEOS::WaveSpeedEstimatorView<dim, Number>;
+      template <typename ScalarNumber = double>
+      using WaveSpeedEstimator = EulerAEOS::WaveSpeedEstimator<ScalarNumber>;
     };
   } // namespace EulerAEOS
 } // namespace ryujin

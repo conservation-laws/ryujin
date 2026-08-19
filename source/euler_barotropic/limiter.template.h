@@ -20,13 +20,11 @@ namespace ryujin
                                     const Number t_min /* = Number(0.) */,
                                     const Number t_max /* = Number(1.) */) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       bool success = true;
       Number t_r = t_max;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const auto large = view.vacuum_state_relaxation_large();
+      const auto large = view_.vacuum_state_relaxation_large();
       const ScalarNumber relax = ScalarNumber(1. + large * eps);
 
       /*
@@ -34,8 +32,8 @@ namespace ryujin
        */
 
       {
-        const auto &rho_U = view.density(U);
-        const auto &rho_P = view.density(P);
+        const auto &rho_U = view_.density(U);
+        const auto &rho_P = view_.density(P);
 
         const auto &rho_min = std::get<0>(bounds);
         const auto &rho_max = std::get<1>(bounds);
@@ -44,9 +42,9 @@ namespace ryujin
          * Verify that rho_U is within bounds. This property might be
          * violated for relative CFL numbers larger than 1.
          */
-        const auto test_min = view.filter_vacuum_density(
+        const auto test_min = view_.filter_vacuum_density(
             std::max(Number(0.), rho_U - relax * rho_max));
-        const auto test_max = view.filter_vacuum_density(
+        const auto test_max = view_.filter_vacuum_density(
             std::max(Number(0.), rho_min - relax * rho_U));
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
@@ -105,10 +103,10 @@ namespace ryujin
         /*
          * Verify that the new state is within bounds:
          */
-        const auto rho_new = view.density(U + t_r * P);
-        const auto test_new_min = view.filter_vacuum_density(
+        const auto rho_new = view_.density(U + t_r * P);
+        const auto test_new_min = view_.filter_vacuum_density(
             std::max(Number(0.), rho_new - relax * rho_max));
-        const auto test_new_max = view.filter_vacuum_density(
+        const auto test_new_max = view_.filter_vacuum_density(
             std::max(Number(0.), rho_min - relax * rho_new));
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT

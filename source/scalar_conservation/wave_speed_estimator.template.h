@@ -27,15 +27,13 @@ namespace ryujin
         const precomputed_type &prec_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto &view = hyperbolic_system.view<dim, Number>();
-
       /* Project all fluxes to 1D: */
-      const Number f_i = view.construct_flux_tensor(prec_i) * n_ij;
-      const Number f_j = view.construct_flux_tensor(prec_j) * n_ij;
-      const Number df_i = view.construct_flux_gradient_tensor(prec_i) * n_ij;
-      const Number df_j = view.construct_flux_gradient_tensor(prec_j) * n_ij;
+      const Number f_i = view_.construct_flux_tensor(prec_i) * n_ij;
+      const Number f_j = view_.construct_flux_tensor(prec_j) * n_ij;
+      const Number df_i = view_.construct_flux_gradient_tensor(prec_i) * n_ij;
+      const Number df_j = view_.construct_flux_gradient_tensor(prec_j) * n_ij;
 
-      const auto h2 = Number(2. * view.derivative_approximation_delta());
+      const auto h2 = Number(2. * view_.derivative_approximation_delta());
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "\nu_i  = " << u_i << std::endl;
@@ -68,7 +66,7 @@ namespace ryujin
 
       constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
 
-      if (parameters.use_greedy_wavespeed()) {
+      if (wave_speed_estimator_.use_greedy_wavespeed()) {
         /*
          * In case of a greedy estimate we make sure that we always use the
          * Roe average and only fall back to the derivative approximation
@@ -132,20 +130,20 @@ namespace ryujin
        */
 
       const auto enforce_entropy = [&](const Number &k) {
-        const Number f_k = view.flux_function(k) * n_ij;
+        const Number f_k = view_.flux_function(k) * n_ij;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "k    = " << k << std::endl;
         std::cout << "f_k  = " << f_k << std::endl;
 #endif
 
-        const Number eta_i = view.kruzkov_entropy(k, u_i);
+        const Number eta_i = view_.kruzkov_entropy(k, u_i);
         const Number q_i =
-            view.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
+            view_.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
 
-        const Number eta_j = view.kruzkov_entropy(k, u_j);
+        const Number eta_j = view_.kruzkov_entropy(k, u_j);
         const Number q_j =
-            view.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
+            view_.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
 
         const Number a = u_i + u_j - ScalarNumber(2.) * k;
         const Number b = f_j - f_i;
@@ -173,12 +171,12 @@ namespace ryujin
       };
 
 
-      if (parameters.use_averaged_entropy()) {
+      if (wave_speed_estimator_.use_averaged_entropy()) {
         const Number k = ScalarNumber(0.5) * (u_i + u_j);
         enforce_entropy(k);
       }
 
-      const unsigned int n_entropies = parameters.random_entropies();
+      const unsigned int n_entropies = wave_speed_estimator_.random_entropies();
       for (unsigned int i = 0; i < n_entropies; ++i) {
         const Number factor = draw();
         const Number k = factor * u_i + (Number(1.) - factor) * u_j;
@@ -195,20 +193,18 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView &pv,
         const state_type &U_i,
         const state_type &U_j,
         const unsigned int i,
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       using pst = typename View::precomputed_type;
 
-      const auto u_i = view.state(U_i);
-      const auto u_j = view.state(U_j);
+      const auto u_i = view_.state(U_i);
+      const auto u_j = view_.state(U_j);
 
-      const auto &pv = precomputed_values;
       const auto prec_i = pv.template read_tensor<Number, pst>(i);
       const auto prec_j = pv.template read_tensor<Number, pst>(js);
 

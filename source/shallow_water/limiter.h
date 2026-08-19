@@ -13,17 +13,23 @@
 
 #include <multicomponent_vector.h>
 #include <newton.h>
+#include <observer_pointer.h>
 
 namespace ryujin
 {
   namespace ShallowWater
   {
+    template <int dim, typename Number = double>
+    class LimiterView;
+
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
-      Limiter(const std::string &subsection = "/Limiter")
+      Limiter(const HyperbolicSystem &hyperbolic_system,
+              const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         iterations_ = 2;
         add_parameter(
@@ -55,7 +61,27 @@ namespace ryujin
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
+      /**
+       * Alias for the view on the limiter for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = LimiterView<dim, Number>;
+
+      /**
+       * Return a view on the Limiter for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return View<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       unsigned int iterations_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
@@ -68,7 +94,7 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class LimiterView
     {
     public:
@@ -89,9 +115,7 @@ namespace ryujin
 
       using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = typename View::PrecomputedVector;
-
-      using Parameters = Limiter<ScalarNumber>;
+      using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       //@}
       /**
@@ -109,14 +133,12 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a Limiter
+       * object as arguments
        */
-      LimiterView(const HyperbolicSystem &hyperbolic_system,
-                  const Parameters &parameters,
-                  const PrecomputedVector &precomputed_values)
-          : hyperbolic_system(hyperbolic_system)
-          , parameters(parameters)
-          , precomputed_values(precomputed_values)
+      LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
+          : view_(view)
+          , limiter_(limiter)
       {
       }
 
@@ -124,7 +146,8 @@ namespace ryujin
        * Given a state @p U_i and an index @p i return "strict" bounds,
        * i.e., a minimal convex set containing the state.
        */
-      Bounds projection_bounds_from_state(const unsigned int i,
+      Bounds projection_bounds_from_state(const PrecomputedVectorView &pv,
+                                          const unsigned int i,
                                           const state_type &U_i) const;
 
       /**
@@ -153,10 +176,10 @@ namespace ryujin
        * LimiterView<dim, Number> limiter_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter_view.reset(i, U_i, flux_i);
+       *   limiter_view.reset(pv, i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter_view.accumulate(js, U_j, flux_j, scaled_c_ij,
+       *     limiter_view.accumulate(pv, js, U_j, flux_j, scaled_c_ij,
        * affine_shift);
        *   }
        *   limiter_view.bounds(hd_i);
@@ -168,7 +191,8 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int i,
+      void reset(const PrecomputedVectorView &pv,
+                 const unsigned int i,
                  const state_type &U_i,
                  const flux_contribution_type &flux_i);
 
@@ -176,7 +200,8 @@ namespace ryujin
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const state_type &U_j,
+      void accumulate(const PrecomputedVectorView &pv,
+                      const state_type &U_j,
                       const state_type &U_star_ij,
                       const state_type &U_star_ji,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
@@ -208,19 +233,18 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
-      const Parameters &parameters;
-      const PrecomputedVector &precomputed_values;
+      const View view_;
+      const Limiter<ScalarNumber> &limiter_;
 
-      state_type U_i;
+      state_type U_i_;
 
       Bounds bounds_;
 
       /* for relaxation */
 
-      Number h_relaxation_numerator;
-      Number v2_relaxation_numerator;
-      Number relaxation_denominator;
+      Number h_relaxation_numerator_;
+      Number v2_relaxation_numerator_;
+      Number relaxation_denominator_;
 
       //@}
     };
@@ -236,12 +260,13 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     LimiterView<dim, Number>::projection_bounds_from_state(
-        const unsigned int /*i*/, const state_type &U_i) const -> Bounds
+        const PrecomputedVectorView & /*pv*/,
+        const unsigned int /*i*/,
+        const state_type &U_i) const -> Bounds
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-      const auto h_i = view.water_depth(U_i);
+      const auto h_i = view_.water_depth(U_i);
       const auto v_i =
-          view.momentum(U_i) * view.inverse_water_depth_mollified(U_i);
+          view_.momentum(U_i) * view_.inverse_water_depth_mollified(U_i);
       const auto v2_i = v_i.norm_square();
 
       return {/*h_min*/ h_i, /*h_max*/ h_i, /*v2_max*/ v2_i};
@@ -277,7 +302,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= parameters.relaxation_factor();
+      r *= limiter_.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       h_min *= std::max((Number(1.) - r), Number(eps));
@@ -289,12 +314,13 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::reset(
-        unsigned int /*i*/,
-        const state_type &new_U_i,
-        const flux_contribution_type & /*new_flux_i*/)
+    DEAL_II_ALWAYS_INLINE inline void
+    LimiterView<dim, Number>::reset(const PrecomputedVectorView & /*pv*/,
+                                    unsigned int /*i*/,
+                                    const state_type &U_i,
+                                    const flux_contribution_type & /*flux_i*/)
     {
-      U_i = new_U_i;
+      U_i_ = U_i;
 
       auto &[h_min, h_max, v2_max] = bounds_;
 
@@ -302,26 +328,25 @@ namespace ryujin
       h_max = Number(0.);
       v2_max = Number(0.);
 
-      h_relaxation_numerator = Number(0.);
-      v2_relaxation_numerator = Number(0.);
-      relaxation_denominator = Number(0.);
+      h_relaxation_numerator_ = Number(0.);
+      v2_relaxation_numerator_ = Number(0.);
+      relaxation_denominator_ = Number(0.);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::accumulate(
+        const PrecomputedVectorView & /*pv*/,
         const state_type &U_j,
         const state_type &U_star_ij,
         const state_type &U_star_ji,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const state_type &affine_shift)
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       /* The bar states: */
 
-      const auto f_star_ij = view.f(U_star_ij);
-      const auto f_star_ji = view.f(U_star_ji);
+      const auto f_star_ij = view_.f(U_star_ij);
+      const auto f_star_ji = view_.f(U_star_ji);
 
       /* bar state shifted by an affine shift: */
       const auto U_ij_bar =
@@ -334,12 +359,12 @@ namespace ryujin
 
       auto &[h_min, h_max, v2_max] = bounds_;
 
-      const auto h_bar_ij = view.water_depth(U_ij_bar);
+      const auto h_bar_ij = view_.water_depth(U_ij_bar);
       h_min = std::min(h_min, h_bar_ij);
       h_max = std::max(h_max, h_bar_ij);
 
-      const auto v_bar_ij = view.momentum(U_ij_bar) *
-                            view.inverse_water_depth_mollified(U_ij_bar);
+      const auto v_bar_ij = view_.momentum(U_ij_bar) *
+                            view_.inverse_water_depth_mollified(U_ij_bar);
       const auto v2_bar_ij = v_bar_ij.norm_square();
       v2_max = std::max(v2_max, v2_bar_ij);
 
@@ -348,17 +373,17 @@ namespace ryujin
       /* Use a uniform weight. */
       const auto beta_ij = Number(1.);
 
-      relaxation_denominator += std::abs(beta_ij);
+      relaxation_denominator_ += std::abs(beta_ij);
 
-      const auto h_i = view.water_depth(U_i);
-      const auto h_j = view.water_depth(U_j);
-      h_relaxation_numerator += beta_ij * (h_i + h_j);
+      const auto h_i = view_.water_depth(U_i_);
+      const auto h_j = view_.water_depth(U_j);
+      h_relaxation_numerator_ += beta_ij * (h_i + h_j);
 
       const auto vel_i =
-          view.momentum(U_i) * view.inverse_water_depth_mollified(U_i);
+          view_.momentum(U_i_) * view_.inverse_water_depth_mollified(U_i_);
       const auto vel_j =
-          view.momentum(U_j) * view.inverse_water_depth_mollified(U_j);
-      v2_relaxation_numerator +=
+          view_.momentum(U_j) * view_.inverse_water_depth_mollified(U_j);
+      v2_relaxation_numerator_ +=
           beta_ij * (-vel_i.norm_square() + vel_j.norm_square());
     }
 
@@ -376,15 +401,14 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_relaxed =
-          ScalarNumber(2. * parameters.relaxation_factor()) *
-          std::abs(h_relaxation_numerator) /
-          (relaxation_denominator + Number(eps));
+      const Number h_relaxed = ScalarNumber(2. * limiter_.relaxation_factor()) *
+                               std::abs(h_relaxation_numerator_) /
+                               (relaxation_denominator_ + Number(eps));
 
       const Number v2_relaxed =
-          ScalarNumber(2. * parameters.relaxation_factor()) *
-          std::abs(v2_relaxation_numerator) /
-          (relaxation_denominator + Number(eps));
+          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          std::abs(v2_relaxation_numerator_) /
+          (relaxation_denominator_ + Number(eps));
 
       h_min_relaxed = std::max(h_min_relaxed, h_min - h_relaxed);
       h_max_relaxed = std::min(h_max_relaxed, h_max + h_relaxed);

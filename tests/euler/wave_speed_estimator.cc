@@ -26,18 +26,12 @@ int main()
   using Number = NUMBER;
 
   HyperbolicSystem hyperbolic_system;
-  WaveSpeedEstimatorView<dim, Number>::Parameters wave_speed_estimator;
+  WaveSpeedEstimator<double> wave_speed_estimator(hyperbolic_system);
 
   const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
-  static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystemView<dim, Number>::n_precomputed_values;
-  using precomputed_type =
-      Vectors::MultiComponentVector<double, n_precomputed_values>;
-  precomputed_type dummy;
-
-  WaveSpeedEstimatorView<dim> wave_speed_estimator_view(
-      hyperbolic_system, wave_speed_estimator, dummy);
+  const auto wave_speed_estimator_view =
+      wave_speed_estimator.view<dim, Number>();
 
   std::stringstream parameters;
   parameters << "subsection WaveSpeedEstimator\n"
