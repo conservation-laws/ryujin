@@ -66,7 +66,7 @@ namespace ryujin
 
       constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
 
-      if (parameters.use_greedy_wavespeed()) {
+      if (wave_speed_estimator.use_greedy_wavespeed()) {
         /*
          * In case of a greedy estimate we make sure that we always use the
          * Roe average and only fall back to the derivative approximation
@@ -171,12 +171,12 @@ namespace ryujin
       };
 
 
-      if (parameters.use_averaged_entropy()) {
+      if (wave_speed_estimator.use_averaged_entropy()) {
         const Number k = ScalarNumber(0.5) * (u_i + u_j);
         enforce_entropy(k);
       }
 
-      const unsigned int n_entropies = parameters.random_entropies();
+      const unsigned int n_entropies = wave_speed_estimator.random_entropies();
       for (unsigned int i = 0; i < n_entropies; ++i) {
         const Number factor = draw();
         const Number k = factor * u_i + (Number(1.) - factor) * u_j;

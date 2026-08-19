@@ -148,12 +148,12 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystemView and a parameters
+       * Constructor taking a HyperbolicSystemView and an Indicator
        * object as arguments
        */
-      IndicatorView(const View &view, const Indicator<ScalarNumber> &parameters)
+      IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
           : view(view)
-          , parameters(parameters)
+          , indicator(indicator)
       {
       }
 
@@ -188,7 +188,7 @@ namespace ryujin
       //@{
 
       const View view;
-      const Indicator<ScalarNumber> &parameters;
+      const Indicator<ScalarNumber> &indicator;
 
       Number rho_i_inverse = 0.;
       Number eta_i = 0.;
@@ -278,7 +278,7 @@ namespace ryujin
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
 
-      return std::min(Number(1.), parameters.evc_factor() * quotient);
+      return std::min(Number(1.), indicator.evc_factor() * quotient);
     }
   } // namespace Euler
 } // namespace ryujin

@@ -103,12 +103,12 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystemView and a parameters
+       * Constructor taking a HyperbolicSystemView and an Indicator
        * object as arguments
        */
-      IndicatorView(const View &view, const Indicator<ScalarNumber> &parameters)
+      IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
           : view(view)
-          , parameters(parameters)
+          , indicator(indicator)
       {
       }
 
@@ -152,7 +152,7 @@ namespace ryujin
       //@{
 
       const View view;
-      const Indicator<ScalarNumber> &parameters;
+      const Indicator<ScalarNumber> &indicator;
 
       //@}
     };

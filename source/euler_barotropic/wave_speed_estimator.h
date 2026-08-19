@@ -104,13 +104,14 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystemView and a parameters
+       * Constructor taking a HyperbolicSystemView and a WaveSpeedEstimator
        * object as arguments
        */
-      WaveSpeedEstimatorView(const View &view,
-                             const WaveSpeedEstimator<ScalarNumber> &parameters)
+      WaveSpeedEstimatorView(
+          const View &view,
+          const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
           : view(view)
-          , parameters(parameters)
+          , wave_speed_estimator(wave_speed_estimator)
       {
       }
 
@@ -141,7 +142,7 @@ namespace ryujin
 
     private:
       const View view;
-      const WaveSpeedEstimator<ScalarNumber> &parameters;
+      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator;
       //@}
     };
   } // namespace EulerBarotropic

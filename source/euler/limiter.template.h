@@ -168,7 +168,7 @@ namespace ryujin
         std::cout << "t_r: (start) " << t_r << std::endl;
 #endif
 
-        for (unsigned int n = 0; n < parameters.newton_max_iterations(); ++n) {
+        for (unsigned int n = 0; n < limiter.newton_max_iterations(); ++n) {
 
           const auto U_r = U + t_r * P;
           const auto rho_r = view.density(U_r);
@@ -253,7 +253,7 @@ namespace ryujin
            * Break if the window between t_l and t_r is within the prescribed
            * tolerance:
            */
-          const Number tolerance(parameters.newton_tolerance());
+          const Number tolerance(limiter.newton_tolerance());
           if (std::max(Number(0.), t_r - t_l - tolerance) == Number(0.)) {
 #ifdef DEBUG_OUTPUT_LIMITER
             std::cout << "break: t_l and t_r within tolerance" << std::endl;

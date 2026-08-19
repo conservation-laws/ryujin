@@ -201,7 +201,7 @@ namespace ryujin
          * Skip the quadratic Newton step if the window between t_l and t_r
          * is within the prescribed tolerance:
          */
-        const Number tolerance(parameters.newton_tolerance());
+        const Number tolerance(limiter.newton_tolerance());
         if (!(std::max(Number(0.), t_r - t_l - tolerance) == Number(0.))) {
           /*
            * If the bound is not satisfied, we need to find the root of a

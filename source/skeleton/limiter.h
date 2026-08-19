@@ -103,12 +103,12 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystemView and a parameters
+       * Constructor taking a HyperbolicSystemView and a Limiter
        * object as arguments
        */
-      LimiterView(const View &view, const Limiter<ScalarNumber> &parameters)
+      LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
           : view(view)
-          , parameters(parameters)
+          , limiter(limiter)
       {
       }
 
@@ -226,7 +226,7 @@ namespace ryujin
       //@{
 
       const View view;
-      const Limiter<ScalarNumber> &parameters;
+      const Limiter<ScalarNumber> &limiter;
 
       Bounds bounds_;
       //@}

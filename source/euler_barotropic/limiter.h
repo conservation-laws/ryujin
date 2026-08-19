@@ -115,12 +115,12 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystemView and a parameters
+       * Constructor taking a HyperbolicSystemView and a Limiter
        * object as arguments
        */
-      LimiterView(const View &view, const Limiter<ScalarNumber> &parameters)
+      LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
           : view(view)
-          , parameters(parameters)
+          , limiter(limiter)
       {
       }
 
@@ -226,7 +226,7 @@ namespace ryujin
       //@{
 
       const View view;
-      const Limiter<ScalarNumber> &parameters;
+      const Limiter<ScalarNumber> &limiter;
 
       state_type U_i;
       flux_contribution_type flux_i;
@@ -286,7 +286,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= parameters.relaxation_factor();
+      r *= limiter.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       rho_min_relaxed *= std::max(Number(1.) - r, Number(eps));
@@ -378,7 +378,7 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto rho_relaxation =
-          ScalarNumber(2. * parameters.relaxation_factor()) *
+          ScalarNumber(2. * limiter.relaxation_factor()) *
           std::abs(rho_relaxation_numerator) /
           (std::abs(rho_relaxation_denominator) + Number(eps));
 
