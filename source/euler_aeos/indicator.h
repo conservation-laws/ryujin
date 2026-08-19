@@ -219,14 +219,14 @@ namespace ryujin
     {
       /* Entropy viscosity commutator: */
 
-      const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
+      const auto &[p_i, gamma_min_i, s_i, eta_i] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
       gamma_min_ = gamma_min_i;
 
       const auto rho_i = view_.density(U_i);
       rho_i_inverse_ = Number(1.) / rho_i;
-      eta_i_ = new_eta_i;
+      eta_i_ = eta_i;
 
       d_eta_i_ =
           view_.surrogate_harten_entropy_derivative(U_i, eta_i_, gamma_min_);

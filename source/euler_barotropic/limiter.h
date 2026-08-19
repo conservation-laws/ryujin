@@ -300,11 +300,11 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     LimiterView<dim, Number>::reset(const PrecomputedVectorView & /*pv*/,
                                     const unsigned int /*i*/,
-                                    const state_type &new_U_i,
-                                    const flux_contribution_type &new_flux_i)
+                                    const state_type &U_i,
+                                    const flux_contribution_type &flux_i)
     {
-      U_i_ = new_U_i;
-      flux_i_ = new_flux_i;
+      U_i_ = U_i;
+      flux_i_ = flux_i;
 
       /* Bounds: */
 

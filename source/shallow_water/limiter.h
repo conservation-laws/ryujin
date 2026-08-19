@@ -314,13 +314,13 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::reset(
-        const PrecomputedVectorView & /*pv*/,
-        unsigned int /*i*/,
-        const state_type &new_U_i,
-        const flux_contribution_type & /*new_flux_i*/)
+    DEAL_II_ALWAYS_INLINE inline void
+    LimiterView<dim, Number>::reset(const PrecomputedVectorView & /*pv*/,
+                                    unsigned int /*i*/,
+                                    const state_type &U_i,
+                                    const flux_contribution_type & /*flux_i*/)
     {
-      U_i_ = new_U_i;
+      U_i_ = U_i;
 
       auto &[h_min, h_max, v2_max] = bounds_;
 
