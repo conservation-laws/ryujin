@@ -80,6 +80,12 @@ namespace ryujin
      */
     void prepare();
 
+    //@}
+    /**
+     * @name Functions for scheduling output
+     */
+    //@{
+
     /**
      * Given a state vector @p state_vector, a file name prefix @p name, the
      * current time @p t, and the current output cycle @p cycle schedule a
@@ -134,6 +140,7 @@ namespace ryujin
     const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
     const ScalarVector &smoothness_indicators_;
+
     //@}
   };
 

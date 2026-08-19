@@ -43,10 +43,9 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using ScalarNumber = typename View::ScalarNumber;
 
@@ -72,7 +71,73 @@ namespace ryujin
      */
     void run();
 
-  protected:
+  private:
+    //@}
+    /**
+     * @name Run time options
+     */
+    //@{
+
+    std::string base_name_;
+    std::string base_name_ensemble_;
+
+    std::string debug_command_;
+    std::string debug_filename_;
+
+    Number t_final_;
+    bool enforce_t_final_;
+    Number timer_granularity_;
+
+    bool enable_output_full_;
+    bool enable_output_levelsets_;
+    bool enable_compute_error_;
+    bool enable_compute_quantities_;
+    bool enable_mesh_adaptivity_;
+
+    unsigned int timer_output_full_multiplier_;
+    unsigned int timer_output_levelsets_multiplier_;
+    unsigned int timer_compute_quantities_multiplier_;
+
+    std::vector<std::string> error_quantities_;
+    bool error_normalize_;
+
+    bool resume_;
+    bool resume_at_time_zero_;
+
+    Number terminal_update_interval_;
+    bool terminal_correct_for_hypertreadhing_;
+
+    Number checkpoint_update_interval_;
+
+    //@}
+    /**
+     * @name Internal data
+     */
+    //@{
+
+    MPIEnsemble mpi_ensemble_;
+
+    std::map<std::string, dealii::Timer> computing_timer_;
+
+    MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
+    MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
+    Discretization<dim> discretization_;
+    OfflineData<dim, Number> offline_data_;
+    MPIEnsembleContainer<InitialValues<Description, dim, Number>>
+        initial_values_;
+    HyperbolicModule<Description, dim, Number> hyperbolic_module_;
+    ParabolicModule<Description, dim, Number> parabolic_module_;
+    TimeIntegrator<Description, dim, Number> time_integrator_;
+    MeshAdaptor<Description, dim, Number> mesh_adaptor_;
+    SolutionTransfer<Description, dim, Number> solution_transfer_;
+    Postprocessor<Description, dim, Number> postprocessor_;
+    VTUOutput<Description, dim, Number> vtu_output_;
+    Quantities<Description, dim, Number> quantities_;
+
+    dealii::types::global_dof_index n_global_dofs_;
+
+    std::ofstream logfile_; /* log file */
+
     //@}
     /**
      * @name Internal methods
@@ -148,73 +213,6 @@ namespace ryujin
                                 Number last_checkpoint,
                                 bool write_to_logfile = false,
                                 bool final_time = false);
-    //@}
-
-  private:
-    /**
-     * @name Run time options
-     */
-    //@{
-
-    std::string base_name_;
-    std::string base_name_ensemble_;
-
-    std::string debug_command_;
-    std::string debug_filename_;
-
-    Number t_final_;
-    bool enforce_t_final_;
-    Number timer_granularity_;
-
-    bool enable_output_full_;
-    bool enable_output_levelsets_;
-    bool enable_compute_error_;
-    bool enable_compute_quantities_;
-    bool enable_mesh_adaptivity_;
-
-    unsigned int timer_output_full_multiplier_;
-    unsigned int timer_output_levelsets_multiplier_;
-    unsigned int timer_compute_quantities_multiplier_;
-
-    std::vector<std::string> error_quantities_;
-    bool error_normalize_;
-
-    bool resume_;
-    bool resume_at_time_zero_;
-
-    Number terminal_update_interval_;
-    bool terminal_correct_for_hypertreadhing_;
-
-    Number checkpoint_update_interval_;
-
-    //@}
-    /**
-     * @name Internal data
-     */
-    //@{
-
-    MPIEnsemble mpi_ensemble_;
-
-    std::map<std::string, dealii::Timer> computing_timer_;
-
-    MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
-    MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
-    Discretization<dim> discretization_;
-    OfflineData<dim, Number> offline_data_;
-    MPIEnsembleContainer<InitialValues<Description, dim, Number>>
-        initial_values_;
-    HyperbolicModule<Description, dim, Number> hyperbolic_module_;
-    ParabolicModule<Description, dim, Number> parabolic_module_;
-    TimeIntegrator<Description, dim, Number> time_integrator_;
-    MeshAdaptor<Description, dim, Number> mesh_adaptor_;
-    SolutionTransfer<Description, dim, Number> solution_transfer_;
-    Postprocessor<Description, dim, Number> postprocessor_;
-    VTUOutput<Description, dim, Number> vtu_output_;
-    Quantities<Description, dim, Number> quantities_;
-
-    dealii::types::global_dof_index n_global_dofs_;
-
-    std::ofstream logfile_; /* log file */
 
     //@}
   };

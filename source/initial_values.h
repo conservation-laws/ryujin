@@ -26,7 +26,7 @@ namespace ryujin
    * Given a position @p point the member function
    * InitialValues::initial_state() returns the corresponding (conserved)
    * initial state. The function is used to interpolate initial values and
-   * enforce Dirichlet boundary conditions. For the latter, the
+   * enforce Dirichlet boundary conditions. For the latter, the the
    * function signature has an additional parameter @p t denoting the
    * current time to allow for time-dependent (in-flow) Dirichlet data.
    *
@@ -43,8 +43,8 @@ namespace ryujin
      * @name Typedefs and constexpr constants
      */
     //@{
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
@@ -64,7 +64,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Interpolate initial states
+     * @name Constructor and setup
      */
     //@{
 
@@ -77,7 +77,6 @@ namespace ryujin
                   const ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/InitialValues");
 
-
     /**
      * Callback for ParameterAcceptor::initialize(). After we read in
      * configuration parameters from the parameter file we have to do some
@@ -86,6 +85,11 @@ namespace ryujin
      */
     void parse_parameters_callback();
 
+    //@}
+    /**
+     * @name Interpolate initial states
+     */
+    //@{
 
     /**
      * Given a position @p point returns the corresponding (conserved)
@@ -100,7 +104,6 @@ namespace ryujin
       return initial_state_(point, t);
     }
 
-
     /**
      * Given a position @p point returns the corresponding precomputed
      * initial values, i.e., the quantities that are derived from the
@@ -114,13 +117,11 @@ namespace ryujin
       return initial_precomputed_(point);
     }
 
-
     /**
      * This routine computes and returns a hyperbolic state vector
      * populated with initial values for a specified time @p t.
      */
     HyperbolicVector interpolate_hyperbolic_vector(Number t = 0) const;
-
 
     /**
      * This routine computes and returns a vector populated with the

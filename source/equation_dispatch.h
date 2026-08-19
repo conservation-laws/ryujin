@@ -188,8 +188,14 @@ namespace ryujin
     std::string equation_;
 
     //@}
+    /**
+     * @name Internal data
+     */
+    //@{
 
     bool time_loop_executed_;
+
+    //@}
   };
 
 

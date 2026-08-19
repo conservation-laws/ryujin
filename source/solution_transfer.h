@@ -48,9 +48,6 @@ namespace ryujin
 
     using state_type = typename View::state_type;
 
-    using StateVector = typename View::StateVector;
-    using HyperbolicVector = typename View::HyperbolicVector;
-
     /**
      * The number of stored entries in the bounds array.
      */
@@ -60,6 +57,9 @@ namespace ryujin
      * Array type used to store accumulated bounds.
      */
     using Bounds = typename LimiterView::Bounds;
+
+    using StateVector = typename View::StateVector;
+    using HyperbolicVector = typename View::HyperbolicVector;
 
     //@}
     /**
@@ -83,8 +83,8 @@ namespace ryujin
 
     //@}
     /**
-     * @name Methods for solution transfer after mesh adaptation and
-     * serialization/deserialization.
+     * @name Functions for solution transfer after mesh adaptation and for
+     * serialization/deserialization
      */
     //@{
 
@@ -95,6 +95,26 @@ namespace ryujin
      * after mesh adaptation, or a Triangulation::store()/load() operation.
      */
     void prepare_projection(const StateVector &old_state_vector);
+
+    /**
+     * Project the data stored in the triangulation into a new state vector
+     * @p new_state_vector. The attached data either comes from a previous
+     * call to prepare_projection() prior to mesh adaptation or has been
+     * read back in from a checkpoint after a call to
+     * Triangulation::load().
+     *
+     * @note After mesh refinement all internal data structures stored in
+     * the OfflineData object must be reinitialized with a call to
+     * prepare() and the @p new_state_vector must be appropriately
+     * initialized with the new Partitioner.
+     */
+    void project(StateVector &new_state_vector);
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
 
     /**
      * Return the handle associated with the call back that was set by
@@ -136,20 +156,6 @@ namespace ryujin
       handle_ = dealii::numbers::invalid_unsigned_int;
     }
 
-    /**
-     * Project the data stored in the triangulation into a new state vector
-     * @p new_state_vector. The attached data either comes from a previous
-     * call to prepare_projection() prior to mesh adaptation or has been
-     * read back in from a checkpoint after a call to
-     * Triangulation::load().
-     *
-     * @note After mesh refinement all internal data structures stored in
-     * the OfflineData object must be reinitialized with a call to
-     * prepare() and the @p new_state_vector must be appropriately
-     * initialized with the new Partitioner.
-     */
-    void project(StateVector &new_state_vector);
-
   private:
     //@}
     /**
@@ -172,6 +178,12 @@ namespace ryujin
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
     unsigned int handle_;
+
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
 
     /**
      * Helper function reading in a state from the hyperbolic state vector.

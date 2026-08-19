@@ -283,12 +283,6 @@ namespace ryujin
     }
 
     /**
-     * Returns the relative CFL number used for computing an appropriate
-     * time-step size.
-     */
-    ACCESSOR_READ_ONLY(cfl)
-
-    /**
      * Sets the relative maximal acceptable tau_max ratio. If the ratio of
      * the enforced time-step size tau and our computed tau_max for the
      * hyperbolic (sub) step is above this limit we throw a Restart
@@ -302,20 +296,32 @@ namespace ryujin
     }
 
     /**
-     * Returns the relative maximal acceptable tau_max ratio. If the ratio
-     * of the enforced time-step size tau and our computed tau_max for the
-     * hyperbolic (sub) step is above this limit we throw a Restart
-     * exception.
-     */
-    ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
-
-    /**
      * Sets the invariant domain violation strategy.
      */
     void set_id_violation_strategy(const IDViolationStrategy &strategy) const
     {
       id_violation_strategy_ = strategy;
     }
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
+
+    /**
+     * Returns the relative CFL number used for computing an appropriate
+     * time-step size.
+     */
+    ACCESSOR_READ_ONLY(cfl)
+
+    /**
+     * Returns the relative maximal acceptable tau_max ratio. If the ratio
+     * of the enforced time-step size tau and our computed tau_max for the
+     * hyperbolic (sub) step is above this limit we throw a Restart
+     * exception.
+     */
+    ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
 
     /**
      * Return a reference to the OfflineData object

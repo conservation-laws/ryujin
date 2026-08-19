@@ -32,10 +32,9 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using StateVector = typename View::StateVector;
 

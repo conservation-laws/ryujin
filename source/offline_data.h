@@ -53,6 +53,11 @@ namespace ryujin
   {
   public:
     /**
+     * @name Typedefs and constexpr constants
+     */
+    //@{
+
+    /**
      * A tuple describing (local) dof index, boundary normal, normal mass,
      * boundary mass, boundary id, and position of the boundary degree of
      * freedom.
@@ -73,6 +78,12 @@ namespace ryujin
                                            unsigned int /*col_idx*/,
                                            unsigned int /*j*/>;
 
+    //@}
+    /**
+     * @name Constructor and setup
+     */
+    //@{
+
     /**
      * Constructor
      */
@@ -90,6 +101,12 @@ namespace ryujin
      */
     void prepare(const unsigned int problem_dimension,
                  const unsigned int n_precomputed_values);
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
 
     /**
      * Return a read-only const reference to the DoFHandler for the
@@ -339,8 +356,77 @@ namespace ryujin
     ACCESSOR_READ_ONLY(discretization)
 
   private:
+    //@}
     /**
-     * Private methods used in prepare()
+     * @name Run time options
+     */
+    //@{
+
+    bool treat_fe_nothing_as_boundary_;
+    double incidence_relaxation_even_;
+    double incidence_relaxation_odd_;
+
+    //@}
+    /**
+     * @name Internal data
+     */
+    //@{
+
+    const MPIEnsemble &mpi_ensemble_;
+
+    dealii::ObserverPointer<const Discretization<dim>> discretization_;
+
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
+
+    dealii::AffineConstraints<Number> affine_constraints_cg_;
+    dealii::AffineConstraints<Number> affine_constraints_dg_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        scalar_partitioner_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        hyperbolic_vector_partitioner_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        precomputed_vector_partitioner_;
+
+    unsigned int n_export_indices_;
+    unsigned int n_locally_internal_;
+    unsigned int n_locally_owned_;
+    unsigned int n_locally_relevant_;
+
+    using BoundaryMap = std::vector<BoundaryDescription>;
+    BoundaryMap boundary_map_;
+    std::vector<BoundaryMap> level_boundary_map_;
+
+    using CouplingBoundaryPairs = std::vector<CouplingDescription>;
+    CouplingBoundaryPairs coupling_boundary_pairs_;
+
+    dealii::DynamicSparsityPattern sparsity_pattern_;
+
+    SparsityPattern<dealii::VectorizedArray<Number>::size()>
+        sparsity_pattern_simd_;
+
+    SparseMatrix<Number> mass_matrix_;
+    SparseMatrix<Number> mass_matrix_inverse_;
+
+    using ScalarVector = Vectors::ScalarVector<Number>;
+    ScalarVector lumped_mass_matrix_;
+    ScalarVector lumped_mass_matrix_inverse_;
+
+    using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
+    std::vector<ScalarHostVectorFloat> level_lumped_mass_matrix_;
+
+    SparseMatrix<Number> betaij_matrix_;
+    SparseMatrix<Number, dim> cij_matrix_;
+    SparseMatrix<Number> incidence_matrix_;
+
+    Number measure_of_omega_;
+
+    //@}
+    /**
+     * @name Internal methods
      */
     //@{
 
@@ -399,64 +485,6 @@ namespace ryujin
      */
     void create_multigrid_data();
 
-    //@}
-    /**
-     * Private fields
-     */
-    //@{
-
-    const MPIEnsemble &mpi_ensemble_;
-
-    dealii::ObserverPointer<const Discretization<dim>> discretization_;
-
-    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
-    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
-
-    dealii::AffineConstraints<Number> affine_constraints_cg_;
-    dealii::AffineConstraints<Number> affine_constraints_dg_;
-
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        scalar_partitioner_;
-
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        hyperbolic_vector_partitioner_;
-
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        precomputed_vector_partitioner_;
-
-    unsigned int n_export_indices_;
-    unsigned int n_locally_internal_;
-    unsigned int n_locally_owned_;
-    unsigned int n_locally_relevant_;
-
-    using BoundaryMap = std::vector<BoundaryDescription>;
-    BoundaryMap boundary_map_;
-    std::vector<BoundaryMap> level_boundary_map_;
-
-    using CouplingBoundaryPairs = std::vector<CouplingDescription>;
-    CouplingBoundaryPairs coupling_boundary_pairs_;
-
-    dealii::DynamicSparsityPattern sparsity_pattern_;
-
-    SparsityPattern<dealii::VectorizedArray<Number>::size()>
-        sparsity_pattern_simd_;
-
-    SparseMatrix<Number> mass_matrix_;
-    SparseMatrix<Number> mass_matrix_inverse_;
-
-    using ScalarVector = Vectors::ScalarVector<Number>;
-    ScalarVector lumped_mass_matrix_;
-    ScalarVector lumped_mass_matrix_inverse_;
-
-    using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
-    std::vector<ScalarHostVectorFloat> level_lumped_mass_matrix_;
-
-    SparseMatrix<Number> betaij_matrix_;
-    SparseMatrix<Number, dim> cij_matrix_;
-    SparseMatrix<Number> incidence_matrix_;
-
-    Number measure_of_omega_;
-
     /**
      * Construct a boundary map for a given set of DoFHandler iterators.
      */
@@ -475,16 +503,6 @@ namespace ryujin
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
-
-    //@}
-    /**
-     * @name Run time options
-     */
-    //@{
-
-    bool treat_fe_nothing_as_boundary_;
-    double incidence_relaxation_even_;
-    double incidence_relaxation_odd_;
 
     //@}
   };

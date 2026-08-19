@@ -72,6 +72,12 @@ namespace ryujin
      */
     void prepare(const std::string &name);
 
+    //@}
+    /**
+     * @name Functions for accumulating and writing out quantities
+     */
+    //@{
+
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
      * Strang step) and accumulates statistics for quantities of interests
@@ -86,9 +92,78 @@ namespace ryujin
                    const Number t,
                    unsigned int cycle);
 
-    //@}
-
   private:
+    //@}
+    /**
+     * @name Internal typedefs
+     */
+    //@{
+
+    /**
+     * A tuple describing (local) dof index, boundary normal, normal mass,
+     * boundary mass, boundary id, and position of the boundary degree of
+     * freedom.
+     *
+     * @fixme This type only differs from the one used in OfflineData by
+     * including a DoF index. It might be better to combine both.
+     */
+    using boundary_point =
+        std::tuple<dealii::types::global_dof_index /*local dof index*/,
+                   dealii::Tensor<1, dim, Number> /*normal*/,
+                   Number /*normal mass*/,
+                   Number /*boundary mass*/,
+                   dealii::types::boundary_id /*id*/,
+                   dealii::Point<dim>> /*position*/;
+
+    /**
+     * A tuple describing boundary values we are interested in: the
+     * primitive state and its second moment, boundary stresses and normal
+     * pressure force.
+     */
+    using boundary_value =
+        std::tuple<state_type /* primitive state */,
+                   state_type /* primitive state second moment */>;
+
+    /**
+     * Temporal statistics we store for each boundary manifold.
+     */
+    using boundary_statistic =
+        std::tuple<std::vector<boundary_value> /* values old */,
+                   std::vector<boundary_value> /* values new */,
+                   std::vector<boundary_value> /* values sum */,
+                   Number /* t old */,
+                   Number /* t new */,
+                   Number /* t sum */>;
+
+    /**
+     * A tuple describing (local) dof index, mass, and position of an
+     * interior degree of freedom.
+     */
+    using interior_point =
+        std::tuple<dealii::types::global_dof_index /*local dof index*/,
+                   Number /*mass*/,
+                   dealii::Point<dim>> /*position*/;
+
+    /**
+     * A tuple describing interior values we are interested in: the
+     * primitive state and its second moment.
+     */
+    using interior_value =
+        std::tuple<state_type /* primitive state */,
+                   state_type /* primitive state second moment */>;
+
+    /**
+     * Temporal statistics we store for each interior manifold.
+     */
+    using interior_statistic =
+        std::tuple<std::vector<interior_value> /* values old */,
+                   std::vector<interior_value> /* values new */,
+                   std::vector<interior_value> /* values sum */,
+                   Number /* t old */,
+                   Number /* t new */,
+                   Number /* t sum */>;
+
+    //@}
     /**
      * @name Run time options
      */
@@ -115,45 +190,9 @@ namespace ryujin
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
     /**
-     * A tuple describing (local) dof index, boundary normal, normal mass,
-     * boundary mass, boundary id, and position of the boundary degree of
-     * freedom.
-     *
-     * @fixme This type only differs from the one used in OfflineData by
-     * including a DoF index. It might be better to combine both.
-     */
-    using boundary_point =
-        std::tuple<dealii::types::global_dof_index /*local dof index*/,
-                   dealii::Tensor<1, dim, Number> /*normal*/,
-                   Number /*normal mass*/,
-                   Number /*boundary mass*/,
-                   dealii::types::boundary_id /*id*/,
-                   dealii::Point<dim>> /*position*/;
-
-    /**
      * The boundary map.
      */
     std::map<std::string, std::vector<boundary_point>> boundary_maps_;
-
-    /**
-     * A tuple describing boundary values we are interested in: the
-     * primitive state and its second moment, boundary stresses and normal
-     * pressure force.
-     */
-    using boundary_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
-
-    /**
-     * Temporal statistics we store for each boundary manifold.
-     */
-    using boundary_statistic =
-        std::tuple<std::vector<boundary_value> /* values old */,
-                   std::vector<boundary_value> /* values new */,
-                   std::vector<boundary_value> /* values sum */,
-                   Number /* t old */,
-                   Number /* t new */,
-                   Number /* t sum */>;
 
     /**
      * Associated statistics for the boundary map.
@@ -163,37 +202,9 @@ namespace ryujin
         boundary_time_series_;
 
     /**
-     * A tuple describing (local) dof index, mass, and position of an
-     * interior degree of freedom.
-     */
-    using interior_point =
-        std::tuple<dealii::types::global_dof_index /*local dof index*/,
-                   Number /*mass*/,
-                   dealii::Point<dim>> /*position*/;
-
-    /**
      * The interior map.
      */
     std::map<std::string, std::vector<interior_point>> interior_maps_;
-
-    /**
-     * A tuple describing interior values we are interested in: the
-     * primitive state and its second moment.
-     */
-    using interior_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
-
-    /**
-     * Temporal statistics we store for each interior manifold.
-     */
-    using interior_statistic =
-        std::tuple<std::vector<interior_value> /* values old */,
-                   std::vector<interior_value> /* values new */,
-                   std::vector<interior_value> /* values sum */,
-                   Number /* t old */,
-                   Number /* t new */,
-                   Number /* t sum */>;
 
     /**
      * Associated statistics for the interior map.
@@ -203,8 +214,10 @@ namespace ryujin
         interior_time_series_;
 
     std::string base_name_;
+    std::string header_;
     bool first_cycle_;
     std::optional<unsigned int> time_series_cycle_;
+    bool mesh_files_have_been_written_;
 
     //@}
     /**
@@ -212,13 +225,9 @@ namespace ryujin
      */
     //@{
 
-    bool mesh_files_have_been_written_;
-
     void write_mesh_files(unsigned int cycle);
 
     void clear_statistics();
-
-    std::string header_;
 
     template <typename point_type, typename value_type>
     value_type internal_accumulate(const StateVector &state_vector,

@@ -259,10 +259,9 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using StateVector = typename View::StateVector;
 
@@ -327,6 +326,12 @@ namespace ryujin
                 Number t,
                 Number t_final = std::numeric_limits<Number>::max());
 
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
+
     /**
      * The selected time-stepping scheme.
      */
@@ -340,7 +345,46 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(efficiency);
 
-  protected:
+  private:
+    //@}
+    /**
+     * @name Run time options
+     */
+    //@{
+
+    Number cfl_min_;
+    Number cfl_max_;
+
+    CFLRecoveryStrategy cfl_recovery_strategy_;
+
+    Number acceptable_tau_max_ratio_;
+    Number tau_max_;
+
+    TimeSteppingScheme time_stepping_scheme_;
+    Number efficiency_;
+
+    //@}
+    /**
+     * @name Internal data
+     */
+    //@{
+
+    const MPIEnsemble &mpi_ensemble_;
+
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const HyperbolicModule<Description, dim, Number>>
+        hyperbolic_module_;
+    dealii::ObserverPointer<const ParabolicModule<Description, dim, Number>>
+        parabolic_module_;
+
+    std::vector<StateVector> temp_;
+
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
+
     /**
      * Given a reference to a previous state vector U performs an explicit
      * second-order strong-stability preserving Runge-Kutta SSPRK(2,2;1/2)
@@ -459,40 +503,6 @@ namespace ryujin
      * parabolic subproblem. The function returns the chosen time step size tau.
      */
     Number step_imex_33(StateVector &state_vector, Number t, Number tau_max);
-
-  private:
-    //@}
-    /**
-     * @name Run time options
-     */
-    //@{
-
-    Number cfl_min_;
-    Number cfl_max_;
-
-    CFLRecoveryStrategy cfl_recovery_strategy_;
-
-    Number acceptable_tau_max_ratio_;
-    Number tau_max_;
-
-    TimeSteppingScheme time_stepping_scheme_;
-    Number efficiency_;
-
-    //@}
-    /**
-     * @name Internal data
-     */
-    //@{
-
-    const MPIEnsemble &mpi_ensemble_;
-
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const HyperbolicModule<Description, dim, Number>>
-        hyperbolic_module_;
-    dealii::ObserverPointer<const ParabolicModule<Description, dim, Number>>
-        parabolic_module_;
-
-    std::vector<StateVector> temp_;
 
     //@}
   };

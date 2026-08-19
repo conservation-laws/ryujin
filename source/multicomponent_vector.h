@@ -490,6 +490,7 @@ namespace ryujin
       Number *data_;
       unsigned int n_locally_owned_;
       unsigned int n_locally_relevant_;
+
       //@}
     };
 
