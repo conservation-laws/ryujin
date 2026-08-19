@@ -27,8 +27,6 @@ namespace ryujin
         const precomputed_type &prec_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto &view = hyperbolic_system.view<dim, Number>();
-
       /* Project all fluxes to 1D: */
       const Number f_i = view.construct_flux_tensor(prec_i) * n_ij;
       const Number f_j = view.construct_flux_tensor(prec_j) * n_ij;
@@ -202,8 +200,6 @@ namespace ryujin
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       using pst = typename View::precomputed_type;
 
       const auto u_i = view.state(U_i);

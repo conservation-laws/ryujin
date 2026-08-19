@@ -10,18 +10,24 @@
 #include "hyperbolic_system.h"
 
 #include <multicomponent_vector.h>
+#include <observer_pointer.h>
 #include <simd.h>
 
 namespace ryujin
 {
   namespace ScalarConservation
   {
+    template <int dim, typename Number = double>
+    class LimiterView;
+
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
-      Limiter(const std::string &subsection = "/Limiter")
+      Limiter(const HyperbolicSystem &hyperbolic_system,
+              const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         iterations_ = 2;
         add_parameter(
@@ -37,7 +43,20 @@ namespace ryujin
       ACCESSOR_READ_ONLY(iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
+      /**
+       * Return a view on the Limiter for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return LimiterView<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       unsigned int iterations_;
       ScalarNumber relaxation_factor_;
     };
@@ -48,7 +67,7 @@ namespace ryujin
      *
      * @ingroup ScalarConservationEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class LimiterView
     {
     public:
@@ -91,11 +110,11 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a
+       * Parameters object as arguments
        */
-      LimiterView(const HyperbolicSystem &hyperbolic_system,
-                  const Parameters &parameters)
-          : hyperbolic_system(hyperbolic_system)
+      LimiterView(const View &view, const Parameters &parameters)
+          : view(view)
           , parameters(parameters)
       {
       }
@@ -189,7 +208,7 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const View view;
       const Parameters &parameters;
 
       state_type U_i;
@@ -217,7 +236,6 @@ namespace ryujin
         const unsigned int /*i*/,
         const state_type &U_i) const -> Bounds
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
       const auto u_i = view.state(U_i);
       return {/*u_min*/ u_i, /*u_max*/ u_i};
     }
@@ -292,8 +310,6 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const state_type &affine_shift)
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
       /* Bounds: */
       auto &[u_min, u_max] = bounds_;
 

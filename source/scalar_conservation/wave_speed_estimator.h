@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <observer_pointer.h>
 #include <simd.h>
 
 #include <deal.II/base/point.h>
@@ -18,12 +19,17 @@ namespace ryujin
 {
   namespace ScalarConservation
   {
+    template <int dim, typename Number = double>
+    class WaveSpeedEstimatorView;
+
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimator(const std::string &subsection = "/WaveSpeedEstimator")
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
       {
         use_greedy_wavespeed_ = false;
         add_parameter("use greedy wavespeed",
@@ -56,7 +62,20 @@ namespace ryujin
       ACCESSOR_READ_ONLY(use_averaged_entropy);
       ACCESSOR_READ_ONLY(random_entropies);
 
+      /**
+       * Return a view on the WaveSpeedEstimator for a given dimension @p dim
+       * and choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return WaveSpeedEstimatorView<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
     private:
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       bool use_greedy_wavespeed_;
       bool use_averaged_entropy_;
       unsigned int random_entropies_;
@@ -73,7 +92,7 @@ namespace ryujin
      *
      * @ingroup ScalarConservationEquations
      */
-    template <int dim, typename Number = double>
+    template <int dim, typename Number>
     class WaveSpeedEstimatorView
     {
     public:
@@ -104,11 +123,11 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystemView and a
+       * Parameters object as arguments
        */
-      WaveSpeedEstimatorView(const HyperbolicSystem &hyperbolic_system,
-                             const Parameters &parameters)
-          : hyperbolic_system(hyperbolic_system)
+      WaveSpeedEstimatorView(const View &view, const Parameters &parameters)
+          : view(view)
           , parameters(parameters)
       {
       }
@@ -136,7 +155,7 @@ namespace ryujin
                      const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const View view;
       const Parameters &parameters;
       //@}
     };
