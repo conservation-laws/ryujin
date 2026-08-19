@@ -296,60 +296,6 @@ namespace ryujin
 
       //@}
       /**
-       * @name Internal methods
-       */
-      //@{
-
-      /**
-       * Set up affine constraints. Internally used in prepare().
-       */
-      void create_constraints();
-
-      /**
-       * Update the background density vector to time t.
-       *
-       * @note: The vector is always updated for t = 0, but the update is
-       * skipped for t > 0 if the background fields are time independent.
-       */
-      void update_background_density(const Number t) const;
-
-      /**
-       * Update the (background) magnetic field vector to time t.
-       *
-       * @note: The vector is always updated for t = 0, but the update is
-       * skipped for t > 0 if the background fields are time independent.
-       */
-      void update_magnetic_field(const Number t) const;
-
-      /**
-       * Compute the potential phi (the last component of the state_vector)
-       * for a given density (the first component of the state_vector).
-       */
-      void compute_potential(const Number t, StateVector &state_vector) const;
-
-      /**
-       * Set the velocity field equal to the magnetic magnetic drift
-       * velocity computed from the potential.
-       */
-      void enforce_magnetic_drift_velocity(StateVector &state_vector) const;
-
-      /**
-       * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform a backward
-       * Euler time step (and store the result in @p new_state_vector).
-       *
-       * If the boolean @crank_nicolson_extrapolation is set to true, then
-       * we perform a final extrapolation on the primitive state for time
-       * t + 2 * tau.
-       */
-      void step(const StateVector &old_state_vector,
-                const Number old_t,
-                StateVector &new_state_vector,
-                Number tau,
-                const bool crank_nicolson_extrapolation) const;
-
-      //@}
-      /**
        * @name Internal data
        */
       //@{
@@ -404,6 +350,60 @@ namespace ryujin
       mutable bool potential_initialized_;
       mutable Number t_background_density_;
       mutable Number t_magnetic_field_;
+      //@}
+      /**
+       * @name Internal methods
+       */
+      //@{
+
+      /**
+       * Set up affine constraints. Internally used in prepare().
+       */
+      void create_constraints();
+
+      /**
+       * Update the background density vector to time t.
+       *
+       * @note: The vector is always updated for t = 0, but the update is
+       * skipped for t > 0 if the background fields are time independent.
+       */
+      void update_background_density(const Number t) const;
+
+      /**
+       * Update the (background) magnetic field vector to time t.
+       *
+       * @note: The vector is always updated for t = 0, but the update is
+       * skipped for t > 0 if the background fields are time independent.
+       */
+      void update_magnetic_field(const Number t) const;
+
+      /**
+       * Compute the potential phi (the last component of the state_vector)
+       * for a given density (the first component of the state_vector).
+       */
+      void compute_potential(const Number t, StateVector &state_vector) const;
+
+      /**
+       * Set the velocity field equal to the magnetic magnetic drift
+       * velocity computed from the potential.
+       */
+      void enforce_magnetic_drift_velocity(StateVector &state_vector) const;
+
+      /**
+       * Given a reference to a previous state vector @p old_state_vector
+       * at time @p old_t and a time-step size @p tau perform a backward
+       * Euler time step (and store the result in @p new_state_vector).
+       *
+       * If the boolean @crank_nicolson_extrapolation is set to true, then
+       * we perform a final extrapolation on the primitive state for time
+       * t + 2 * tau.
+       */
+      void step(const StateVector &old_state_vector,
+                const Number old_t,
+                StateVector &new_state_vector,
+                Number tau,
+                const bool crank_nicolson_extrapolation) const;
+
       //@}
     };
   } // namespace EulerPoisson

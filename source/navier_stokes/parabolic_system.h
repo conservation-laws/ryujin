@@ -54,17 +54,25 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields, methods, and friends
+       * @name Run time options
        */
       //@{
+
 
       double mu_;
       double lambda_;
       double cv_inverse_kappa_;
 
+
       //@}
+      /**
+       * @name Internal data
+       */
+      //@{
 
       const std::vector<std::string> parabolic_component_names_;
+
+      //@}
     }; /* ParabolicSystem */
 
 

@@ -35,6 +35,27 @@ namespace ryujin
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Alias for the view on the wave speed estimator for a given dimension @p
+       * dim and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = WaveSpeedEstimatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
       WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
@@ -55,15 +76,14 @@ namespace ryujin
                       "during limiting");
       }
 
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
+
       ACCESSOR_READ_ONLY(newton_tolerance);
       ACCESSOR_READ_ONLY(newton_max_iterations);
-
-      /**
-       * Alias for the view on the wave speed estimator for a given dimension @p
-       * dim and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = WaveSpeedEstimatorView<dim, Number>;
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
@@ -78,9 +98,24 @@ namespace ryujin
       }
 
     private:
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 

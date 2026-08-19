@@ -36,12 +36,10 @@ namespace ryujin
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
-                         const std::string &subsection = "/WaveSpeedEstimator")
-          : ParameterAcceptor(subsection)
-          , hyperbolic_system_(&hyperbolic_system)
-      {
-      }
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
 
       /**
        * Alias for the view on the wave speed estimator for a given dimension @p
@@ -49,6 +47,28 @@ namespace ryujin
        */
       template <int dim, typename Number = double>
       using View = WaveSpeedEstimatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const std::string &subsection = "/WaveSpeedEstimator")
+          : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
+      {
+      }
+
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
@@ -63,7 +83,15 @@ namespace ryujin
       }
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 

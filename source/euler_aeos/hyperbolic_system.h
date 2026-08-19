@@ -111,15 +111,23 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields, methods, and friends
+       * @name Run time options
        */
       //@{
 
       std::string equation_of_state_;
+
       double reference_density_;
       double vacuum_state_relaxation_small_;
       double vacuum_state_relaxation_large_;
+
       bool compute_strict_bounds_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
 
       EquationOfStateLibrary::equation_of_state_list_type
           equation_of_state_list_;
@@ -129,6 +137,7 @@ namespace ryujin
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
       //@}
     }; /* HyperbolicSystem */
 
@@ -156,6 +165,151 @@ namespace ryujin
     {
     public:
       /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * The underlying scalar number type.
+       */
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      /**
+       * The dimension of the state space.
+       */
+      static constexpr unsigned int problem_dimension = 2 + dim;
+
+      /**
+       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
+       */
+      using state_type = dealii::Tensor<1, problem_dimension, Number>;
+
+      /**
+       * Storage type for the flux \f$\mathbf{f}\f$.
+       */
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = flux_type;
+
+      /**
+       * An array holding all component names of the conserved state as a
+       * string.
+       */
+      static inline const auto component_names =
+          []() -> std::array<std::string, problem_dimension> {
+        if constexpr (dim == 1)
+          return {"rho", "m", "E"};
+        else if constexpr (dim == 2)
+          return {"rho", "m_1", "m_2", "E"};
+        else if constexpr (dim == 3)
+          return {"rho", "m_1", "m_2", "m_3", "E"};
+        __builtin_trap();
+      }();
+
+      /**
+       * An array holding all component names of the primitive state as a
+       * string.
+       */
+      static inline const auto primitive_component_names =
+          []() -> std::array<std::string, problem_dimension> {
+        if constexpr (dim == 1)
+          return {"rho", "v", "e"};
+        else if constexpr (dim == 2)
+          return {"rho", "v_1", "v_2", "e"};
+        else if constexpr (dim == 3)
+          return {"rho", "v_1", "v_2", "v_3", "e"};
+        __builtin_trap();
+      }();
+
+      /**
+       * The number of precomputed values.
+       */
+      static constexpr unsigned int n_precomputed_values = 4;
+
+      /**
+       * Array type used for precomputed values.
+       */
+      using precomputed_type = std::array<Number, n_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto precomputed_names =
+          std::array<std::string, n_precomputed_values>{
+              {"p",
+               "surrogate_gamma_min",
+               "surrogate_specific_entropy",
+               "surrogate_harten_entropy"}};
+
+      /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_initial_precomputed_values = 0;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using initial_precomputed_type =
+          std::array<Number, n_initial_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto initial_precomputed_names =
+          std::array<std::string, n_initial_precomputed_values>{};
+
+      /**
+       * A compound state vector.
+       */
+      using StateVector = Vectors::
+          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing the hyperbolic state vector:
+       */
+      using HyperbolicVector =
+          Vectors::MultiComponentVector<ScalarNumber, problem_dimension>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed states:
+       */
+      using PrecomputedVector =
+          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * states:
+       */
+      using PrecomputedVectorView =
+          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed initial
+       * states:
+       */
+      using InitialPrecomputedVector =
+          Vectors::MultiComponentVector<ScalarNumber,
+                                        n_initial_precomputed_values>;
+
+      /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * initial states:
+       */
+      using InitialPrecomputedVectorView =
+          Vectors::MultiComponentVectorView<ScalarNumber,
+                                            n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
        * Constructor taking a reference to the underlying
        * HyperbolicSystem
        */
@@ -173,11 +327,7 @@ namespace ryujin
         return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
       }
 
-      /**
-       * The underlying scalar number type.
-       */
-      using ScalarNumber = typename get_value_type<Number>::type;
-
+      //@}
       /**
        * @name Access to runtime parameters
        */
@@ -373,151 +523,6 @@ namespace ryujin
       static constexpr bool have_gamma = false;
       static constexpr bool have_covolume_constant = true;
       static constexpr bool have_energy_equation = true;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-    public:
-      //@}
-      /**
-       * @name Typedefs and constexpr constants
-       */
-      //@{
-
-      /**
-       * The dimension of the state space.
-       */
-      static constexpr unsigned int problem_dimension = 2 + dim;
-
-      /**
-       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
-       */
-      using state_type = dealii::Tensor<1, problem_dimension, Number>;
-
-      /**
-       * Storage type for the flux \f$\mathbf{f}\f$.
-       */
-      using flux_type =
-          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
-
-      /**
-       * The storage type used for flux contributions.
-       */
-      using flux_contribution_type = flux_type;
-
-      /**
-       * An array holding all component names of the conserved state as a
-       * string.
-       */
-      static inline const auto component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"rho", "m", "E"};
-        else if constexpr (dim == 2)
-          return {"rho", "m_1", "m_2", "E"};
-        else if constexpr (dim == 3)
-          return {"rho", "m_1", "m_2", "m_3", "E"};
-        __builtin_trap();
-      }();
-
-      /**
-       * An array holding all component names of the primitive state as a
-       * string.
-       */
-      static inline const auto primitive_component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"rho", "v", "e"};
-        else if constexpr (dim == 2)
-          return {"rho", "v_1", "v_2", "e"};
-        else if constexpr (dim == 3)
-          return {"rho", "v_1", "v_2", "v_3", "e"};
-        __builtin_trap();
-      }();
-
-      /**
-       * The number of precomputed values.
-       */
-      static constexpr unsigned int n_precomputed_values = 4;
-
-      /**
-       * Array type used for precomputed values.
-       */
-      using precomputed_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_names =
-          std::array<std::string, n_precomputed_values>{
-              {"p",
-               "surrogate_gamma_min",
-               "surrogate_specific_entropy",
-               "surrogate_harten_entropy"}};
-
-      /**
-       * The number of precomputed initial values.
-       */
-      static constexpr unsigned int n_initial_precomputed_values = 0;
-
-      /**
-       * Array type used for precomputed initial values.
-       */
-      using initial_precomputed_type =
-          std::array<Number, n_initial_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto initial_precomputed_names =
-          std::array<std::string, n_initial_precomputed_values>{};
-
-      /**
-       * A compound state vector.
-       */
-      using StateVector = Vectors::
-          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing the hyperbolic state vector:
-       */
-      using HyperbolicVector =
-          Vectors::MultiComponentVector<ScalarNumber, problem_dimension>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using PrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
-
-      /**
-       * MulticomponentVectorView for accessing a vector of precomputed
-       * states:
-       */
-      using PrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using InitialPrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber,
-                                        n_initial_precomputed_values>;
-
-      /**
-       * MulticomponentVectorView for accessing a vector of precomputed
-       * initial states:
-       */
-      using InitialPrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber,
-                                            n_initial_precomputed_values>;
 
       //@}
       /**
@@ -846,6 +851,16 @@ namespace ryujin
       template <typename Lambda>
       state_type apply_galilei_transform(const state_type &state,
                                          const Lambda &lambda) const;
+
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
+
       //@}
     }; /* HyperbolicSystemView */
 

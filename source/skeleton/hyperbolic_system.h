@@ -87,8 +87,15 @@ namespace ryujin
       }
 
     private:
+      /**
+       * @name Internal data
+       */
+      //@{
+
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
+      //@}
     }; /* HyperbolicSystem */
 
 
@@ -102,29 +109,6 @@ namespace ryujin
     template <int dim, typename Number>
     class HyperbolicSystemView
     {
-    public:
-      /**
-       * Constructor taking a reference to the underlying
-       * HyperbolicSystem
-       */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
-      {
-      }
-
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-
     public:
       /**
        * @name Typedefs and constexpr constants
@@ -260,6 +244,30 @@ namespace ryujin
       using InitialPrecomputedVectorView =
           Vectors::MultiComponentVectorView<ScalarNumber,
                                             n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
 
       //@}
       /**
@@ -431,6 +439,15 @@ namespace ryujin
       {
         return state;
       }
+
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
 
       //@}
     }; /* HyperbolicSystemView */

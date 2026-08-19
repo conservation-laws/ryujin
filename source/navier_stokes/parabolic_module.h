@@ -280,27 +280,6 @@ namespace ryujin
 
       //@}
       /**
-       * @name Internal methods
-       */
-      //@{
-
-      /**
-       * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform a backward
-       * Euler time step (and store the result in @p new_state_vector).
-       *
-       * If the boolean @crank_nicolson_extrapolation is set to true, then
-       * we perform a final extrapolation on the primitive state for time
-       * t + 2 * tau.
-       */
-      void step(const StateVector &old_state_vector,
-                const Number old_t,
-                StateVector &new_state_vector,
-                Number tau,
-                const bool crank_nicolson_extrapolation) const;
-
-      //@}
-      /**
        * @name Internal data
        */
       //@{
@@ -365,6 +344,27 @@ namespace ryujin
               dealii::LinearAlgebra::distributed::Vector<float>>,
           dealii::LinearAlgebra::distributed::Vector<float>>
           mg_smoother_energy_;
+
+      //@}
+      /**
+       * @name Internal methods
+       */
+      //@{
+
+      /**
+       * Given a reference to a previous state vector @p old_state_vector
+       * at time @p old_t and a time-step size @p tau perform a backward
+       * Euler time step (and store the result in @p new_state_vector).
+       *
+       * If the boolean @crank_nicolson_extrapolation is set to true, then
+       * we perform a final extrapolation on the primitive state for time
+       * t + 2 * tau.
+       */
+      void step(const StateVector &old_state_vector,
+                const Number old_t,
+                StateVector &new_state_vector,
+                Number tau,
+                const bool crank_nicolson_extrapolation) const;
 
       //@}
     };

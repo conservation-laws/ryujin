@@ -31,6 +31,27 @@ namespace ryujin
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Alias for the view on the limiter for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = LimiterView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
@@ -41,14 +62,13 @@ namespace ryujin
             "iterations", iterations_, "Number of limiter iterations");
       }
 
-      ACCESSOR_READ_ONLY(iterations);
-
+      //@}
       /**
-       * Alias for the view on the limiter for a given dimension @p dim
-       * and choice of number type @p Number.
+       * @name Information and statistics
        */
-      template <int dim, typename Number = double>
-      using View = LimiterView<dim, Number>;
+      //@{
+
+      ACCESSOR_READ_ONLY(iterations);
 
       /**
        * Return a view on the Limiter for a given dimension @p dim and
@@ -63,8 +83,23 @@ namespace ryujin
       }
 
     private:
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
       unsigned int iterations_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 

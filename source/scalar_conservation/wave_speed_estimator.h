@@ -36,6 +36,27 @@ namespace ryujin
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Alias for the view on the wave speed estimator for a given dimension @p
+       * dim and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = WaveSpeedEstimatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
       WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
@@ -68,16 +89,15 @@ namespace ryujin
             "inequality on the prescribed number of random Krŭzkov entropies.");
       }
 
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
+
       ACCESSOR_READ_ONLY(use_greedy_wavespeed);
       ACCESSOR_READ_ONLY(use_averaged_entropy);
       ACCESSOR_READ_ONLY(random_entropies);
-
-      /**
-       * Alias for the view on the wave speed estimator for a given dimension @p
-       * dim and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = WaveSpeedEstimatorView<dim, Number>;
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
@@ -92,10 +112,25 @@ namespace ryujin
       }
 
     private:
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
       bool use_greedy_wavespeed_;
       bool use_averaged_entropy_;
       unsigned int random_entropies_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 

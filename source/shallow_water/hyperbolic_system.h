@@ -87,9 +87,10 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields, methods, and friends
+       * @name Run time options
        */
       //@{
+
       double gravity_;
       double manning_friction_coefficient_;
 
@@ -97,8 +98,15 @@ namespace ryujin
       double dry_state_relaxation_small_;
       double dry_state_relaxation_large_;
 
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
       //@}
     }; /* HyperbolicSystem */
 
@@ -126,76 +134,14 @@ namespace ryujin
     {
     public:
       /**
-       * Constructor taking a reference to the underlying
-       * HyperbolicSystem
+       * @name Typedefs and constexpr constants
        */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
-      {
-      }
-
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
+      //@{
 
       /**
        * The underlying scalar number type.
        */
       using ScalarNumber = typename get_value_type<Number>::type;
-
-      /**
-       * @name Access to runtime parameters
-       */
-      //@{
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gravity() const
-      {
-        return hyperbolic_system_.gravity_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      manning_friction_coefficient() const
-      {
-        return hyperbolic_system_.manning_friction_coefficient_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
-      {
-        return hyperbolic_system_.reference_water_depth_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      dry_state_relaxation_small() const
-      {
-        return hyperbolic_system_.dry_state_relaxation_small_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      dry_state_relaxation_large() const
-      {
-        return hyperbolic_system_.dry_state_relaxation_large_;
-      }
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-    public:
-      //@}
-      /**
-       * @name Typedefs and constexpr constants
-       */
-      //@{
 
       /**
        * The dimension of the state space.
@@ -321,6 +267,64 @@ namespace ryujin
       using InitialPrecomputedVectorView =
           Vectors::MultiComponentVectorView<ScalarNumber,
                                             n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
+
+      //@}
+      /**
+       * @name Access to runtime parameters
+       */
+      //@{
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber gravity() const
+      {
+        return hyperbolic_system_.gravity_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      manning_friction_coefficient() const
+      {
+        return hyperbolic_system_.manning_friction_coefficient_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
+      {
+        return hyperbolic_system_.reference_water_depth_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      dry_state_relaxation_small() const
+      {
+        return hyperbolic_system_.dry_state_relaxation_small_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      dry_state_relaxation_large() const
+      {
+        return hyperbolic_system_.dry_state_relaxation_large_;
+      }
 
       //@}
       /**
@@ -638,6 +642,15 @@ namespace ryujin
       template <typename Lambda>
       state_type apply_galilei_transform(const state_type &state,
                                          const Lambda &lambda) const;
+
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
 
       //@}
     }; /* HyperbolicSystemView */
