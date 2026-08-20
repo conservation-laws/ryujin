@@ -15,6 +15,7 @@
 #include <simd.h>
 #include <state_vector.h>
 
+#include <deal.II/base/memory_space.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
@@ -24,7 +25,9 @@ namespace ryujin
 {
   namespace Euler
   {
-    template <int dim, typename Number>
+    template <int dim,
+              typename Number,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class HyperbolicSystemView;
 
     /**
@@ -53,21 +56,27 @@ namespace ryujin
 
       /**
        * Alias for the view on the hyperbolic system for a given dimension @p
-       * dim and choice of number type @p Number.
+       * dim, choice of number type @p Number, and memory space @p
+       * MemorySpace.
        */
-      template <int dim, typename Number = double>
-      using View = HyperbolicSystemView<dim, Number>;
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       /**
        * Return a view on the Hyperbolic System for a given dimension @p
        * dim and choice of number type @p Number (which can be a scalar
        * float, or double, as well as a VectorizedArray holding packed
-       * scalars.
+       * scalars. The optional @p MemorySpace template parameter selects
+       * whether the view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{*this};
+        return View<dim, Number, MemorySpace>{*this};
       }
 
       /**
@@ -99,7 +108,7 @@ namespace ryujin
 
       //@}
 
-      template <int dim, typename Number>
+      template <int, typename, typename>
       friend class HyperbolicSystemView;
     }; /* HyperbolicSystem */
 
@@ -120,12 +129,22 @@ namespace ryujin
      * // etc.
      * ```
      *
+     * @note This class is designed to be copied by value into computation
+     * loops with access to either the host or device memory space. As such
+     * we do not store a reference to the underlying HyperbolicSystem but
+     * copy all runtime parameters into the view when it is created.
+     *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class HyperbolicSystemView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
@@ -242,8 +261,11 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+      using PrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          MemorySpace>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed initial
@@ -257,9 +279,11 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber,
-                                            n_initial_precomputed_values>;
+      using InitialPrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_initial_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          MemorySpace>;
 
       //@}
       /**
@@ -272,13 +296,22 @@ namespace ryujin
        * HyperbolicSystem
        */
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
       {
+        /*
+         * Copy all runtime parameters over to the view:
+         */
+        const auto gamma = hyperbolic_system.gamma_;
+        gamma_ = ScalarNumber(gamma);
+        reference_density_ = ScalarNumber(hyperbolic_system.reference_density_);
+        vacuum_state_relaxation_small_ =
+            ScalarNumber(hyperbolic_system.vacuum_state_relaxation_small_);
+        vacuum_state_relaxation_large_ =
+            ScalarNumber(hyperbolic_system.vacuum_state_relaxation_large_);
+
         /*
          * Precompute a number of derived gamma coefficients that contain
          * divisions:
          */
-        const auto gamma = hyperbolic_system.gamma_;
         gamma_inverse_ = ScalarNumber(1. / gamma);
         gamma_plus_one_inverse_ = ScalarNumber(1. / (gamma + 1.));
         gamma_minus_one_inverse_ = ScalarNumber(1. / (gamma - 1.));
@@ -292,26 +325,26 @@ namespace ryujin
        */
       //@{
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber gamma() const
       {
-        return hyperbolic_system_.gamma_;
+        return gamma_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber reference_density() const
       {
-        return hyperbolic_system_.reference_density_;
+        return reference_density_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       vacuum_state_relaxation_small() const
       {
-        return hyperbolic_system_.vacuum_state_relaxation_small_;
+        return vacuum_state_relaxation_small_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       vacuum_state_relaxation_large() const
       {
-        return hyperbolic_system_.vacuum_state_relaxation_large_;
+        return vacuum_state_relaxation_large_;
       }
 
       //@}
@@ -324,22 +357,24 @@ namespace ryujin
        */
       //@{
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_inverse() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber gamma_inverse() const
       {
         return gamma_inverse_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_plus_one_inverse() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
+      gamma_plus_one_inverse() const
       {
         return gamma_plus_one_inverse_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_minus_one_inverse() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
+      gamma_minus_one_inverse() const
       {
         return gamma_minus_one_inverse_;
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       gamma_minus_one_over_gamma_plus_one() const
       {
         return gamma_minus_one_over_gamma_plus_one_;
@@ -365,7 +400,7 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, return
        * the density <code>U[0]</code>
        */
-      static Number density(const state_type &U);
+      static DEAL_II_HOST_DEVICE Number density(const state_type &U);
 
       /**
        * Given a density @p rho this function returns 0 if the magniatude
@@ -379,26 +414,28 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, return
        * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
        */
-      static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
+      static DEAL_II_HOST_DEVICE dealii::Tensor<1, dim, Number>
+      momentum(const state_type &U);
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, return
        * the total energy <code>U[1+dim]</code>
        */
-      static Number total_energy(const state_type &U);
+      static DEAL_II_HOST_DEVICE Number total_energy(const state_type &U);
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the internal energy \f$\varepsilon = (\rho e)\f$.
        */
-      static Number internal_energy(const state_type &U);
+      static DEAL_II_HOST_DEVICE Number internal_energy(const state_type &U);
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative of the internal energy
        * \f$\varepsilon = (\rho e)\f$.
        */
-      static state_type internal_energy_derivative(const state_type &U);
+      static DEAL_II_HOST_DEVICE state_type
+      internal_energy_derivative(const state_type &U);
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -410,7 +447,7 @@ namespace ryujin
        *   p = (\gamma - 1)\;(\rho e)
        * \f]
        */
-      Number pressure(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number pressure(const state_type &U) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -419,7 +456,7 @@ namespace ryujin
        *   c^2 = \frac{\gamma\,p}{\rho}
        * \f]
        */
-      Number speed_of_sound(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number speed_of_sound(const state_type &U) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -537,7 +574,7 @@ namespace ryujin
        * \end{pmatrix},
        * \f]
        */
-      flux_type f(const state_type &U) const;
+      DEAL_II_HOST_DEVICE flux_type f(const state_type &U) const;
 
       /**
        * Given a state @p U_i and an index @p i compute flux contributions.
@@ -669,7 +706,10 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system_;
+      ScalarNumber gamma_;
+      ScalarNumber reference_density_;
+      ScalarNumber vacuum_state_relaxation_small_;
+      ScalarNumber vacuum_state_relaxation_large_;
 
       ScalarNumber gamma_inverse_;
       ScalarNumber gamma_minus_one_inverse_;
@@ -744,17 +784,17 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::density(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::density(const state_type &U)
     {
       return U[0];
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::filter_vacuum_density(
+    HyperbolicSystemView<dim, Number, MemorySpace>::filter_vacuum_density(
         const Number &rho) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
@@ -766,9 +806,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-    HyperbolicSystemView<dim, Number>::momentum(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::momentum(
+        const state_type &U)
     {
       dealii::Tensor<1, dim, Number> result;
       for (unsigned int i = 0; i < dim; ++i)
@@ -777,17 +818,19 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::total_energy(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::total_energy(
+        const state_type &U)
     {
       return U[1 + dim];
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::internal_energy(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::internal_energy(
+        const state_type &U)
     {
       /*
        * rho e = (E - 1/2*m^2/rho)
@@ -799,9 +842,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::internal_energy_derivative(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::internal_energy_derivative(
         const state_type &U) -> state_type
     {
       /*
@@ -826,18 +869,20 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::pressure(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::pressure(
+        const state_type &U) const
     {
       /* p = (gamma - 1) * (rho e) */
       return (gamma() - ScalarNumber(1.)) * internal_energy(U);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::speed_of_sound(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::speed_of_sound(
+        const state_type &U) const
     {
       /* c^2 = gamma * p / rho */
       const Number rho_inverse = ScalarNumber(1.) / density(U);
@@ -846,9 +891,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::specific_entropy(
+    HyperbolicSystemView<dim, Number, MemorySpace>::specific_entropy(
         const state_type &U) const
     {
       /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
@@ -857,9 +902,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::harten_entropy(const state_type &U) const
+    HyperbolicSystemView<dim, Number, MemorySpace>::harten_entropy(
+        const state_type &U) const
     {
       /* rho^2 e = \rho E - 1/2*m^2 */
 
@@ -872,9 +918,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::harten_entropy_derivative(
+    HyperbolicSystemView<dim, Number, MemorySpace>::harten_entropy_derivative(
         const state_type &U) const -> state_type
     {
       /*
@@ -909,9 +955,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::mathematical_entropy(
+    HyperbolicSystemView<dim, Number, MemorySpace>::mathematical_entropy(
         const state_type &U) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -920,10 +966,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::mathematical_entropy_derivative(
-        const state_type &U) const -> state_type
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        mathematical_entropy_derivative(const state_type &U) const -> state_type
     {
       /*
        * With
@@ -957,9 +1003,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline bool
-    HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
+    HyperbolicSystemView<dim, Number, MemorySpace>::is_admissible(
+        const state_type &U) const
     {
       const auto rho_new = density(U);
       const auto e_new = internal_energy(U);
@@ -986,10 +1033,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <int component>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::linearized_eigenvector(
+    HyperbolicSystemView<dim, Number, MemorySpace>::linearized_eigenvector(
         const state_type &U, const dealii::Tensor<1, dim, Number> &normal) const
         -> std::array<state_type, 2>
     {
@@ -1041,13 +1088,14 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <int component>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::prescribe_riemann_characteristic(
-        const state_type &U,
-        const state_type &U_bar,
-        const dealii::Tensor<1, dim, Number> &normal) const -> state_type
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        prescribe_riemann_characteristic(
+            const state_type &U,
+            const state_type &U_bar,
+            const dealii::Tensor<1, dim, Number> &normal) const -> state_type
     {
       static_assert(component == 1 || component == 2,
                     "component has to be 1 or 2");
@@ -1100,10 +1148,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::apply_boundary_conditions(
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_boundary_conditions(
         dealii::types::boundary_id id,
         const state_type &U,
         const dealii::Tensor<1, dim, Number> &normal,
@@ -1199,9 +1247,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::f(const state_type &U) const -> flux_type
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::f(const state_type &U) const
+        -> flux_type
     {
       const auto rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
@@ -1221,9 +1270,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_contribution(
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView & /*ipv*/,
         const unsigned int /*i*/,
@@ -1233,9 +1282,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_contribution(
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView & /*ipv*/,
         const unsigned int * /*js*/,
@@ -1245,9 +1294,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_divergence(
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
@@ -1256,10 +1305,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename ST>
-    auto HyperbolicSystemView<dim, Number>::expand_state(const ST &state) const
-        -> state_type
+    auto HyperbolicSystemView<dim, Number, MemorySpace>::expand_state(
+        const ST &state) const -> state_type
     {
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
@@ -1279,10 +1328,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename ST>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::from_initial_state(
+    HyperbolicSystemView<dim, Number, MemorySpace>::from_initial_state(
         const ST &initial_state) const -> state_type
     {
       const auto primitive_state = expand_state(initial_state);
@@ -1290,9 +1339,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::from_primitive_state(
+    HyperbolicSystemView<dim, Number, MemorySpace>::from_primitive_state(
         const state_type &primitive_state) const -> state_type
     {
       const auto &rho = primitive_state[0];
@@ -1312,9 +1361,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::to_primitive_state(
+    HyperbolicSystemView<dim, Number, MemorySpace>::to_primitive_state(
         const state_type &state) const -> state_type
     {
       const auto &rho = state[0];
@@ -1332,9 +1381,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
-    auto HyperbolicSystemView<dim, Number>::apply_galilei_transform(
+    auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_galilei_transform(
         const state_type &state, const Lambda &lambda) const -> state_type
     {
       auto result = state;
