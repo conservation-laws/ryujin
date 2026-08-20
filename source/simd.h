@@ -322,7 +322,9 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T>
-  T fast_pow(const T x, const T b, const Bias bias = Bias::none);
+  DEAL_II_HOST_DEVICE T fast_pow(const T x,
+                                 const T b,
+                                 const Bias bias = Bias::none);
 
 
   /**
@@ -348,6 +350,42 @@ namespace ryujin
   fast_pow(const dealii::VectorizedArray<T, width> x,
            const dealii::VectorizedArray<T, width> b,
            const Bias bias = Bias::none);
+
+
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE float
+  fast_pow(const float x, const float b, [[maybe_unused]] const Bias bias)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom fast_pow implementation instead of std::pow(): */
+    return fast_pow(dealii::VectorizedArray<float, 4>(x), b, bias)[0];
+#else
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#endif
+  }
+
+
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE double
+  fast_pow(const double x, const double b, [[maybe_unused]] const Bias bias)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation (in single precision) */
+    return std::pow(static_cast<float>(x), static_cast<float>(b));
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom fast_pow implementation instead of std::pow(): */
+    return fast_pow(dealii::VectorizedArray<double, 2>(x), b, bias)[0];
+#else
+    /* Call generic std::pow() implementation (in single precision) */
+    return std::pow(static_cast<float>(x), static_cast<float>(b));
+#endif
+  }
 
   //@}
   /**
