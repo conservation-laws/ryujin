@@ -297,6 +297,19 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::print_solver_statistics(
+        std::ostream &output) const
+    {
+      output << "        [ " << std::setprecision(2) << std::fixed
+             << n_iterations_velocity_
+             << (use_gmg_velocity_ ? " GMG vel -- " : " CG vel -- ")
+             << n_iterations_internal_energy_
+             << (use_gmg_internal_energy_ ? " GMG int ]" : " CG int ]")
+             << std::endl;
+    }
+
+
+    template <int dim, typename Number>
     void ParabolicModule<dim, Number>::step(
         const StateVector &old_state_vector,
         const Number t,
@@ -971,19 +984,6 @@ namespace ryujin
           throw Restart{Number(0.5) * tau};
         }
       }
-    }
-
-
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::print_solver_statistics(
-        std::ostream &output) const
-    {
-      output << "        [ " << std::setprecision(2) << std::fixed
-             << n_iterations_velocity_
-             << (use_gmg_velocity_ ? " GMG vel -- " : " CG vel -- ")
-             << n_iterations_internal_energy_
-             << (use_gmg_internal_energy_ ? " GMG int ]" : " CG int ]")
-             << std::endl;
     }
 
   } // namespace NavierStokes

@@ -16,6 +16,205 @@ namespace ryujin
 {
   namespace Euler
   {
+
+    template <int dim, typename Number>
+    Number WaveSpeedEstimatorView<dim, Number>::compute(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      /*
+       * For exactly solving the Riemann problem we need to start with a
+       * good upper and lower bound, p_1 <= p_star <= p_2, for finding
+       * phi(p_star) == 0. This implies that we have to ensure that
+       * phi(p_2) >= 0 and phi(p_1) <= 0.
+       *
+       * Instead of solving the Riemann problem exactly, however we will
+       * simply use the upper bound p_2 (with p_2 >= p_star) to compute
+       * lambda_max and return the estimate.
+       *
+       * We will use three candidates, p_min, p_max and the two rarefaction
+       * approximation p_star_tilde. We have (up to round-off errors) that
+       * phi(p_star_tilde) >= 0. So this is a safe upper bound, it might
+       * just be too large.
+       *
+       * Depending on the sign of phi(p_max) we select the following ranges:
+       *
+       *   phi(p_max) <  0:
+       *     p_1  <-  p_max   and   p_2  <-  p_star_tilde
+       *
+       *   phi(p_max) >= 0:
+       *     p_1  <-  p_min   and   p_2  <-  min(p_max, p_star_tilde)
+       *
+       * Nota bene:
+       *
+       *  - The special case phi(p_max) == 0 as discussed in [1] is already
+       *    contained in the second condition.
+       *
+       *  - In principle, we would have to treat the case phi(p_min) > 0 as
+       *    well. This corresponds to two expansion waves and a good
+       *    estimate for the wavespeed is obtained by simply computing
+       *    lambda_max with p_2 = 0.
+       *
+       *    However, it turns out that numerically in this case we will
+       *    have
+       *
+       *      0 < p_star <= p_star_tilde <= p_min <= p_max.
+       *
+       *    So it is sufficient to end up with p_2 = p_star_tilde (!!) to
+       *    compute the exact same wave speed as for p_2 = 0.
+       *
+       *    Note: If for some reason p_star should be computed exactly,
+       *    then p_1 has to be set to zero. This can be done efficiently by
+       *    simply checking for p_2 < p_1 and setting p_1 <- 0 if
+       *    necessary.
+       */
+
+      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "rho_left: " << rho_i << std::endl;
+      std::cout << "u_left: " << u_i << std::endl;
+      std::cout << "p_left: " << p_i << std::endl;
+      std::cout << "a_left: " << a_i << std::endl;
+      std::cout << "rho_right: " << rho_j << std::endl;
+      std::cout << "u_right: " << u_j << std::endl;
+      std::cout << "p_right: " << p_j << std::endl;
+      std::cout << "a_right: " << a_j << std::endl;
+#endif
+
+      const Number p_max = std::max(p_i, p_j);
+
+      const Number rarefaction =
+          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
+      const Number failsafe = p_star_failsafe(riemann_data_i, riemann_data_j);
+      const Number p_star_tilde = std::min(rarefaction, failsafe);
+
+      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
+
+      Number p_2 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max,
+              Number(0.),
+              p_star_tilde,
+              std::min(p_max, p_star_tilde));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "   p^*_tilde  = " << p_2 << "\n";
+      std::cout << "   phi(p_*_t) = "
+                << phi(riemann_data_i, riemann_data_j, p_2) << std::endl;
+#endif
+
+      /*
+       * If we do no Newton iteration, cut it short:
+       */
+
+      if (wave_speed_estimator_.newton_max_iterations() == 0) {
+        const auto lambda_max =
+            compute_lambda(riemann_data_i, riemann_data_j, p_2);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        std::cout << "-> lambda_max = " << lambda_max << std::endl;
+#endif
+        return lambda_max;
+      }
+
+      /*
+       * Compute p_1 and ensure that p_1 < p_2. If we hit a case with two
+       * expansions we might indeed have that p_star_tilde < p_1. Set p_1 =
+       * p_2 in this case.
+       */
+
+      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+
+      Number p_1 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max, Number(0.), p_max, p_min);
+
+      p_1 = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, p_2);
+
+      /*
+       * Step 2: Perform quadratic Newton iteration.
+       *
+       * See [1], p. 915f (4.8) and (4.9)
+       */
+
+      auto [gap, lambda_max] =
+          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << std::fixed << std::setprecision(16);
+      std::cout << "p_1: (start) " << p_1 << std::endl;
+      std::cout << "p_2: (start) " << p_2 << std::endl;
+      std::cout << "gap: (start) " << gap << std::endl;
+      std::cout << "l_m: (start) " << lambda_max << std::endl;
+#endif
+
+      for (unsigned int i = 0;
+           i < wave_speed_estimator_.newton_max_iterations();
+           ++i) {
+
+        /* We accept our current guess if we reach the tolerance... */
+        const Number tolerance(wave_speed_estimator_.newton_tolerance());
+        if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+          std::cout << "converged after " << i << " iterations." << std::endl;
+#endif
+          break;
+        }
+
+        // FIXME: Fuse these computations:
+        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+        const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+        const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
+
+        quadratic_newton_step(p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
+
+        /* Update  lambda_max and gap: */
+        auto [gap_new, lambda_max_new] =
+            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+        gap = gap_new;
+        lambda_max = lambda_max_new;
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
+        std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
+        std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
+        std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
+        std::cout << "p_1: (  " << i << "  ) " << p_1 << std::endl;
+        std::cout << "p_2: (  " << i << "  ) " << p_2 << std::endl;
+        std::cout << "gap:         " << gap << std::endl;
+        std::cout << "l_m:         " << lambda_max << std::endl;
+#endif
+      }
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "-> lambda_max = " << lambda_max << std::endl;
+#endif
+
+      return lambda_max;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView & /*pv*/,
+        const state_type &U_i,
+        const state_type &U_j,
+        const unsigned int /*i*/,
+        const unsigned int * /*js*/,
+        const dealii::Tensor<1, dim, Number> &n_ij) const
+    {
+      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+
+      return compute(riemann_data_i, riemann_data_j);
+    }
+
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data,
@@ -390,204 +589,6 @@ namespace ryujin
       const auto p = view_1d.pressure(state);
       const auto a = view_1d.speed_of_sound(state);
       return {{rho, proj_m * rho_inverse, p, a}};
-    }
-
-
-    template <int dim, typename Number>
-    Number WaveSpeedEstimatorView<dim, Number>::compute(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j) const
-    {
-      /*
-       * For exactly solving the Riemann problem we need to start with a
-       * good upper and lower bound, p_1 <= p_star <= p_2, for finding
-       * phi(p_star) == 0. This implies that we have to ensure that
-       * phi(p_2) >= 0 and phi(p_1) <= 0.
-       *
-       * Instead of solving the Riemann problem exactly, however we will
-       * simply use the upper bound p_2 (with p_2 >= p_star) to compute
-       * lambda_max and return the estimate.
-       *
-       * We will use three candidates, p_min, p_max and the two rarefaction
-       * approximation p_star_tilde. We have (up to round-off errors) that
-       * phi(p_star_tilde) >= 0. So this is a safe upper bound, it might
-       * just be too large.
-       *
-       * Depending on the sign of phi(p_max) we select the following ranges:
-       *
-       *   phi(p_max) <  0:
-       *     p_1  <-  p_max   and   p_2  <-  p_star_tilde
-       *
-       *   phi(p_max) >= 0:
-       *     p_1  <-  p_min   and   p_2  <-  min(p_max, p_star_tilde)
-       *
-       * Nota bene:
-       *
-       *  - The special case phi(p_max) == 0 as discussed in [1] is already
-       *    contained in the second condition.
-       *
-       *  - In principle, we would have to treat the case phi(p_min) > 0 as
-       *    well. This corresponds to two expansion waves and a good
-       *    estimate for the wavespeed is obtained by simply computing
-       *    lambda_max with p_2 = 0.
-       *
-       *    However, it turns out that numerically in this case we will
-       *    have
-       *
-       *      0 < p_star <= p_star_tilde <= p_min <= p_max.
-       *
-       *    So it is sufficient to end up with p_2 = p_star_tilde (!!) to
-       *    compute the exact same wave speed as for p_2 = 0.
-       *
-       *    Note: If for some reason p_star should be computed exactly,
-       *    then p_1 has to be set to zero. This can be done efficiently by
-       *    simply checking for p_2 < p_1 and setting p_1 <- 0 if
-       *    necessary.
-       */
-
-      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "rho_left: " << rho_i << std::endl;
-      std::cout << "u_left: " << u_i << std::endl;
-      std::cout << "p_left: " << p_i << std::endl;
-      std::cout << "a_left: " << a_i << std::endl;
-      std::cout << "rho_right: " << rho_j << std::endl;
-      std::cout << "u_right: " << u_j << std::endl;
-      std::cout << "p_right: " << p_j << std::endl;
-      std::cout << "a_right: " << a_j << std::endl;
-#endif
-
-      const Number p_max = std::max(p_i, p_j);
-
-      const Number rarefaction =
-          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
-      const Number failsafe = p_star_failsafe(riemann_data_i, riemann_data_j);
-      const Number p_star_tilde = std::min(rarefaction, failsafe);
-
-      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
-
-      Number p_2 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max,
-              Number(0.),
-              p_star_tilde,
-              std::min(p_max, p_star_tilde));
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "   p^*_tilde  = " << p_2 << "\n";
-      std::cout << "   phi(p_*_t) = "
-                << phi(riemann_data_i, riemann_data_j, p_2) << std::endl;
-#endif
-
-      /*
-       * If we do no Newton iteration, cut it short:
-       */
-
-      if (wave_speed_estimator_.newton_max_iterations() == 0) {
-        const auto lambda_max =
-            compute_lambda(riemann_data_i, riemann_data_j, p_2);
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "-> lambda_max = " << lambda_max << std::endl;
-#endif
-        return lambda_max;
-      }
-
-      /*
-       * Compute p_1 and ensure that p_1 < p_2. If we hit a case with two
-       * expansions we might indeed have that p_star_tilde < p_1. Set p_1 =
-       * p_2 in this case.
-       */
-
-      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
-
-      Number p_1 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max, Number(0.), p_max, p_min);
-
-      p_1 = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, p_2);
-
-      /*
-       * Step 2: Perform quadratic Newton iteration.
-       *
-       * See [1], p. 915f (4.8) and (4.9)
-       */
-
-      auto [gap, lambda_max] =
-          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << std::fixed << std::setprecision(16);
-      std::cout << "p_1: (start) " << p_1 << std::endl;
-      std::cout << "p_2: (start) " << p_2 << std::endl;
-      std::cout << "gap: (start) " << gap << std::endl;
-      std::cout << "l_m: (start) " << lambda_max << std::endl;
-#endif
-
-      for (unsigned int i = 0;
-           i < wave_speed_estimator_.newton_max_iterations();
-           ++i) {
-
-        /* We accept our current guess if we reach the tolerance... */
-        const Number tolerance(wave_speed_estimator_.newton_tolerance());
-        if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-          std::cout << "converged after " << i << " iterations." << std::endl;
-#endif
-          break;
-        }
-
-        // FIXME: Fuse these computations:
-        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
-        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
-        const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
-        const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
-
-        quadratic_newton_step(p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
-
-        /* Update  lambda_max and gap: */
-        auto [gap_new, lambda_max_new] =
-            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
-        gap = gap_new;
-        lambda_max = lambda_max_new;
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
-        std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
-        std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
-        std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
-        std::cout << "p_1: (  " << i << "  ) " << p_1 << std::endl;
-        std::cout << "p_2: (  " << i << "  ) " << p_2 << std::endl;
-        std::cout << "gap:         " << gap << std::endl;
-        std::cout << "l_m:         " << lambda_max << std::endl;
-#endif
-      }
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "-> lambda_max = " << lambda_max << std::endl;
-#endif
-
-      return lambda_max;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute(
-        const PrecomputedVectorView & /*pv*/,
-        const state_type &U_i,
-        const state_type &U_j,
-        const unsigned int /*i*/,
-        const unsigned int * /*js*/,
-        const dealii::Tensor<1, dim, Number> &n_ij) const
-    {
-      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
-
-      return compute(riemann_data_i, riemann_data_j);
     }
 
   } // namespace Euler

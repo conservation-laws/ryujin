@@ -80,42 +80,6 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  inline DEAL_II_ALWAYS_INLINE auto
-  SolutionTransfer<Description, dim, Number>::read_tensor(
-      const HyperbolicVector &U, const dealii::types::global_dof_index global_i)
-      -> state_type
-  {
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    const auto &affine_constraints = offline_data_->affine_constraints();
-    const auto local_i = scalar_partitioner->global_to_local(global_i);
-    if (affine_constraints.is_constrained(global_i)) {
-      state_type result;
-      const auto &line = *affine_constraints.get_constraint_entries(global_i);
-      for (const auto &[global_k, c_k] : line) {
-        const auto local_k = scalar_partitioner->global_to_local(global_k);
-        result += c_k * U.read_tensor(local_k);
-      }
-      return result;
-    } else {
-      return U.read_tensor(local_i);
-    }
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  inline DEAL_II_ALWAYS_INLINE void
-  SolutionTransfer<Description, dim, Number>::add_tensor(
-      HyperbolicVector &U,
-      const state_type &new_U_i,
-      const dealii::types::global_dof_index global_i)
-  {
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    const auto local_i = scalar_partitioner->global_to_local(global_i);
-    U.add_tensor(new_U_i, local_i);
-  }
-
-
-  template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::prepare_projection(
       const StateVector &old_state_vector [[maybe_unused]])
   {
@@ -902,5 +866,41 @@ namespace ryujin
     }
 #endif
 #endif
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  inline DEAL_II_ALWAYS_INLINE auto
+  SolutionTransfer<Description, dim, Number>::read_tensor(
+      const HyperbolicVector &U, const dealii::types::global_dof_index global_i)
+      -> state_type
+  {
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto &affine_constraints = offline_data_->affine_constraints();
+    const auto local_i = scalar_partitioner->global_to_local(global_i);
+    if (affine_constraints.is_constrained(global_i)) {
+      state_type result;
+      const auto &line = *affine_constraints.get_constraint_entries(global_i);
+      for (const auto &[global_k, c_k] : line) {
+        const auto local_k = scalar_partitioner->global_to_local(global_k);
+        result += c_k * U.read_tensor(local_k);
+      }
+      return result;
+    } else {
+      return U.read_tensor(local_i);
+    }
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  inline DEAL_II_ALWAYS_INLINE void
+  SolutionTransfer<Description, dim, Number>::add_tensor(
+      HyperbolicVector &U,
+      const state_type &new_U_i,
+      const dealii::types::global_dof_index global_i)
+  {
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto local_i = scalar_partitioner->global_to_local(global_i);
+    U.add_tensor(new_U_i, local_i);
   }
 } // namespace ryujin

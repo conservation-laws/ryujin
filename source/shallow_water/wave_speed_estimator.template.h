@@ -22,6 +22,36 @@ namespace ryujin
   {
     using namespace dealii;
 
+
+    template <int dim, typename Number>
+    inline Number WaveSpeedEstimatorView<dim, Number>::compute(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      const Number h_star = compute_h_star(riemann_data_i, riemann_data_j);
+
+      const Number lambda_max =
+          compute_lambda(riemann_data_i, riemann_data_j, h_star);
+
+      return lambda_max;
+    }
+
+
+    template <int dim, typename Number>
+    Number WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView & /*pv*/,
+        const state_type &U_i,
+        const state_type &U_j,
+        const unsigned int /*i*/,
+        const unsigned int * /*js*/,
+        const dealii::Tensor<1, dim, Number> &n_ij) const
+    {
+      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+      return compute(riemann_data_i, riemann_data_j);
+    }
+
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data_Z,
@@ -217,35 +247,6 @@ namespace ryujin
       const auto a = std::sqrt(h * gravity);
 
       return {{h, projected_velocity, a}};
-    }
-
-
-    template <int dim, typename Number>
-    inline Number WaveSpeedEstimatorView<dim, Number>::compute(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j) const
-    {
-      const Number h_star = compute_h_star(riemann_data_i, riemann_data_j);
-
-      const Number lambda_max =
-          compute_lambda(riemann_data_i, riemann_data_j, h_star);
-
-      return lambda_max;
-    }
-
-
-    template <int dim, typename Number>
-    Number WaveSpeedEstimatorView<dim, Number>::compute(
-        const PrecomputedVectorView & /*pv*/,
-        const state_type &U_i,
-        const state_type &U_j,
-        const unsigned int /*i*/,
-        const unsigned int * /*js*/,
-        const dealii::Tensor<1, dim, Number> &n_ij) const
-    {
-      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
-      return compute(riemann_data_i, riemann_data_j);
     }
 
   } // namespace ShallowWater

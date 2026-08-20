@@ -47,6 +47,114 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    Number WaveSpeedEstimatorView<dim, Number>::compute(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      const auto pinf = view_.eos_interpolation_pinfty();
+
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "rho_left: " << rho_i << std::endl;
+      std::cout << "u_left: " << u_i << std::endl;
+      std::cout << "p_left: " << p_i << std::endl;
+      std::cout << "gamma_left: " << gamma_i << std::endl;
+      std::cout << "a_left: " << a_i << std::endl;
+      std::cout << "rho_right: " << rho_j << std::endl;
+      std::cout << "u_right: " << u_j << std::endl;
+      std::cout << "p_right: " << p_j << std::endl;
+      std::cout << "gamma_right: " << gamma_j << std::endl;
+      std::cout << "a_right: " << a_j << std::endl;
+#endif
+
+      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
+
+      if (!view_.compute_strict_bounds()) {
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+        const Number p_debug =
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+        std::cout << "   p^*_debug  = " << p_debug << "\n";
+        std::cout << "   phi(p_*_d) = "
+                  << phi(riemann_data_i, riemann_data_j, p_debug) << "\n";
+        std::cout << "-> lambda_deb = "
+                  << compute_lambda(riemann_data_i, riemann_data_j, p_debug)
+                  << std::endl;
+#endif
+
+        const Number p_star_tilde =
+            p_star_interpolated(riemann_data_i, riemann_data_j);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
+
+        const Number p_2 =
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                phi_p_max,
+                Number(0.),
+                std::min(p_star_tilde, p_star_backup),
+                std::min(p_max, p_star_tilde));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        std::cout << "   p^*_tilde  = " << p_2 << "\n";
+        std::cout << "   phi(p_*_t) = "
+                  << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
+        std::cout << "-> lambda_max = "
+                  << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
+                  << std::endl;
+#endif
+
+        return compute_lambda(riemann_data_i, riemann_data_j, p_2);
+      }
+
+      const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+      const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+
+      const Number p_2 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "   p^*_tilde  = " << p_2 << "\n";
+      std::cout << "   phi(p_*_t) = "
+                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
+      std::cout << "-> lambda_max = "
+                << compute_lambda(riemann_data_i, riemann_data_j, p_2)
+                << std::endl;
+#endif
+
+      return compute_lambda(riemann_data_i, riemann_data_j, p_2);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    WaveSpeedEstimatorView<dim, Number>::compute(
+        const PrecomputedVectorView &pv,
+        const state_type &U_i,
+        const state_type &U_j,
+        const unsigned int i,
+        const unsigned int *js,
+        const dealii::Tensor<1, dim, Number> &n_ij) const
+    {
+      const auto &[p_i, unused_i, s_i, eta_i] =
+          pv.template read_tensor<Number, precomputed_type>(i);
+
+      const auto &[p_j, unused_j, s_j, eta_j] =
+          pv.template read_tensor<Number, precomputed_type>(js);
+
+      const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
+      const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);
+
+      return compute(riemann_data_i, riemann_data_j);
+    }
+
+
+    template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     WaveSpeedEstimatorView<dim, Number>::c(const Number &gamma) const
     {
@@ -586,115 +694,6 @@ namespace ryujin
 
       return {{rho, proj_m * rho_inverse, p, gamma, a}};
     }
-
-
-    template <int dim, typename Number>
-    Number WaveSpeedEstimatorView<dim, Number>::compute(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j) const
-    {
-      const auto pinf = view_.eos_interpolation_pinfty();
-
-      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "rho_left: " << rho_i << std::endl;
-      std::cout << "u_left: " << u_i << std::endl;
-      std::cout << "p_left: " << p_i << std::endl;
-      std::cout << "gamma_left: " << gamma_i << std::endl;
-      std::cout << "a_left: " << a_i << std::endl;
-      std::cout << "rho_right: " << rho_j << std::endl;
-      std::cout << "u_right: " << u_j << std::endl;
-      std::cout << "p_right: " << p_j << std::endl;
-      std::cout << "gamma_right: " << gamma_j << std::endl;
-      std::cout << "a_right: " << a_j << std::endl;
-#endif
-
-      const Number p_max = std::max(p_i, p_j) + pinf;
-      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
-
-      if (!view_.compute_strict_bounds()) {
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-        const Number p_debug =
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-        std::cout << "   p^*_debug  = " << p_debug << "\n";
-        std::cout << "   phi(p_*_d) = "
-                  << phi(riemann_data_i, riemann_data_j, p_debug) << "\n";
-        std::cout << "-> lambda_deb = "
-                  << compute_lambda(riemann_data_i, riemann_data_j, p_debug)
-                  << std::endl;
-#endif
-
-        const Number p_star_tilde =
-            p_star_interpolated(riemann_data_i, riemann_data_j);
-        const Number p_star_backup =
-            p_star_failsafe(riemann_data_i, riemann_data_j);
-
-        const Number p_2 =
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                phi_p_max,
-                Number(0.),
-                std::min(p_star_tilde, p_star_backup),
-                std::min(p_max, p_star_tilde));
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "   p^*_tilde  = " << p_2 << "\n";
-        std::cout << "   phi(p_*_t) = "
-                  << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
-        std::cout << "-> lambda_max = "
-                  << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
-                  << std::endl;
-#endif
-
-        return compute_lambda(riemann_data_i, riemann_data_j, p_2);
-      }
-
-      const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-      const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-
-      const Number p_2 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "   p^*_tilde  = " << p_2 << "\n";
-      std::cout << "   phi(p_*_t) = "
-                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
-      std::cout << "-> lambda_max = "
-                << compute_lambda(riemann_data_i, riemann_data_j, p_2)
-                << std::endl;
-#endif
-
-      return compute_lambda(riemann_data_i, riemann_data_j, p_2);
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute(
-        const PrecomputedVectorView &pv,
-        const state_type &U_i,
-        const state_type &U_j,
-        const unsigned int i,
-        const unsigned int *js,
-        const dealii::Tensor<1, dim, Number> &n_ij) const
-    {
-      const auto &[p_i, unused_i, s_i, eta_i] =
-          pv.template read_tensor<Number, precomputed_type>(i);
-
-      const auto &[p_j, unused_j, s_j, eta_j] =
-          pv.template read_tensor<Number, precomputed_type>(js);
-
-      const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);
-
-      return compute(riemann_data_i, riemann_data_j);
-    }
-
 
   } // namespace EulerAEOS
 } // namespace ryujin
