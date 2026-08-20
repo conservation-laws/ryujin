@@ -98,20 +98,9 @@ namespace ryujin
       double vacuum_state_relaxation_large_;
 
       //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-      double gamma_inverse_;
-      double gamma_minus_one_inverse_;
-      double gamma_minus_one_over_gamma_plus_one_;
-      double gamma_plus_one_inverse_;
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
-
-      //@}
     }; /* HyperbolicSystem */
 
 
@@ -285,6 +274,16 @@ namespace ryujin
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
           : hyperbolic_system_(hyperbolic_system)
       {
+        /*
+         * Precompute a number of derived gamma coefficients that contain
+         * divisions:
+         */
+        const auto gamma = hyperbolic_system.gamma_;
+        gamma_inverse_ = ScalarNumber(1. / gamma);
+        gamma_plus_one_inverse_ = ScalarNumber(1. / (gamma + 1.));
+        gamma_minus_one_inverse_ = ScalarNumber(1. / (gamma - 1.));
+        gamma_minus_one_over_gamma_plus_one_ =
+            ScalarNumber((gamma - 1.) / (gamma + 1.));
       }
 
       //@}
@@ -327,24 +326,23 @@ namespace ryujin
 
       DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_inverse() const
       {
-        return ScalarNumber(hyperbolic_system_.gamma_inverse_);
+        return gamma_inverse_;
       }
 
       DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_plus_one_inverse() const
       {
-        return ScalarNumber(hyperbolic_system_.gamma_plus_one_inverse_);
+        return gamma_plus_one_inverse_;
       }
 
       DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_minus_one_inverse() const
       {
-        return ScalarNumber(hyperbolic_system_.gamma_minus_one_inverse_);
+        return gamma_minus_one_inverse_;
       }
 
       DEAL_II_ALWAYS_INLINE inline ScalarNumber
       gamma_minus_one_over_gamma_plus_one() const
       {
-        return ScalarNumber(
-            hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
+        return gamma_minus_one_over_gamma_plus_one_;
       }
 
       //@}
@@ -673,6 +671,11 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system_;
 
+      ScalarNumber gamma_inverse_;
+      ScalarNumber gamma_minus_one_inverse_;
+      ScalarNumber gamma_minus_one_over_gamma_plus_one_;
+      ScalarNumber gamma_plus_one_inverse_;
+
       //@}
     }; /* HyperbolicSystemView */
 
@@ -703,20 +706,6 @@ namespace ryujin
       add_parameter("vacuum state relaxation large",
                     vacuum_state_relaxation_large_,
                     "Problem specific vacuum relaxation parameter");
-
-      /*
-       * Precompute a number of derived gamma coefficients that contain
-       * divisions:
-       */
-      const auto compute_inverses = [this] {
-        gamma_inverse_ = 1. / gamma_;
-        gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
-        gamma_minus_one_inverse_ = 1. / (gamma_ - 1.);
-        gamma_minus_one_over_gamma_plus_one_ = (gamma_ - 1.) / (gamma_ + 1.);
-      };
-
-      compute_inverses();
-      ParameterAcceptor::parse_parameters_call_back.connect(compute_inverses);
     }
 
 
