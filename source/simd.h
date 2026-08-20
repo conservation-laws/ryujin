@@ -143,7 +143,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename Number>
-  inline DEAL_II_ALWAYS_INLINE Number positive_part(const Number number)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number positive_part(const Number number)
   {
     return std::max(Number(0.), number);
   }
@@ -155,9 +155,62 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename Number>
-  inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number negative_part(const Number number)
   {
     return -std::min(Number(0.), number);
+  }
+
+
+  /**
+   * A wrapper around dealii::compare_and_apply_mask() for scalar number
+   * types that is annotated with DEAL_II_HOST_DEVICE so that it can be
+   * used in device code.
+   *
+   * @ingroup SIMD
+   */
+  template <dealii::SIMDComparison predicate, typename Number>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+  compare_and_apply_mask(const Number &left,
+                         const Number &right,
+                         const Number &true_value,
+                         const Number &false_value)
+  {
+    static_assert(std::is_floating_point_v<Number>,
+                  "Only scalar number types are allowed");
+
+    bool mask = false;
+    if constexpr (predicate == dealii::SIMDComparison::equal)
+      mask = (left == right);
+    else if constexpr (predicate == dealii::SIMDComparison::not_equal)
+      mask = (left != right);
+    else if constexpr (predicate == dealii::SIMDComparison::less_than)
+      mask = (left < right);
+    else if constexpr (predicate == dealii::SIMDComparison::less_than_or_equal)
+      mask = (left <= right);
+    else if constexpr (predicate == dealii::SIMDComparison::greater_than)
+      mask = (left > right);
+    else
+      mask = (left >= right);
+
+    return mask ? true_value : false_value;
+  }
+
+
+  /**
+   * Variant of above function for VectorizedArray that simply forwards to
+   * the dealii::compare_and_apply_mask() implementation. (Host only.)
+   *
+   * @ingroup SIMD
+   */
+  template <dealii::SIMDComparison predicate, typename T, std::size_t width>
+  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<T, width>
+  compare_and_apply_mask(const dealii::VectorizedArray<T, width> &left,
+                         const dealii::VectorizedArray<T, width> &right,
+                         const dealii::VectorizedArray<T, width> &true_value,
+                         const dealii::VectorizedArray<T, width> &false_value)
+  {
+    return dealii::compare_and_apply_mask<predicate>(
+        left, right, true_value, false_value);
   }
 
 
@@ -169,7 +222,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <int N, typename T>
-  inline T fixed_power(const T x)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE T fixed_power(const T x)
   {
     return dealii::Utilities::fixed_power<N, T>(x);
   }
