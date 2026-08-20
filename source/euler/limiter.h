@@ -244,9 +244,8 @@ namespace ryujin
        * a larger, combined set of bounds that this is a (convex) superset
        * of the two.
        */
-      DEAL_II_HOST_DEVICE Bounds
-      combine_bounds(const Bounds &bounds_left,
-                     const Bounds &bounds_right) const;
+      DEAL_II_HOST_DEVICE Bounds combine_bounds(
+          const Bounds &bounds_left, const Bounds &bounds_right) const;
 
       /**
        * This function applies a relaxation to a given a (strict) bound @p

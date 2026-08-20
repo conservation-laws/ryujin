@@ -292,9 +292,8 @@ namespace ryujin
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
-      DEAL_II_HOST_DEVICE Number
-      lambda1_minus(const primitive_type &riemann_data,
-                    const Number p_star) const;
+      DEAL_II_HOST_DEVICE Number lambda1_minus(
+          const primitive_type &riemann_data, const Number p_star) const;
 
 
       /**
@@ -302,9 +301,8 @@ namespace ryujin
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
-      DEAL_II_HOST_DEVICE Number
-      lambda3_plus(const primitive_type &primitive_state,
-                   const Number p_star) const;
+      DEAL_II_HOST_DEVICE Number lambda3_plus(
+          const primitive_type &primitive_state, const Number p_star) const;
 
 
       /**
