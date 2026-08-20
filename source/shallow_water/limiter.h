@@ -22,6 +22,11 @@ namespace ryujin
     template <int dim, typename Number = double>
     class LimiterView;
 
+    /**
+     * The convex limiter.
+     *
+     * @ingroup ShallowWaterEquations
+     */
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
@@ -90,7 +95,10 @@ namespace ryujin
 
 
     /**
-     * The convex limiter.
+     * A view of the Limiter that makes the interface available for a given
+     * dimension @p dim and choice of number type @p Number (which can be a
+     * scalar float, or double, as well as a VectorizedArray holding packed
+     * scalars).
      *
      * @ingroup ShallowWaterEquations
      */

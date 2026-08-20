@@ -22,6 +22,16 @@ namespace ryujin
     template <int dim, typename Number = double>
     class WaveSpeedEstimatorView;
 
+    /**
+     * A fast estimate for a sufficient maximal wavespeed of the 1D Riemann
+     * problem. The wavespeed estimate is based on a guaranteed upper bound
+     * on the maximal wavespeed for convex fluxes, see Example 79.17 on
+     * page 333 of @cite GuermondErn2021. As well as an augmented "Roe
+     * average" based on an entropy inequality of a suitable Krŭzkov
+     * entropy, see @cite ryujin-2023-5 Section 4.
+     *
+     * @ingroup ScalarConservationEquations
+     */
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
@@ -90,12 +100,10 @@ namespace ryujin
 
 
     /**
-     * A fast estimate for a sufficient maximal wavespeed of the 1D Riemann
-     * problem. The wavespeed estimate is based on a guaranteed upper bound
-     * on the maximal wavespeed for convex fluxes, see Example 79.17 on
-     * page 333 of @cite GuermondErn2021. As well as an augmented "Roe
-     * average" based on an entropy inequality of a suitable Krŭzkov
-     * entropy, see @cite ryujin-2023-5 Section 4.
+     * A view of the WaveSpeedEstimator that makes the interface available
+     * for a given dimension @p dim and choice of number type @p Number
+     * (which can be a scalar float, or double, as well as a VectorizedArray
+     * holding packed scalars).
      *
      * @ingroup ScalarConservationEquations
      */

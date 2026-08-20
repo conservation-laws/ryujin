@@ -21,6 +21,38 @@ namespace ryujin
     template <int dim, typename Number = double>
     class LimiterView;
 
+    /**
+     * The convex limiter.
+     *
+     * The limiter implements a convex limiting technique as described in
+     * @cite GuermondEtAl2018,  @cite ryujin-2021-1 and
+     * @cite ryujin-2023-4.
+     * Given a computed set of bounds and an update direction \f$\mathbf
+     * P_{ij}\f$ one can now determine a candidate \f$\tilde l_{ij}\f$ by
+     * computing
+     *
+     * \f{align}
+     *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
+     *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde
+     * l_{ij}\mathbf P_{ij})
+     *   \,\le\,\rho_{\text{max}},\quad
+     *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
+     * P_{ij})\Big\}, \f}
+     *
+     * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
+     *
+     * Algorithmically this is accomplished as follows: Given an initial
+     * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
+     * make the interval smaller ensuring the bounds on the density are
+     * fulfilled. If limiting on the specific entropy is selected we then
+     * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
+     * solving for the root of a 3-convex function
+     * \f{align}
+     *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
+     * U)-\phi_{\text{min}}\big). \f}
+     *
+     * @ingroup EulerEquations
+     */
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
@@ -89,34 +121,10 @@ namespace ryujin
 
 
     /**
-     * The convex limiter.
-     *
-     * The class implements a convex limiting technique as described in
-     * @cite GuermondEtAl2018,  @cite ryujin-2021-1 and
-     * @cite ryujin-2023-4.
-     * Given a computed set of bounds and an update direction \f$\mathbf
-     * P_{ij}\f$ one can now determine a candidate \f$\tilde l_{ij}\f$ by
-     * computing
-     *
-     * \f{align}
-     *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
-     *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde
-     * l_{ij}\mathbf P_{ij})
-     *   \,\le\,\rho_{\text{max}},\quad
-     *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
-     * P_{ij})\Big\}, \f}
-     *
-     * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
-     *
-     * Algorithmically this is accomplished as follows: Given an initial
-     * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
-     * make the interval smaller ensuring the bounds on the density are
-     * fulfilled. If limiting on the specific entropy is selected we then
-     * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
-     * solving for the root of a 3-convex function
-     * \f{align}
-     *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
-     * U)-\phi_{\text{min}}\big). \f}
+     * A view of the Limiter that makes the interface available for a given
+     * dimension @p dim and choice of number type @p Number (which can be a
+     * scalar float, or double, as well as a VectorizedArray holding packed
+     * scalars).
      *
      * @ingroup EulerEquations
      */

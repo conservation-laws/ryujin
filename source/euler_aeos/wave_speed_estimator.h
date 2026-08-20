@@ -22,6 +22,15 @@ namespace ryujin
     template <int dim, typename Number = double>
     class WaveSpeedEstimatorView;
 
+    /**
+     * A fast approximative solver for the 1D Riemann problem. The solver
+     * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
+     * for the maximal wavespeed is a strict upper bound.
+     *
+     * The solver is based on @cite ClaytonGuermondPopov-2022.
+     *
+     * @ingroup EulerEquations
+     */
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
@@ -58,11 +67,10 @@ namespace ryujin
 
 
     /**
-     * A fast approximative solver for the 1D Riemann problem. The solver
-     * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
-     * for the maximal wavespeed is a strict upper bound.
-     *
-     * The solver is based on @cite ClaytonGuermondPopov-2022.
+     * A view of the WaveSpeedEstimator that makes the interface available
+     * for a given dimension @p dim and choice of number type @p Number
+     * (which can be a scalar float, or double, as well as a VectorizedArray
+     * holding packed scalars).
      *
      * @ingroup EulerEquations
      */

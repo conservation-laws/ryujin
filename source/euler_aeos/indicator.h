@@ -24,6 +24,45 @@ namespace ryujin
     template <int dim, typename Number = double>
     class IndicatorView;
 
+    /**
+     * An indicator strategy used to form the preliminary high-order
+     * update.
+     *
+     * The indicator is an entropy-viscosity commutator as described
+     * in @cite GuermondEtAl2011 and @cite GuermondEtAl2018. For a given
+     * entropy \f$\eta\f$ (either the mathematical entropy, or a Harten
+     * entropy, see the documentation of HyperbolicSystem) we let
+     * \f$\eta'\f$ denote its derivative with respect to the state variables.
+     * We then compute a normalized entropy viscosity ratio \f$\alpha_i^n\f$
+     * for the state \f$\boldsymbol U_i^n\f$ as follows:
+     * \f{align}
+     *   \alpha_i^n\;=\;\frac{N_i^n}{D_i^n},
+     *   \quad
+     *   N_i^n\;:=\;\left|a_i^n- \eta'(\boldsymbol U^n_i)\cdot\boldsymbol
+     *   b_i^n +\frac{\eta(\boldsymbol U^n_i)}{\rho_i^n}\big(\boldsymbol
+     *   b_i^n\big)_1\right|,
+     *   \quad
+     *   D_i^n\;:=\;\left|a_i^n\right| +
+     *   \sum_{k=1}^{d+1}\left|\big(\eta'(\boldsymbol U^n_i)\big)_k-
+     *   \delta_{1k}\frac{\eta(\boldsymbol U^n_i)}{\rho_i^n}\right|
+     *   \,\left|\big(\boldsymbol b_i^n\big)_k\right|,
+     * \f}
+     * where where \f$\big(\,.\,\big)_k\f$ denotes the \f$k\f$-th component
+     * of a vector, \f$\delta_{ij}\f$ is Kronecker's delta, and where we have
+     * set
+     * \f{align}
+     *   a_i^n \;:=\;
+     *   \sum_{j\in\mathcal{I}_i}\left(\frac{\eta(\boldsymbol U_j^n)}{\rho_j^n}
+     *   -\frac{\eta(\boldsymbol U_i^n)}{\rho_i^n}\right)\,
+     *   \boldsymbol m_j^n\cdot\boldsymbol c_{ij},
+     *   \qquad
+     *   \boldsymbol b_i^n \;:=\;
+     *   \sum_{j\in\mathcal{I}_i}\left(\mathbf{f}(\boldsymbol U_j^n)-
+     *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
+     * \f}
+     *
+     * @ingroup EulerEquations
+     */
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
@@ -67,41 +106,10 @@ namespace ryujin
 
 
     /**
-     * This class implements an indicator strategy used to form the
-     * preliminary high-order update.
-     *
-     * The indicator is an entropy-viscosity commutator as described
-     * in @cite GuermondEtAl2011 and @cite GuermondEtAl2018. For a given
-     * entropy \f$\eta\f$ (either the mathematical entropy, or a Harten
-     * entropy, see the documentation of HyperbolicSystem) we let
-     * \f$\eta'\f$ denote its derivative with respect to the state variables.
-     * We then compute a normalized entropy viscosity ratio \f$\alpha_i^n\f$
-     * for the state \f$\boldsymbol U_i^n\f$ as follows:
-     * \f{align}
-     *   \alpha_i^n\;=\;\frac{N_i^n}{D_i^n},
-     *   \quad
-     *   N_i^n\;:=\;\left|a_i^n- \eta'(\boldsymbol U^n_i)\cdot\boldsymbol
-     *   b_i^n +\frac{\eta(\boldsymbol U^n_i)}{\rho_i^n}\big(\boldsymbol
-     *   b_i^n\big)_1\right|,
-     *   \quad
-     *   D_i^n\;:=\;\left|a_i^n\right| +
-     *   \sum_{k=1}^{d+1}\left|\big(\eta'(\boldsymbol U^n_i)\big)_k-
-     *   \delta_{1k}\frac{\eta(\boldsymbol U^n_i)}{\rho_i^n}\right|
-     *   \,\left|\big(\boldsymbol b_i^n\big)_k\right|,
-     * \f}
-     * where where \f$\big(\,.\,\big)_k\f$ denotes the \f$k\f$-th component
-     * of a vector, \f$\delta_{ij}\f$ is Kronecker's delta, and where we have
-     * set
-     * \f{align}
-     *   a_i^n \;:=\;
-     *   \sum_{j\in\mathcal{I}_i}\left(\frac{\eta(\boldsymbol U_j^n)}{\rho_j^n}
-     *   -\frac{\eta(\boldsymbol U_i^n)}{\rho_i^n}\right)\,
-     *   \boldsymbol m_j^n\cdot\boldsymbol c_{ij},
-     *   \qquad
-     *   \boldsymbol b_i^n \;:=\;
-     *   \sum_{j\in\mathcal{I}_i}\left(\mathbf{f}(\boldsymbol U_j^n)-
-     *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
-     * \f}
+     * A view of the Indicator that makes the interface available for a
+     * given dimension @p dim and choice of number type @p Number (which can
+     * be a scalar float, or double, as well as a VectorizedArray holding
+     * packed scalars).
      *
      * @ingroup EulerEquations
      */

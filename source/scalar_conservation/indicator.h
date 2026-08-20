@@ -24,6 +24,12 @@ namespace ryujin
     template <int dim, typename Number = double>
     class IndicatorView;
 
+    /**
+     * A suitable indicator strategy that is used to form the preliminary
+     * high-order update.
+     *
+     * @ingroup ScalarConservationEquations
+     */
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
@@ -67,8 +73,10 @@ namespace ryujin
 
 
     /**
-     * An suitable indicator strategy that is used to form the preliminary
-     * high-order update.
+     * A view of the Indicator that makes the interface available for a
+     * given dimension @p dim and choice of number type @p Number (which can
+     * be a scalar float, or double, as well as a VectorizedArray holding
+     * packed scalars).
      *
      * @ingroup ScalarConservationEquations
      */
