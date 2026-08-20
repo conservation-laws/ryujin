@@ -174,7 +174,8 @@ namespace ryujin
           const View &view,
           const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
           : view_(view)
-          , wave_speed_estimator_(wave_speed_estimator)
+          , newton_tolerance_(wave_speed_estimator.newton_tolerance())
+          , newton_max_iterations_(wave_speed_estimator.newton_max_iterations())
       {
       }
 
@@ -352,7 +353,8 @@ namespace ryujin
       //@{
 
       const View view_;
-      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+      ScalarNumber newton_tolerance_;
+      unsigned int newton_max_iterations_;
 
       //@}
     };

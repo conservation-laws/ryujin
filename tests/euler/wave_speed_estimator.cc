@@ -30,14 +30,15 @@ int main()
 
   const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
-  const auto wave_speed_estimator_view =
-      wave_speed_estimator.view<dim, Number>();
-
   std::stringstream parameters;
   parameters << "subsection WaveSpeedEstimator\n"
              << "set newton max iterations = " NEWTON_ITERATIONS "\n"
              << "end" << std::endl;
   ParameterAcceptor::initialize(parameters);
+
+  /* The view has to be created after parsing parameters: */
+  const auto wave_speed_estimator_view =
+      wave_speed_estimator.view<dim, Number>();
 
   const auto riemann_data = [&](const auto &state) {
     const Number rho = state[0];

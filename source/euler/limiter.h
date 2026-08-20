@@ -207,7 +207,9 @@ namespace ryujin
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
           : view_(view)
-          , limiter_(limiter)
+          , newton_tolerance_(limiter.newton_tolerance())
+          , newton_max_iterations_(limiter.newton_max_iterations())
+          , relaxation_factor_(limiter.relaxation_factor())
       {
       }
 
@@ -317,7 +319,9 @@ namespace ryujin
       //@{
 
       const View view_;
-      const Limiter<ScalarNumber> &limiter_;
+      ScalarNumber newton_tolerance_;
+      unsigned int newton_max_iterations_;
+      ScalarNumber relaxation_factor_;
 
       state_type U_i_;
 
@@ -382,7 +386,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter_.relaxation_factor();
+      r *= relaxation_factor_;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       rho_min *= std::max(Number(1.) - r, Number(eps));
@@ -482,12 +486,12 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto rho_relaxation =
-          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          ScalarNumber(2. * relaxation_factor_) *
           std::abs(rho_relaxation_numerator_) /
           (std::abs(rho_relaxation_denominator_) + Number(eps));
 
       const auto entropy_relaxation =
-          limiter_.relaxation_factor() * (s_interp_max_ - s_min);
+          relaxation_factor_ * (s_interp_max_ - s_min);
 
       rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
       rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);

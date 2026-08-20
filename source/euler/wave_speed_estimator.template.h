@@ -109,7 +109,7 @@ namespace ryujin
        * If we do no Newton iteration, cut it short:
        */
 
-      if (wave_speed_estimator_.newton_max_iterations() == 0) {
+      if (newton_max_iterations_ == 0) {
         const auto lambda_max =
             compute_lambda(riemann_data_i, riemann_data_j, p_2);
 
@@ -151,12 +151,10 @@ namespace ryujin
       std::cout << "l_m: (start) " << lambda_max << std::endl;
 #endif
 
-      for (unsigned int i = 0;
-           i < wave_speed_estimator_.newton_max_iterations();
-           ++i) {
+      for (unsigned int i = 0; i < newton_max_iterations_; ++i) {
 
         /* We accept our current guess if we reach the tolerance... */
-        const Number tolerance(wave_speed_estimator_.newton_tolerance());
+        const Number tolerance(newton_tolerance_);
         if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
           std::cout << "converged after " << i << " iterations." << std::endl;

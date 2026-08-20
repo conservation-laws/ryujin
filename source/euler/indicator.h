@@ -196,7 +196,7 @@ namespace ryujin
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
           : view_(view)
-          , indicator_(indicator)
+          , evc_factor_(indicator.evc_factor())
       {
       }
 
@@ -231,7 +231,7 @@ namespace ryujin
       //@{
 
       const View view_;
-      const Indicator<ScalarNumber> &indicator_;
+      ScalarNumber evc_factor_;
 
       Number rho_i_inverse_ = 0.;
       Number eta_i_ = 0.;
@@ -321,7 +321,7 @@ namespace ryujin
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i_));
 
-      return std::min(Number(1.), indicator_.evc_factor() * quotient);
+      return std::min(Number(1.), evc_factor_ * quotient);
     }
   } // namespace Euler
 } // namespace ryujin
