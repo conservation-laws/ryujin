@@ -260,15 +260,6 @@ namespace ryujin
       {
       }
 
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
-
       //@}
       /**
        * @name Computing derived physical quantities

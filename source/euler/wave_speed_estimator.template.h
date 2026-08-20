@@ -581,13 +581,16 @@ namespace ryujin
       const auto E = view_.total_energy(U) -
                      Number(0.5) * perp.norm_square() * rho_inverse;
 
-      using state_type_1d =
-          typename HyperbolicSystemView<1, Number>::state_type;
-      const auto view_1d = view_.template view<1, Number>();
+      /*
+       * Compute the pressure and speed of sound of the projected
+       * one-dimensional state [rho, proj_m, E]:
+       */
+      const auto gamma = view_.gamma();
+      const auto internal_energy =
+          E - ScalarNumber(0.5) * (proj_m * proj_m) * rho_inverse;
+      const auto p = (gamma - ScalarNumber(1.)) * internal_energy;
+      const auto a = std::sqrt(gamma * p * rho_inverse);
 
-      const auto state = state_type_1d{{rho, proj_m, E}};
-      const auto p = view_1d.pressure(state);
-      const auto a = view_1d.speed_of_sound(state);
       return {{rho, proj_m * rho_inverse, p, a}};
     }
 
