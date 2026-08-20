@@ -11,6 +11,8 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/vectorization.h>
 
+#include <cmath>
+
 
 /**
  * @name Exception handling in SIMD context
@@ -234,7 +236,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T>
-  T pow(const T x, const T b);
+  DEAL_II_HOST_DEVICE T pow(const T x, const T b);
 
 
   /**
@@ -259,6 +261,40 @@ namespace ryujin
       const dealii::VectorizedArray<T, width> b);
 
 
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE float pow(const float x, const float b)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation: */
+    return std::pow(x, b);
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom pow implementation instead of std::pow(): */
+    return pow(dealii::VectorizedArray<float, 4>(x), b)[0];
+#else
+    /* Call generic std::pow() implementation: */
+    return std::pow(x, b);
+#endif
+  }
+
+
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE double pow(const double x, const double b)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom pow implementation instead of std::pow(): */
+    return pow(dealii::VectorizedArray<double, 2>(x), b)[0];
+#else
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#endif
+  }
+
+
   /**
    * Controls the bias of the fast_pow() functions.
    */
@@ -269,14 +305,12 @@ namespace ryujin
     none,
 
     /**
-     * Guarantee an upper bound, i.e., fast_pow(x,b) >= pow(x,b) provided
-     * that FIXME
+     * Guarantee an upper bound, i.e., fast_pow(x,b) >= pow(x,b).
      */
     max,
 
     /**
-     * Guarantee a lower bound, i.e., fast_pow(x,b) >= pow(x,b) provided
-     * that FIXME
+     * Guarantee a lower bound, i.e., fast_pow(x,b) >= pow(x,b).
      */
     min
   };
