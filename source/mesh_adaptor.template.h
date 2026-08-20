@@ -190,200 +190,6 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators(
-      const StateVector &state_vector) const
-  {
-    const auto &affine_constraints = offline_data_->affine_constraints();
-    const unsigned int n_internal = offline_data_->n_locally_internal();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
-    using VA = dealii::VectorizedArray<Number>;
-
-    /*
-     * Extract selected quantities:
-     */
-
-    auto quantities =
-        SelectedComponentsExtractor<Description, dim, Number>::extract(
-            *offline_data_,
-            *hyperbolic_system_,
-            *parabolic_system_,
-            state_vector,
-            initial_precomputed_,
-            {"alpha"},
-            {alpha_},
-            smoothness_selected_quantities_);
-
-    for (auto &it : quantities) {
-      it.update_ghost_values();
-      affine_constraints.distribute(it);
-      it.update_ghost_values();
-    }
-
-    /*
-     * Set up temporary vectors:
-     */
-
-    const unsigned int n_entries = quantities.size();
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    /*
-     * Ensure we have at least one entry in numerator and denominator
-     * available. We use those for temporary storage.
-     */
-    std::vector<ScalarHostVector> numerator(std::max(1u, n_entries));
-    std::vector<ScalarHostVector> denominator(std::max(1u, n_entries));
-    for (auto &it : numerator)
-      it.reinit(scalar_partitioner);
-    for (auto &it : denominator)
-      it.reinit(scalar_partitioner);
-
-    /*
-     * Commpute numerators and denominators for the smoothness indicators:
-     */
-
-    const auto body = [&](auto sentinel, unsigned int i) {
-      using T = decltype(sentinel);
-      unsigned int stride_size = get_stride_size<T>;
-
-      /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
-      if (row_length == 1)
-        return;
-
-      boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
-      for (unsigned int k = 0; k < n_entries; ++k) {
-        value_i[k] = read_entry<T>(quantities[k], i);
-      }
-
-      boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
-      boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
-
-      const unsigned int *js = sparsity_simd.columns(i);
-      for (unsigned int col_idx = 0; col_idx < row_length;
-           ++col_idx, js += stride_size) {
-
-        /* Skip diagonal. */
-        if (col_idx == 0)
-          continue;
-
-        const auto beta_ij = betaij_matrix.template read_entry<T>(i, col_idx);
-
-        for (unsigned int k = 0; k < n_entries; ++k) {
-          const auto value_j_k = read_entry<T>(quantities[k], js);
-          numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
-          denominator_i[k] +=
-              std::abs(beta_ij) * //
-              std::max(std::abs(value_j_k), std::abs(value_i[k]));
-        }
-
-        for (unsigned int k = 0; k < n_entries; ++k) {
-          write_entry<T>(numerator[k], numerator_i[k], i);
-          write_entry<T>(denominator[k], denominator_i[k], i);
-        }
-      }
-    };
-
-    cpu_simd_loop<Number>("mesh_adaptor_1", body, 0, n_internal, n_owned);
-
-    /*
-     * Sum up and normalize the indicators and store the result in numerator[0]:
-     */
-
-    constexpr Number eps = std::numeric_limits<Number>::epsilon();
-
-    std::vector<Number> denominator_global_maximum(n_entries);
-    for (unsigned int k = 0; k < n_entries; ++k) {
-      denominator_global_maximum[k] = dealii::Utilities::MPI::max(
-          denominator[k].linfty_norm(), mpi_ensemble_.ensemble_communicator());
-
-      denominator_global_maximum[k] =
-          std::max(denominator_global_maximum[k], eps);
-    }
-
-    const auto body_normalize = [&](auto sentinel, unsigned int i) {
-      using T = decltype(sentinel);
-
-      /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
-      if (row_length == 1)
-        return;
-
-      auto alpha_i = T(0.);
-      for (unsigned int k = 0; k < n_entries; ++k) {
-        const auto numerator_i = read_entry<T>(numerator[k], i);
-        const auto denominator_i = read_entry<T>(denominator[k], i);
-
-        auto denominator =
-            (Number(1.) - smoothness_local_global_ratio_) * denominator_i +
-            smoothness_local_global_ratio_ * denominator_global_maximum[k];
-        denominator = std::max(T(eps), denominator);
-
-        alpha_i += std::abs(numerator_i) / denominator;
-      }
-
-      alpha_i = std::min(alpha_i, T(smoothness_max_cutoff_));
-      alpha_i = std::max(alpha_i, T(smoothness_min_cutoff_));
-      write_entry<T>(/*SIC!*/ numerator[0], alpha_i, i);
-    };
-
-    cpu_simd_loop<Number>(
-        "mesh_adaptor_2", body_normalize, 0, n_internal, n_owned);
-
-    /*
-     * Widen indicators over stencil via max() operator:
-     */
-
-    const auto body_widen = [&](auto sentinel, unsigned int i) {
-      using T = decltype(sentinel);
-      unsigned int stride_size = get_stride_size<T>;
-
-      /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
-      if (row_length == 1)
-        return;
-
-      auto alpha_i = read_entry<T>(numerator[0], i);
-
-      const unsigned int *js = sparsity_simd.columns(i);
-      for (unsigned int col_idx = 0; col_idx < row_length;
-           ++col_idx, js += stride_size) {
-
-        /* Skip diagonal. */
-        if (col_idx == 0)
-          continue;
-
-        const auto alpha_j = read_entry<T>(numerator[0], js);
-
-        alpha_i = std::max(alpha_i, alpha_j);
-      }
-
-      write_entry<T>(/*SIC!*/ denominator[0], alpha_i, i);
-    };
-
-    for (unsigned int cycle = 0; cycle < smoothness_widen_stencil_; ++cycle) {
-      numerator[0].update_ghost_values();
-      cpu_simd_loop<Number>(
-          "mesh_adaptor_3", body_widen, 0, n_internal, n_owned);
-      numerator[0] = /*SIC!*/ denominator[0];
-    }
-
-    numerator[0].update_ghost_values();
-    affine_constraints.distribute(numerator[0]);
-
-    /*
-     * Insert result into smoothness_indicators_:
-     */
-
-    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
-    smoothness_indicators_.insert_component(numerator[0], 0);
-    smoothness_indicators_.update_ghost_values();
-  }
-
-
-  template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::analyze(
       const StateVector &state_vector, const Number t, unsigned int cycle)
   {
@@ -615,5 +421,199 @@ namespace ryujin
          triangulation.active_cell_iterators_on_level(min_refinement_level_))
       cell->clear_coarsen_flag();
 #endif
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators(
+      const StateVector &state_vector) const
+  {
+    const auto &affine_constraints = offline_data_->affine_constraints();
+    const unsigned int n_internal = offline_data_->n_locally_internal();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto &betaij_matrix = offline_data_->betaij_matrix();
+    using VA = dealii::VectorizedArray<Number>;
+
+    /*
+     * Extract selected quantities:
+     */
+
+    auto quantities =
+        SelectedComponentsExtractor<Description, dim, Number>::extract(
+            *offline_data_,
+            *hyperbolic_system_,
+            *parabolic_system_,
+            state_vector,
+            initial_precomputed_,
+            {"alpha"},
+            {alpha_},
+            smoothness_selected_quantities_);
+
+    for (auto &it : quantities) {
+      it.update_ghost_values();
+      affine_constraints.distribute(it);
+      it.update_ghost_values();
+    }
+
+    /*
+     * Set up temporary vectors:
+     */
+
+    const unsigned int n_entries = quantities.size();
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
+    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    /*
+     * Ensure we have at least one entry in numerator and denominator
+     * available. We use those for temporary storage.
+     */
+    std::vector<ScalarHostVector> numerator(std::max(1u, n_entries));
+    std::vector<ScalarHostVector> denominator(std::max(1u, n_entries));
+    for (auto &it : numerator)
+      it.reinit(scalar_partitioner);
+    for (auto &it : denominator)
+      it.reinit(scalar_partitioner);
+
+    /*
+     * Commpute numerators and denominators for the smoothness indicators:
+     */
+
+    const auto body = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+      unsigned int stride_size = get_stride_size<T>;
+
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
+
+      boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
+      for (unsigned int k = 0; k < n_entries; ++k) {
+        value_i[k] = read_entry<T>(quantities[k], i);
+      }
+
+      boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
+      boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
+
+      const unsigned int *js = sparsity_simd.columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += stride_size) {
+
+        /* Skip diagonal. */
+        if (col_idx == 0)
+          continue;
+
+        const auto beta_ij = betaij_matrix.template read_entry<T>(i, col_idx);
+
+        for (unsigned int k = 0; k < n_entries; ++k) {
+          const auto value_j_k = read_entry<T>(quantities[k], js);
+          numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
+          denominator_i[k] +=
+              std::abs(beta_ij) * //
+              std::max(std::abs(value_j_k), std::abs(value_i[k]));
+        }
+
+        for (unsigned int k = 0; k < n_entries; ++k) {
+          write_entry<T>(numerator[k], numerator_i[k], i);
+          write_entry<T>(denominator[k], denominator_i[k], i);
+        }
+      }
+    };
+
+    cpu_simd_loop<Number>("mesh_adaptor_1", body, 0, n_internal, n_owned);
+
+    /*
+     * Sum up and normalize the indicators and store the result in numerator[0]:
+     */
+
+    constexpr Number eps = std::numeric_limits<Number>::epsilon();
+
+    std::vector<Number> denominator_global_maximum(n_entries);
+    for (unsigned int k = 0; k < n_entries; ++k) {
+      denominator_global_maximum[k] = dealii::Utilities::MPI::max(
+          denominator[k].linfty_norm(), mpi_ensemble_.ensemble_communicator());
+
+      denominator_global_maximum[k] =
+          std::max(denominator_global_maximum[k], eps);
+    }
+
+    const auto body_normalize = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
+
+      auto alpha_i = T(0.);
+      for (unsigned int k = 0; k < n_entries; ++k) {
+        const auto numerator_i = read_entry<T>(numerator[k], i);
+        const auto denominator_i = read_entry<T>(denominator[k], i);
+
+        auto denominator =
+            (Number(1.) - smoothness_local_global_ratio_) * denominator_i +
+            smoothness_local_global_ratio_ * denominator_global_maximum[k];
+        denominator = std::max(T(eps), denominator);
+
+        alpha_i += std::abs(numerator_i) / denominator;
+      }
+
+      alpha_i = std::min(alpha_i, T(smoothness_max_cutoff_));
+      alpha_i = std::max(alpha_i, T(smoothness_min_cutoff_));
+      write_entry<T>(/*SIC!*/ numerator[0], alpha_i, i);
+    };
+
+    cpu_simd_loop<Number>(
+        "mesh_adaptor_2", body_normalize, 0, n_internal, n_owned);
+
+    /*
+     * Widen indicators over stencil via max() operator:
+     */
+
+    const auto body_widen = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+      unsigned int stride_size = get_stride_size<T>;
+
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
+
+      auto alpha_i = read_entry<T>(numerator[0], i);
+
+      const unsigned int *js = sparsity_simd.columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += stride_size) {
+
+        /* Skip diagonal. */
+        if (col_idx == 0)
+          continue;
+
+        const auto alpha_j = read_entry<T>(numerator[0], js);
+
+        alpha_i = std::max(alpha_i, alpha_j);
+      }
+
+      write_entry<T>(/*SIC!*/ denominator[0], alpha_i, i);
+    };
+
+    for (unsigned int cycle = 0; cycle < smoothness_widen_stencil_; ++cycle) {
+      numerator[0].update_ghost_values();
+      cpu_simd_loop<Number>(
+          "mesh_adaptor_3", body_widen, 0, n_internal, n_owned);
+      numerator[0] = /*SIC!*/ denominator[0];
+    }
+
+    numerator[0].update_ghost_values();
+    affine_constraints.distribute(numerator[0]);
+
+    /*
+     * Insert result into smoothness_indicators_:
+     */
+
+    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
+    smoothness_indicators_.insert_component(numerator[0], 0);
+    smoothness_indicators_.update_ghost_values();
   }
 } // namespace ryujin

@@ -348,6 +348,16 @@ namespace ryujin
 
 
     template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::print_solver_statistics(
+        std::ostream &output) const
+    {
+      output << "        [ " << std::setprecision(2) << std::fixed //
+             << n_iterations_gauss_ << " GMG gauss -- "            //
+             << n_iterations_step_ << " GMG step ]" << std::endl;
+    }
+
+
+    template <typename Description, int dim, typename Number>
     void ParabolicModule<Description, dim, Number>::create_constraints()
     {
 #ifdef DEBUG_OUTPUT
@@ -1133,16 +1143,6 @@ namespace ryujin
 
       cpu_simd_loop<Number>(
           "time_step_parabolic_2c", body, 0, n_owned, n_owned);
-    }
-
-
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::print_solver_statistics(
-        std::ostream &output) const
-    {
-      output << "        [ " << std::setprecision(2) << std::fixed //
-             << n_iterations_gauss_ << " GMG gauss -- "            //
-             << n_iterations_step_ << " GMG step ]" << std::endl;
     }
 
   } // namespace EulerPoisson

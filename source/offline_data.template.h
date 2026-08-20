@@ -176,87 +176,6 @@ namespace ryujin
 
 
   /*
-   * Modifies:
-   *     n_locally_internal_
-   */
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::ensure_simd_stride_consistency()
-  {
-    auto &dof_handler = this->dof_handler();
-
-    /*
-     * A small lambda to check for stride-level consistency of the internal
-     * index range:
-     */
-    const auto consistent_stride_range [[maybe_unused]] = [&]() {
-      constexpr auto group_size = VectorizedArray<Number>::size();
-      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-      const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
-
-      unsigned int group_row_length = 0;
-      unsigned int i = 0;
-      for (; i < n_locally_internal_; ++i) {
-        if (i % group_size == 0) {
-          group_row_length = sparsity_pattern_.row_length(offset + i);
-        } else {
-          if (group_row_length != sparsity_pattern_.row_length(offset + i)) {
-            break;
-          }
-        }
-      }
-      return i / group_size * group_size;
-    };
-
-    /*
-     * A small lambda that performs a "logical or" over all MPI ranks:
-     */
-    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
-    };
-
-    /*
-     * We have to ensure that the locally internal numbering range is still
-     * consistent, meaning that all strides have the same stencil size.
-     * This property might not hold any more after the elimination
-     * procedure of constrained degrees of freedom (periodicity, or hanging
-     * node constraints). Therefore, the following little dance:
-     */
-
-    const auto &affine_constraints = this->affine_constraints();
-    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
-      if (mpi_allreduce_logical_or( //
-              consistent_stride_range() != n_locally_internal_)) {
-        /*
-         * In this case we try to fix up the numbering by pushing affected
-         * strides to the end and slightly lowering the n_locally_internal_
-         * marker.
-         */
-        n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
-            dof_handler,
-            sparsity_pattern_,
-            n_locally_internal_,
-            VectorizedArray<Number>::size());
-        create_constraints_and_sparsity_pattern();
-        n_locally_internal_ = consistent_stride_range();
-      }
-    }
-
-    /*
-     * Check that after all the dof manipulation and setup we still end up
-     * with indices in [0, locally_internal) that have uniform stencil size
-     * within a stride.
-     */
-    Assert(consistent_stride_range() == n_locally_internal_,
-           dealii::ExcInternalError());
-  }
-
-
-  /*
    * Populates:
    *     affine_constraints_cg_
    *     affine_constraints_dg_
@@ -405,6 +324,87 @@ namespace ryujin
         locally_owned,
         mpi_ensemble_.ensemble_communicator(),
         locally_relevant);
+  }
+
+
+  /*
+   * Modifies:
+   *     n_locally_internal_
+   */
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::ensure_simd_stride_consistency()
+  {
+    auto &dof_handler = this->dof_handler();
+
+    /*
+     * A small lambda to check for stride-level consistency of the internal
+     * index range:
+     */
+    const auto consistent_stride_range [[maybe_unused]] = [&]() {
+      constexpr auto group_size = VectorizedArray<Number>::size();
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+
+      unsigned int group_row_length = 0;
+      unsigned int i = 0;
+      for (; i < n_locally_internal_; ++i) {
+        if (i % group_size == 0) {
+          group_row_length = sparsity_pattern_.row_length(offset + i);
+        } else {
+          if (group_row_length != sparsity_pattern_.row_length(offset + i)) {
+            break;
+          }
+        }
+      }
+      return i / group_size * group_size;
+    };
+
+    /*
+     * A small lambda that performs a "logical or" over all MPI ranks:
+     */
+    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
+      std::function<bool(const bool &, const bool &)> comparator =
+          [](const bool &left, const bool &right) -> bool {
+        return left || right;
+      };
+      return Utilities::MPI::all_reduce(
+          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
+    };
+
+    /*
+     * We have to ensure that the locally internal numbering range is still
+     * consistent, meaning that all strides have the same stencil size.
+     * This property might not hold any more after the elimination
+     * procedure of constrained degrees of freedom (periodicity, or hanging
+     * node constraints). Therefore, the following little dance:
+     */
+
+    const auto &affine_constraints = this->affine_constraints();
+    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
+      if (mpi_allreduce_logical_or( //
+              consistent_stride_range() != n_locally_internal_)) {
+        /*
+         * In this case we try to fix up the numbering by pushing affected
+         * strides to the end and slightly lowering the n_locally_internal_
+         * marker.
+         */
+        n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
+            dof_handler,
+            sparsity_pattern_,
+            n_locally_internal_,
+            VectorizedArray<Number>::size());
+        create_constraints_and_sparsity_pattern();
+        n_locally_internal_ = consistent_stride_range();
+      }
+    }
+
+    /*
+     * Check that after all the dof manipulation and setup we still end up
+     * with indices in [0, locally_internal) that have uniform stencil size
+     * within a stride.
+     */
+    Assert(consistent_stride_range() == n_locally_internal_,
+           dealii::ExcInternalError());
   }
 
 

@@ -247,6 +247,197 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
+  void Quantities<Description, dim, Number>::accumulate(
+      const StateVector &state_vector, const Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
+#endif
+
+    const auto accumulate = [&](const auto &point_maps,
+                                const auto &manifolds,
+                                auto &statistics,
+                                auto &time_series) {
+      for (const auto &[name, point_map] : point_maps) {
+
+        /* Find the correct option string in manifolds */
+        const auto &options = get_options_from_name(manifolds, name);
+
+        /* skip if we don't average in space or time: */
+        if (options.find("time_averaged") == std::string::npos &&
+            options.find("space_averaged") == std::string::npos)
+          continue;
+
+        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+            statistics[name];
+
+        std::swap(t_old, t_new);
+        std::swap(val_old, val_new);
+
+        /* accumulate new values */
+
+        const auto spatial_average =
+            internal_accumulate(state_vector, point_map, val_new);
+
+        /* Average in time with trapezoidal rule: */
+
+        if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
+          /* We have not accumulated any statistics yet: */
+          t_old = t - 1.;
+          t_new = t;
+
+        } else {
+
+          t_new = t;
+          const Number tau = t_new - t_old;
+
+          for (std::size_t i = 0; i < val_sum.size(); ++i) {
+            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
+            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
+            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
+            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
+          }
+          t_sum += tau;
+        }
+
+        /* Record average in space: */
+        time_series[name].push_back({t, spatial_average});
+      }
+    };
+
+    accumulate(interior_maps_,
+               interior_manifolds_,
+               interior_statistics_,
+               interior_time_series_);
+
+    accumulate(boundary_maps_,
+               boundary_manifolds_,
+               boundary_statistics_,
+               boundary_time_series_);
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void Quantities<Description, dim, Number>::write_out(
+      const StateVector &state_vector, const Number t, unsigned int cycle)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
+#endif
+
+    /*
+     * First, write out mesh files if this hasn't happened yet.
+     */
+    if (!mesh_files_have_been_written_) {
+      write_mesh_files(cycle);
+      mesh_files_have_been_written_ = true;
+    }
+
+    /*
+     * Next write out instantaneous and time_averaged maps, and flush the
+     * space_averaged values to the corresponding log files:
+     */
+
+    const auto write_out = [&](const auto &point_maps,
+                               const auto &manifolds,
+                               auto &statistics,
+                               auto &time_series) {
+      for (const auto &[name, point_map] : point_maps) {
+
+        /* Find the correct option string in manifolds */
+        const auto &options = get_options_from_name(manifolds, name);
+
+        const auto prefix =
+            base_name_ + "-" + name + "-R" + Utilities::to_string(cycle, 4);
+
+        /*
+         * Compute and output instantaneous field:
+         */
+
+        if (options.find("instantaneous") != std::string::npos) {
+
+          const std::string file_name = prefix + "-instantaneous.dat";
+
+          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+              statistics[name];
+
+          std::stringstream time_stamp;
+          time_stamp << std::scientific << std::setprecision(14);
+          time_stamp << "# at t = " << t << std::endl;
+
+          /* We have not computed any updated statistics yet: */
+
+          if (options.find("time_averaged") == std::string::npos &&
+              options.find("space_averaged") == std::string::npos)
+            internal_accumulate(state_vector, point_map, val_new);
+          else
+            AssertThrow(t_new == t, dealii::ExcInternalError());
+
+          internal_write_out(file_name, time_stamp.str(), val_new, Number(1.));
+        }
+
+        /*
+         * Output time averaged field:
+         */
+
+        if (options.find("time_averaged") != std::string::npos) {
+
+          const std::string file_name = prefix + "-time_averaged.dat";
+
+          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+              statistics[name];
+
+          /* Check whether we have accumulated any statistics yet: */
+          if (t_sum != Number(0.)) {
+            std::stringstream time_stamp;
+            time_stamp << std::scientific << std::setprecision(14);
+            time_stamp << "# averaged from t = " << t_new - t_sum
+                       << " to t = " << t_new << std::endl;
+
+            internal_write_out(
+                file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
+          }
+        }
+
+        /*
+         * Output space averaged field:
+         */
+
+        if (options.find("space_averaged") != std::string::npos) {
+          bool append = true;
+          if (!time_series_cycle_.has_value()) {
+            time_series_cycle_ = cycle;
+            append = false;
+          }
+
+          const auto file_name =
+              base_name_ + "-" + name + "-R" +
+              Utilities::to_string(time_series_cycle_.value(), 4) +
+              "-space_averaged_time_series.dat";
+
+          auto &series = time_series[name];
+          internal_write_out_time_series(file_name, series, /*append*/ append);
+          series.clear();
+        }
+      }
+    };
+
+    write_out(interior_maps_,
+              interior_manifolds_,
+              interior_statistics_,
+              interior_time_series_);
+
+    write_out(boundary_maps_,
+              boundary_manifolds_,
+              boundary_statistics_,
+              boundary_time_series_);
+
+    if (clear_temporal_statistics_on_writeout_)
+      clear_statistics();
+  }
+
+
+  template <typename Description, int dim, typename Number>
   void
   Quantities<Description, dim, Number>::write_mesh_files(unsigned int cycle)
   {
@@ -494,197 +685,6 @@ namespace ryujin
       output << std::flush;
       output.close();
     }
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void Quantities<Description, dim, Number>::accumulate(
-      const StateVector &state_vector, const Number t)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
-#endif
-
-    const auto accumulate = [&](const auto &point_maps,
-                                const auto &manifolds,
-                                auto &statistics,
-                                auto &time_series) {
-      for (const auto &[name, point_map] : point_maps) {
-
-        /* Find the correct option string in manifolds */
-        const auto &options = get_options_from_name(manifolds, name);
-
-        /* skip if we don't average in space or time: */
-        if (options.find("time_averaged") == std::string::npos &&
-            options.find("space_averaged") == std::string::npos)
-          continue;
-
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            statistics[name];
-
-        std::swap(t_old, t_new);
-        std::swap(val_old, val_new);
-
-        /* accumulate new values */
-
-        const auto spatial_average =
-            internal_accumulate(state_vector, point_map, val_new);
-
-        /* Average in time with trapezoidal rule: */
-
-        if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
-          /* We have not accumulated any statistics yet: */
-          t_old = t - 1.;
-          t_new = t;
-
-        } else {
-
-          t_new = t;
-          const Number tau = t_new - t_old;
-
-          for (std::size_t i = 0; i < val_sum.size(); ++i) {
-            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
-            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
-            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
-            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
-          }
-          t_sum += tau;
-        }
-
-        /* Record average in space: */
-        time_series[name].push_back({t, spatial_average});
-      }
-    };
-
-    accumulate(interior_maps_,
-               interior_manifolds_,
-               interior_statistics_,
-               interior_time_series_);
-
-    accumulate(boundary_maps_,
-               boundary_manifolds_,
-               boundary_statistics_,
-               boundary_time_series_);
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void Quantities<Description, dim, Number>::write_out(
-      const StateVector &state_vector, const Number t, unsigned int cycle)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
-#endif
-
-    /*
-     * First, write out mesh files if this hasn't happened yet.
-     */
-    if (!mesh_files_have_been_written_) {
-      write_mesh_files(cycle);
-      mesh_files_have_been_written_ = true;
-    }
-
-    /*
-     * Next write out instantaneous and time_averaged maps, and flush the
-     * space_averaged values to the corresponding log files:
-     */
-
-    const auto write_out = [&](const auto &point_maps,
-                               const auto &manifolds,
-                               auto &statistics,
-                               auto &time_series) {
-      for (const auto &[name, point_map] : point_maps) {
-
-        /* Find the correct option string in manifolds */
-        const auto &options = get_options_from_name(manifolds, name);
-
-        const auto prefix =
-            base_name_ + "-" + name + "-R" + Utilities::to_string(cycle, 4);
-
-        /*
-         * Compute and output instantaneous field:
-         */
-
-        if (options.find("instantaneous") != std::string::npos) {
-
-          const std::string file_name = prefix + "-instantaneous.dat";
-
-          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-              statistics[name];
-
-          std::stringstream time_stamp;
-          time_stamp << std::scientific << std::setprecision(14);
-          time_stamp << "# at t = " << t << std::endl;
-
-          /* We have not computed any updated statistics yet: */
-
-          if (options.find("time_averaged") == std::string::npos &&
-              options.find("space_averaged") == std::string::npos)
-            internal_accumulate(state_vector, point_map, val_new);
-          else
-            AssertThrow(t_new == t, dealii::ExcInternalError());
-
-          internal_write_out(file_name, time_stamp.str(), val_new, Number(1.));
-        }
-
-        /*
-         * Output time averaged field:
-         */
-
-        if (options.find("time_averaged") != std::string::npos) {
-
-          const std::string file_name = prefix + "-time_averaged.dat";
-
-          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-              statistics[name];
-
-          /* Check whether we have accumulated any statistics yet: */
-          if (t_sum != Number(0.)) {
-            std::stringstream time_stamp;
-            time_stamp << std::scientific << std::setprecision(14);
-            time_stamp << "# averaged from t = " << t_new - t_sum
-                       << " to t = " << t_new << std::endl;
-
-            internal_write_out(
-                file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
-          }
-        }
-
-        /*
-         * Output space averaged field:
-         */
-
-        if (options.find("space_averaged") != std::string::npos) {
-          bool append = true;
-          if (!time_series_cycle_.has_value()) {
-            time_series_cycle_ = cycle;
-            append = false;
-          }
-
-          const auto file_name =
-              base_name_ + "-" + name + "-R" +
-              Utilities::to_string(time_series_cycle_.value(), 4) +
-              "-space_averaged_time_series.dat";
-
-          auto &series = time_series[name];
-          internal_write_out_time_series(file_name, series, /*append*/ append);
-          series.clear();
-        }
-      }
-    };
-
-    write_out(interior_maps_,
-              interior_manifolds_,
-              interior_statistics_,
-              interior_time_series_);
-
-    write_out(boundary_maps_,
-              boundary_manifolds_,
-              boundary_statistics_,
-              boundary_time_series_);
-
-    if (clear_temporal_statistics_on_writeout_)
-      clear_statistics();
   }
 
 } /* namespace ryujin */
