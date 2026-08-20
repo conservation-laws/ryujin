@@ -35,7 +35,7 @@ namespace ryujin
    * @ingroup Miscellaneous
    */
   template <typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
   quadratic_newton_step(Number &p_1,
                         Number &p_2,
                         const Number phi_p_1,
@@ -71,14 +71,14 @@ namespace ryujin
     /* Make sure we do not produce NaNs: */
 
     auto t_1 =
-        p_1 - dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+        p_1 - ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                   std::abs(denominator_1),
                   Number(eps),
                   Number(0.),
                   ScalarNumber(2.) * phi_p_1 / denominator_1);
 
     auto t_2 =
-        p_2 - dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+        p_2 - ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                   std::abs(denominator_2),
                   Number(eps),
                   Number(0.),

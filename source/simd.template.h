@@ -196,7 +196,7 @@ namespace ryujin
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
   template <>
   // DEAL_II_ALWAYS_INLINE inline
-  float pow(const float x, const float b)
+  float pow_impl(const float x, const float b)
   {
     /* Use a custom pow implementation instead of std::pow(): */
     return vcl::pow(vcl::Vec4f(x), b).extract(0);
@@ -205,7 +205,7 @@ namespace ryujin
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
-  double pow(const double x, const double b)
+  double pow_impl(const double x, const double b)
   {
     /* Use a custom pow implementation instead of std::pow(): */
     return vcl::pow(vcl::Vec2d(x), b).extract(0);
@@ -234,7 +234,7 @@ namespace ryujin
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
-  float pow(const float x, const float b)
+  float pow_impl(const float x, const float b)
   {
     // Call generic std::pow() implementation
     return std::pow(x, b);
@@ -243,7 +243,7 @@ namespace ryujin
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
-  double pow(const double x, const double b)
+  double pow_impl(const double x, const double b)
   {
     // Call generic std::pow() implementation
     return std::pow(x, b);
