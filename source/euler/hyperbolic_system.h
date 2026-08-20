@@ -408,7 +408,7 @@ namespace ryujin
        * Otherwise rho is returned unmodified. Here, rho_cutoff is the
        * reference density multiplied by eps.
        */
-      Number filter_vacuum_density(const Number &rho) const;
+      DEAL_II_HOST_DEVICE Number filter_vacuum_density(const Number &rho) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, return
@@ -465,7 +465,7 @@ namespace ryujin
        *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}.
        * \f]
        */
-      Number specific_entropy(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number specific_entropy(const state_type &U) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -474,7 +474,7 @@ namespace ryujin
        *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
        * \f]
        */
-      Number harten_entropy(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number harten_entropy(const state_type &U) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -483,27 +483,30 @@ namespace ryujin
        *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
        * \f]
        */
-      state_type harten_entropy_derivative(const state_type &U) const;
+      DEAL_II_HOST_DEVICE state_type
+      harten_entropy_derivative(const state_type &U) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the entropy \f$\eta = p^{1/\gamma}\f$.
        */
-      Number mathematical_entropy(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number
+      mathematical_entropy(const state_type &U) const;
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative \f$\eta'\f$ of the entropy \f$\eta =
        * p^{1/\gamma}\f$.
        */
-      state_type mathematical_entropy_derivative(const state_type &U) const;
+      DEAL_II_HOST_DEVICE state_type
+      mathematical_entropy_derivative(const state_type &U) const;
 
       /**
        * Returns whether the state @p U is admissible. If @p U is a
        * vectorized state then @p U is admissible if all vectorized values
        * are admissible.
        */
-      bool is_admissible(const state_type &U) const;
+      DEAL_II_HOST_DEVICE bool is_admissible(const state_type &U) const;
 
       //@}
       /**
@@ -595,13 +598,13 @@ namespace ryujin
        *
        * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
-      flux_contribution_type
+      DEAL_II_HOST_DEVICE flux_contribution_type
       flux_contribution(const PrecomputedVectorView &pv,
                         const InitialPrecomputedVectorView &ipv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
-      flux_contribution_type
+      DEAL_II_HOST_DEVICE flux_contribution_type
       flux_contribution(const PrecomputedVectorView &pv,
                         const InitialPrecomputedVectorView &ipv,
                         const unsigned int *js,
@@ -611,7 +614,7 @@ namespace ryujin
        * Given flux contributions @p flux_i and @p flux_j compute the flux
        * <code>(-f(U_i) - f(U_j) * c_ij</code>
        */
-      state_type
+      DEAL_II_HOST_DEVICE state_type
       flux_divergence(const flux_contribution_type &flux_i,
                       const flux_contribution_type &flux_j,
                       const dealii::Tensor<1, dim, Number> &c_ij) const;
@@ -619,7 +622,7 @@ namespace ryujin
       /** The low-order and high-order fluxes are the same */
       static constexpr bool have_high_order_flux = false;
 
-      state_type high_order_flux_divergence(
+      DEAL_II_HOST_DEVICE state_type high_order_flux_divergence(
           const flux_contribution_type &flux_i,
           const flux_contribution_type &flux_j,
           const dealii::Tensor<1, dim, Number> &c_ij) const = delete;
@@ -633,15 +636,17 @@ namespace ryujin
       /** We do not have source terms: */
       static constexpr bool have_source_terms = false;
 
-      state_type nodal_source(const PrecomputedVectorView &pv,
-                              const unsigned int i,
-                              const state_type &U_i,
-                              const ScalarNumber tau) const = delete;
+      DEAL_II_HOST_DEVICE state_type
+      nodal_source(const PrecomputedVectorView &pv,
+                   const unsigned int i,
+                   const state_type &U_i,
+                   const ScalarNumber tau) const = delete;
 
-      state_type nodal_source(const PrecomputedVectorView &pv,
-                              const unsigned int *js,
-                              const state_type &U_j,
-                              const ScalarNumber tau) const = delete;
+      DEAL_II_HOST_DEVICE state_type
+      nodal_source(const PrecomputedVectorView &pv,
+                   const unsigned int *js,
+                   const state_type &U_j,
+                   const ScalarNumber tau) const = delete;
 
       //@}
       /**
@@ -793,7 +798,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline Number
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     HyperbolicSystemView<dim, Number, MemorySpace>::filter_vacuum_density(
         const Number &rho) const
     {
@@ -801,7 +806,7 @@ namespace ryujin
       const Number rho_cutoff_large =
           reference_density() * vacuum_state_relaxation_large() * eps;
 
-      return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+      return ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           std::abs(rho), rho_cutoff_large, Number(0.), rho);
     }
 
@@ -892,7 +897,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline Number
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     HyperbolicSystemView<dim, Number, MemorySpace>::specific_entropy(
         const state_type &U) const
     {
@@ -903,7 +908,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline Number
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     HyperbolicSystemView<dim, Number, MemorySpace>::harten_entropy(
         const state_type &U) const
     {
@@ -919,7 +924,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline auto
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::harten_entropy_derivative(
         const state_type &U) const -> state_type
     {
@@ -956,7 +961,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline Number
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     HyperbolicSystemView<dim, Number, MemorySpace>::mathematical_entropy(
         const state_type &U) const
     {
@@ -967,7 +972,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline auto
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::
         mathematical_entropy_derivative(const state_type &U) const -> state_type
     {
@@ -1004,7 +1009,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline bool
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool
     HyperbolicSystemView<dim, Number, MemorySpace>::is_admissible(
         const state_type &U) const
     {
@@ -1015,9 +1020,9 @@ namespace ryujin
       constexpr auto gt = dealii::SIMDComparison::greater_than;
       using T = Number;
       const auto test =
-          dealii::compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
-          dealii::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
-          dealii::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
+          ryujin::compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
+          ryujin::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
+          ryujin::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
       if (!(test == Number(0.))) {
@@ -1271,7 +1276,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline auto
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView & /*ipv*/,
@@ -1283,7 +1288,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline auto
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView & /*ipv*/,
@@ -1295,7 +1300,7 @@ namespace ryujin
 
 
     template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_ALWAYS_INLINE inline auto
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
