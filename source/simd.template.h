@@ -194,24 +194,6 @@ namespace ryujin
    ****************************************************************************/
 
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  float pow(const float x, const float b)
-  {
-    /* Use a custom pow implementation instead of std::pow(): */
-    return vcl::pow(vcl::Vec4f(x), b).extract(0);
-  }
-
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  double pow(const double x, const double b)
-  {
-    /* Use a custom pow implementation instead of std::pow(): */
-    return vcl::pow(vcl::Vec2d(x), b).extract(0);
-  }
-
-
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
@@ -231,24 +213,6 @@ namespace ryujin
   }
 
 #else
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  float pow(const float x, const float b)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(x, b);
-  }
-
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  double pow(const double x, const double b)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(x, b);
-  }
-
 
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
@@ -277,24 +241,6 @@ namespace ryujin
    ****************************************************************************/
 
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  float fast_pow(const float x, const float b, const Bias bias)
-  {
-    /* Use a custom pow implementation instead of std::pow(): */
-    return fast_pow_impl(vcl::Vec4f(x), vcl::Vec4f(b), bias).extract(0);
-  }
-
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  double fast_pow(const double x, const double b, const Bias bias)
-  {
-    /* Use a custom pow implementation instead of std::pow(): */
-    return fast_pow_impl(vcl::Vec4f(x), vcl::Vec4f(b), bias).extract(0);
-  }
-
-
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width> fast_pow(
@@ -320,24 +266,6 @@ namespace ryujin
   }
 
 #else
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  float fast_pow(const float x, const float b, const Bias)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(x, b);
-  }
-
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  double fast_pow(const double x, const double b, const Bias)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(static_cast<float>(x), static_cast<float>(b));
-  }
-
 
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline

@@ -11,6 +11,8 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/vectorization.h>
 
+#include <cmath>
+
 
 /**
  * @name Exception handling in SIMD context
@@ -143,7 +145,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename Number>
-  inline DEAL_II_ALWAYS_INLINE Number positive_part(const Number number)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number positive_part(const Number number)
   {
     return std::max(Number(0.), number);
   }
@@ -155,9 +157,62 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename Number>
-  inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number negative_part(const Number number)
   {
     return -std::min(Number(0.), number);
+  }
+
+
+  /**
+   * A wrapper around dealii::compare_and_apply_mask() for scalar number
+   * types that is annotated with DEAL_II_HOST_DEVICE so that it can be
+   * used in device code.
+   *
+   * @ingroup SIMD
+   */
+  template <dealii::SIMDComparison predicate, typename Number>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+  compare_and_apply_mask(const Number &left,
+                         const Number &right,
+                         const Number &true_value,
+                         const Number &false_value)
+  {
+    static_assert(std::is_floating_point_v<Number>,
+                  "Only scalar number types are allowed");
+
+    bool mask = false;
+    if constexpr (predicate == dealii::SIMDComparison::equal)
+      mask = (left == right);
+    else if constexpr (predicate == dealii::SIMDComparison::not_equal)
+      mask = (left != right);
+    else if constexpr (predicate == dealii::SIMDComparison::less_than)
+      mask = (left < right);
+    else if constexpr (predicate == dealii::SIMDComparison::less_than_or_equal)
+      mask = (left <= right);
+    else if constexpr (predicate == dealii::SIMDComparison::greater_than)
+      mask = (left > right);
+    else
+      mask = (left >= right);
+
+    return mask ? true_value : false_value;
+  }
+
+
+  /**
+   * Variant of above function for VectorizedArray that simply forwards to
+   * the dealii::compare_and_apply_mask() implementation. (Host only.)
+   *
+   * @ingroup SIMD
+   */
+  template <dealii::SIMDComparison predicate, typename T, std::size_t width>
+  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<T, width>
+  compare_and_apply_mask(const dealii::VectorizedArray<T, width> &left,
+                         const dealii::VectorizedArray<T, width> &right,
+                         const dealii::VectorizedArray<T, width> &true_value,
+                         const dealii::VectorizedArray<T, width> &false_value)
+  {
+    return dealii::compare_and_apply_mask<predicate>(
+        left, right, true_value, false_value);
   }
 
 
@@ -169,7 +224,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <int N, typename T>
-  inline T fixed_power(const T x)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE T fixed_power(const T x)
   {
     return dealii::Utilities::fixed_power<N, T>(x);
   }
@@ -181,7 +236,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T>
-  T pow(const T x, const T b);
+  DEAL_II_HOST_DEVICE T pow(const T x, const T b);
 
 
   /**
@@ -206,6 +261,40 @@ namespace ryujin
       const dealii::VectorizedArray<T, width> b);
 
 
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE float pow(const float x, const float b)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation: */
+    return std::pow(x, b);
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom pow implementation instead of std::pow(): */
+    return pow(dealii::VectorizedArray<float, 4>(x), b)[0];
+#else
+    /* Call generic std::pow() implementation: */
+    return std::pow(x, b);
+#endif
+  }
+
+
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE double pow(const double x, const double b)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom pow implementation instead of std::pow(): */
+    return pow(dealii::VectorizedArray<double, 2>(x), b)[0];
+#else
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#endif
+  }
+
+
   /**
    * Controls the bias of the fast_pow() functions.
    */
@@ -216,14 +305,12 @@ namespace ryujin
     none,
 
     /**
-     * Guarantee an upper bound, i.e., fast_pow(x,b) >= pow(x,b) provided
-     * that FIXME
+     * Guarantee an upper bound, i.e., fast_pow(x,b) >= pow(x,b).
      */
     max,
 
     /**
-     * Guarantee a lower bound, i.e., fast_pow(x,b) >= pow(x,b) provided
-     * that FIXME
+     * Guarantee a lower bound, i.e., fast_pow(x,b) >= pow(x,b).
      */
     min
   };
@@ -235,7 +322,9 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <typename T>
-  T fast_pow(const T x, const T b, const Bias bias = Bias::none);
+  DEAL_II_HOST_DEVICE T fast_pow(const T x,
+                                 const T b,
+                                 const Bias bias = Bias::none);
 
 
   /**
@@ -261,6 +350,42 @@ namespace ryujin
   fast_pow(const dealii::VectorizedArray<T, width> x,
            const dealii::VectorizedArray<T, width> b,
            const Bias bias = Bias::none);
+
+
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE float
+  fast_pow(const float x, const float b, [[maybe_unused]] const Bias bias)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom fast_pow implementation instead of std::pow(): */
+    return fast_pow(dealii::VectorizedArray<float, 4>(x), b, bias)[0];
+#else
+    /* Call generic std::pow() implementation */
+    return std::pow(x, b);
+#endif
+  }
+
+
+  template <>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE double
+  fast_pow(const double x, const double b, [[maybe_unused]] const Bias bias)
+  {
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+    /* Call generic std::pow() implementation (in single precision) */
+    return std::pow(static_cast<float>(x), static_cast<float>(b));
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+    /* Use a custom fast_pow implementation instead of std::pow(): */
+    return fast_pow(dealii::VectorizedArray<double, 2>(x), b, bias)[0];
+#else
+    /* Call generic std::pow() implementation (in single precision) */
+    return std::pow(static_cast<float>(x), static_cast<float>(b));
+#endif
+  }
 
   //@}
   /**

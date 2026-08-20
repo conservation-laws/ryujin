@@ -144,7 +144,7 @@ namespace ryujin
             int problem_dim = FT::dimension,
             typename TT = typename FT::value_type,
             typename T = typename TT::value_type>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, T>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, problem_dim, T>
   contract(const FT &flux_ij, const TT &c_ij)
   {
     dealii::Tensor<1, problem_dim, T> result;
@@ -158,8 +158,8 @@ namespace ryujin
    * Add two given rank-2 tensors flux_left_ij and flux_right_ij:
    */
   template <typename FT, int problem_dim = FT::dimension>
-  DEAL_II_ALWAYS_INLINE inline FT add(const FT &flux_left_ij,
-                                      const FT &flux_right_ij)
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE FT add(const FT &flux_left_ij,
+                                           const FT &flux_right_ij)
   {
     FT result;
     for (unsigned int k = 0; k < problem_dim; ++k)
