@@ -23,10 +23,61 @@ namespace ryujin
     template <int dim, typename Number = double>
     class LimiterView;
 
+    /**
+     * The convex limiter.
+     *
+     * The limiter implements a convex limiting technique as described in
+     * @cite GuermondEtAl2018 and @cite ryujin-2021-1. Given a
+     * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
+     * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
+     *
+     * \f{align}
+     *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
+     *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde
+     * l_{ij}\mathbf P_{ij})
+     *   \,\le\,\rho_{\text{max}},\quad
+     *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
+     * P_{ij})\Big\}, \f}
+     *
+     * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
+     *
+     * Algorithmically this is accomplished as follows: Given an initial
+     * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
+     * make the interval smaller ensuring the bounds on the density are
+     * fulfilled. If limiting on the specific entropy is selected we then
+     * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
+     * solving for the root of a 3-convex function
+     * \f{align}
+     *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
+     * U)-\phi_{\text{min}}\big). \f}
+     *
+     * @ingroup EulerEquations
+     */
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Alias for the view on the limiter for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = LimiterView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
@@ -57,17 +108,16 @@ namespace ryujin
                       "factor * (m_i/|Omega|)^(1.5/d).");
       }
 
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
+
       ACCESSOR_READ_ONLY(iterations);
       ACCESSOR_READ_ONLY(newton_tolerance);
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
-
-      /**
-       * Alias for the view on the limiter for a given dimension @p dim
-       * and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = LimiterView<dim, Number>;
 
       /**
        * Return a view on the Limiter for a given dimension @p dim and
@@ -82,41 +132,34 @@ namespace ryujin
       }
 
     private:
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
       unsigned int iterations_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
       ScalarNumber relaxation_factor_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 
     /**
-     * The convex limiter.
-     *
-     * The class implements a convex limiting technique as described in
-     * @cite GuermondEtAl2018 and @cite ryujin-2021-1. Given a
-     * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
-     * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
-     *
-     * \f{align}
-     *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
-     *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde
-     * l_{ij}\mathbf P_{ij})
-     *   \,\le\,\rho_{\text{max}},\quad
-     *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
-     * P_{ij})\Big\}, \f}
-     *
-     * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
-     *
-     * Algorithmically this is accomplished as follows: Given an initial
-     * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
-     * make the interval smaller ensuring the bounds on the density are
-     * fulfilled. If limiting on the specific entropy is selected we then
-     * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
-     * solving for the root of a 3-convex function
-     * \f{align}
-     *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
-     * U)-\phi_{\text{min}}\big). \f}
+     * A view of the Limiter that makes the interface available for a given
+     * dimension @p dim and choice of number type @p Number (which can be a
+     * scalar float, or double, as well as a VectorizedArray holding packed
+     * scalars).
      *
      * @ingroup EulerEquations
      */
@@ -147,7 +190,6 @@ namespace ryujin
       /**
        * @name Computation and manipulation of bounds
        */
-      //
       //@{
       /**
        * The number of stored entries in the bounds array.
@@ -240,8 +282,10 @@ namespace ryujin
        */
       Bounds bounds(const Number hd_i) const;
 
-      //*}
-      /** @name Convex limiter */
+      //@}
+      /**
+       * @name Convex limiter
+       */
       //@{
 
       /**
@@ -267,7 +311,9 @@ namespace ryujin
 
     private:
       //@}
-      /** @name Arguments and internal fields */
+      /**
+       * @name Internal data
+       */
       //@{
 
       const View view_;

@@ -87,7 +87,7 @@ namespace ryujin
 
   /**
    * A "factory" class that is used to populate a list of all possible
-   * initial states for a given equation desribed by @p Description.
+   * initial states for a given equation described by @p Description.
    *
    * This works by specializing the static member function
    * populate_initial_state_list for all possible equation @p Description.

@@ -229,20 +229,13 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <int dim>
-  class Discretization : public dealii::ParameterAcceptor
+  class Discretization final : public dealii::ParameterAcceptor
   {
   public:
     /**
-     * Constructor.
+     * @name Typedefs and constexpr constants
      */
-    Discretization(const MPIEnsemble &mpi_ensemble,
-                   const std::string &subsection = "/Discretization");
-
-    /**
-     * Create the triangulation and set up the finite element, mapping and
-     * quadrature objects.
-     */
-    void prepare(const std::string &base_name);
+    //@{
 
     /**
      * A collection of mappings, finite elements, and quadratures that are
@@ -264,8 +257,27 @@ namespace ryujin
           face_nodal_quadrature;
     };
 
+    //@}
     /**
-     * @name Accessors to data structures managed by this class.
+     * @name Constructor and setup
+     */
+    //@{
+
+    /**
+     * Constructor.
+     */
+    Discretization(const MPIEnsemble &mpi_ensemble,
+                   const std::string &subsection = "/Discretization");
+
+    /**
+     * Create the triangulation and set up the finite element, mapping and
+     * quadrature objects.
+     */
+    void prepare(const std::string &base_name);
+
+    //@}
+    /**
+     * @name Information and statistics
      */
     //@{
 
@@ -345,6 +357,7 @@ namespace ryujin
      * Return a read-only const reference to the triangulation.
      */
     ACCESSOR_READ_ONLY(triangulation)
+
     /**
      * Return a read-only const reference to the mapping.
      *
@@ -395,7 +408,7 @@ namespace ryujin
     ACCESSOR_CONTAINER_READ_ONLY(collection_, quadrature)
 
     /**
-     * Return a read-only const reference to a highe order quadrature rule
+     * Return a read-only const reference to a higher order quadrature rule
      * used for computing errors.
      *
      * @note The accessor returns an QCollection object.
@@ -459,10 +472,10 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal data:
+     * @name Internal data
      */
     //@{
-    //
+
     const MPIEnsemble &mpi_ensemble_;
 
     std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
@@ -471,8 +484,6 @@ namespace ryujin
 
     std::set<std::shared_ptr<Geometry<dim>>> geometry_list_;
     std::shared_ptr<Geometry<dim>> selected_geometry_;
-
-    //@}
 
     /**
      * In the SolutionTransfer class we need writable access to the
@@ -493,5 +504,7 @@ namespace ryujin
      */
     template <int dim_>
     friend class Geometry;
+
+    //@}
   };
 } /* namespace ryujin */

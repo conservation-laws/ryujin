@@ -23,51 +23,9 @@ namespace ryujin
     template <int dim, typename Number = double>
     class IndicatorView;
 
-    template <typename ScalarNumber = double>
-    class Indicator : public dealii::ParameterAcceptor
-    {
-    public:
-      Indicator(const HyperbolicSystem &hyperbolic_system,
-                const std::string &subsection = "/Indicator")
-          : ParameterAcceptor(subsection)
-          , hyperbolic_system_(&hyperbolic_system)
-      {
-        evc_factor_ = ScalarNumber(1.);
-        add_parameter("evc factor",
-                      evc_factor_,
-                      "Factor for scaling the entropy viscocity commuator");
-      }
-
-      ACCESSOR_READ_ONLY(evc_factor);
-
-      /**
-       * Alias for the view on the indicator for a given dimension @p dim
-       * and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = IndicatorView<dim, Number>;
-
-      /**
-       * Return a view on the Indicator for a given dimension @p dim and
-       * choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars).
-       */
-      template <int dim, typename Number>
-      auto view() const
-      {
-        return View<dim, Number>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
-      }
-
-    private:
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-      ScalarNumber evc_factor_;
-    };
-
-
     /**
-     * This class implements an indicator strategy used to form the
-     * preliminary high-order update.
+     * An indicator strategy used to form the preliminary high-order
+     * update.
      *
      * The indicator is an entropy-viscosity commutator as described
      * in @cite GuermondEtAl2011 and @cite GuermondEtAl2018. For a given
@@ -101,6 +59,91 @@ namespace ryujin
      *   \sum_{j\in\mathcal{I}_i}\left(\mathbf{f}(\boldsymbol U_j^n)-
      *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
      * \f}
+     *
+     * @ingroup EulerEquations
+     */
+    template <typename ScalarNumber = double>
+    class Indicator : public dealii::ParameterAcceptor
+    {
+    public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Alias for the view on the indicator for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = IndicatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
+      Indicator(const HyperbolicSystem &hyperbolic_system,
+                const std::string &subsection = "/Indicator")
+          : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
+      {
+        evc_factor_ = ScalarNumber(1.);
+        add_parameter("evc factor",
+                      evc_factor_,
+                      "Factor for scaling the entropy viscocity commuator");
+      }
+
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
+
+      ACCESSOR_READ_ONLY(evc_factor);
+
+      /**
+       * Return a view on the Indicator for a given dimension @p dim and
+       * choice of number type @p Number (which can be a scalar float, or
+       * double, as well as a VectorizedArray holding packed scalars).
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return View<dim, Number>{
+            hyperbolic_system_->template view<dim, Number>(), *this};
+      }
+
+    private:
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
+      ScalarNumber evc_factor_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
+    };
+
+
+    /**
+     * A view of the Indicator that makes the interface available for a
+     * given dimension @p dim and choice of number type @p Number (which can
+     * be a scalar float, or double, as well as a VectorizedArray holding
+     * packed scalars).
      *
      * @ingroup EulerEquations
      */
@@ -179,11 +222,11 @@ namespace ryujin
        */
       Number alpha(const Number h_i) const;
 
-      //@}
 
     private:
+      //@}
       /**
-       * @name
+       * @name Internal data
        */
       //@{
 

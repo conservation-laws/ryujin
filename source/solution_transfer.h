@@ -20,14 +20,14 @@ namespace ryujin
    * The SolutionTransfer class is an adaptation of the
    * parallel::distributed::SolutionTransfer class and method implemented
    * in deal.II. This class is, in contrast to the deal.II version,
-   * specifically taylored to our needs:
+   * specifically tailored to our needs:
    *  - it uses the MultiComponentVector directly,
    *  - it implements a local mass matrix projection with convex limiting.
    *
    * @ingroup Mesh
    */
   template <typename Description, int dim, typename Number = double>
-  class SolutionTransfer : public dealii::ParameterAcceptor
+  class SolutionTransfer final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -48,9 +48,6 @@ namespace ryujin
 
     using state_type = typename View::state_type;
 
-    using StateVector = typename View::StateVector;
-    using HyperbolicVector = typename View::HyperbolicVector;
-
     /**
      * The number of stored entries in the bounds array.
      */
@@ -60,6 +57,9 @@ namespace ryujin
      * Array type used to store accumulated bounds.
      */
     using Bounds = typename LimiterView::Bounds;
+
+    using StateVector = typename View::StateVector;
+    using HyperbolicVector = typename View::HyperbolicVector;
 
     //@}
     /**
@@ -83,8 +83,8 @@ namespace ryujin
 
     //@}
     /**
-     * @name Methods for solution transfer after mesh adaptation and
-     * serialization/deserialization.
+     * @name Functions for solution transfer after mesh adaptation and for
+     * serialization/deserialization
      */
     //@{
 
@@ -95,6 +95,26 @@ namespace ryujin
      * after mesh adaptation, or a Triangulation::store()/load() operation.
      */
     void prepare_projection(const StateVector &old_state_vector);
+
+    /**
+     * Project the data stored in the triangulation into a new state vector
+     * @p new_state_vector. The attached data either comes from a previous
+     * call to prepare_projection() prior to mesh adaptation or has been
+     * read back in from a checkpoint after a call to
+     * Triangulation::load().
+     *
+     * @note After mesh refinement all internal data structures stored in
+     * the OfflineData object must be reinitialized with a call to
+     * prepare() and the @p new_state_vector must be appropriately
+     * initialized with the new Partitioner.
+     */
+    void project(StateVector &new_state_vector);
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
 
     /**
      * Return the handle associated with the call back that was set by
@@ -127,28 +147,14 @@ namespace ryujin
     }
 
     /**
-     * Return the handle associated with the call back that was set by
-     * prepare_projection() and the associated data attached to the
-     * triangulation.
+     * Invalidate the currently stored handle. After a call to this function
+     * a new handle can be registered with prepare_projection(), or
+     * set_handle().
      */
     void reset_handle()
     {
       handle_ = dealii::numbers::invalid_unsigned_int;
     }
-
-    /**
-     * Project the data stored in the triangulation into a new state vector
-     * @p new_state_vector. The attached data either comes from a previous
-     * call to prepare_projection() prior to mesh adaptation or has been
-     * read back in from a checkpoint after a call to
-     * Triangulation::load().
-     *
-     * @note After mesh refinement all internal data structures stored in
-     * the OfflineData object must be reinitialized with a call to
-     * prepare() and the @p new_state_vector must be appropriately
-     * initialized with the new Partitioner.
-     */
-    void project(StateVector &new_state_vector);
 
   private:
     //@}
@@ -173,6 +179,12 @@ namespace ryujin
 
     unsigned int handle_;
 
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
+
     /**
      * Helper function reading in a state from the hyperbolic state vector.
      * The function translates the global index @p global_i into the local
@@ -194,5 +206,7 @@ namespace ryujin
     void add_tensor(HyperbolicVector &U,
                     const state_type &U_i,
                     const dealii::types::global_dof_index global_i);
+
+    //@}
   };
 } // namespace ryujin

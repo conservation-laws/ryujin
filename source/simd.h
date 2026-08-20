@@ -480,7 +480,7 @@ namespace ryujin
 
 
   /**
-   * Update the the k-th serial component of a Tensor of VectorizedArray
+   * Update the k-th serial component of a Tensor of VectorizedArray
    *
    * @ingroup SIMD
    */

@@ -49,9 +49,14 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <int dim, typename Number = double>
-  class OfflineData : public dealii::ParameterAcceptor
+  class OfflineData final : public dealii::ParameterAcceptor
   {
   public:
+    /**
+     * @name Typedefs and constexpr constants
+     */
+    //@{
+
     /**
      * A tuple describing (local) dof index, boundary normal, normal mass,
      * boundary mass, boundary id, and position of the boundary degree of
@@ -73,6 +78,12 @@ namespace ryujin
                                            unsigned int /*col_idx*/,
                                            unsigned int /*j*/>;
 
+    //@}
+    /**
+     * @name Constructor and setup
+     */
+    //@{
+
     /**
      * Constructor
      */
@@ -90,6 +101,12 @@ namespace ryujin
      */
     void prepare(const unsigned int problem_dimension,
                  const unsigned int n_precomputed_values);
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
 
     /**
      * Return a read-only const reference to the DoFHandler for the
@@ -142,7 +159,7 @@ namespace ryujin
      * ("cG") variant of the selected finite element space in (deal.II
      * typical) global numbering.
      *
-     * @note The affine constraints object is populated with with (a)
+     * @note The affine constraints object is populated with (a)
      * hanging node constraints, and (b) periodicity constraints, that
      * directly affect the chosen ansatz space.
      *
@@ -156,7 +173,7 @@ namespace ryujin
      * discontinuous ("dG") variant of the selected finite element space in
      * (deal.II typical) global numbering.
      *
-     * @note The affine constraints object is populated with with (a)
+     * @note The affine constraints object is populated with (a)
      * hanging node constraints, and (b) periodicity constraints, that
      * directly affect the chosen ansatz space.
      *
@@ -169,7 +186,7 @@ namespace ryujin
      * An AffineConstraints object storing constraints in (deal.II typical)
      * global numbering.
      *
-     * @note The affine constraints object is populated with with (a)
+     * @note The affine constraints object is populated with (a)
      * hanging node constraints, and (b) periodicity constraints, that
      * directly affect the chosen ansatz space.
      */
@@ -230,7 +247,7 @@ namespace ryujin
 
     /**
      * Number of locally relevant degrees of freedom: This number is the
-     * toal number of degrees of freedom we store locally on this MPI rank.
+     * total number of degrees of freedom we store locally on this MPI rank.
      * I.e.,  we can access the half open interval [0, n_locally_relevant_)
      * on this machine.
      */
@@ -339,66 +356,19 @@ namespace ryujin
     ACCESSOR_READ_ONLY(discretization)
 
   private:
+    //@}
     /**
-     * Private methods used in prepare()
+     * @name Run time options
      */
     //@{
 
-    /**
-     * Set up DoFHandlers. Internally used in prepare().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void create_dof_handlers();
-
-    /**
-     * Renumber the hyperbolic DoFHandler for use with our SIMD sparsity
-     * pattern. Internally used in prepare().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void renumber_for_simd();
-
-    /**
-     * Set up affine constraints and sparsity pattern. Internally used in
-     * setup().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void create_constraints_and_sparsity_pattern();
-
-    /**
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void ensure_simd_stride_consistency();
-
-    /**
-     * Create partitioner. Internally used in setup().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void create_partitioner_and_simd_sparsity(
-        const unsigned int problem_dimension,
-        const unsigned int n_precomputed_values);
-
-    /**
-     * Assemble all matrices. Internally used in prepare().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void create_matrices();
-
-    /**
-     * Create multigrid data. Internally used in prepare().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void create_multigrid_data();
+    bool treat_fe_nothing_as_boundary_;
+    double incidence_relaxation_even_;
+    double incidence_relaxation_odd_;
 
     //@}
     /**
-     * Private fields
+     * @name Internal data
      */
     //@{
 
@@ -454,6 +424,67 @@ namespace ryujin
 
     Number measure_of_omega_;
 
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
+
+    /**
+     * Set up DoFHandlers. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_dof_handlers();
+
+    /**
+     * Renumber the hyperbolic DoFHandler for use with our SIMD sparsity
+     * pattern. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void renumber_for_simd();
+
+    /**
+     * Set up affine constraints and sparsity pattern. Internally used in
+     * prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_constraints_and_sparsity_pattern();
+
+    /**
+     * Ensure that the SIMD stride of the renumbered degrees of freedom
+     * remains consistent across all MPI ranks. Internally used in
+     * prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void ensure_simd_stride_consistency();
+
+    /**
+     * Create partitioner. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_partitioner_and_simd_sparsity(
+        const unsigned int problem_dimension,
+        const unsigned int n_precomputed_values);
+
+    /**
+     * Assemble all matrices. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_matrices();
+
+    /**
+     * Create multigrid data. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_multigrid_data();
+
     /**
      * Construct a boundary map for a given set of DoFHandler iterators.
      */
@@ -472,16 +503,6 @@ namespace ryujin
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
-
-    //@}
-    /**
-     * @name Run time options
-     */
-    //@{
-
-    bool treat_fe_nothing_as_boundary_;
-    double incidence_relaxation_even_;
-    double incidence_relaxation_odd_;
 
     //@}
   };

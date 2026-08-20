@@ -16,7 +16,7 @@ namespace ryujin
     /**
      * A user-specified equation of state
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerPoissonEquations
      */
     template <int dim, typename Number = double>
     class Constant : public ElectrostaticConfiguration<dim, Number>

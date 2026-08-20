@@ -25,10 +25,37 @@ namespace ryujin
     template <int dim, typename Number = double>
     class IndicatorView;
 
+    /**
+     * A suitable indicator strategy that is used to form the preliminary
+     * high-order update.
+     *
+     * @ingroup ShallowWaterEquations
+     */
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
     {
     public:
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * Alias for the view on the indicator for a given dimension @p dim
+       * and choice of number type @p Number.
+       */
+      template <int dim, typename Number = double>
+      using View = IndicatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
       Indicator(const HyperbolicSystem &hyperbolic_system,
                 const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
@@ -40,14 +67,13 @@ namespace ryujin
                       "Factor for scaling the entropy viscocity commuator");
       }
 
-      ACCESSOR_READ_ONLY(evc_factor);
-
+      //@}
       /**
-       * Alias for the view on the indicator for a given dimension @p dim
-       * and choice of number type @p Number.
+       * @name Information and statistics
        */
-      template <int dim, typename Number = double>
-      using View = IndicatorView<dim, Number>;
+      //@{
+
+      ACCESSOR_READ_ONLY(evc_factor);
 
       /**
        * Return a view on the Indicator for a given dimension @p dim and
@@ -62,14 +88,31 @@ namespace ryujin
       }
 
     private:
-      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
       ScalarNumber evc_factor_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 
     /**
-     * An suitable indicator strategy that is used to form the preliminary
-     * high-order update.
+     * A view of the Indicator that makes the interface available for a
+     * given dimension @p dim and choice of number type @p Number (which can
+     * be a scalar float, or double, as well as a VectorizedArray holding
+     * packed scalars).
      *
      * @ingroup ShallowWaterEquations
      */
@@ -148,11 +191,11 @@ namespace ryujin
        */
       Number alpha(const Number h_i);
 
-      //@}
 
     private:
+      //@}
       /**
-       * @name
+       * @name Internal data
        */
       //@{
 

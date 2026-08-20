@@ -336,6 +336,12 @@ namespace ryujin
   };
 
 
+  /**
+   * A multigrid transfer operator that builds the level transfer from a
+   * given DoFHandler and MGLevelObject of MatrixFree objects.
+   *
+   * @ingroup EulerPoissonEquations
+   */
   template <int dim, typename Number>
   class MGTransfer : public dealii::MGTransferMatrixFree<dim, Number>
   {
@@ -371,6 +377,12 @@ namespace ryujin
   };
 
 
+  /**
+   * A geometric multigrid smoother and preconditioner for the Laplace
+   * operator used when solving for the electrostatic potential.
+   *
+   * @ingroup EulerPoissonEquations
+   */
   template <int dim, typename Number>
   class MGSmoother : public dealii::EnableObserverPointer
   {
@@ -388,6 +400,10 @@ namespace ryujin
 
     MGSmoother() = default;
 
+    /**
+     * Run time parameters controlling the multigrid V-cycle and the
+     * Chebyshev smoother.
+     */
     struct MultigridParameters {
       unsigned int gmg_max_iter;
       double gmg_smoother_range;
@@ -567,7 +583,6 @@ namespace ryujin
     }
 
   private:
-    //@}
     /**
      * @name Internal data
      */

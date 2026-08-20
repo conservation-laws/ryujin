@@ -145,6 +145,12 @@ namespace ryujin
      */
     void prepare(const Number t);
 
+    //@}
+    /**
+     * @name Functions for performing mesh adaptation
+     */
+    //@{
+
     /**
      * Analyze the given StateVector with the configured adaptation
      * strategy and time point selection strategy and decide whether a mesh
@@ -155,14 +161,6 @@ namespace ryujin
                  unsigned int cycle);
 
     /**
-     * A boolean indicating whether we should perform a mesh adapation step
-     * in the current cycle. The analyze() method will set this boolean to
-     * true whenever the selected adaptation strategy advices to perform an
-     * adaptation cycle.
-     */
-    ACCESSOR_READ_ONLY(need_mesh_adaptation)
-
-    /**
      * Mark cells for coarsening and refinement with the configured mesh
      * adaptation and marking strategies.
      */
@@ -170,15 +168,29 @@ namespace ryujin
         dealii::Triangulation<dim> &triangulation) const;
 
     /**
-     * The computed cell indicators.
-     */
-    ACCESSOR_READ_ONLY(indicators);
-
-    /**
      * Compute smoothness indicators. This function reinitializes and
      * populates the smoothness_indicators() vector.
      */
     void compute_smoothness_indicators(const StateVector &state_vector) const;
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
+
+    /**
+     * A boolean indicating whether we should perform a mesh adaptation step
+     * in the current cycle. The analyze() method will set this boolean to
+     * true whenever the selected adaptation strategy advises to perform an
+     * adaptation cycle.
+     */
+    ACCESSOR_READ_ONLY(need_mesh_adaptation)
+
+    /**
+     * The computed cell indicators.
+     */
+    ACCESSOR_READ_ONLY(indicators);
 
     /**
      * The computed smoothness indicators. The vector is only valid if the
@@ -187,6 +199,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(smoothness_indicators);
 
   private:
+    //@}
     /**
      * @name Run time options
      */
@@ -214,7 +227,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal fields and methods
+     * @name Internal data
      */
     //@{
 
@@ -232,16 +245,23 @@ namespace ryujin
     mutable dealii::Vector<float> indicators_;
 
     /* random adaptation: */
-
-    void populate_cell_indicators_with_random_values() const;
-
     mutable std::mt19937_64 mersenne_twister_;
 
-    /* Smoothness indicator: */
+    /* smoothness indicators: */
+    mutable ScalarVector smoothness_indicators_;
 
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
+
+    /* random adaptation: */
+    void populate_cell_indicators_with_random_values() const;
+
+    /* smoothness indicators: */
     void populate_cell_indicators_from_smoothness_indicators() const;
 
-    mutable ScalarVector smoothness_indicators_;
     //@}
   };
 

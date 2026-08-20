@@ -20,7 +20,7 @@ namespace ryujin
 {
 
   /**
-   * the VTUOutput class implements output of the conserved state vector
+   * The VTUOutput class implements output of the conserved state vector
    * and a number of postprocessed quantities computed by the Postprocessor
    * class.
    *
@@ -80,17 +80,23 @@ namespace ryujin
      */
     void prepare();
 
+    //@}
     /**
-     * Given a state vector @p U and a file name prefix @p name, the
-     * current time @p t, and the current output cycle @p cycle) schedule a
+     * @name Functions for scheduling output
+     */
+    //@{
+
+    /**
+     * Given a state vector @p state_vector, a file name prefix @p name, the
+     * current time @p t, and the current output cycle @p cycle schedule a
      * solution output.
      *
      * The function post-processes quantities synchronously, and (depending
      * on configuration options) schedules the write-out asynchronously
-     * onto a background worker thread. This implies that @p U can again be
-     * modified once schedule_output() returned.
+     * onto a background worker thread. This implies that @p state_vector
+     * can again be modified once schedule_output() returned.
      *
-     * The booleans @p output_full controls whether the full vector field
+     * The boolean @p output_full controls whether the full vector field
      * is written out. Correspondingly, @p output_cutplanes controls
      * whether cells in the vicinity of predefined cutplanes are written
      * out.
@@ -105,6 +111,7 @@ namespace ryujin
                          bool output_cutplanes = true);
 
   private:
+    //@}
     /**
      * @name Run time options
      */
@@ -133,6 +140,7 @@ namespace ryujin
     const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
     const ScalarVector &smoothness_indicators_;
+
     //@}
   };
 

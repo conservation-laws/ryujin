@@ -16,9 +16,30 @@
 
 
 /**
+ * @defgroup InitialValues Initial Values
+ *
+ * This module contains classes and functions related to prescribing
+ * initial values and (time dependent) Dirichlet boundary data.
+ */
+
+
+/**
  * @defgroup Miscellaneous Miscellaneous
  *
  * Miscellaneous helper functions, macros and classes.
+ */
+
+
+/**
+ * @defgroup LinearAlgebra Linear Algebra
+ *
+ * This module contains the classes and functions used for storing and
+ * operating on linear algebra objects: distributed vectors that hold a
+ * fixed number of components per vector entry, the sparsity pattern and
+ * sparse matrix used for the stencil-based operations, the corresponding
+ * "view" classes that hand out access to the underlying data in either
+ * the host or the device memory space, and simple linear operators such
+ * as a diagonal preconditioner.
  */
 
 
@@ -58,6 +79,15 @@
  *
  * This module contains classes and functions related to solving the
  * compressible Euler equations of gas dynamics.
+ */
+
+
+/**
+ * @defgroup EulerPoissonEquations The Euler-Poisson Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Euler equations coupled to a Poisson problem for the
+ * electrostatic potential.
  */
 
 

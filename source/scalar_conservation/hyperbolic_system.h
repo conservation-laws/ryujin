@@ -84,17 +84,26 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields, methods, and friends
+       * @name Run time options
        */
       //@{
+
       std::string flux_;
 
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       FluxLibrary::flux_list_type flux_list_;
+
       using Flux = FluxLibrary::Flux;
       std::shared_ptr<Flux> selected_flux_;
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
       //@}
     }; /* HyperbolicSystem */
 
@@ -103,84 +112,22 @@ namespace ryujin
      * A view on the HyperbolicSystem for a given dimension @p dim and
      * choice of number type @p Number (which can be a scalar float, or
      * double, as well as a VectorizedArray holding packed scalars.
+     *
+     * @ingroup ScalarConservationEquations
      */
     template <int dim, typename Number>
     class HyperbolicSystemView
     {
     public:
       /**
-       * Constructor taking a reference to the underlying
-       * HyperbolicSystem
+       * @name Typedefs and constexpr constants
        */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
-      {
-      }
-
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
+      //@{
 
       /**
        * The underlying scalar number type.
        */
       using ScalarNumber = typename get_value_type<Number>::type;
-
-      /**
-       * @name Access to runtime parameters
-       */
-      //@{
-
-      DEAL_II_ALWAYS_INLINE inline const std::string &flux() const
-      {
-        return hyperbolic_system_.flux_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      derivative_approximation_delta() const
-      {
-        const auto &flux = hyperbolic_system_.selected_flux_;
-        return ScalarNumber(flux->derivative_approximation_delta());
-      }
-
-      //@}
-      /**
-       * @name Low-level access to the flux function parser:
-       */
-      //@{
-
-      /**
-       * For a given state \f$u\f$ compute the flux \f$f(u)\f$.
-       */
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-      flux_function(const Number &u) const;
-
-      /**
-       * For a given state \f$u\f$ compute the flux gradient \f$f'(u)\f$.
-       */
-      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-      flux_gradient_function(const Number &u) const;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-    public:
-      //@}
-      /**
-       * @name Types and constexpr constants
-       */
-      //@{
 
       /**
        * The dimension of the state space.
@@ -298,6 +245,66 @@ namespace ryujin
       using InitialPrecomputedVectorView =
           Vectors::MultiComponentVectorView<ScalarNumber,
                                             n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
+
+      //@}
+      /**
+       * @name Access to runtime parameters
+       */
+      //@{
+
+      DEAL_II_ALWAYS_INLINE inline const std::string &flux() const
+      {
+        return hyperbolic_system_.flux_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      derivative_approximation_delta() const
+      {
+        const auto &flux = hyperbolic_system_.selected_flux_;
+        return ScalarNumber(flux->derivative_approximation_delta());
+      }
+
+      //@}
+      /**
+       * @name Low-level access to the flux function parser
+       */
+      //@{
+
+      /**
+       * For a given state \f$u\f$ compute the flux \f$f(u)\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+      flux_function(const Number &u) const;
+
+      /**
+       * For a given state \f$u\f$ compute the flux gradient \f$f'(u)\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+      flux_gradient_function(const Number &u) const;
 
       //@}
       /**
@@ -513,6 +520,16 @@ namespace ryujin
         return state;
       }
 
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
+
+      //@}
     }; /* HyperbolicSystemView */
 
 

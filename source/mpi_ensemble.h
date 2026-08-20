@@ -16,7 +16,7 @@ namespace ryujin
 {
   /**
    * A class responsible for subdividing a given global MPI communicator
-   * into a set of "ensembles" with a coresponding ensemble communicator.
+   * into a set of "ensembles" with a corresponding ensemble communicator.
    * This allows us to run similar, related hyperbolic systems in parallel
    * on subranges of the set of (global) MPI processes.
    *
@@ -29,11 +29,11 @@ namespace ryujin
   {
   public:
     /**
-     * Prepare the MPI ensemble and split the gobal MPI communicator into
+     * Prepare the MPI ensemble and split the global MPI communicator into
      * @p n_ensembles different subranges of comparable size. The boolean
      * @p global_synchronization indicates whether (global) world
      * synchronization of time step size and other synchronization state is
-     * performend in the HyperbolicModule and ParabolicModule, or whether
+     * performed in the HyperbolicModule and ParabolicModule, or whether
      * such synchronization remains local to the ensemble.
      *
      * @pre The total number of mpi ranks must be an integer multiple of

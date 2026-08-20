@@ -151,7 +151,7 @@ namespace ryujin
 
   protected:
     /**
-     * @name Internal data structures:
+     * @name Internal data
      */
     //@{
 
@@ -180,7 +180,7 @@ namespace ryujin
   private:
     //@}
     /**
-     * @name Runtime parameters:
+     * @name Run time options
      */
     //@{
 
@@ -188,8 +188,14 @@ namespace ryujin
     std::string equation_;
 
     //@}
+    /**
+     * @name Internal data
+     */
+    //@{
 
     bool time_loop_executed_;
+
+    //@}
   };
 
 
@@ -265,6 +271,8 @@ namespace ryujin
   /**
    * A small Dispatch struct templated in Description that registers the
    * callbacks.
+   *
+   * @ingroup TimeLoop
    */
   template <typename Description, typename Number>
   struct Dispatch {

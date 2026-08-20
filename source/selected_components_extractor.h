@@ -11,6 +11,17 @@
 
 namespace ryujin
 {
+  /**
+   * A helper class that extracts a selection of named components from a
+   * state vector into a vector of scalar vectors suitable for output and
+   * postprocessing.
+   *
+   * A component can be selected by any of its conserved, primitive,
+   * parabolic, precomputed, or initial-precomputed name, or by one of the
+   * additional names supplied by the caller.
+   *
+   * @ingroup TimeLoop
+   */
   template <typename Description, int dim, typename Number>
   struct SelectedComponentsExtractor {
     using HyperbolicSystem = typename Description::HyperbolicSystem;

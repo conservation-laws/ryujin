@@ -33,7 +33,7 @@ namespace ryujin
      * @note This function is used to efficiently set up a single vector
      * partitioner in OfflineData used in all MultiComponentVector instances.
      *
-     * @ingroup SIMD
+     * @ingroup LinearAlgebra
      */
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
     create_vector_partitioner(
@@ -55,7 +55,7 @@ namespace ryujin
      * that stores a vector element of @p n_comp components per entry
      * (instead of a scalar value).
      *
-     * @ingroup SIMD
+     * @ingroup LinearAlgebra
      */
     template <typename Number,
               int n_comp,
@@ -65,7 +65,7 @@ namespace ryujin
     {
     public:
       /**
-       * @name Constructor, reinitialization, assignment
+       * @name Constructor and initialization
        */
       //@{
 
@@ -98,7 +98,7 @@ namespace ryujin
 
       //@}
       /**
-       * Memory space access and synchronization:
+       * @name Memory space access and synchronization
        */
       //@{
 
@@ -133,10 +133,8 @@ namespace ryujin
       void move_to_memory_space();
 
       //@}
-
-      //@}
       /**
-       * MPI synchronization.
+       * @name MPI synchronization
        */
       //@{
 
@@ -193,6 +191,20 @@ namespace ryujin
     };
 
 
+    /**
+     * A "view" of a MultiComponentVector that lives in the host or device
+     * memory space. It provides a number of methods for reading and
+     * writing scalar and tensor-valued entries.
+     *
+     * @note This class is designed to be captured by value in computation
+     * loops with access to either the host or device memory space. As such
+     * we do not store a reference to the underlying MultiComponentVector
+     * but rather raw pointers into the corresponding memory. The view is
+     * only valid as long as the underlying MultiComponentVector object is
+     * not modified.
+     *
+     * @ingroup LinearAlgebra
+     */
     template <typename Number,
               int n_comp,
               int simd_length,
@@ -202,7 +214,7 @@ namespace ryujin
     {
     public:
       /**
-       * @name Constructor and reinitialization
+       * @name Constructor and initialization
        */
       //@{
 
@@ -440,7 +452,7 @@ namespace ryujin
 
       //@}
       /**
-       * MPI synchronization.
+       * @name MPI synchronization
        */
       //@{
 
@@ -468,7 +480,7 @@ namespace ryujin
     private:
       //@}
       /**
-       * Internal data fields:
+       * @name Internal fields
        */
       //@{
 
@@ -478,6 +490,7 @@ namespace ryujin
       Number *data_;
       unsigned int n_locally_owned_;
       unsigned int n_locally_relevant_;
+
       //@}
     };
 

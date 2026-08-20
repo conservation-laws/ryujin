@@ -52,6 +52,11 @@ namespace ryujin
       e_rho_p = EOS_Ut_DPt,
     };
 
+    /**
+     * A thin RAII wrapper around an eospac table handle.
+     *
+     * @ingroup EulerEquations
+     */
     class Interface
     {
     public:
@@ -434,10 +439,10 @@ namespace ryujin
 
     private:
       /**
-       * Private methods and fields for initializing the eospac interface
+       * @name Internal data and methods for the eospac interface
        */
       //@{
-      //
+
       void set_up_database() const
       {
         AssertThrow(

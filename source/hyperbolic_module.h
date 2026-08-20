@@ -169,7 +169,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Functons for performing explicit time steps
+     * @name Functions for performing explicit time steps
      */
     //@{
 
@@ -249,7 +249,7 @@ namespace ryujin
      *   \bF^{s,n}_i\;:=\;
      *   \sum_{j\in\Ii}\Big(-(\polf(\bUnis)+\polf(\bUnjs)) \cdot\bc_{ij}\Big).
      * \f}
-     * where \f$\omega_s\f$ denotes the weigths for the given stages
+     * where \f$\omega_s\f$ denotes the weights for the given stages
      * \f$\bU^{s,n}\f$.
      *
      * @note The routine only performs an explicit update step on the
@@ -283,12 +283,6 @@ namespace ryujin
     }
 
     /**
-     * Returns the relative CFL number used for computing an appropriate
-     * time-step size.
-     */
-    ACCESSOR_READ_ONLY(cfl)
-
-    /**
      * Sets the relative maximal acceptable tau_max ratio. If the ratio of
      * the enforced time-step size tau and our computed tau_max for the
      * hyperbolic (sub) step is above this limit we throw a Restart
@@ -302,20 +296,32 @@ namespace ryujin
     }
 
     /**
-     * Returns the relative maximal acceptable tau_max ratio. If the ratio
-     * of the enforced time-step size tau and our computed tau_max for the
-     * hyperbolic (sub) step is above this limit we throw a Restart
-     * exception.
-     */
-    ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
-
-    /**
      * Sets the invariant domain violation strategy.
      */
     void set_id_violation_strategy(const IDViolationStrategy &strategy) const
     {
       id_violation_strategy_ = strategy;
     }
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
+
+    /**
+     * Returns the relative CFL number used for computing an appropriate
+     * time-step size.
+     */
+    ACCESSOR_READ_ONLY(cfl)
+
+    /**
+     * Returns the relative maximal acceptable tau_max ratio. If the ratio
+     * of the enforced time-step size tau and our computed tau_max for the
+     * hyperbolic (sub) step is above this limit we throw a Restart
+     * exception.
+     */
+    ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
 
     /**
      * Return a reference to the OfflineData object
@@ -354,7 +360,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(n_corrections)
 
     /**
-     * The number of ID violation warnings encounterd in the step()
+     * The number of ID violation warnings encountered in the step()
      * function. We issue a warning whenever we encounter an ID violation
      * in the low order update (and throwing a restart is disabled).
      */

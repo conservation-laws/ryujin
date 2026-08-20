@@ -16,7 +16,7 @@ namespace ryujin
     /**
      * A generic flux description parsed from a user-provided string
      *
-     * @ingroup ScalarConservation
+     * @ingroup ScalarConservationEquations
      */
     class Burgers : public Flux
     {

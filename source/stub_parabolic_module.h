@@ -32,10 +32,9 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using StateVector = typename View::StateVector;
 
@@ -49,7 +48,7 @@ namespace ryujin
      * Constructor.
      */
     StubParabolicModule(
-        const MPIEnsemble & /*mpi_ensemle*/,
+        const MPIEnsemble & /*mpi_ensemble*/,
         std::map<std::string, dealii::Timer> & /*computing_timer*/,
         const OfflineData<dim, Number> & /*offline_data*/,
         const HyperbolicSystem & /*hyperbolic_system*/,
@@ -72,7 +71,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Functons for performing explicit time steps
+     * @name Functions for performing explicit time steps
      */
     //@{
 
@@ -193,7 +192,7 @@ namespace ryujin
     }
 
     /**
-     * The number of ID violation warnings encounterd in the step()
+     * The number of ID violation warnings encountered in the step()
      * function.
      */
     unsigned int n_warnings() const

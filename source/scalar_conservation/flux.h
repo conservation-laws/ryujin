@@ -25,7 +25,7 @@ namespace ryujin
      * This function derives directly from dealii::Function<1>. Derived
      * classes must thus implement the value() and gradient() methods.
      *
-     * @ingroup ScalarConservation
+     * @ingroup ScalarConservationEquations
      */
     class Flux : public dealii::ParameterAcceptor
     {

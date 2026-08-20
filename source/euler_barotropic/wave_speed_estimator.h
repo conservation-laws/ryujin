@@ -22,16 +22,22 @@ namespace ryujin
     template <int dim, typename Number = double>
     class WaveSpeedEstimatorView;
 
+    /**
+     * Specialized approximative solver for the 1D Riemann problem of the
+     * barotropic Euler equations. The solver ensures that the estimate
+     * \f$\lambda_{\text{max}}\f$ that is returned by compute() is a
+     * guaranteed upper bound of the maximal wavespeed.
+     *
+     * @ingroup EulerEquations
+     */
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
-                         const std::string &subsection = "/WaveSpeedEstimator")
-          : ParameterAcceptor(subsection)
-          , hyperbolic_system_(&hyperbolic_system)
-      {
-      }
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
 
       /**
        * Alias for the view on the wave speed estimator for a given dimension @p
@@ -39,6 +45,28 @@ namespace ryujin
        */
       template <int dim, typename Number = double>
       using View = WaveSpeedEstimatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const std::string &subsection = "/WaveSpeedEstimator")
+          : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
+      {
+      }
+
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
@@ -53,15 +81,23 @@ namespace ryujin
       }
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 
     /**
-     * Specialized approximative solver for the 1D Riemann problem of the
-     * barotropic Euler equations. The solver ensures that the estimate
-     * \f$\lambda_{\text{max}}\f$ that is returned by compute() is a
-     * guaranteed upper bound of the maximal wavespeed.
+     * A view of the WaveSpeedEstimator that makes the interface available
+     * for a given dimension @p dim and choice of number type @p Number
+     * (which can be a scalar float, or double, as well as a VectorizedArray
+     * holding packed scalars).
      *
      * @ingroup EulerEquations
      */
@@ -137,12 +173,21 @@ namespace ryujin
       //@}
 
     protected:
-      /** @name Internal functions used in the Riemann solver */
+      /**
+       * @name Internal methods
+       */
       //@{
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       const View view_;
       const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+
       //@}
     };
   } // namespace EulerBarotropic

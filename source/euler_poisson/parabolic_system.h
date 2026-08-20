@@ -17,6 +17,13 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
+    /**
+     * A parabolic system describing an electrostatic force model with a
+     * background magnetic field. The electrostatic potential is obtained
+     * by solving a Poisson problem for the given density distribution.
+     *
+     * @ingroup EulerPoissonEquations
+     */
     class ParabolicSystem final : public dealii::ParameterAcceptor
     {
     public:

@@ -87,8 +87,15 @@ namespace ryujin
       }
 
     private:
+      /**
+       * @name Internal data
+       */
+      //@{
+
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
+      //@}
     }; /* HyperbolicSystem */
 
 
@@ -96,36 +103,15 @@ namespace ryujin
      * A view on the HyperbolicSystem for a given dimension @p dim and
      * choice of number type @p Number (which can be a scalar float, or
      * double, as well as a VectorizedArray holding packed scalars.
+     *
+     * @ingroup SkeletonEquations
      */
     template <int dim, typename Number>
     class HyperbolicSystemView
     {
     public:
       /**
-       * Constructor taking a reference to the underlying
-       * HyperbolicSystem
-       */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
-      {
-      }
-
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-
-    public:
-      /**
-       * @name Types and constexpr constants
+       * @name Typedefs and constexpr constants
        */
       //@{
 
@@ -258,6 +244,30 @@ namespace ryujin
       using InitialPrecomputedVectorView =
           Vectors::MultiComponentVectorView<ScalarNumber,
                                             n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
 
       //@}
       /**
@@ -430,6 +440,16 @@ namespace ryujin
         return state;
       }
 
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
+
+      //@}
     }; /* HyperbolicSystemView */
   }    // namespace Skeleton
 } // namespace ryujin

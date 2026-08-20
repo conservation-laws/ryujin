@@ -24,16 +24,22 @@ namespace ryujin
     template <int dim, typename Number = double>
     class WaveSpeedEstimatorView;
 
+    /**
+     * A fast approximative solver for the associated 1D Riemann problem.
+     * The solver has to ensure that the estimate
+     * \f$\lambda_{\text{max}}\f$ that is returned for the maximal
+     * wavespeed is a strict upper bound.
+     *
+     * @ingroup ShallowWaterEquations
+     */
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
     {
     public:
-      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
-                         const std::string &subsection = "/WaveSpeedEstimator")
-          : ParameterAcceptor(subsection)
-          , hyperbolic_system_(&hyperbolic_system)
-      {
-      }
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
 
       /**
        * Alias for the view on the wave speed estimator for a given dimension @p
@@ -41,6 +47,28 @@ namespace ryujin
        */
       template <int dim, typename Number = double>
       using View = WaveSpeedEstimatorView<dim, Number>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor.
+       */
+      WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
+                         const std::string &subsection = "/WaveSpeedEstimator")
+          : ParameterAcceptor(subsection)
+          , hyperbolic_system_(&hyperbolic_system)
+      {
+      }
+
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
@@ -55,15 +83,23 @@ namespace ryujin
       }
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      //@}
     };
 
 
     /**
-     * A fast approximative solver for the associated 1D Riemann problem.
-     * The solver has to ensure that the estimate
-     * \f$\lambda_{\text{max}}\f$ that is returned for the maximal
-     * wavespeed is a strict upper bound.
+     * A view of the WaveSpeedEstimator that makes the interface available
+     * for a given dimension @p dim and choice of number type @p Number
+     * (which can be a scalar float, or double, as well as a VectorizedArray
+     * holding packed scalars).
      *
      * @ingroup ShallowWaterEquations
      */
@@ -140,7 +176,7 @@ namespace ryujin
     protected:
       //@}
       /**
-       * @name Internal functions used in the Riemann solver
+       * @name Internal methods
        */
       //@{
 
@@ -171,8 +207,15 @@ namespace ryujin
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
       const View view_;
       const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+
       //@}
     };
   } // namespace ShallowWater

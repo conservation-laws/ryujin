@@ -39,6 +39,8 @@ namespace ryujin
    * SparsityPattern for details). For the non-vectorized row index
    * region [n_internal_dofs, n_locally_relevant_dofs) we store the matrix in
    * CSR format (equivalent to the static dealii::SparsityPattern).
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename Number,
             int n_comp = 1,
@@ -47,7 +49,7 @@ namespace ryujin
   {
   public:
     /**
-     * Constructor and initialization (in host memory space):
+     * @name Constructor and initialization
      */
     //@{
 
@@ -64,6 +66,9 @@ namespace ryujin
     /**
      * Reinit function reinitializes the matrix with the given SIMD
      * sparsity pattern. The locally owned and ghost ranges are zeroed.
+     *
+     * @note Construction and initialization always happen in the host
+     * memory space.
      */
     void reinit(const SparsityPattern<simd_length> &sparsity);
 
@@ -74,7 +79,7 @@ namespace ryujin
 
     //@}
     /**
-     * Memory space access and synchronization:
+     * @name Memory space access and synchronization
      */
     //@{
 
@@ -109,7 +114,7 @@ namespace ryujin
 
     //@}
     /**
-     * MPI synchronization.
+     * @name MPI synchronization
      */
     //@{
 
@@ -174,6 +179,8 @@ namespace ryujin
    * rather raw pointers into the corresponding memory. The view is only
    * valid as long as the underlying SparsityPattern object is not
    * modified.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename Number,
             int n_comp,
@@ -183,6 +190,11 @@ namespace ryujin
   class SparseMatrixView
   {
   public:
+    /**
+     * @name Constructor and initialization
+     */
+    //@{
+
     SparseMatrixView() = default;
 
     SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
@@ -200,6 +212,12 @@ namespace ryujin
      * Return the underlying sparsity pattern view.
      */
     ACCESSOR_READ_ONLY(sparsity_pattern);
+
+    //@}
+    /**
+     * @name Access to scalar or tensor-valued entries
+     */
+    //@{
 
     /* Get scalar or tensor-valued entry: */
 
@@ -338,10 +356,9 @@ namespace ryujin
                                         const unsigned int column_index) const
       requires(writable);
 
-
     //@}
     /**
-     * MPI synchronization.
+     * @name MPI synchronization
      */
     //@{
 
@@ -354,9 +371,13 @@ namespace ryujin
     void compress(dealii::VectorOperation::values operation) const
       requires(writable);
 
-    //@}
-
   private:
+    //@}
+    /**
+     * @name Internal fields
+     */
+    //@{
+
     using SM = SparseMatrix<Number, n_comp, simd_length>;
     std::conditional_t<writable, SM *, const SM *> sparse_matrix_;
 
@@ -364,6 +385,8 @@ namespace ryujin
 
     using KokkosSpace = typename MemorySpace::kokkos_space;
     Kokkos::View<Number *, KokkosSpace> data_;
+
+    //@}
   };
 
 

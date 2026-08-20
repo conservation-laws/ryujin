@@ -87,14 +87,21 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields, methods, and friends
+       * @name Run time options
        */
       //@{
+
       double gamma_;
 
       double reference_density_;
       double vacuum_state_relaxation_small_;
       double vacuum_state_relaxation_large_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
 
       double gamma_inverse_;
       double gamma_minus_one_inverse_;
@@ -103,6 +110,7 @@ namespace ryujin
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
       //@}
     }; /* HyperbolicSystem */
 
@@ -122,118 +130,22 @@ namespace ryujin
      * const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
      * // etc.
      * ```
+     *
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number>
     class HyperbolicSystemView
     {
     public:
       /**
-       * Constructor taking a reference to the underlying
-       * HyperbolicSystem
+       * @name Typedefs and constexpr constants
        */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
-      {
-      }
-
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
+      //@{
 
       /**
        * The underlying scalar number type.
        */
       using ScalarNumber = typename get_value_type<Number>::type;
-
-      /**
-       * @name Access to runtime parameters
-       */
-      //@{
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma() const
-      {
-        return hyperbolic_system_.gamma_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
-      {
-        return hyperbolic_system_.reference_density_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      vacuum_state_relaxation_small() const
-      {
-        return hyperbolic_system_.vacuum_state_relaxation_small_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      vacuum_state_relaxation_large() const
-      {
-        return hyperbolic_system_.vacuum_state_relaxation_large_;
-      }
-
-      //@}
-      /**
-       * @name Access to cached inverses
-       *
-       * A collection of commonly used expressions with gamma that would
-       * otherwise need to be recomputed many times putting unnecessary
-       * pressure on the div/sqrt ALU unit.
-       */
-      //@{
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_inverse() const
-      {
-        return ScalarNumber(hyperbolic_system_.gamma_inverse_);
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_plus_one_inverse() const
-      {
-        return ScalarNumber(hyperbolic_system_.gamma_plus_one_inverse_);
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_minus_one_inverse() const
-      {
-        return ScalarNumber(hyperbolic_system_.gamma_minus_one_inverse_);
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      gamma_minus_one_over_gamma_plus_one() const
-      {
-        return ScalarNumber(
-            hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
-      }
-
-      //@}
-      /**
-       * constexpr booleans used in the EulerInitialStates namespace
-       */
-      //@{
-
-      static constexpr bool have_gamma = true;
-      static constexpr bool have_covolume_constant = false;
-      static constexpr bool have_energy_equation = true;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-    public:
-      //@}
-      /**
-       * @name Types and constexpr constants
-       */
-      //@{
 
       /**
        * The dimension of the state space.
@@ -359,6 +271,100 @@ namespace ryujin
       using InitialPrecomputedVectorView =
           Vectors::MultiComponentVectorView<ScalarNumber,
                                             n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
+
+      //@}
+      /**
+       * @name Access to runtime parameters
+       */
+      //@{
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma() const
+      {
+        return hyperbolic_system_.gamma_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
+      {
+        return hyperbolic_system_.reference_density_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      vacuum_state_relaxation_small() const
+      {
+        return hyperbolic_system_.vacuum_state_relaxation_small_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      vacuum_state_relaxation_large() const
+      {
+        return hyperbolic_system_.vacuum_state_relaxation_large_;
+      }
+
+      //@}
+      /**
+       * @name Access to cached inverses
+       *
+       * A collection of commonly used expressions with gamma that would
+       * otherwise need to be recomputed many times putting unnecessary
+       * pressure on the div/sqrt ALU unit.
+       */
+      //@{
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_inverse() const
+      {
+        return ScalarNumber(hyperbolic_system_.gamma_inverse_);
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_plus_one_inverse() const
+      {
+        return ScalarNumber(hyperbolic_system_.gamma_plus_one_inverse_);
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_minus_one_inverse() const
+      {
+        return ScalarNumber(hyperbolic_system_.gamma_minus_one_inverse_);
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      gamma_minus_one_over_gamma_plus_one() const
+      {
+        return ScalarNumber(
+            hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
+      }
+
+      //@}
+      /**
+       * @name Constexpr booleans used in the EulerInitialStates namespace
+       */
+      //@{
+
+      static constexpr bool have_gamma = true;
+      static constexpr bool have_covolume_constant = false;
+      static constexpr bool have_energy_equation = true;
 
       //@}
       /**
@@ -666,6 +672,16 @@ namespace ryujin
       template <typename Lambda>
       state_type apply_galilei_transform(const state_type &state,
                                          const Lambda &lambda) const;
+
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
+
       //@}
     }; /* HyperbolicSystemView */
 

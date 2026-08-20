@@ -112,14 +112,21 @@ namespace ryujin
 
     private:
       /**
-       * @name Runtime parameters, internal fields, methods, and friends
+       * @name Run time options
        */
       //@{
 
       std::string barotropic_equation_of_state_;
+
       double reference_density_;
       double vacuum_state_relaxation_small_;
       double vacuum_state_relaxation_large_;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
 
       BarotropicEquationOfStateLibrary::equation_of_state_list_type
           barotropic_equation_of_state_list_;
@@ -131,6 +138,7 @@ namespace ryujin
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
+
       //@}
     }; /* HyperbolicSystem */
 
@@ -150,154 +158,22 @@ namespace ryujin
      * const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
      * // etc.
      * ```
+     *
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number>
     class HyperbolicSystemView
     {
     public:
       /**
-       * Constructor taking a reference to the underlying
-       * HyperbolicSystem
+       * @name Typedefs and constexpr constants
        */
-      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
-      {
-      }
-
-      /**
-       * Create a modified view from the current one:
-       */
-      template <int dim2, typename Number2>
-      auto view() const
-      {
-        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
-      }
+      //@{
 
       /**
        * The underlying scalar number type.
        */
       using ScalarNumber = typename get_value_type<Number>::type;
-
-      /**
-       * @name Access to runtime parameters
-       */
-      //@{
-
-      DEAL_II_ALWAYS_INLINE inline const std::string &
-      barotropic_equation_of_state() const
-      {
-        return hyperbolic_system_.barotropic_equation_of_state_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
-      {
-        return hyperbolic_system_.reference_density_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      vacuum_state_relaxation_small() const
-      {
-        return hyperbolic_system_.vacuum_state_relaxation_small_;
-      }
-
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      vacuum_state_relaxation_large() const
-      {
-        return hyperbolic_system_.vacuum_state_relaxation_large_;
-      }
-
-      //@}
-      /**
-       * @name Low-level access to the selected equation of state.
-       */
-      //@{
-
-      /**
-       * For a given density \f$\rho\f$ return the
-       * <i>specific</i> internal energy \f$e\f$.
-       */
-      DEAL_II_ALWAYS_INLINE inline Number
-      beos_specific_internal_energy(const Number &rho) const
-      {
-        const auto &beos =
-            hyperbolic_system_.selected_barotropic_equation_of_state_;
-
-        if constexpr (std::is_same_v<ScalarNumber, Number>) {
-          return ScalarNumber(beos->specific_internal_energy(rho));
-        } else {
-          Number e;
-          for (unsigned int k = 0; k < Number::size(); ++k) {
-            e[k] = ScalarNumber(beos->specific_internal_energy(rho[k]));
-          }
-          return e;
-        }
-      }
-
-      /**
-       * For a given density \f$\rho\f$ return the pressure \f$p\f$.
-       */
-      DEAL_II_ALWAYS_INLINE inline Number beos_pressure(const Number &rho) const
-      {
-        const auto &beos =
-            hyperbolic_system_.selected_barotropic_equation_of_state_;
-
-        if constexpr (std::is_same_v<ScalarNumber, Number>) {
-          return ScalarNumber(beos->pressure(rho));
-        } else {
-          Number p;
-          for (unsigned int k = 0; k < Number::size(); ++k) {
-            p[k] = ScalarNumber(beos->pressure(rho[k]));
-          }
-          return p;
-        }
-      }
-
-      /**
-       * For a given density \f$\rho\f$ and <i>specific</i> internal
-       * energy \f$e\f$ return the sound speed \f$a\f$.
-       */
-      DEAL_II_ALWAYS_INLINE inline Number
-      beos_speed_of_sound(const Number &rho) const
-      {
-        const auto &beos =
-            hyperbolic_system_.selected_barotropic_equation_of_state_;
-
-        if constexpr (std::is_same_v<ScalarNumber, Number>) {
-          return ScalarNumber(beos->speed_of_sound(rho));
-        } else {
-          Number a;
-          for (unsigned int k = 0; k < Number::size(); ++k) {
-            a[k] = ScalarNumber(beos->speed_of_sound(rho[k]));
-          }
-          return a;
-        }
-      }
-
-      //@}
-      /**
-       * constexpr booleans used in the EulerInitialStates namespace
-       */
-      //@{
-
-      static constexpr bool have_gamma = false;
-      static constexpr bool have_covolume_constant = false;
-      static constexpr bool have_energy_equation = false;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-    private:
-      const HyperbolicSystem &hyperbolic_system_;
-
-    public:
-      //@}
-      /**
-       * @name Types and constexpr constants
-       */
-      //@{
 
       /**
        * The dimension of the state space.
@@ -423,6 +299,136 @@ namespace ryujin
       using InitialPrecomputedVectorView =
           Vectors::MultiComponentVectorView<ScalarNumber,
                                             n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
+
+      //@}
+      /**
+       * @name Access to runtime parameters
+       */
+      //@{
+
+      DEAL_II_ALWAYS_INLINE inline const std::string &
+      barotropic_equation_of_state() const
+      {
+        return hyperbolic_system_.barotropic_equation_of_state_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
+      {
+        return hyperbolic_system_.reference_density_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      vacuum_state_relaxation_small() const
+      {
+        return hyperbolic_system_.vacuum_state_relaxation_small_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      vacuum_state_relaxation_large() const
+      {
+        return hyperbolic_system_.vacuum_state_relaxation_large_;
+      }
+
+      //@}
+      /**
+       * @name Low-level access to the selected equation of state
+       */
+      //@{
+
+      /**
+       * For a given density \f$\rho\f$ return the
+       * <i>specific</i> internal energy \f$e\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      beos_specific_internal_energy(const Number &rho) const
+      {
+        const auto &beos =
+            hyperbolic_system_.selected_barotropic_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(beos->specific_internal_energy(rho));
+        } else {
+          Number e;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            e[k] = ScalarNumber(beos->specific_internal_energy(rho[k]));
+          }
+          return e;
+        }
+      }
+
+      /**
+       * For a given density \f$\rho\f$ return the pressure \f$p\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number beos_pressure(const Number &rho) const
+      {
+        const auto &beos =
+            hyperbolic_system_.selected_barotropic_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(beos->pressure(rho));
+        } else {
+          Number p;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            p[k] = ScalarNumber(beos->pressure(rho[k]));
+          }
+          return p;
+        }
+      }
+
+      /**
+       * For a given density \f$\rho\f$ and <i>specific</i> internal
+       * energy \f$e\f$ return the sound speed \f$a\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      beos_speed_of_sound(const Number &rho) const
+      {
+        const auto &beos =
+            hyperbolic_system_.selected_barotropic_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(beos->speed_of_sound(rho));
+        } else {
+          Number a;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            a[k] = ScalarNumber(beos->speed_of_sound(rho[k]));
+          }
+          return a;
+        }
+      }
+
+      //@}
+      /**
+       * @name Constexpr booleans used in the EulerInitialStates namespace
+       */
+      //@{
+
+      static constexpr bool have_gamma = false;
+      static constexpr bool have_covolume_constant = false;
+      static constexpr bool have_energy_equation = false;
 
       //@}
       /**
@@ -588,6 +594,7 @@ namespace ryujin
           const flux_contribution_type &flux_j,
           const dealii::Tensor<1, dim, Number> &c_ij) const = delete;
 
+      //@}
       /**
        * @name Computing stencil source terms
        */
@@ -659,6 +666,16 @@ namespace ryujin
       template <typename Lambda>
       state_type apply_galilei_transform(const state_type &state,
                                          const Lambda &lambda) const;
+
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem &hyperbolic_system_;
+
       //@}
     }; /* HyperbolicSystemView */
 

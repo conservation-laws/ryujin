@@ -36,15 +36,15 @@ namespace ryujin
    * @ingroup InitialValues
    */
   template <typename Description, int dim, typename Number = double>
-  class InitialValues : public dealii::ParameterAcceptor
+  class InitialValues final : public dealii::ParameterAcceptor
   {
   public:
     /**
      * @name Typedefs and constexpr constants
      */
     //@{
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
@@ -64,7 +64,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Interpolate initial states
+     * @name Constructor and setup
      */
     //@{
 
@@ -77,7 +77,6 @@ namespace ryujin
                   const ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/InitialValues");
 
-
     /**
      * Callback for ParameterAcceptor::initialize(). After we read in
      * configuration parameters from the parameter file we have to do some
@@ -86,11 +85,16 @@ namespace ryujin
      */
     void parse_parameters_callback();
 
+    //@}
+    /**
+     * @name Interpolate initial states
+     */
+    //@{
 
     /**
      * Given a position @p point returns the corresponding (conserved)
      * initial state. The function is used to interpolate initial values
-     * and enforce Dirichlet boundary conditions. For the latter, the the
+     * and enforce Dirichlet boundary conditions. For the latter, the
      * function signature has an additional parameter @p t denoting the
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
@@ -100,13 +104,12 @@ namespace ryujin
       return initial_state_(point, t);
     }
 
-
     /**
-     * Given a position @p point returns the corresponding (conserved)
-     * initial state. The function is used to interpolate initial values
-     * and enforce Dirichlet boundary conditions. For the latter, the the
-     * function signature has an additional parameter @p t denoting the
-     * current time to allow for time-dependent (in-flow) Dirichlet data.
+     * Given a position @p point returns the corresponding precomputed
+     * initial values, i.e., the quantities that are derived from the
+     * initial state and that remain constant throughout the computation
+     * (such as, for example, the bathymetry of the shallow water
+     * equations).
      */
     DEAL_II_ALWAYS_INLINE inline initial_precomputed_type
     initial_precomputed(const dealii::Point<dim> &point) const
@@ -114,17 +117,15 @@ namespace ryujin
       return initial_precomputed_(point);
     }
 
-
     /**
-     * This routine computes and returns a state vector populated with
-     * initial values for a specified time @p t.
+     * This routine computes and returns a hyperbolic state vector
+     * populated with initial values for a specified time @p t.
      */
     HyperbolicVector interpolate_hyperbolic_vector(Number t = 0) const;
 
-
     /**
-     * This routine computes and returns a state vector populated with
-     * initial values for a specified time @p t.
+     * This routine computes and returns a vector populated with the
+     * precomputed initial values returned by initial_precomputed().
      */
     InitialPrecomputedVector interpolate_initial_precomputed_vector() const;
 
@@ -145,7 +146,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Internal data:
+     * @name Internal data
      */
     //@{
 

@@ -21,7 +21,7 @@ namespace ryujin
      * Populate a given container with all equation of states defined in
      * this namespace.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerPoissonEquations
      */
     template <int dim, typename Number>
     void populate_electrostatic_configuration_list(

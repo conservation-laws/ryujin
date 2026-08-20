@@ -20,6 +20,8 @@ namespace ryujin
      * take a dealii::Point<dim> as argument and return a double that is
      * used for the shift. The computation of the shift must only depend on
      * the x-coordinate (in 2D) or the x and y coordinates (in 3D).
+     *
+     * @ingroup Mesh
      */
     template <int dim, typename Callable>
     class ProfileManifold : public dealii::ChartManifold<dim>
