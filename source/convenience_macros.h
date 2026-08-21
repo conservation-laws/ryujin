@@ -283,6 +283,19 @@ namespace
 //@{
 
 /**
+ * Defined during the device compilation pass of a "single source" offloading
+ * compiler (clang CUDA/HIP, SYCL), i.e., when the current translation unit
+ * is compiled for the device and not for the host.
+ *
+ * @ingroup Miscellaneous
+ */
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
+    defined(__SYCL_DEVICE_ONLY__)
+#define RYUJIN_DEVICE_COMPILATION_PASS
+#endif
+
+
+/**
  * Macro expanding to a `#pragma` directive that looks nicer in indented
  * code and can be used in other preprocessor macro definitions.
  *
