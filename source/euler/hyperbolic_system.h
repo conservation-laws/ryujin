@@ -10,6 +10,7 @@
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <loop.h>
+#include <mirrored.h>
 #include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>
@@ -48,6 +49,42 @@ namespace ryujin
        */
       static inline const std::string problem_name =
           "Compressible Euler equations (polytropic gas EOS, optimized)";
+
+      /**
+       * A structure holding all runtime parameters of the hyperbolic
+       * system, as well as a number of derived quantities that would
+       * otherwise need to be recomputed over and over again.
+       */
+      struct Parameters {
+        /**
+         * @name Run time parameters
+         */
+        //@{
+
+        double gamma;
+
+        double reference_density;
+        double vacuum_state_relaxation_small;
+        double vacuum_state_relaxation_large;
+
+        //@}
+        /**
+         * @name Cached inverses
+         *
+         * A collection of commonly used expressions with gamma that would
+         * otherwise need to be recomputed many times putting unnecessary
+         * pressure on the div/sqrt ALU unit. These are recomputed in
+         * update_parameters().
+         */
+        //@{
+
+        double gamma_inverse;
+        double gamma_minus_one_inverse;
+        double gamma_minus_one_over_gamma_plus_one;
+        double gamma_plus_one_inverse;
+
+        //@}
+      };
 
       /**
        * Constructor.
@@ -96,15 +133,19 @@ namespace ryujin
 
     private:
       /**
-       * @name Run time options
+       * @name Internal fields, methods, and friends
        */
       //@{
 
-      double gamma_;
+      /**
+       * Recompute all derived quantities of the Parameters structure and
+       * copy the result over to the default memory space. This function is
+       * called from the constructor and connected to the
+       * parse_parameters_call_back signal.
+       */
+      void update_parameters();
 
-      double reference_density_;
-      double vacuum_state_relaxation_small_;
-      double vacuum_state_relaxation_large_;
+      Mirrored<Parameters> parameters_;
 
       //@}
 
@@ -296,27 +337,9 @@ namespace ryujin
        * HyperbolicSystem
        */
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : parameters_(
+                hyperbolic_system.parameters_.template get_view<MemorySpace>())
       {
-        /*
-         * Copy all runtime parameters over to the view:
-         */
-        const auto gamma = hyperbolic_system.gamma_;
-        gamma_ = ScalarNumber(gamma);
-        reference_density_ = ScalarNumber(hyperbolic_system.reference_density_);
-        vacuum_state_relaxation_small_ =
-            ScalarNumber(hyperbolic_system.vacuum_state_relaxation_small_);
-        vacuum_state_relaxation_large_ =
-            ScalarNumber(hyperbolic_system.vacuum_state_relaxation_large_);
-
-        /*
-         * Precompute a number of derived gamma coefficients that contain
-         * divisions:
-         */
-        gamma_inverse_ = ScalarNumber(1. / gamma);
-        gamma_plus_one_inverse_ = ScalarNumber(1. / (gamma + 1.));
-        gamma_minus_one_inverse_ = ScalarNumber(1. / (gamma - 1.));
-        gamma_minus_one_over_gamma_plus_one_ =
-            ScalarNumber((gamma - 1.) / (gamma + 1.));
       }
 
       //@}
@@ -327,24 +350,24 @@ namespace ryujin
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber gamma() const
       {
-        return gamma_;
+        return ScalarNumber(parameters_().gamma);
       }
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber reference_density() const
       {
-        return reference_density_;
+        return ScalarNumber(parameters_().reference_density);
       }
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       vacuum_state_relaxation_small() const
       {
-        return vacuum_state_relaxation_small_;
+        return ScalarNumber(parameters_().vacuum_state_relaxation_small);
       }
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       vacuum_state_relaxation_large() const
       {
-        return vacuum_state_relaxation_large_;
+        return ScalarNumber(parameters_().vacuum_state_relaxation_large);
       }
 
       //@}
@@ -359,25 +382,25 @@ namespace ryujin
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber gamma_inverse() const
       {
-        return gamma_inverse_;
+        return ScalarNumber(parameters_().gamma_inverse);
       }
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       gamma_plus_one_inverse() const
       {
-        return gamma_plus_one_inverse_;
+        return ScalarNumber(parameters_().gamma_plus_one_inverse);
       }
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       gamma_minus_one_inverse() const
       {
-        return gamma_minus_one_inverse_;
+        return ScalarNumber(parameters_().gamma_minus_one_inverse);
       }
 
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       gamma_minus_one_over_gamma_plus_one() const
       {
-        return gamma_minus_one_over_gamma_plus_one_;
+        return ScalarNumber(parameters_().gamma_minus_one_over_gamma_plus_one);
       }
 
       //@}
@@ -718,15 +741,10 @@ namespace ryujin
        */
       //@{
 
-      ScalarNumber gamma_;
-      ScalarNumber reference_density_;
-      ScalarNumber vacuum_state_relaxation_small_;
-      ScalarNumber vacuum_state_relaxation_large_;
+      using ParameterView = typename Mirrored<
+          HyperbolicSystem::Parameters>::template View<MemorySpace>;
 
-      ScalarNumber gamma_inverse_;
-      ScalarNumber gamma_minus_one_inverse_;
-      ScalarNumber gamma_minus_one_over_gamma_plus_one_;
-      ScalarNumber gamma_plus_one_inverse_;
+      ParameterView parameters_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -740,24 +758,58 @@ namespace ryujin
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
+        , parameters_("euler_hyperbolic_system_parameters")
     {
-      gamma_ = 7. / 5.;
-      add_parameter("gamma", gamma_, "The ratio of specific heats");
+      /*
+       * Note: We bind the parameters directly to the storage held by the
+       * Mirrored object. The corresponding memory is allocated once in the
+       * constructor and never reallocated, so the addresses remain valid
+       * for the lifetime of this object.
+       */
+      auto &parameters = parameters_.value();
 
-      reference_density_ = 1.;
+      parameters.gamma = 7. / 5.;
+      add_parameter("gamma", parameters.gamma, "The ratio of specific heats");
+
+      parameters.reference_density = 1.;
       add_parameter("reference density",
-                    reference_density_,
+                    parameters.reference_density,
                     "Problem specific density reference");
 
-      vacuum_state_relaxation_small_ = 1.e2;
+      parameters.vacuum_state_relaxation_small = 1.e2;
       add_parameter("vacuum state relaxation small",
-                    vacuum_state_relaxation_small_,
+                    parameters.vacuum_state_relaxation_small,
                     "Problem specific vacuum relaxation parameter");
 
-      vacuum_state_relaxation_large_ = 1.e4;
+      parameters.vacuum_state_relaxation_large = 1.e4;
       add_parameter("vacuum state relaxation large",
-                    vacuum_state_relaxation_large_,
+                    parameters.vacuum_state_relaxation_large,
                     "Problem specific vacuum relaxation parameter");
+
+      ParameterAcceptor::parse_parameters_call_back.connect(
+          [this] { update_parameters(); });
+
+      update_parameters();
+    }
+
+
+    inline void HyperbolicSystem::update_parameters()
+    {
+      auto &parameters = parameters_.value();
+
+      /*
+       * Precompute a number of derived gamma coefficients that contain
+       * divisions:
+       */
+      const auto gamma = parameters.gamma;
+      parameters.gamma_inverse = 1. / gamma;
+      parameters.gamma_plus_one_inverse = 1. / (gamma + 1.);
+      parameters.gamma_minus_one_inverse = 1. / (gamma - 1.);
+      parameters.gamma_minus_one_over_gamma_plus_one =
+          (gamma - 1.) / (gamma + 1.);
+
+      /* Copy the parameters over to the default memory space: */
+      parameters_.update();
     }
 
 
