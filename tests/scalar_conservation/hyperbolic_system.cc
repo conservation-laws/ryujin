@@ -45,8 +45,10 @@ void test(const std::string &expression)
             << std::endl;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   test<1, double>("burgers");
   dealii::ParameterAcceptor::clear();
   test<1, float>("burgers");

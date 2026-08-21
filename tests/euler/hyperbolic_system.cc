@@ -1,6 +1,7 @@
 #include <hyperbolic_system.h>
 #include <simd.h>
 
+#include <deal.II/base/mpi.h>
 #include <deal.II/base/vectorization.h>
 
 #include <iomanip>
@@ -77,8 +78,10 @@ void test()
             << std::endl;                              //
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   std::cout << "\ndouble:\n" << std::endl;
   test<1, double>();
   test<2, double>();
