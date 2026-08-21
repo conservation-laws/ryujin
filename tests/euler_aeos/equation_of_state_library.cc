@@ -117,8 +117,10 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos,
   }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   /* polytropic gas */
 
   std::cout << "\nPolytropicGas with gamma=1.4" << std::endl;

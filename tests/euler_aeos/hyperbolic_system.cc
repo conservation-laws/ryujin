@@ -92,8 +92,10 @@ void test(const Number gamma)
             << std::endl;                                              //
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   const auto set_covolume = [&](const double covolume) {
     /*
      * Set the interpolatory covolume by selecting an equation of state

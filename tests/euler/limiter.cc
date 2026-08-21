@@ -5,6 +5,8 @@
 #include <multicomponent_vector.h>
 #include <simd.h>
 
+#include <deal.II/base/mpi.h>
+
 #include <limiter.h>
 
 #define DEBUG_EXPENSIVE_BOUNDS_CHECK
@@ -16,8 +18,10 @@ using namespace ryujin::Euler;
 using namespace ryujin;
 using namespace dealii;
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
