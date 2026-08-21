@@ -5,12 +5,12 @@
 #include <multicomponent_vector.h>
 #include <simd.h>
 
-#include <limiter.h>
+#include <deal.II/base/mpi.h>
 
 #define DEBUG_EXPENSIVE_BOUNDS_CHECK
 #define DEBUG_OUTPUT
 #define DEBUG_OUTPUT_LIMITER
-#include <limiter.template.h>
+#include <limiter.h>
 
 using namespace ryujin::Euler;
 using namespace ryujin;
