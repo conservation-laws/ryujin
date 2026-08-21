@@ -6,6 +6,7 @@
 #pragma once
 
 #include <compile_time_options.h>
+#include <convenience_macros.h>
 
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/utilities.h>
@@ -264,8 +265,7 @@ namespace ryujin
   template <>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE float pow(const float x, const float b)
   {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
-    defined(__SYCL_DEVICE_ONLY__)
+#ifdef RYUJIN_DEVICE_COMPILATION_PASS
     /* Call generic std::pow() implementation: */
     return std::pow(x, b);
 #elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
@@ -281,8 +281,7 @@ namespace ryujin
   template <>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE double pow(const double x, const double b)
   {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
-    defined(__SYCL_DEVICE_ONLY__)
+#ifdef RYUJIN_DEVICE_COMPILATION_PASS
     /* Call generic std::pow() implementation */
     return std::pow(x, b);
 #elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
@@ -356,8 +355,7 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE float
   fast_pow(const float x, const float b, [[maybe_unused]] const Bias bias)
   {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
-    defined(__SYCL_DEVICE_ONLY__)
+#ifdef RYUJIN_DEVICE_COMPILATION_PASS
     /* Call generic std::pow() implementation */
     return std::pow(x, b);
 #elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
@@ -374,8 +372,7 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE double
   fast_pow(const double x, const double b, [[maybe_unused]] const Bias bias)
   {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
-    defined(__SYCL_DEVICE_ONLY__)
+#ifdef RYUJIN_DEVICE_COMPILATION_PASS
     /* Call generic std::pow() implementation (in single precision) */
     return std::pow(static_cast<float>(x), static_cast<float>(b));
 #elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
