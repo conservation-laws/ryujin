@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <mirrored.h>
 #include <newton.h>
 #include <observer_pointer.h>
 #include <simd.h>
@@ -22,7 +23,9 @@ namespace ryujin
 {
   namespace Euler
   {
-    template <int dim, typename Number = double>
+    template <int dim,
+              typename Number = double,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class WaveSpeedEstimatorView;
 
     /**
@@ -44,11 +47,23 @@ namespace ryujin
       //@{
 
       /**
-       * Alias for the view on the wave speed estimator for a given dimension @p
-       * dim and choice of number type @p Number.
+       * A structure holding all runtime parameters of the wave speed
+       * estimator.
        */
-      template <int dim, typename Number = double>
-      using View = WaveSpeedEstimatorView<dim, Number>;
+      struct Parameters {
+        double newton_tolerance;
+        unsigned int newton_max_iterations;
+      };
+
+      /**
+       * Alias for the view on the wave speed estimator for a given
+       * dimension @p dim, choice of number type @p Number, and memory
+       * space @p MemorySpace.
+       */
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = WaveSpeedEstimatorView<dim, Number, MemorySpace>;
 
       //@}
       /**
@@ -62,21 +77,35 @@ namespace ryujin
       WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
+          , parameters_("euler_wave_speed_estimator_parameters")
           , hyperbolic_system_(&hyperbolic_system)
       {
+        /*
+         * Note: We bind the parameters directly to the storage held by the
+         * Mirrored object. The corresponding memory is allocated once in
+         * the constructor and never reallocated, so the addresses remain
+         * valid for the lifetime of this object.
+         */
+        auto &parameters = parameters_.value();
+
         if constexpr (std::is_same<ScalarNumber, double>::value)
-          newton_tolerance_ = 1.e-10;
+          parameters.newton_tolerance = 1.e-10;
         else
-          newton_tolerance_ = 1.e-4;
+          parameters.newton_tolerance = 1.e-4;
         add_parameter("newton tolerance",
-                      newton_tolerance_,
+                      parameters.newton_tolerance,
                       "Tolerance for the quadratic newton stopping criterion");
 
-        newton_max_iterations_ = 0;
+        parameters.newton_max_iterations = 0;
         add_parameter("newton max iterations",
-                      newton_max_iterations_,
+                      parameters.newton_max_iterations,
                       "Maximal number of quadratic newton iterations performed "
                       "during limiting");
+
+        /* Copy the parameters over to the default memory space: */
+        ParameterAcceptor::parse_parameters_call_back.connect(
+            [this] { parameters_.update(); });
+        parameters_.update();
       }
 
       //@}
@@ -85,19 +114,31 @@ namespace ryujin
        */
       //@{
 
-      ACCESSOR_READ_ONLY(newton_tolerance);
-      ACCESSOR_READ_ONLY(newton_max_iterations);
+      ScalarNumber newton_tolerance() const
+      {
+        return ScalarNumber(parameters_.value().newton_tolerance);
+      }
+
+      unsigned int newton_max_iterations() const
+      {
+        return parameters_.value().newton_max_iterations;
+      }
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
        * and choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars).
+       * double, as well as a VectorizedArray holding packed scalars). The
+       * optional @p MemorySpace template parameter selects whether the
+       * view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
+        return View<dim, Number, MemorySpace>{
+            hyperbolic_system_->template view<dim, Number, MemorySpace>(),
+            *this};
       }
 
     private:
@@ -107,8 +148,7 @@ namespace ryujin
        */
       //@{
 
-      ScalarNumber newton_tolerance_;
-      unsigned int newton_max_iterations_;
+      Mirrored<Parameters> parameters_;
 
       //@}
       /**
@@ -119,6 +159,9 @@ namespace ryujin
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
       //@}
+
+      template <int, typename, typename>
+      friend class WaveSpeedEstimatorView;
     };
 
 
@@ -130,16 +173,21 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class WaveSpeedEstimatorView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -177,8 +225,26 @@ namespace ryujin
           const View &view,
           const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
           : view_(view)
-          , wave_speed_estimator_(wave_speed_estimator)
+          , parameters_(wave_speed_estimator.parameters_
+                            .template get_view<MemorySpace>())
       {
+      }
+
+      /**
+       * Return the tolerance for the quadratic Newton stopping criterion.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber newton_tolerance() const
+      {
+        return ScalarNumber(parameters_().newton_tolerance);
+      }
+
+      /**
+       * Return the maximal number of quadratic Newton iterations.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+      newton_max_iterations() const
+      {
+        return parameters_().newton_max_iterations;
       }
 
       /**
@@ -186,8 +252,9 @@ namespace ryujin
        * compute an estimation of an upper bound for the maximum wavespeed
        * lambda.
        */
-      Number compute(const primitive_type &riemann_data_i,
-                     const primitive_type &riemann_data_j) const;
+      DEAL_II_HOST_DEVICE Number
+      compute(const primitive_type &riemann_data_i,
+              const primitive_type &riemann_data_j) const;
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -196,12 +263,13 @@ namespace ryujin
        * Returns a tuple consisting of lambda max and the number of Newton
        * iterations used in the solver to find it.
        */
-      Number compute(const PrecomputedVectorView &pv,
-                     const state_type &U_i,
-                     const state_type &U_j,
-                     const unsigned int i,
-                     const unsigned int *js,
-                     const dealii::Tensor<1, dim, Number> &n_ij) const;
+      DEAL_II_HOST_DEVICE Number
+      compute(const PrecomputedVectorView &pv,
+              const state_type &U_i,
+              const state_type &U_j,
+              const unsigned int i,
+              const unsigned int *js,
+              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
       //@}
 
@@ -216,7 +284,8 @@ namespace ryujin
        *
        * Cost: 1x pow, 1x division, 2x sqrt
        */
-      Number f(const primitive_type &riemann_data, const Number p_star) const;
+      DEAL_II_HOST_DEVICE Number f(const primitive_type &riemann_data,
+                                   const Number p_star) const;
 
 
       /**
@@ -224,7 +293,8 @@ namespace ryujin
        *
        * Cost: 1x pow, 3x division, 1x sqrt
        */
-      Number df(const primitive_type &riemann_data, const Number &p_star) const;
+      DEAL_II_HOST_DEVICE Number df(const primitive_type &riemann_data,
+                                    const Number &p_star) const;
 
 
       /**
@@ -232,9 +302,9 @@ namespace ryujin
        *
        * Cost: 2x pow, 6x division, 2x sqrt
        */
-      Number phi(const primitive_type &riemann_data_i,
-                 const primitive_type &riemann_data_j,
-                 const Number p_in) const;
+      DEAL_II_HOST_DEVICE Number phi(const primitive_type &riemann_data_i,
+                                     const primitive_type &riemann_data_j,
+                                     const Number p_in) const;
 
 
       /**
@@ -242,9 +312,9 @@ namespace ryujin
        *
        * Cost: 2x pow, 6x division, 2x sqrt
        */
-      Number dphi(const primitive_type &riemann_data_i,
-                  const primitive_type &riemann_data_j,
-                  const Number &p) const;
+      DEAL_II_HOST_DEVICE Number dphi(const primitive_type &riemann_data_i,
+                                      const primitive_type &riemann_data_j,
+                                      const Number &p) const;
 
 
       /**
@@ -261,8 +331,9 @@ namespace ryujin
        *
        * Cost: 0x pow, 2x division, 2x sqrt
        */
-      Number phi_of_p_max(const primitive_type &riemann_data_i,
-                          const primitive_type &riemann_data_j) const;
+      DEAL_II_HOST_DEVICE Number
+      phi_of_p_max(const primitive_type &riemann_data_i,
+                   const primitive_type &riemann_data_j) const;
 
 
       /**
@@ -270,8 +341,8 @@ namespace ryujin
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
-      Number lambda1_minus(const primitive_type &riemann_data,
-                           const Number p_star) const;
+      DEAL_II_HOST_DEVICE Number lambda1_minus(
+          const primitive_type &riemann_data, const Number p_star) const;
 
 
       /**
@@ -279,8 +350,8 @@ namespace ryujin
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
-      Number lambda3_plus(const primitive_type &primitive_state,
-                          const Number p_star) const;
+      DEAL_II_HOST_DEVICE Number lambda3_plus(
+          const primitive_type &primitive_state, const Number p_star) const;
 
 
       /**
@@ -293,10 +364,11 @@ namespace ryujin
        *
        * Cost: 0x pow, 4x division, 4x sqrt
        */
-      std::array<Number, 2> compute_gap(const primitive_type &riemann_data_i,
-                                        const primitive_type &riemann_data_j,
-                                        const Number p_1,
-                                        const Number p_2) const;
+      DEAL_II_HOST_DEVICE std::array<Number, 2>
+      compute_gap(const primitive_type &riemann_data_i,
+                  const primitive_type &riemann_data_j,
+                  const Number p_1,
+                  const Number p_2) const;
 
 
       /**
@@ -308,9 +380,10 @@ namespace ryujin
        *
        * Cost: 0x pow, 2x division, 2x sqrt (inclusive)
        */
-      Number compute_lambda(const primitive_type &riemann_data_i,
-                            const primitive_type &riemann_data_j,
-                            const Number p_star) const;
+      DEAL_II_HOST_DEVICE Number
+      compute_lambda(const primitive_type &riemann_data_i,
+                     const primitive_type &riemann_data_j,
+                     const Number p_star) const;
 
 
       /**
@@ -321,8 +394,9 @@ namespace ryujin
        *
        * Cost: 2x pow, 2x division, 0x sqrt
        */
-      Number p_star_two_rarefaction(const primitive_type &riemann_data_i,
-                                    const primitive_type &riemann_data_j) const;
+      DEAL_II_HOST_DEVICE Number
+      p_star_two_rarefaction(const primitive_type &riemann_data_i,
+                             const primitive_type &riemann_data_j) const;
 
       /**
        * Failsafe approximation to p_star computed for two primitive states
@@ -332,8 +406,9 @@ namespace ryujin
        *
        * Cost: 0x pow, 3x division, 3x sqrt
        */
-      Number p_star_failsafe(const primitive_type &riemann_data_i,
-                             const primitive_type &riemann_data_j) const;
+      DEAL_II_HOST_DEVICE Number
+      p_star_failsafe(const primitive_type &riemann_data_i,
+                      const primitive_type &riemann_data_j) const;
 
 
       /**
@@ -343,7 +418,7 @@ namespace ryujin
        * compute and return the Riemann data [rho, u, p, a] (used in the
        * approximative Riemann solver).
        */
-      primitive_type
+      DEAL_II_HOST_DEVICE primitive_type
       riemann_data_from_state(const state_type &U,
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
@@ -354,8 +429,11 @@ namespace ryujin
        */
       //@{
 
+      using ParameterView = typename Mirrored<typename WaveSpeedEstimator<
+          ScalarNumber>::Parameters>::template View<MemorySpace>;
+
       const View view_;
-      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+      ParameterView parameters_;
 
       //@}
     };
@@ -368,8 +446,9 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number>
-    Number WaveSpeedEstimatorView<dim, Number>::compute(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -444,7 +523,7 @@ namespace ryujin
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
       Number p_2 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               phi_p_max,
               Number(0.),
               p_star_tilde,
@@ -460,7 +539,7 @@ namespace ryujin
        * If we do no Newton iteration, cut it short:
        */
 
-      if (wave_speed_estimator_.newton_max_iterations() == 0) {
+      if (newton_max_iterations() == 0) {
         const auto lambda_max =
             compute_lambda(riemann_data_i, riemann_data_j, p_2);
 
@@ -479,10 +558,10 @@ namespace ryujin
       const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
 
       Number p_1 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               phi_p_max, Number(0.), p_max, p_min);
 
-      p_1 = dealii::compare_and_apply_mask<
+      p_1 = ryujin::compare_and_apply_mask<
           dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, p_2);
 
       /*
@@ -502,12 +581,10 @@ namespace ryujin
       std::cout << "l_m: (start) " << lambda_max << std::endl;
 #endif
 
-      for (unsigned int i = 0;
-           i < wave_speed_estimator_.newton_max_iterations();
-           ++i) {
+      for (unsigned int i = 0; i < newton_max_iterations(); ++i) {
 
         /* We accept our current guess if we reach the tolerance... */
-        const Number tolerance(wave_speed_estimator_.newton_tolerance());
+        const Number tolerance(newton_tolerance());
         if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
           std::cout << "converged after " << i << " iterations." << std::endl;
@@ -549,9 +626,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const PrecomputedVectorView & /*pv*/,
         const state_type &U_i,
         const state_type &U_j,
@@ -566,10 +643,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::f(const primitive_type &riemann_data,
-                                           const Number p_star) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::f(
+        const primitive_type &riemann_data, const Number p_star) const
     {
       const auto &gamma = view_.gamma();
 
@@ -587,16 +664,16 @@ namespace ryujin
       const auto false_value =
           ScalarNumber(2.) * a * factor / (gamma - ScalarNumber(1.));
 
-      return dealii::compare_and_apply_mask<
+      return ryujin::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
           p_star, p, true_value, false_value);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::df(const primitive_type &riemann_data,
-                                            const Number &p_star) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::df(
+        const primitive_type &riemann_data, const Number &p_star) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
       const auto &gamma = view_.gamma();
@@ -623,15 +700,15 @@ namespace ryujin
       const auto false_value =
           factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
-      return dealii::compare_and_apply_mask<
+      return ryujin::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
           p_star, p, true_value, false_value);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::phi(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::phi(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number p_in) const
@@ -643,9 +720,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::dphi(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::dphi(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number &p) const
@@ -666,9 +743,9 @@ namespace ryujin
      *
      * Cost: 0x pow, 2x division, 2x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::phi_of_p_max(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::phi_of_p_max(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -707,9 +784,9 @@ namespace ryujin
      *
      * Cost: 0x pow, 1x division, 1x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::lambda1_minus(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
       const auto &gamma = view_.gamma();
@@ -731,9 +808,9 @@ namespace ryujin
      *
      * Cost: 0x pow, 1x division, 1x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::lambda3_plus(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::lambda3_plus(
         const primitive_type &primitive_state, const Number p_star) const
     {
       const auto &gamma = view_.gamma();
@@ -758,9 +835,9 @@ namespace ryujin
      *
      * Cost: 0x pow, 4x division, 4x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline std::array<Number, 2>
-    WaveSpeedEstimatorView<dim, Number>::compute_gap(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE std::array<Number, 2>
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute_gap(
         const std::array<Number, 4> &riemann_data_i,
         const std::array<Number, 4> &riemann_data_j,
         const Number p_1,
@@ -793,9 +870,9 @@ namespace ryujin
      *
      * Cost: 0x pow, 2x division, 2x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute_lambda(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute_lambda(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number p_star) const
@@ -815,9 +892,9 @@ namespace ryujin
      *
      * Cost: 2x pow, 2x division, 0x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::p_star_two_rarefaction(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::p_star_two_rarefaction(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -870,9 +947,9 @@ namespace ryujin
      *
      * Cost: 2x pow, 2x division, 0x sqrt
      */
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::p_star_failsafe(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::p_star_failsafe(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -916,9 +993,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    WaveSpeedEstimatorView<dim, Number>::riemann_data_from_state(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::riemann_data_from_state(
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
