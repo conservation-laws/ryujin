@@ -29,8 +29,8 @@ int main(int argc, char *argv[])
   sparse_matrix.reinit(sparsity_pattern);
 
 
-  auto view_1 = sparse_matrix.get_view();
-  const auto view_2 = sparse_matrix.get_view();
+  auto view_1 = sparse_matrix.view();
+  const auto view_2 = sparse_matrix.view();
   std::cout << view_1.read_entry(0, 0) << std::endl;
   std::cout << view_2.read_entry(0, 0) << std::endl;
   view_1.write_entry(0., 0, 0); // OK
@@ -42,8 +42,8 @@ int main(int argc, char *argv[])
 
   auto &sparse_matrix_ref_1 = sparse_matrix;
 
-  auto view_3 = sparse_matrix_ref_1.get_view();
-  const auto view_4 = sparse_matrix_ref_1.get_view();
+  auto view_3 = sparse_matrix_ref_1.view();
+  const auto view_4 = sparse_matrix_ref_1.view();
 
   std::cout << view_3.read_entry(0, 0) << std::endl;
   std::cout << view_4.read_entry(0, 0) << std::endl;
@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
 
   const auto &sparse_matrix_ref_2 = sparse_matrix;
 
-  auto view_5 = sparse_matrix_ref_2.get_view();
-  const auto view_6 = sparse_matrix_ref_2.get_view();
+  auto view_5 = sparse_matrix_ref_2.view();
+  const auto view_6 = sparse_matrix_ref_2.view();
 
   std::cout << view_5.read_entry(0, 0) << std::endl;
   std::cout << view_6.read_entry(0, 0) << std::endl;
