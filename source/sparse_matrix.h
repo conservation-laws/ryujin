@@ -1197,7 +1197,7 @@ namespace ryujin
     Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not active."));
 
-    sparse_matrix_->template zero_out_ghost_rows<MemorySpace>();
+    sparse_matrix_->template zero_out_ghost_rows_on_memory_space<MemorySpace>();
   }
 
 
