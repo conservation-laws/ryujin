@@ -26,11 +26,10 @@ int main(int argc, char *argv[])
   using DefaultSpace = dealii::MemorySpace::Default;
 
   const auto print_status = [&]() {
-    std::cout << "HostSpace active == "
-              << state_vector.is_active_memory_space<HostSpace>() << std::endl
-              << "DefaultSpace active == "
-              << state_vector.is_active_memory_space<DefaultSpace>()
-              << std::endl;
+    std::cout << "HostSpace resident == "
+              << state_vector.is_resident<HostSpace>() << std::endl
+              << "DefaultSpace resident == "
+              << state_vector.is_resident<DefaultSpace>() << std::endl;
   };
 
   print_status();
@@ -55,7 +54,7 @@ int main(int argc, char *argv[])
   state_vector.move_to_memory_space<DefaultSpace>();
   print_status();
 
-  const auto &view = state_vector.template get_view<DefaultSpace>();
+  const auto &view = state_vector.template view<DefaultSpace>();
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
   const auto exec = ExecutionSpace{};
   Kokkos::parallel_for("test",
