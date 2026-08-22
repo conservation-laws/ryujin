@@ -98,7 +98,8 @@ namespace ryujin
 
     indices_transposed_host_ =
         Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-            "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
+            "sparsity_pattern_indices_transposed",
+            sparsity.n_nonzero_elements());
 
     /* Vectorized part: */
 
