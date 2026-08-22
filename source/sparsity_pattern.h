@@ -8,6 +8,8 @@
 #include <compile_time_options.h>
 #include <convenience_macros.h>
 
+#include "gpu.h"
+
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/config.h>
 #include <deal.II/base/partitioner.h>
@@ -20,7 +22,8 @@ namespace ryujin
 
 
   /**
-   * A specialized sparsity pattern for efficient, vectorized SIMD access.
+   * A specialized sparsity pattern for efficient, vectorized SIMD and GPU
+   * access.
    *
    * In the vectorized row index region [0, n_internal_dofs) we store data
    * as an array-of-struct-of-array type as follows:
@@ -44,7 +47,8 @@ namespace ryujin
    * @ingroup LinearAlgebra
    */
   template <int simd_length>
-  class SparsityPattern : public SparsityPatternView<simd_length>
+  class SparsityPattern : public SparsityPatternView<simd_length>,
+                          public MirroredStorage<SparsityPattern<simd_length>>
   {
   public:
     /**
@@ -67,7 +71,9 @@ namespace ryujin
         const dealii::DynamicSparsityPattern &sparsity,
         const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
             &partitioner,
-        bool symmetrize_ghost_range = true);
+        bool symmetrize_ghost_range = true,
+        const TransferPolicy transfer_policy =
+            TransferPolicy::explicit_transfers);
 
     /**
      * Reinit function that reinitializes the SIMD sparsity pattern for a
@@ -78,19 +84,24 @@ namespace ryujin
      * then all transpose entries (j, i) are added to the sparsity pattern,
      * where i is within the locally owned range. This access is required
      * for our stencil based methods.
+     *
+     * After reinit() the sparsity pattern is resident on both the host
+     * and default (device) memory spaces.
      */
     void reinit(const unsigned int n_internal_dofs,
                 const dealii::DynamicSparsityPattern &sparsity,
                 const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
                     &partitioner,
-                bool symmetrize_ghost_range = true);
+                bool symmetrize_ghost_range = true,
+                const TransferPolicy transfer_policy =
+                    TransferPolicy::explicit_transfers);
 
     /**
      * Return a (read only) view on the sparsity pattern for the selected
      * memory space.
      */
-    template <typename MemorySpace>
-    SparsityPatternView<simd_length, MemorySpace> get_view() const;
+    template <typename MemorySpace = dealii::MemorySpace::Host>
+    SparsityPatternView<simd_length, MemorySpace> view() const;
 
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner);
 
@@ -133,19 +144,43 @@ namespace ryujin
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 
+    /*
+     * Note: The storage is marked mutable so that the (logically const)
+     * copy_to_memory_space() operation can populate a mirror from within
+     * a const view() under the implicit_transfers policy.
+     */
+
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    Kokkos::View<unsigned int *, KokkosHost> row_starts_host_;
-    Kokkos::View<unsigned int *, KokkosHost> column_indices_host_;
-    Kokkos::View<unsigned int *, KokkosHost> indices_transposed_host_;
+    mutable Kokkos::View<unsigned int *, KokkosHost> row_starts_host_;
+    mutable Kokkos::View<unsigned int *, KokkosHost> column_indices_host_;
+    mutable Kokkos::View<unsigned int *, KokkosHost> indices_transposed_host_;
 
     using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
-    Kokkos::View<unsigned int *, KokkosDefault> row_starts_default_;
-    Kokkos::View<unsigned int *, KokkosDefault> column_indices_default_;
-    Kokkos::View<unsigned int *, KokkosDefault> indices_transposed_default_;
+    mutable Kokkos::View<unsigned int *, KokkosDefault> row_starts_default_;
+    mutable Kokkos::View<unsigned int *, KokkosDefault> column_indices_default_;
+    mutable Kokkos::View<unsigned int *, KokkosDefault>
+        indices_transposed_default_;
 
     std::vector<std::pair<unsigned int, unsigned int>> entries_to_be_sent_;
     std::vector<std::pair<unsigned int, unsigned int>> send_targets_;
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets_;
+
+    /*
+     * Storage primitives used by the MirroredStorage base class:
+     */
+
+    template <typename MemorySpace>
+    void allocate_storage() const;
+
+    template <typename To, typename From>
+    void deep_copy_storage() const;
+
+    template <typename MemorySpace>
+    void deallocate_storage();
+
+    void refresh_direct_interface();
+
+    friend class MirroredStorage<SparsityPattern<simd_length>>;
 
     template <int, typename>
     friend class SparsityPatternView;
@@ -349,9 +384,116 @@ namespace ryujin
   template <int simd_length>
   template <typename MemorySpace>
   SparsityPatternView<simd_length, MemorySpace>
-  SparsityPattern<simd_length>::get_view() const
+  SparsityPattern<simd_length>::view() const
   {
+    this->template prepare_read_access<MemorySpace>();
+
     return SparsityPatternView<simd_length, MemorySpace>(*this);
+  }
+
+
+  template <int simd_length>
+  template <typename MemorySpace>
+  void SparsityPattern<simd_length>::allocate_storage() const
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
+
+    /*
+     * Note: We allocate without initializing because a deep_copy_storage()
+     * always follows. The extents are queried from the other (resident)
+     * memory space.
+     */
+
+    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+      row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparsity_pattern_row_starts"),
+          row_starts_default_.extent(0));
+
+      column_indices_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparsity_pattern_column_indices"),
+          column_indices_default_.extent(0));
+
+      indices_transposed_host_ =
+          Kokkos::View<unsigned int *, KokkosHost, Aligned>(
+              Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                                 "sparsity_pattern_indices_transposed"),
+              indices_transposed_default_.extent(0));
+
+    } else {
+      row_starts_default_ = Kokkos::View<unsigned int *, KokkosDefault>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparsity_pattern_row_starts"),
+          row_starts_host_.extent(0));
+
+      column_indices_default_ = Kokkos::View<unsigned int *, KokkosDefault>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparsity_pattern_column_indices"),
+          column_indices_host_.extent(0));
+
+      indices_transposed_default_ = Kokkos::View<unsigned int *, KokkosDefault>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparsity_pattern_indices_transposed"),
+          indices_transposed_host_.extent(0));
+    }
+  }
+
+
+  template <int simd_length>
+  template <typename To, typename From>
+  void SparsityPattern<simd_length>::deep_copy_storage() const
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+
+    if constexpr (std::is_same_v<To, HostSpace>) {
+      Kokkos::deep_copy(/*dst*/ row_starts_host_, /*src*/ row_starts_default_);
+      Kokkos::deep_copy(/*dst*/ column_indices_host_,
+                        /*src*/ column_indices_default_);
+      Kokkos::deep_copy(/*dst*/ indices_transposed_host_,
+                        /*src*/ indices_transposed_default_);
+    } else {
+      Kokkos::deep_copy(/*dst*/ row_starts_default_, /*src*/ row_starts_host_);
+      Kokkos::deep_copy(/*dst*/ column_indices_default_,
+                        /*src*/ column_indices_host_);
+      Kokkos::deep_copy(/*dst*/ indices_transposed_default_,
+                        /*src*/ indices_transposed_host_);
+    }
+  }
+
+
+  template <int simd_length>
+  template <typename MemorySpace>
+  void SparsityPattern<simd_length>::deallocate_storage()
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+
+    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+      row_starts_host_ = {};
+      column_indices_host_ = {};
+      indices_transposed_host_ = {};
+
+      /*
+       * The inherited direct-access view holds reference counted copies
+       * of the host views. Release the view subobject as well so that the
+       * host memory is actually freed:
+       */
+      static_cast<SparsityPatternView<simd_length> &>(*this) =
+          SparsityPatternView<simd_length>{};
+
+    } else {
+      row_starts_default_ = {};
+      column_indices_default_ = {};
+      indices_transposed_default_ = {};
+    }
+  }
+
+
+  template <int simd_length>
+  void SparsityPattern<simd_length>::refresh_direct_interface()
+  {
+    SparsityPatternView<simd_length>::reinit(*this);
   }
 
 
@@ -377,14 +519,19 @@ namespace ryujin
                       std::is_same_v<MemorySpace, DefaultSpace>,
                   "Unexpected memory space");
 
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      row_starts_ = sparsity_pattern.row_starts_host_;
-      column_indices_ = sparsity_pattern.column_indices_host_;
-      indices_transposed_ = sparsity_pattern.indices_transposed_host_;
-    } else {
+    /*
+     * Note: If the host and default memory spaces coincide all views
+     * reference the host storage.
+     */
+    if constexpr (have_separate_memory_spaces &&
+                  !std::is_same_v<MemorySpace, HostSpace>) {
       row_starts_ = sparsity_pattern.row_starts_default_;
       column_indices_ = sparsity_pattern.column_indices_default_;
       indices_transposed_ = sparsity_pattern.indices_transposed_default_;
+    } else {
+      row_starts_ = sparsity_pattern.row_starts_host_;
+      column_indices_ = sparsity_pattern.column_indices_host_;
+      indices_transposed_ = sparsity_pattern.indices_transposed_host_;
     }
   }
 

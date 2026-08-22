@@ -27,9 +27,14 @@ namespace ryujin
       const dealii::DynamicSparsityPattern &sparsity,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &partitioner,
-      bool symmetrize_ghost_range)
+      bool symmetrize_ghost_range,
+      const TransferPolicy transfer_policy)
   {
-    reinit(n_internal_dofs, sparsity, partitioner, symmetrize_ghost_range);
+    reinit(n_internal_dofs,
+           sparsity,
+           partitioner,
+           symmetrize_ghost_range,
+           transfer_policy);
   }
 
 
@@ -39,8 +44,11 @@ namespace ryujin
       const dealii::DynamicSparsityPattern &dsp,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &partitioner,
-      const bool symmetrize_ghost_range)
+      const bool symmetrize_ghost_range,
+      const TransferPolicy transfer_policy)
   {
+    this->set_transfer_policy(transfer_policy);
+
     this->n_internal_dofs_ = n_internal_dofs;
     this->n_locally_owned_dofs_ = partitioner->locally_owned_size();
     this->partitioner_ = partitioner;
@@ -87,7 +95,6 @@ namespace ryujin
     /* Allocate memory: */
 
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
     row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
@@ -389,18 +396,16 @@ namespace ryujin
     }
 
     /*
-     * Copy data over to device and initialize the default host view:
+     * Copy the data over to the device so that the sparsity pattern ends
+     * up resident on both memory spaces. If the host and default memory
+     * spaces coincide this is a no-op: views for both memory spaces
+     * simply reference the host storage.
      */
 
-    row_starts_default_ = Kokkos::create_mirror_view_and_copy(
-        typename KokkosDefault::execution_space(), row_starts_host_);
+    this->reset_residency(/*host*/ true, /*default*/ false);
+    this->template copy_to_memory_space<dealii::MemorySpace::Default>();
 
-    column_indices_default_ = Kokkos::create_mirror_view_and_copy(
-        typename KokkosDefault::execution_space(), column_indices_host_);
-
-    indices_transposed_default_ = Kokkos::create_mirror_view_and_copy(
-        typename KokkosDefault::execution_space(), indices_transposed_host_);
-
+    /* Reinitialize the direct-access (host) view: */
     SparsityPatternView<simd_length>::reinit(*this);
   }
 } // namespace ryujin
