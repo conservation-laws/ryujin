@@ -1,0 +1,15 @@
+After sadd() on HostSpace:
+3 8 13 18
+23 28 33 38
+43 48 53 58
+63 68 73 78
+After sadd() on DefaultSpace:
+5 12 19 26
+25 32 39 46
+45 52 59 66
+65 72 79 86
+Increment vector:
+1 2 3 4
+1 2 3 4
+1 2 3 4
+1 2 3 4
