@@ -63,8 +63,7 @@ namespace ryujin
               int n_comp,
               int simd_length = dealii::VectorizedArray<Number>::size()>
     class MultiComponentVector
-        : public MultiComponentVectorView<Number, n_comp, simd_length>,
-          public MirroredStorage<
+        : public MirroredStorage<
               MultiComponentVector<Number, n_comp, simd_length>>
     {
     public:
@@ -562,7 +561,6 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
         const MultiComponentVector &other)
-        : MultiComponentVectorView<Number, n_comp, simd_length>()
     {
       *this = other;
     }
@@ -571,7 +569,6 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
         MultiComponentVector &&other) noexcept
-        : MultiComponentVectorView<Number, n_comp, simd_length>()
     {
       *this = other;
     }
@@ -604,9 +601,6 @@ namespace ryujin
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
       this->reset_residency(/*host*/ true, /*default*/ false);
-
-      /* Reinitialize view to point to the correct vector data: */
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 
@@ -644,9 +638,6 @@ namespace ryujin
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
       this->reset_residency(/*host*/ true, /*default*/ false);
-
-      /* Reinitialize view to point to the correct vector data: */
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 
@@ -660,13 +651,6 @@ namespace ryujin
       host_vector_ = other.host_vector_;
       if constexpr (have_separate_memory_spaces)
         default_vector_ = other.default_vector_;
-
-      /* Reinitialize view to point to the correct vector data: */
-      if (this->template is_resident<dealii::MemorySpace::Host>())
-        MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
-      else
-        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
-            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
 
       return *this;
     }
@@ -682,13 +666,6 @@ namespace ryujin
       host_vector_ = std::move(other.host_vector_);
       if constexpr (have_separate_memory_spaces)
         default_vector_ = std::move(other.default_vector_);
-
-      /* Reinitialize view to point to the correct vector data: */
-      if (this->template is_resident<dealii::MemorySpace::Host>())
-        MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
-      else
-        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
-            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
 
       return *this;
     }
@@ -772,13 +749,6 @@ namespace ryujin
       if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
         host_vector_.reinit(0);
 
-        /*
-         * The inherited direct-access view holds a raw pointer into the
-         * host vector. Reset the view subobject as well:
-         */
-        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
-            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
-
       } else {
         default_vector_.reinit(0);
       }
@@ -789,7 +759,6 @@ namespace ryujin
     void MultiComponentVector<Number, n_comp, simd_length>::
         refresh_direct_interface()
     {
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 

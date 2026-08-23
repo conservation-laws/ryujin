@@ -449,5 +449,5 @@ namespace ryujin
 
       //@}
     }; /* HyperbolicSystemView */
-  } // namespace Skeleton
+  }    // namespace Skeleton
 } // namespace ryujin

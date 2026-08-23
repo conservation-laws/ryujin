@@ -814,6 +814,9 @@ namespace ryujin
     {
       const auto sparsity_simd_view = sparsity_pattern_simd_.view();
       const auto mass_matrix_view = mass_matrix_.view();
+      const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+      const auto lumped_mass_matrix_inverse_view =
+          lumped_mass_matrix_inverse_.view();
 
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -834,15 +837,15 @@ namespace ryujin
           m_i += m_ij;
         }
 
-        lumped_mass_matrix_.template write_entry<T>(m_i, i);
-        lumped_mass_matrix_inverse_. //
+        lumped_mass_matrix_view.template write_entry<T>(m_i, i);
+        lumped_mass_matrix_inverse_view. //
             template write_entry<T>(Number(1.) / m_i, i);
       };
 
       cpu_simd_loop<Number>("", body, 0, n_locally_internal_, n_locally_owned_);
 
-      lumped_mass_matrix_.update_ghost_values();
-      lumped_mass_matrix_inverse_.update_ghost_values();
+      lumped_mass_matrix_view.update_ghost_values();
+      lumped_mass_matrix_inverse_view.update_ghost_values();
     }
 
     /*
@@ -850,6 +853,8 @@ namespace ryujin
      */
 
     if (discretization_->have_discontinuous_ansatz()) {
+      const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+
       /* The local, per-cell assembly routine: */
       const auto local_assemble_system = [&](const auto &cell,
                                              auto &scratch,
@@ -950,8 +955,8 @@ namespace ryujin
                       scalar_partitioner_->global_to_local(global_i);
                   const auto local_j =
                       scalar_partitioner_->global_to_local(global_j);
-                  const auto m_i = lumped_mass_matrix_.read_entry(local_i);
-                  const auto m_j = lumped_mass_matrix_.read_entry(local_j);
+                  const auto m_i = lumped_mass_matrix_view.read_entry(local_i);
+                  const auto m_j = lumped_mass_matrix_view.read_entry(local_j);
                   const auto hd_ij =
                       Number(0.5) * (m_i + m_j) / measure_of_omega_;
 

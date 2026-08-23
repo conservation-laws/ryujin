@@ -404,8 +404,5 @@ namespace ryujin
 
     this->reset_residency(/*host*/ true, /*default*/ false);
     this->template copy_to_memory_space<dealii::MemorySpace::Default>();
-
-    /* Reinitialize the direct-access (host) view: */
-    SparsityPatternView<simd_length>::reinit(*this);
   }
 } // namespace ryujin

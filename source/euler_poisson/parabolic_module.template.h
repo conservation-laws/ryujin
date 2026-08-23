@@ -798,11 +798,12 @@ namespace ryujin
 
       const Number alpha = parabolic_system_->alpha();
 
-      const auto old_U_view = std::get<0>(old_state_vector).view();
+      const auto &old_U = std::get<0>(old_state_vector);
+      const auto old_U_view = old_U.view();
       const auto &old_V = std::get<2>(old_state_vector);
       const auto &old_potential = old_V.block(0);
 
-      const auto new_U_view = std::get<0>(new_state_vector).view();
+      auto &new_U = std::get<0>(new_state_vector);
       auto &new_V = std::get<2>(new_state_vector);
       auto &new_potential = new_V.block(0);
 
@@ -1092,6 +1093,7 @@ namespace ryujin
        */
 
       new_U = old_U;
+      const auto new_U_view = new_U.view();
 
       if (crank_nicolson_extrapolation) {
         new_potential *= Number(2.);

@@ -47,8 +47,7 @@ namespace ryujin
             int n_comp = 1,
             int simd_length = dealii::VectorizedArray<Number>::size()>
   class SparseMatrix
-      : public SparseMatrixView<Number, n_comp, simd_length>,
-        public MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>
+      : public MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>
   {
   public:
     /**
@@ -528,9 +527,6 @@ namespace ryujin
     data_default_ = {};
     exchange_buffer_default_ = {};
     this->reset_residency(/*host*/ true, /*default*/ false);
-
-    /* reinitialize the view: */
-    SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
   }
 
 
@@ -638,14 +634,6 @@ namespace ryujin
       data_host_ = {};
       exchange_buffer_host_ = {};
 
-      /*
-       * The inherited direct-access view holds a reference counted copy
-       * of the host data view. Release the view subobject as well so
-       * that the host memory is actually freed:
-       */
-      static_cast<SparseMatrixView<Number, n_components, simd_length> &>(
-          *this) = SparseMatrixView<Number, n_components, simd_length>{};
-
     } else {
       data_default_ = {};
       exchange_buffer_default_ = {};
@@ -657,12 +645,6 @@ namespace ryujin
   void
   SparseMatrix<Number, n_components, simd_length>::refresh_direct_interface()
   {
-    /*
-     * Note: This calls sparsity_pattern_->view<Host>() internally.
-     * Moving a matrix to the host memory space thus requires a sparsity
-     * pattern that is resident on the host memory space.
-     */
-    SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
   }
 
 
