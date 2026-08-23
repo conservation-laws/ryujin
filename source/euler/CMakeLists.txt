@@ -6,8 +6,6 @@
 add_library(obj_euler OBJECT
   equation_dispatch.cc
   initial_state_library.cc
-  limiter.cc
-  wave_speed_estimator.cc
   )
 set_target_properties(obj_euler PROPERTIES LINKER_LANGUAGE CXX)
 deal_ii_setup_target(obj_euler)

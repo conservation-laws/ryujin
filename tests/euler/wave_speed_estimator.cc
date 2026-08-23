@@ -8,7 +8,6 @@
 
 #include <deal.II/base/mpi.h>
 #include <wave_speed_estimator.h>
-#include <wave_speed_estimator.template.h>
 
 #ifndef NEWTON_ITERATIONS
 #define NEWTON_ITERATIONS "0"
