@@ -214,15 +214,16 @@ int main(int argc, char *argv[])
 
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);
+  const auto sparse_matrix_view = sparse_matrix.view();
 
   for (unsigned int i = 0; i < n_locally_relevant; ++i) {
     const unsigned int row_length = sparsity_pattern_view.row_length(i);
     for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-      sparse_matrix.write_entry(std::pow(10., mpi_rank), i, col_idx);
+      sparse_matrix_view.write_entry(std::pow(10., mpi_rank), i, col_idx);
     }
   }
 
-  sparse_matrix.compress(dealii::VectorOperation::add);
+  sparse_matrix_view.compress(dealii::VectorOperation::add);
 
   const auto print_matrix = [&]() {
     for (unsigned int i = 0; i < n_locally_relevant; ++i) {
@@ -232,7 +233,7 @@ int main(int argc, char *argv[])
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
         const auto j_global = partitioner->local_to_global(*js);
         std::cout << "(" << i_global << "," << j_global << ") "
-                  << sparse_matrix.read_entry(i, col_idx) << std::endl;
+                  << sparse_matrix_view.read_entry(i, col_idx) << std::endl;
       }
     }
   };

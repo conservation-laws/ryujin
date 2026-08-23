@@ -37,17 +37,18 @@ int main(int argc, char *argv[])
 
   ryujin::SparseMatrix<double, 1, simd_width> my_sparse(my_sparsity);
   const auto my_sparsity_view = my_sparsity.view();
+  const auto my_sparse_view = my_sparse.view();
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
-      my_sparse.write_entry(static_cast<double>(i * 3 + j), i, j);
-  my_sparse.write_entry(36., 12, 0);
-  my_sparse.write_entry(37., 12, 1);
-  my_sparse.write_entry(38., 13, 0);
-  my_sparse.write_entry(39., 13, 1);
+      my_sparse_view.write_entry(static_cast<double>(i * 3 + j), i, j);
+  my_sparse_view.write_entry(36., 12, 0);
+  my_sparse_view.write_entry(37., 12, 1);
+  my_sparse_view.write_entry(38., 13, 0);
+  my_sparse_view.write_entry(39., 13, 1);
   std::cout << "Matrix entries row by row" << std::endl;
   for (unsigned int i = 0; i < my_sparsity_view.n_rows(); ++i) {
     for (unsigned int j = 0; j < my_sparsity_view.row_length(i); ++j) {
-      const auto a = my_sparse.read_entry(i, j);
+      const auto a = my_sparse_view.read_entry(i, j);
       std::cout << a << " ";
     }
     std::cout << std::endl;
@@ -56,20 +57,20 @@ int main(int argc, char *argv[])
   unsigned int i = 0;
   for (; i < (12 / simd_width) * simd_width; i += simd_width) {
     for (unsigned int j = 0; j < 3; ++j) {
-      const auto a = my_sparse.template read_entry<VA>(i, j);
+      const auto a = my_sparse_view.template read_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
   }
   for (; i < 14; i++)
-    std::cout << my_sparse.read_entry(i, 0) << " " << my_sparse.read_entry(i, 1)
-              << " ";
+    std::cout << my_sparse_view.read_entry(i, 0) << " "
+              << my_sparse_view.read_entry(i, 1) << " ";
   std::cout << std::endl;
 
   std::cout << "Matrix entries transposed row by row" << std::endl;
   for (unsigned int i = 0; i < my_sparsity_view.n_rows(); ++i) {
     for (unsigned int j = 0; j < my_sparsity_view.row_length(i); ++j) {
-      const auto a = my_sparse.read_transposed_entry(i, j);
+      const auto a = my_sparse_view.read_transposed_entry(i, j);
       std::cout << a << " ";
     }
     std::cout << std::endl;
@@ -79,13 +80,13 @@ int main(int argc, char *argv[])
   i = 0;
   for (; i < (12 / simd_width) * simd_width; i += simd_width) {
     for (unsigned int j = 0; j < 3; ++j) {
-      const auto a = my_sparse.template read_transposed_entry<VA>(i, j);
+      const auto a = my_sparse_view.template read_transposed_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
   }
   for (; i < 14; i++)
-    std::cout << my_sparse.read_transposed_entry(i, 0) << " "
-              << my_sparse.read_transposed_entry(i, 1) << " ";
+    std::cout << my_sparse_view.read_transposed_entry(i, 0) << " "
+              << my_sparse_view.read_transposed_entry(i, 1) << " ";
   std::cout << std::endl;
 }

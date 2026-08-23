@@ -107,6 +107,7 @@ int main(int argc, char *argv[])
 
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);
+  const auto sparse_matrix_view = sparse_matrix.view();
 
   /* Add a local contribution from all owning cells: */
   for (const auto &cell : dof_handler.active_cell_iterators()) {
@@ -130,7 +131,7 @@ int main(int argc, char *argv[])
         cell_matrix, dof_indices, affine_constraints, sparse_matrix);
   }
 
-  sparse_matrix.compress(dealii::VectorOperation::add);
+  sparse_matrix_view.compress(dealii::VectorOperation::add);
 
   const auto print_matrix = [&]() {
     for (unsigned int i = 0; i < n_locally_relevant; ++i) {
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
         const auto j_global = partitioner->local_to_global(*js);
         std::cout << "(" << i_global << "," << j_global << ") "
-                  << sparse_matrix.read_entry(i, col_idx) << std::endl;
+                  << sparse_matrix_view.read_entry(i, col_idx) << std::endl;
       }
     }
   };

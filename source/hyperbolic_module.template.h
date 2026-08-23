@@ -281,14 +281,31 @@ namespace ryujin
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
 
-    const auto &mass_matrix = offline_data_->mass_matrix();
-    const auto &mass_matrix_inverse = offline_data_->mass_matrix_inverse();
+    const auto mass_matrix_view = offline_data_->mass_matrix().view();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &lumped_mass_matrix_inverse =
         offline_data_->lumped_mass_matrix_inverse();
 
-    const auto &cij_matrix = offline_data_->cij_matrix();
-    const auto &incidence_matrix = offline_data_->incidence_matrix();
+    const auto cij_matrix_view = offline_data_->cij_matrix().view();
+
+    /*
+     * The mass_matrix_inverse and incidence_matrix objects are only
+     * initialized (and accessed) for a discontinuous ansatz:
+     */
+    const bool have_discontinuous_ansatz =
+        offline_data_->discretization().have_discontinuous_ansatz();
+    using MatrixReadView = decltype(offline_data_->mass_matrix().view());
+    const auto mass_matrix_inverse_view =
+        have_discontinuous_ansatz ? offline_data_->mass_matrix_inverse().view()
+                                  : MatrixReadView{};
+    const auto incidence_matrix_view =
+        have_discontinuous_ansatz ? offline_data_->incidence_matrix().view()
+                                  : MatrixReadView{};
+
+    const auto dij_matrix_view = dij_matrix_.view();
+    const auto lij_matrix_view = lij_matrix_.view();
+    const auto lij_matrix_next_view = lij_matrix_next_.view();
+    const auto pij_matrix_view = pij_matrix_.view();
 
     const auto &coupling_boundary_pairs =
         offline_data_->coupling_boundary_pairs();
@@ -367,7 +384,7 @@ namespace ryujin
 
           const auto U_j = old_U.template read_tensor<T>(js);
 
-          const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+          const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
           indicator_view.accumulate(old_precomputed, js, U_j, c_ij);
 
@@ -385,7 +402,7 @@ namespace ryujin
               old_precomputed, U_i, U_j, i, js, n_ij);
           const auto d_ij = norm * lambda_max;
 
-          dij_matrix_.write_entry(d_ij, i, col_idx, true);
+          dij_matrix_view.write_entry(d_ij, i, col_idx, true);
         }
 
         const auto mass = lumped_mass_matrix.template read_entry<T>(i);
@@ -442,18 +459,18 @@ namespace ryujin
         const auto U_i = old_U.read_tensor(i);
         const auto U_j = old_U.read_tensor(j);
 
-        const auto c_ji = cij_matrix.read_transposed_tensor(i, col_idx);
+        const auto c_ji = cij_matrix_view.read_transposed_tensor(i, col_idx);
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm_ji = c_ji.norm();
         const auto n_ji = c_ji / norm_ji;
 
-        const auto d_ij = dij_matrix_.read_entry(i, col_idx);
+        const auto d_ij = dij_matrix_view.read_entry(i, col_idx);
 
         const auto lambda_max = wave_speed_estimator_view.compute(
             old_precomputed, U_j, U_i, j, &i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
 
-        dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
+        dij_matrix_view.write_entry(std::max(d_ij, d_ji), i, col_idx);
       };
 
       cpu_simd_loop<Number>(loop_name(),
@@ -487,7 +504,7 @@ namespace ryujin
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
-            const auto d_ji = dij_matrix_.read_transposed_entry(i, col_idx);
+            const auto d_ji = dij_matrix_view.read_transposed_entry(i, col_idx);
 
 #ifdef DEBUG_SYMMETRY_CHECK
             /* Verify that d_ji == std::max(d_ij, d_ji): */
@@ -495,7 +512,7 @@ namespace ryujin
             const auto U_i = old_U.read_tensor(i);
             const auto U_j = old_U.read_tensor(j);
 
-            const auto c_ij = cij_matrix.read_tensor(i, col_idx);
+            const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
             Assert(c_ij.norm() > 1.e-12, ExcInternalError());
             const auto norm_ij = c_ij.norm();
             const auto n_ij = c_ij / norm_ij;
@@ -509,10 +526,10 @@ namespace ryujin
                                       "boundary degrees of freedom."));
 #endif
 
-            dij_matrix_.write_entry(d_ji, i, col_idx);
+            dij_matrix_view.write_entry(d_ji, i, col_idx);
           }
 
-          d_sum -= dij_matrix_.read_entry(i, col_idx);
+          d_sum -= dij_matrix_view.read_entry(i, col_idx);
         }
 
         /*
@@ -524,7 +541,7 @@ namespace ryujin
             std::min(d_sum, Number(-1.e6) * std::numeric_limits<Number>::min());
 
         /* write diagonal element */
-        dij_matrix_.write_entry(d_sum, i, 0);
+        dij_matrix_view.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.read_entry(i);
         const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
@@ -583,7 +600,7 @@ namespace ryujin
 
 #ifdef DEBUG
     /*  Exchange d_ij so that we can check for symmetry: */
-    dij_matrix_.update_ghost_rows();
+    dij_matrix_view.update_ghost_rows();
 #endif
 
     /*
@@ -673,8 +690,10 @@ namespace ryujin
             const auto flux_j = view.flux_contribution(
                 old_precomputed, initial_precomputed_, js, U_j);
 
-            const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
-            const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+            const auto d_ij =
+                dij_matrix_view.template read_entry<T>(i, col_idx);
+            const auto c_ij =
+                cij_matrix_view.template read_tensor<T>(i, col_idx);
 
             const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
             affine_shift += B_ij;
@@ -695,12 +714,12 @@ namespace ryujin
 
           const auto alpha_j = alpha_.template read_entry<T>(js);
 
-          const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
+          const auto d_ij = dij_matrix_view.template read_entry<T>(i, col_idx);
           auto factor = (alpha_i + alpha_j) * Number(.5);
 
           if constexpr (have_discontinuous_ansatz) {
             const auto incidence_ij =
-                incidence_matrix.template read_entry<T>(i, col_idx);
+                incidence_matrix_view.template read_entry<T>(i, col_idx);
             factor = std::max(factor, incidence_ij);
           }
 
@@ -714,13 +733,13 @@ namespace ryujin
            * that the (local) values of d_ij and d_ji match.
            */
           const auto d_ji =
-              dij_matrix_.template read_transposed_entry<T>(i, col_idx);
+              dij_matrix_view.template read_transposed_entry<T>(i, col_idx);
           Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
                  dealii::ExcMessage(
                      "d_ij not symmetrized correctly over MPI ranks"));
 #endif
 
-          const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+          const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
           constexpr auto eps = std::numeric_limits<Number>::epsilon();
           const auto scale =
               dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
@@ -730,7 +749,7 @@ namespace ryujin
           const auto flux_j = view.flux_contribution(
               old_precomputed, initial_precomputed_, js, U_j);
 
-          const auto m_ij = mass_matrix.template read_entry<T>(i, col_idx);
+          const auto m_ij = mass_matrix_view.template read_entry<T>(i, col_idx);
 
           /*
            * Compute low-order flux and limiter bounds:
@@ -820,7 +839,7 @@ namespace ryujin
             }
           }
 
-          pij_matrix_.template write_tensor<T>(P_ij, i, col_idx, true);
+          pij_matrix_view.template write_tensor<T>(P_ij, i, col_idx, true);
         }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
@@ -925,7 +944,7 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          auto P_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
+          auto P_ij = pij_matrix_view.template read_tensor<T>(i, col_idx);
           const auto F_jH = r_.template read_tensor<T>(js);
 
           /*
@@ -939,7 +958,7 @@ namespace ryujin
 
             const auto m_j = lumped_mass_matrix.template read_entry<T>(js);
             const auto m_ij_inv =
-                mass_matrix_inverse.template read_entry<T>(i, col_idx);
+                mass_matrix_inverse_view.template read_entry<T>(i, col_idx);
             const auto b_ij = m_i * m_ij_inv - kronecker_ij;
             const auto b_ji = m_j * m_ij_inv - kronecker_ij;
 
@@ -950,7 +969,8 @@ namespace ryujin
 
             const auto m_j_inv =
                 lumped_mass_matrix_inverse.template read_entry<T>(js);
-            const auto m_ij = mass_matrix.template read_entry<T>(i, col_idx);
+            const auto m_ij =
+                mass_matrix_view.template read_entry<T>(i, col_idx);
             const auto b_ij = kronecker_ij - m_ij * m_j_inv;
             const auto b_ji = kronecker_ij - m_ij * m_i_inv;
 
@@ -958,7 +978,7 @@ namespace ryujin
           }
 
           P_ij *= factor;
-          pij_matrix_.template write_tensor<T>(P_ij, i, col_idx);
+          pij_matrix_view.template write_tensor<T>(P_ij, i, col_idx);
 
           /*
            * Compute limiter coefficients:
@@ -966,7 +986,7 @@ namespace ryujin
 
           const auto &[l_ij, success] =
               limiter_view.limit(bounds, U_i_new, P_ij);
-          lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
+          lij_matrix_view.template write_entry<T>(l_ij, i, col_idx, true);
 
           /*
            * If the success is set to false then the low-order update
@@ -996,7 +1016,7 @@ namespace ryujin
             loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
-      lij_matrix_.update_ghost_rows();
+      lij_matrix_view.update_ghost_rows();
     }
 
     /*
@@ -1018,8 +1038,9 @@ namespace ryujin
           computing_timer_,
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
-      const auto &lij_matrix =
-          (n_iterations == 2 && last_round) ? lij_matrix_next_ : lij_matrix_;
+      const auto lij_view = (n_iterations == 2 && last_round)
+                                ? lij_matrix_next_view
+                                : lij_matrix_view;
 
       auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
@@ -1042,11 +1063,11 @@ namespace ryujin
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
-          const auto l_ij = std::min(
-              lij_matrix.template read_entry<T>(i, col_idx),
-              lij_matrix.template read_transposed_entry<T>(i, col_idx));
+          const auto l_ij =
+              std::min(lij_view.template read_entry<T>(i, col_idx),
+                       lij_view.template read_transposed_entry<T>(i, col_idx));
 
-          const auto p_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
+          const auto p_ij = pij_matrix_view.template read_tensor<T>(i, col_idx);
 
           U_i_new += l_ij * lambda * p_ij;
 
@@ -1074,8 +1095,9 @@ namespace ryujin
 
           const auto old_l_ij = lij_row[col_idx];
 
-          const auto new_p_ij = (T(1.) - old_l_ij) *
-                                pij_matrix_.template read_tensor<T>(i, col_idx);
+          const auto new_p_ij =
+              (T(1.) - old_l_ij) *
+              pij_matrix_view.template read_tensor<T>(i, col_idx);
 
           const auto &[new_l_ij, success] =
               limiter_view.limit(bounds, U_i_new, new_p_ij);
@@ -1102,14 +1124,14 @@ namespace ryujin
            * This approach only works for at most two limiting steps.
            */
           const auto entry = (T(1.) - old_l_ij) * new_l_ij;
-          lij_matrix_next_.write_entry(entry, i, col_idx, true);
+          lij_matrix_next_view.write_entry(entry, i, col_idx, true);
         }
       };
 
       cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
       if (!last_round) {
-        lij_matrix_next_.update_ghost_rows();
+        lij_matrix_next_view.update_ghost_rows();
       }
     } /* limiter_iter_ */
 

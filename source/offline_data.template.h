@@ -793,15 +793,15 @@ namespace ryujin
                     AssemblyScratchData<dim>(*discretization_),
                     AssemblyCopyData<dim, Number>());
 
-    mass_matrix_.compress(VectorOperation::add);
-    mass_matrix_.update_ghost_rows();
-    cij_matrix_.compress(VectorOperation::add);
-    cij_matrix_.update_ghost_rows();
-    betaij_matrix_.compress(VectorOperation::add);
-    betaij_matrix_.update_ghost_rows();
+    mass_matrix_.view().compress(VectorOperation::add);
+    mass_matrix_.view().update_ghost_rows();
+    cij_matrix_.view().compress(VectorOperation::add);
+    cij_matrix_.view().update_ghost_rows();
+    betaij_matrix_.view().compress(VectorOperation::add);
+    betaij_matrix_.view().update_ghost_rows();
     if (discretization_->have_discontinuous_ansatz()) {
-      mass_matrix_inverse_.compress(VectorOperation::add);
-      mass_matrix_inverse_.update_ghost_rows();
+      mass_matrix_inverse_.view().compress(VectorOperation::add);
+      mass_matrix_inverse_.view().update_ghost_rows();
     }
 
     measure_of_omega_ = Utilities::MPI::sum(
@@ -813,6 +813,7 @@ namespace ryujin
 
     {
       const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+      const auto mass_matrix_view = mass_matrix_.view();
 
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -829,7 +830,7 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto m_ij = mass_matrix_.template read_entry<T>(i, col_idx);
+          const auto m_ij = mass_matrix_view.template read_entry<T>(i, col_idx);
           m_i += m_ij;
         }
 
@@ -1015,7 +1016,7 @@ namespace ryujin
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
 
-      incidence_matrix_.compress(VectorOperation::add);
+      incidence_matrix_.view().compress(VectorOperation::add);
     }
 
     /*
@@ -1050,6 +1051,8 @@ namespace ryujin
      */
 
     const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+    const auto mass_matrix_view = mass_matrix_.view();
+    const auto cij_matrix_view = cij_matrix_.view();
 
     for (unsigned int i = 0; i < n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
@@ -1058,7 +1061,7 @@ namespace ryujin
         continue;
 
       auto sum =
-          mass_matrix_.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
+          mass_matrix_view.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -1068,7 +1071,7 @@ namespace ryujin
                                                  : js + col_idx);
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
-        const auto m_ij = mass_matrix_.read_entry(i, col_idx);
+        const auto m_ij = mass_matrix_view.read_entry(i, col_idx);
         if (discretization_->have_discontinuous_ansatz()) {
           // Interfacial coupling terms are present in the stencil but zero
           // in the mass matrix
@@ -1078,7 +1081,7 @@ namespace ryujin
         }
         sum += m_ij;
 
-        const auto m_ji = mass_matrix_.read_transposed_entry(i, col_idx);
+        const auto m_ji = mass_matrix_view.read_transposed_entry(i, col_idx);
         if (std::abs(m_ij - m_ji) >= 1.e-12) {
           // The m_ij matrix is not symmetric
           std::stringstream ss;
@@ -1100,7 +1103,7 @@ namespace ryujin
       if (row_length == 1)
         continue;
 
-      auto sum = cij_matrix_.read_tensor(i, 0);
+      auto sum = cij_matrix_view.read_tensor(i, 0);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -1110,11 +1113,11 @@ namespace ryujin
                                                  : js + col_idx);
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
-        const auto c_ij = cij_matrix_.read_tensor(i, col_idx);
+        const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
         Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
         sum += c_ij;
 
-        const auto c_ji = cij_matrix_.read_transposed_tensor(i, col_idx);
+        const auto c_ji = cij_matrix_view.read_transposed_tensor(i, col_idx);
         if ((c_ij + c_ji).norm() >= 1.e-12) {
           // The c_ij matrix is not symmetric, this can only happen if i
           // and j are both located on the boundary.

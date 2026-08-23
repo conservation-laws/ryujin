@@ -233,6 +233,23 @@ namespace ryujin
         const SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
       requires(!writable);
 
+    /**
+     * Converting constructor creating a read only view from a writable
+     * view (mirroring the conversion from `T *` to `const T *`).
+     *
+     * @note We need to make this a templated constructor, otherwise the
+     * writable-converting constructor here would suppress the default copy
+     * constructor.
+     */
+    template <bool other_writable>
+    DEAL_II_HOST_DEVICE
+    SparseMatrixView(const SparseMatrixView<Number,
+                                            n_comp,
+                                            simd_length,
+                                            MemorySpace,
+                                            other_writable> &other)
+      requires(!writable && other_writable);
+
     template <typename SparseMatrix>
     void reinit(SparseMatrix &sparse_matrix)
       requires(writable != std::is_const_v<SparseMatrix>);
@@ -414,6 +431,9 @@ namespace ryujin
 
     using KokkosSpace = typename MemorySpace::kokkos_space;
     Kokkos::View<Number *, KokkosSpace> data_;
+
+    template <typename, int, int, typename, bool>
+    friend class SparseMatrixView;
 
     //@}
   };
@@ -927,6 +947,27 @@ namespace ryujin
             int simd_length,
             typename MemorySpace,
             bool writable>
+  template <bool other_writable>
+  DEAL_II_HOST_DEVICE
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      SparseMatrixView(const SparseMatrixView<Number,
+                                              n_comp,
+                                              simd_length,
+                                              MemorySpace,
+                                              other_writable> &other)
+    requires(!writable && other_writable)
+      : sparse_matrix_(other.sparse_matrix_)
+      , sparsity_pattern_(other.sparsity_pattern_)
+      , data_(other.data_)
+  {
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
   template <typename SparseMatrix>
   void
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::reinit(
@@ -1380,6 +1421,8 @@ namespace ryujin
       }
     }
 
+    const auto sparse_matrix_view = sparse_matrix.view();
+
     const auto &sparsity_pattern = sparse_matrix.sparsity_pattern();
     const auto sparsity_pattern_view = sparsity_pattern.view();
     const auto &partitioner = sparsity_pattern.partitioner();
@@ -1397,7 +1440,7 @@ namespace ryujin
             if (entry == Number{})
               return;
             const auto col_idx = sparsity_pattern_view.column_index(i, j);
-            sparse_matrix.add_entry(c_ij * entry, i, col_idx);
+            sparse_matrix_view.add_entry(c_ij * entry, i, col_idx);
           } else if constexpr (is_array) {
             dealii::Tensor<1, n_comp, Number> entry;
             for (unsigned int k = 0; k < n_comp; ++k)
@@ -1405,7 +1448,7 @@ namespace ryujin
             if (entry == dealii::Tensor<1, n_comp>{})
               return;
             const auto col_idx = sparsity_pattern_view.column_index(i, j);
-            sparse_matrix.add_tensor(c_ij * entry, i, col_idx);
+            sparse_matrix_view.add_tensor(c_ij * entry, i, col_idx);
           }
         };
 

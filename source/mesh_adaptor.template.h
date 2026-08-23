@@ -433,7 +433,7 @@ namespace ryujin
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
+    const auto betaij_matrix_view = offline_data_->betaij_matrix().view();
     using VA = dealii::VectorizedArray<Number>;
 
     /*
@@ -505,7 +505,8 @@ namespace ryujin
         if (col_idx == 0)
           continue;
 
-        const auto beta_ij = betaij_matrix.template read_entry<T>(i, col_idx);
+        const auto beta_ij =
+            betaij_matrix_view.template read_entry<T>(i, col_idx);
 
         for (unsigned int k = 0; k < n_entries; ++k) {
           const auto value_j_k = read_entry<T>(quantities[k], js);

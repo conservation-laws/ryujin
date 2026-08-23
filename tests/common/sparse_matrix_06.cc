@@ -51,12 +51,15 @@ int main(int argc, char *argv[])
   /* Fill entries on the host space: */
 
   print_status();
-  sparse_matrix.write_entry(22.0, 0, 1);
-  sparse_matrix.write_entry(20.0, 0, 2);
-  sparse_matrix.write_entry(220.0, 1, 1);
-  sparse_matrix.write_entry(200.0, 1, 2);
-  sparse_matrix.write_entry(2200.0, 2, 1);
-  sparse_matrix.write_entry(2000.0, 2, 2);
+  {
+    const auto host_view = sparse_matrix.view();
+    host_view.write_entry(22.0, 0, 1);
+    host_view.write_entry(20.0, 0, 2);
+    host_view.write_entry(220.0, 1, 1);
+    host_view.write_entry(200.0, 1, 2);
+    host_view.write_entry(2200.0, 2, 1);
+    host_view.write_entry(2000.0, 2, 2);
+  }
 
   /* Copying to the default space keeps both spaces resident: */
 
@@ -88,7 +91,8 @@ int main(int argc, char *argv[])
   std::cout << "After move to HostSpace:" << std::endl;
   sparse_matrix.move_to_memory_space<HostSpace>();
   print_status();
-  std::cout << "Entry (0, 1): " << sparse_matrix.read_entry(0, 1) << std::endl;
+  std::cout << "Entry (0, 1): " << sparse_matrix.view().read_entry(0, 1)
+            << std::endl;
 
   /* Sum up rows on the default space: */
 

@@ -121,7 +121,7 @@ namespace ryujin
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const auto &cij_matrix = offline_data_->cij_matrix();
+    const auto cij_matrix_view = offline_data_->cij_matrix().view();
 
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -165,7 +165,7 @@ namespace ryujin
         const auto view = hyperbolic_system_->template view<dim, T>();
         const auto prim_j = view.to_primitive_state(U_j);
 
-        const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+        const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
         unsigned int k = 0;
         for (const auto &[is_primitive, index] : schlieren_indices_) {
