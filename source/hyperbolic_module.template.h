@@ -58,7 +58,8 @@ namespace ryujin
               << std::endl;
 #endif
 
-    AssertThrow(limiter_.iterations() <= 2,
+    const auto limiter_view = limiter_.template view<dim, Number>();
+    AssertThrow(limiter_view.iterations() <= 2,
                 dealii::ExcMessage(
                     "The number of limiter iterations must be between [0,2]"));
 
@@ -313,6 +314,9 @@ namespace ryujin
     const auto lij_matrix_view = lij_matrix_.view();
     const auto lij_matrix_next_view = lij_matrix_next_.view();
     const auto pij_matrix_view = pij_matrix_.view();
+
+    const auto n_limiter_iterations =
+        limiter_.template view<dim, Number>().iterations();
 
     const auto &coupling_boundary_pairs =
         offline_data_->coupling_boundary_pairs();
@@ -904,7 +908,7 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-    if (limiter_.iterations() != 0) {
+    if (n_limiter_iterations != 0) {
       Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
 
       auto body = [&](auto sentinel,
@@ -1047,16 +1051,15 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-    const auto n_iterations = limiter_.iterations();
-    for (unsigned int pass = 0; pass < n_iterations; ++pass) {
-      bool last_round = (pass + 1 == n_iterations);
+    for (unsigned int pass = 0; pass < n_limiter_iterations; ++pass) {
+      bool last_round = (pass + 1 == n_limiter_iterations);
 
       std::string additional_step = (last_round ? "" : ", next l_ij");
       Scope scope(
           computing_timer_,
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
-      const auto lij_view = (n_iterations == 2 && last_round)
+      const auto lij_view = (n_limiter_iterations == 2 && last_round)
                                 ? lij_matrix_next_view
                                 : lij_matrix_view;
 

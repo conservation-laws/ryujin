@@ -66,15 +66,6 @@ namespace ryujin
                       "factor * (m_i/|Omega|)^(1.5/d).");
       }
 
-      //@}
-      /**
-       * @name Information and statistics
-       */
-      //@{
-
-      ACCESSOR_READ_ONLY(iterations);
-      ACCESSOR_READ_ONLY(relaxation_factor);
-
       /**
        * Return a view on the Limiter for a given dimension @p dim and
        * choice of number type @p Number (which can be a scalar float, or
@@ -106,6 +97,9 @@ namespace ryujin
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
       //@}
+
+      template <int, typename>
+      friend class LimiterView;
     };
 
 
@@ -164,6 +158,22 @@ namespace ryujin
           : view_(view)
           , limiter_(limiter)
       {
+      }
+
+      /**
+       * Return the number of limiter iterations.
+       */
+      unsigned int iterations() const
+      {
+        return limiter_.iterations_;
+      }
+
+      /**
+       * Return the factor used for scaling the relaxation window.
+       */
+      ScalarNumber relaxation_factor() const
+      {
+        return limiter_.relaxation_factor_;
       }
 
       /**
@@ -319,7 +329,7 @@ namespace ryujin
         r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                           //
         r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter_.relaxation_factor();
+      r *= relaxation_factor();
 
       u_min = std::min((Number(1.) - r) * u_min, (Number(1.) + r) * u_min);
       u_max = std::max((Number(1.) + r) * u_max, (Number(1.) - r) * u_max);
@@ -402,7 +412,7 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const Number u_relaxation =
-          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          ScalarNumber(2. * relaxation_factor()) *
           std::abs(u_relaxation_numerator_) /
           (std::abs(u_relaxation_denominator_) + Number(eps));
 
