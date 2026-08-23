@@ -118,7 +118,8 @@ namespace ryujin
 
     const auto &affine_constraints = offline_data_->affine_constraints();
 
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
 
@@ -144,7 +145,7 @@ namespace ryujin
       constexpr unsigned int stride_size = get_stride_size<T>;
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
@@ -156,7 +157,7 @@ namespace ryujin
       for (auto &it : local_vorticity_values)
         it = curl_type<T>();
 
-      const unsigned int *js = sparsity_simd.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 

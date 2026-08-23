@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
       (12 / simd_width) * simd_width, spars, partitioner);
 
   ryujin::SparseMatrix<double, 1, simd_width> my_sparse(my_sparsity);
+  const auto my_sparsity_view = my_sparsity.view();
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
       my_sparse.write_entry(static_cast<double>(i * 3 + j), i, j);
@@ -44,8 +45,8 @@ int main(int argc, char *argv[])
   my_sparse.write_entry(38., 13, 0);
   my_sparse.write_entry(39., 13, 1);
   std::cout << "Matrix entries row by row" << std::endl;
-  for (unsigned int i = 0; i < my_sparsity.n_rows(); ++i) {
-    for (unsigned int j = 0; j < my_sparsity.row_length(i); ++j) {
+  for (unsigned int i = 0; i < my_sparsity_view.n_rows(); ++i) {
+    for (unsigned int j = 0; j < my_sparsity_view.row_length(i); ++j) {
       const auto a = my_sparse.read_entry(i, j);
       std::cout << a << " ";
     }
@@ -66,8 +67,8 @@ int main(int argc, char *argv[])
   std::cout << std::endl;
 
   std::cout << "Matrix entries transposed row by row" << std::endl;
-  for (unsigned int i = 0; i < my_sparsity.n_rows(); ++i) {
-    for (unsigned int j = 0; j < my_sparsity.row_length(i); ++j) {
+  for (unsigned int i = 0; i < my_sparsity_view.n_rows(); ++i) {
+    for (unsigned int j = 0; j < my_sparsity_view.row_length(i); ++j) {
       const auto a = my_sparse.read_transposed_entry(i, j);
       std::cout << a << " ";
     }

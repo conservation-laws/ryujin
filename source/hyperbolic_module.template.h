@@ -278,7 +278,8 @@ namespace ryujin
 
     /* References to precomputed matrices and the stencil: */
 
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
 
     const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &mass_matrix_inverse = offline_data_->mass_matrix_inverse();
@@ -352,7 +353,7 @@ namespace ryujin
         auto indicator_view = indicator_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
@@ -360,7 +361,7 @@ namespace ryujin
 
         indicator_view.reset(old_precomputed, i, U_i);
 
-        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
@@ -472,14 +473,14 @@ namespace ryujin
 #endif
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
         Number d_sum = Number(0.);
 
         /* skip diagonal: */
-        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
@@ -613,7 +614,7 @@ namespace ryujin
         auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
@@ -663,7 +664,7 @@ namespace ryujin
          * before we can compute limiter bounds.
          */
 
-        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         if constexpr (shallow_water) {
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
@@ -686,7 +687,7 @@ namespace ryujin
           affine_shift += tau * /* m_i_inv * m_i */ S_i;
         }
 
-        js = sparsity_simd.columns(i);
+        js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
@@ -881,7 +882,7 @@ namespace ryujin
         auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
@@ -895,7 +896,7 @@ namespace ryujin
          */
         if constexpr (have_discontinuous_ansatz) {
           /* Skip diagonal. */
-          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+          const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
           for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
             bounds = limiter_view.combine_bounds(
@@ -920,7 +921,7 @@ namespace ryujin
         const auto factor = tau * m_i_inv * lambda_inv;
 
         /* Skip diagonal. */
-        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+        const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
@@ -1027,7 +1028,7 @@ namespace ryujin
         auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 

@@ -332,7 +332,8 @@ namespace ryujin
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+      const auto sparsity_simd_view =
+          offline_data_->sparsity_pattern_simd().view();
 
       DiagonalMatrix<dim, Number> diagonal_matrix;
 
@@ -868,7 +869,7 @@ namespace ryujin
           const auto view = hyperbolic_system_->template view<dim, T>();
 
           /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
           if (row_length == 1)
             return;
 

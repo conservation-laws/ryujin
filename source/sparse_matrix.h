@@ -485,11 +485,14 @@ namespace ryujin
 
     this->sparsity_pattern_ = &sparsity;
 
+    const auto sparsity_view = sparsity.view();
+
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
     data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-        "sparse_matrix_data", sparsity.n_nonzero_elements() * n_components);
+        "sparse_matrix_data",
+        sparsity_view.n_nonzero_elements() * n_components);
 
     const std::size_t n_indices = sparsity.entries_to_be_sent().size();
 
@@ -544,13 +547,15 @@ namespace ryujin
 
     Assert(sparsity_pattern_ != nullptr, dealii::ExcNotInitialized());
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     /*
      * Note: We allocate without initializing because a deep_copy_storage()
      * always follows.
      */
 
     const std::size_t n_data =
-        sparsity_pattern_->n_nonzero_elements() * n_components;
+        sparsity_view.n_nonzero_elements() * n_components;
     const std::size_t n_exchange =
         n_components * sparsity_pattern_->entries_to_be_sent().size();
 
@@ -655,10 +660,11 @@ namespace ryujin
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     const auto ghost_offset =
-        sparsity_pattern_->template ghost_offset<n_components>();
-    const auto end_offset =
-        sparsity_pattern_->n_nonzero_elements() * n_components;
+        sparsity_view.template ghost_offset<n_components>();
+    const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
     std::fill(data_host_.data() + ghost_offset,
               data_host_.data() + end_offset,
               Number{});
@@ -679,6 +685,8 @@ namespace ryujin
     Assert(this->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
     const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
@@ -694,7 +702,7 @@ namespace ryujin
     std::vector<MPI_Request> requests(n_requests);
 
     const auto ghost_offset =
-        sparsity_pattern_->template ghost_offset<n_components>();
+        sparsity_view.template ghost_offset<n_components>();
 
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
       const auto receive_offset =
@@ -724,8 +732,8 @@ namespace ryujin
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset = sparsity_pattern_->template offset<n_components>(
-            row, column_index, d);
+        const auto offset =
+            sparsity_view.template offset<n_components>(row, column_index, d);
         exchange_buffer_host_(n_components * c + d) = data_host_(offset);
       }
     }
@@ -784,6 +792,8 @@ namespace ryujin
     Assert(this->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
     const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
@@ -829,7 +839,7 @@ namespace ryujin
     }
 
     const auto ghost_offset =
-        sparsity_pattern_->template ghost_offset<n_components>();
+        sparsity_view.template ghost_offset<n_components>();
 
     /*
      * Note: For the compress() operation we send our ghost range to the
@@ -875,8 +885,8 @@ namespace ryujin
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset = sparsity_pattern_->template offset<n_components>(
-            row, column_index, d);
+        const auto offset =
+            sparsity_view.template offset<n_components>(row, column_index, d);
         data_host_(offset) += exchange_buffer_host_(n_components * c + d);
       }
     }
@@ -1371,6 +1381,7 @@ namespace ryujin
     }
 
     const auto &sparsity_pattern = sparse_matrix.sparsity_pattern();
+    const auto sparsity_pattern_view = sparsity_pattern.view();
     const auto &partitioner = sparsity_pattern.partitioner();
 
     /*
@@ -1385,7 +1396,7 @@ namespace ryujin
             const Number &entry = cell_matrix(r, c);
             if (entry == Number{})
               return;
-            const auto col_idx = sparsity_pattern.column_index(i, j);
+            const auto col_idx = sparsity_pattern_view.column_index(i, j);
             sparse_matrix.add_entry(c_ij * entry, i, col_idx);
           } else if constexpr (is_array) {
             dealii::Tensor<1, n_comp, Number> entry;
@@ -1393,7 +1404,7 @@ namespace ryujin
               entry[k] = cell_matrix[k](r, c);
             if (entry == dealii::Tensor<1, n_comp>{})
               return;
-            const auto col_idx = sparsity_pattern.column_index(i, j);
+            const auto col_idx = sparsity_pattern_view.column_index(i, j);
             sparse_matrix.add_tensor(c_ij * entry, i, col_idx);
           }
         };

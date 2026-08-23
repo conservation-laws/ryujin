@@ -942,7 +942,8 @@ namespace ryujin
     {
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
-      const auto &sparsity_simd = offline_data.sparsity_pattern_simd();
+      const auto sparsity_simd_view =
+          offline_data.sparsity_pattern_simd().view();
       using VA = dealii::VectorizedArray<ScalarNumber>;
 
       const auto &U = std::get<0>(state_vector);
@@ -955,7 +956,7 @@ namespace ryujin
         using View = HyperbolicSystemView<dim, T>;
         using precomputed_type = typename View::precomputed_type;
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (skip_constrained_dofs && row_length == 1)
           return;
 
@@ -983,7 +984,7 @@ namespace ryujin
         using View = HyperbolicSystemView<dim, T>;
         using PT = typename View::precomputed_type;
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (skip_constrained_dofs && row_length == 1)
           return;
 
@@ -995,7 +996,7 @@ namespace ryujin
         const auto view = this->view<dim, T>();
 
         constexpr unsigned int stride_size = get_stride_size<T>;
-        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+        const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 

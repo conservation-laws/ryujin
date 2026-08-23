@@ -431,7 +431,8 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     using VA = dealii::VectorizedArray<Number>;
 
@@ -484,7 +485,7 @@ namespace ryujin
       unsigned int stride_size = get_stride_size<T>;
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
@@ -496,7 +497,7 @@ namespace ryujin
       boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
       boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
 
-      const unsigned int *js = sparsity_simd.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 
@@ -542,7 +543,7 @@ namespace ryujin
       using T = decltype(sentinel);
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
@@ -576,13 +577,13 @@ namespace ryujin
       unsigned int stride_size = get_stride_size<T>;
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
       auto alpha_i = read_entry<T>(numerator[0], i);
 
-      const unsigned int *js = sparsity_simd.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 

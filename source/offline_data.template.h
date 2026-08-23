@@ -812,18 +812,20 @@ namespace ryujin
      */
 
     {
+      const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
         constexpr unsigned int stride_size = get_stride_size<T>;
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
         T m_i{};
 
-        const unsigned int *js = sparsity_pattern_simd_.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
@@ -1047,9 +1049,11 @@ namespace ryujin
      * Verify that the mij_matrix_ object is consistent:
      */
 
+    const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+
     for (unsigned int i = 0; i < n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         continue;
 
@@ -1058,7 +1062,7 @@ namespace ryujin
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
                                                  : js + col_idx);
@@ -1092,7 +1096,7 @@ namespace ryujin
 
     for (unsigned int i = 0; i < n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         continue;
 
@@ -1100,7 +1104,7 @@ namespace ryujin
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
                                                  : js + col_idx);
@@ -1223,6 +1227,8 @@ namespace ryujin
               << std::endl;
 #endif
 
+    const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+
     /*
      * Create a temporary multimap with the (local) dof index as key:
      */
@@ -1334,8 +1340,7 @@ namespace ryujin
             continue;
 
           /* Skip constrained degrees of freedom: */
-          const unsigned int row_length =
-              sparsity_pattern_simd_.row_length(index);
+          const unsigned int row_length = sparsity_simd_view.row_length(index);
           if (row_length == 1)
             continue;
 
@@ -1512,6 +1517,8 @@ namespace ryujin
      * Now, collect all coupling boundary pairs:
      */
 
+    const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+
     CouplingBoundaryPairs result;
 
     for (const auto i : locally_relevant_boundary_indices) {
@@ -1520,13 +1527,13 @@ namespace ryujin
       if (i >= n_locally_owned_)
         continue;
 
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
 
       /* Skip all constrained degrees of freedom: */
       if (row_length == 1)
         continue;
 
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       constexpr auto simd_length = VectorizedArray<Number>::size();
       /* skip diagonal: */
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
