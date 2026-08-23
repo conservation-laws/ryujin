@@ -11,6 +11,7 @@
 
 #include <compile_time_options.h>
 #include <deal.II/base/config.h>
+#include <gpu.h>
 #include <multicomponent_vector.h>
 #include <newton.h>
 #include <observer_pointer.h>
@@ -22,7 +23,9 @@ namespace ryujin
 {
   namespace Euler
   {
-    template <int dim, typename Number = double>
+    template <int dim,
+              typename Number = double,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class LimiterView;
 
     /**
@@ -65,11 +68,23 @@ namespace ryujin
       //@{
 
       /**
-       * Alias for the view on the limiter for a given dimension @p dim
-       * and choice of number type @p Number.
+       * A structure holding all runtime parameters of the limiter.
        */
-      template <int dim, typename Number = double>
-      using View = LimiterView<dim, Number>;
+      struct Parameters {
+        unsigned int iterations;
+        double newton_tolerance;
+        unsigned int newton_max_iterations;
+        double relaxation_factor;
+      };
+
+      /**
+       * Alias for the view on the limiter for a given dimension @p dim,
+       * choice of number type @p Number, and memory space @p MemorySpace.
+       */
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = LimiterView<dim, Number, MemorySpace>;
 
       //@}
       /**
@@ -83,54 +98,59 @@ namespace ryujin
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
+          , parameters_("euler_limiter_parameters",
+                        TransferPolicy::implicit_transfers)
           , hyperbolic_system_(&hyperbolic_system)
       {
-        iterations_ = 2;
-        add_parameter(
-            "iterations", iterations_, "Number of limiter iterations");
+        /*
+         * Note: We bind the parameters directly to the storage held by the
+         * Mirrored object. The corresponding memory is allocated once in
+         * the constructor and never reallocated, so the addresses remain
+         * valid for the lifetime of this object.
+         */
+        auto &parameters = *parameters_.view();
+
+        parameters.iterations = 2;
+        add_parameter("iterations",
+                      parameters.iterations,
+                      "Number of limiter iterations");
 
         if constexpr (std::is_same<ScalarNumber, double>::value)
-          newton_tolerance_ = 1.e-10;
+          parameters.newton_tolerance = 1.e-10;
         else
-          newton_tolerance_ = 1.e-4;
+          parameters.newton_tolerance = 1.e-4;
         add_parameter("newton tolerance",
-                      newton_tolerance_,
+                      parameters.newton_tolerance,
                       "Tolerance for the quadratic newton stopping criterion");
 
-        newton_max_iterations_ = 2;
+        parameters.newton_max_iterations = 2;
         add_parameter("newton max iterations",
-                      newton_max_iterations_,
+                      parameters.newton_max_iterations,
                       "Maximal number of quadratic newton iterations performed "
                       "during limiting");
 
-        relaxation_factor_ = ScalarNumber(1.);
+        parameters.relaxation_factor = 1.;
         add_parameter("relaxation factor",
-                      relaxation_factor_,
+                      parameters.relaxation_factor,
                       "Factor for scaling the relaxation window with r_i = "
                       "factor * (m_i/|Omega|)^(1.5/d).");
       }
 
-      //@}
-      /**
-       * @name Information and statistics
-       */
-      //@{
-
-      ACCESSOR_READ_ONLY(iterations);
-      ACCESSOR_READ_ONLY(newton_tolerance);
-      ACCESSOR_READ_ONLY(newton_max_iterations);
-      ACCESSOR_READ_ONLY(relaxation_factor);
-
       /**
        * Return a view on the Limiter for a given dimension @p dim and
        * choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars).
+       * double, as well as a VectorizedArray holding packed scalars). The
+       * optional @p MemorySpace template parameter selects whether the
+       * view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
+        return View<dim, Number, MemorySpace>{
+            hyperbolic_system_->template view<dim, Number, MemorySpace>(),
+            *this};
       }
 
     private:
@@ -140,10 +160,7 @@ namespace ryujin
        */
       //@{
 
-      unsigned int iterations_;
-      ScalarNumber newton_tolerance_;
-      unsigned int newton_max_iterations_;
-      ScalarNumber relaxation_factor_;
+      Mirrored<Parameters> parameters_;
 
       //@}
       /**
@@ -154,6 +171,9 @@ namespace ryujin
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
       //@}
+
+      template <int, typename, typename>
+      friend class LimiterView;
     };
 
 
@@ -165,16 +185,21 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class LimiterView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -209,25 +234,59 @@ namespace ryujin
        */
       LimiterView(const View &view, const Limiter<ScalarNumber> &limiter)
           : view_(view)
-          , limiter_(limiter)
+          , parameters_(limiter.parameters_.template view<MemorySpace>())
       {
+      }
+
+      /**
+       * Return the number of limiter iterations.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int iterations() const
+      {
+        return parameters_->iterations;
+      }
+
+      /**
+       * Return the tolerance for the quadratic Newton stopping criterion.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber newton_tolerance() const
+      {
+        return ScalarNumber(parameters_->newton_tolerance);
+      }
+
+      /**
+       * Return the maximal number of quadratic Newton iterations.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+      newton_max_iterations() const
+      {
+        return parameters_->newton_max_iterations;
+      }
+
+      /**
+       * Return the factor used for scaling the relaxation window.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber relaxation_factor() const
+      {
+        return ScalarNumber(parameters_->relaxation_factor);
       }
 
       /**
        * Given a state @p U_i and an index @p i return "strict" bounds,
        * i.e., a minimal convex set containing the state.
        */
-      Bounds projection_bounds_from_state(const PrecomputedVectorView &pv,
-                                          const unsigned int i,
-                                          const state_type &U_i) const;
+      DEAL_II_HOST_DEVICE Bounds
+      projection_bounds_from_state(const PrecomputedVectorView &pv,
+                                   const unsigned int i,
+                                   const state_type &U_i) const;
 
       /**
        * Given two bounds bounds_left, bounds_right, this function computes
        * a larger, combined set of bounds that this is a (convex) superset
        * of the two.
        */
-      Bounds combine_bounds(const Bounds &bounds_left,
-                            const Bounds &bounds_right) const;
+      DEAL_II_HOST_DEVICE Bounds combine_bounds(
+          const Bounds &bounds_left, const Bounds &bounds_right) const;
 
       /**
        * This function applies a relaxation to a given a (strict) bound @p
@@ -237,7 +296,8 @@ namespace ryujin
        * with $(1+r)$ and minimum bounds with $(1-r)$, while ensuring that
        * the bounds still describe an admissible state.
        */
-      Bounds fully_relax_bounds(const Bounds &bounds, const Number &hd) const;
+      DEAL_II_HOST_DEVICE Bounds fully_relax_bounds(const Bounds &bounds,
+                                                    const Number &hd) const;
 
       //@}
       /**
@@ -263,26 +323,27 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const PrecomputedVectorView &pv,
-                 const unsigned int i,
-                 const state_type &U_i,
-                 const flux_contribution_type &flux_i);
+      DEAL_II_HOST_DEVICE void reset(const PrecomputedVectorView &pv,
+                                     const unsigned int i,
+                                     const state_type &U_i,
+                                     const flux_contribution_type &flux_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const PrecomputedVectorView &pv,
-                      const unsigned int *js,
-                      const state_type &U_j,
-                      const flux_contribution_type &flux_j,
-                      const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-                      const state_type &affine_shift);
+      DEAL_II_HOST_DEVICE void
+      accumulate(const PrecomputedVectorView &pv,
+                 const unsigned int *js,
+                 const state_type &U_j,
+                 const flux_contribution_type &flux_j,
+                 const dealii::Tensor<1, dim, Number> &scaled_c_ij,
+                 const state_type &affine_shift);
 
       /**
        * Return the computed bounds (with relaxation applied).
        */
-      Bounds bounds(const Number hd_i) const;
+      DEAL_II_HOST_DEVICE Bounds bounds(const Number hd_i) const;
 
       //@}
       /**
@@ -305,11 +366,12 @@ namespace ryujin
        * violated due to round-off errors when computing the limiter
        * bounds.
        */
-      std::tuple<Number, bool> limit(const Bounds &bounds,
-                                     const state_type &U,
-                                     const state_type &P,
-                                     const Number t_min = Number(0.),
-                                     const Number t_max = Number(1.)) const;
+      DEAL_II_HOST_DEVICE std::tuple<Number, bool>
+      limit(const Bounds &bounds,
+            const state_type &U,
+            const state_type &P,
+            const Number t_min = Number(0.),
+            const Number t_max = Number(1.)) const;
 
     private:
       //@}
@@ -319,7 +381,7 @@ namespace ryujin
       //@{
 
       const View view_;
-      const Limiter<ScalarNumber> &limiter_;
+      const Limiter<ScalarNumber>::Parameters *const parameters_;
 
       state_type U_i_;
 
@@ -340,9 +402,9 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    LimiterView<dim, Number>::projection_bounds_from_state(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    LimiterView<dim, Number, MemorySpace>::projection_bounds_from_state(
         const PrecomputedVectorView &pv,
         const unsigned int i,
         const state_type &U_i) const -> Bounds
@@ -355,8 +417,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto LimiterView<dim, Number>::combine_bounds(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    LimiterView<dim, Number, MemorySpace>::combine_bounds(
         const Bounds &bounds_left, const Bounds &bounds_right) const -> Bounds
     {
       const auto &[rho_min_l, rho_max_l, s_min_l] = bounds_left;
@@ -368,23 +431,22 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    LimiterView<dim, Number>::fully_relax_bounds(const Bounds &bounds,
-                                                 const Number &hd) const
-        -> Bounds
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    LimiterView<dim, Number, MemorySpace>::fully_relax_bounds(
+        const Bounds &bounds, const Number &hd) const -> Bounds
     {
       auto relaxed_bounds = bounds;
       auto &[rho_min, rho_max, s_min] = relaxed_bounds;
 
       /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
-      Number r = std::sqrt(hd);                              // in 3D: ^ 3/6
-      if constexpr (dim == 2)                                //
-        r = dealii::Utilities::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
-      else if constexpr (dim == 1)                           //
-        r = dealii::Utilities::fixed_power<3>(r);            // in 1D: ^ 3/2
-      r *= limiter_.relaxation_factor();
+      Number r = std::sqrt(hd);                   // in 3D: ^ 3/6
+      if constexpr (dim == 2)                     //
+        r = ryujin::fixed_power<3>(std::sqrt(r)); // in 2D: ^ 3/4
+      else if constexpr (dim == 1)                //
+        r = ryujin::fixed_power<3>(r);            // in 1D: ^ 3/2
+      r *= relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       rho_min *= std::max(Number(1.) - r, Number(eps));
@@ -395,12 +457,13 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    LimiterView<dim, Number>::reset(const PrecomputedVectorView & /*pv*/,
-                                    const unsigned int /*i*/,
-                                    const state_type &U_i,
-                                    const flux_contribution_type & /*flux_i*/)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    LimiterView<dim, Number, MemorySpace>::reset(
+        const PrecomputedVectorView & /*pv*/,
+        const unsigned int /*i*/,
+        const state_type &U_i,
+        const flux_contribution_type & /*flux_i*/)
     {
       U_i_ = U_i;
 
@@ -420,8 +483,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void LimiterView<dim, Number>::accumulate(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    LimiterView<dim, Number, MemorySpace>::accumulate(
         const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
@@ -470,9 +534,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    LimiterView<dim, Number>::bounds(const Number hd_i) const -> Bounds
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    LimiterView<dim, Number, MemorySpace>::bounds(const Number hd_i) const
+        -> Bounds
     {
       const auto &[rho_min, rho_max, s_min] = bounds_;
 
@@ -484,12 +549,12 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto rho_relaxation =
-          ScalarNumber(2. * limiter_.relaxation_factor()) *
+          ScalarNumber(2. * relaxation_factor()) *
           std::abs(rho_relaxation_numerator_) /
           (std::abs(rho_relaxation_denominator_) + Number(eps));
 
       const auto entropy_relaxation =
-          limiter_.relaxation_factor() * (s_interp_max_ - s_min);
+          relaxation_factor() * (s_interp_max_ - s_min);
 
       rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
       rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);
@@ -499,13 +564,14 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    std::tuple<Number, bool>
-    LimiterView<dim, Number>::limit(const Bounds &bounds,
-                                    const state_type &U,
-                                    const state_type &P,
-                                    const Number t_min /* = Number(0.) */,
-                                    const Number t_max /* = Number(1.) */) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE std::tuple<Number, bool>
+    LimiterView<dim, Number, MemorySpace>::limit(
+        const Bounds &bounds,
+        const state_type &U,
+        const state_type &P,
+        const Number t_min /* = Number(0.) */,
+        const Number t_max /* = Number(1.) */) const
     {
       bool success = true;
       Number t_r = t_max;
@@ -558,7 +624,7 @@ namespace ryujin
 
         constexpr auto lt = dealii::SIMDComparison::less_than;
 
-        t_r = dealii::compare_and_apply_mask<lt>( //
+        t_r = ryujin::compare_and_apply_mask<lt>( //
             rho_max,
             rho_U + t_r * rho_P,
             /*
@@ -570,7 +636,7 @@ namespace ryujin
             (rho_max - rho_U) * denominator,
             t_r);
 
-        t_r = dealii::compare_and_apply_mask<lt>( //
+        t_r = ryujin::compare_and_apply_mask<lt>( //
             rho_U + t_r * rho_P,
             rho_min,
             /*
@@ -655,7 +721,7 @@ namespace ryujin
         std::cout << "t_r: (start) " << t_r << std::endl;
 #endif
 
-        for (unsigned int n = 0; n < limiter_.newton_max_iterations(); ++n) {
+        for (unsigned int n = 0; n < newton_max_iterations(); ++n) {
 
           const auto U_r = U + t_r * P;
           const auto rho_r = view_.density(U_r);
@@ -670,7 +736,7 @@ namespace ryujin
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
            */
-          t_l = dealii::compare_and_apply_mask<
+          t_l = ryujin::compare_and_apply_mask<
               dealii::SIMDComparison::greater_than>(
               psi_r, Number(0.), t_r, t_l);
 
@@ -731,7 +797,7 @@ namespace ryujin
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
            */
-          t_l = dealii::compare_and_apply_mask<
+          t_l = ryujin::compare_and_apply_mask<
               dealii::SIMDComparison::greater_than>(
               psi_r, Number(0.), t_r, t_l);
 #endif
@@ -740,7 +806,7 @@ namespace ryujin
            * Break if the window between t_l and t_r is within the prescribed
            * tolerance:
            */
-          const Number tolerance(limiter_.newton_tolerance());
+          const Number tolerance(newton_tolerance());
           if (std::max(Number(0.), t_r - t_l - tolerance) == Number(0.)) {
 #ifdef DEBUG_OUTPUT_LIMITER
             std::cout << "break: t_l and t_r within tolerance" << std::endl;
