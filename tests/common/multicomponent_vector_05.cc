@@ -36,15 +36,15 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.write_tensor<double>(tensor, i);
+    state_vector.view().write_tensor<double>(tensor, i);
 
     dealii::Tensor<1, 4, double> increment{{1., 2., 3., 4.}};
-    increment_vector.write_tensor<double>(increment, i);
+    increment_vector.view().write_tensor<double>(increment, i);
   }
 
   const auto print = [](const auto &vector) {
     for (unsigned int i = 0; i < 4; ++i)
-      std::cout << vector.template read_tensor<double>(i) << "\n";
+      std::cout << vector.view().template read_tensor<double>(i) << "\n";
   };
 
   /* sadd() on the host memory space: */

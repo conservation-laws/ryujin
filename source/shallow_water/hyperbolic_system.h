@@ -249,8 +249,12 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+      using PrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          dealii::MemorySpace::Host,
+          /*writable=*/false>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed initial
@@ -264,9 +268,12 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber,
-                                            n_initial_precomputed_values>;
+      using InitialPrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_initial_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          dealii::MemorySpace::Host,
+          /*writable=*/false>;
 
       //@}
       /**
@@ -695,8 +702,8 @@ namespace ryujin
           offline_data.sparsity_pattern_simd().view();
       using VA = dealii::VectorizedArray<ScalarNumber>;
 
-      const auto &U = std::get<0>(state_vector);
-      auto &precomputed = std::get<1>(state_vector);
+      const auto U_view = std::get<0>(state_vector).view();
+      const auto precomputed_view = std::get<1>(state_vector).view();
 
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -707,7 +714,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template read_tensor<T>(i);
+        const auto U_i = U_view.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto eta_m = view.mathematical_entropy(U_i);
         const auto h_sharp = view.water_depth_sharp(U_i);
@@ -715,7 +722,7 @@ namespace ryujin
 
         const precomputed_type prec_i{eta_m, h_star};
 
-        precomputed.template write_tensor<T>(prec_i, i);
+        precomputed_view.template write_tensor<T>(prec_i, i);
       };
 
       cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);

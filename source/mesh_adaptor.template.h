@@ -280,6 +280,8 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
+    const auto smoothness_indicators_view = smoothness_indicators_.view();
+
     const auto &dof_handler = offline_data_->dof_handler();
     for (const auto &cell : dof_handler.active_cell_iterators()) {
       if (!cell->is_locally_owned())
@@ -296,7 +298,7 @@ namespace ryujin
         const auto global_i = local_dof_indices[i];
         const auto local_i = scalar_partitioner->global_to_local(global_i);
         auto alpha_i =
-            smoothness_indicators_.template read_entry<Number>(local_i);
+            smoothness_indicators_view.template read_entry<Number>(local_i);
         alpha_cell += alpha_i;
       }
       alpha_cell *= scale;
@@ -615,7 +617,8 @@ namespace ryujin
      */
 
     smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
-    smoothness_indicators_.insert_component(numerator[0], 0);
-    smoothness_indicators_.update_ghost_values();
+    const auto smoothness_indicators_view = smoothness_indicators_.view();
+    smoothness_indicators_view.insert_component(numerator[0], 0);
+    smoothness_indicators_view.update_ghost_values();
   }
 } // namespace ryujin

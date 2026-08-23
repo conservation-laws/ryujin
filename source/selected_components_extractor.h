@@ -120,15 +120,16 @@ namespace ryujin
 
       for (const auto &[i, k] : conserved_indices) {
         const auto &U = std::get<0>(state_vector);
-        U.extract_component(extracted_components[i], k);
+        U.view().extract_component(extracted_components[i], k);
       }
 
       if (!primitive_indices.empty()) {
         const auto &U = std::get<0>(state_vector);
+        const auto U_view = U.view();
         const unsigned int n_owned = scalar_partitioner->locally_owned_size();
         const auto view = hyperbolic_system.template view<dim, Number>();
         for (unsigned int i = 0; i < n_owned; ++i) {
-          const auto U_i = U.read_tensor(i);
+          const auto U_i = U_view.read_tensor(i);
           const auto PU_i = view.to_primitive_state(U_i);
           for (const auto &[j, k] : primitive_indices)
             extracted_components[j].local_element(i) = PU_i[k];
@@ -137,7 +138,7 @@ namespace ryujin
 
       for (const auto &[i, k] : precomputed_indices) {
         const auto &prec = std::get<1>(state_vector);
-        prec.extract_component(extracted_components[i], k);
+        prec.view().extract_component(extracted_components[i], k);
       }
 
       for (const auto &[i, k] : parabolic_indices) {
@@ -146,11 +147,12 @@ namespace ryujin
       }
 
       for (const auto &[i, k] : initial_indices) {
-        initial_precomputed.extract_component(extracted_components[i], k);
+        initial_precomputed.view().extract_component(extracted_components[i],
+                                                     k);
       }
 
       for (const auto &[i, k] : additional_indices) {
-        additional_vectors[k].get().extract_component( //
+        additional_vectors[k].get().view().extract_component( //
             extracted_components[i],
             0);
       }

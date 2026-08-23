@@ -269,16 +269,17 @@ namespace ryujin
     // VectorTools::interpolate for every component separately. If this
     // gets too slow, we should consider writing out to a temporary (block)
     // vector and then inserting into the MultiComponentVector.
+    const auto U_view = U.view();
     const auto callable = [&](const auto &p) { return initial_state(p, t); };
     for (unsigned int d = 0; d < problem_dimension; ++d) {
       VectorTools::interpolate(offline_data_->discretization().mapping(),
                                offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);
-      U.insert_component(temp, d);
+      U_view.insert_component(temp, d);
     }
 
-    U.update_ghost_values();
+    U_view.update_ghost_values();
 
     return U;
   }
@@ -309,15 +310,16 @@ namespace ryujin
     // VectorTools::interpolate for every component separately. If this
     // gets too slow, we should consider writing out to a temporary (block)
     // vector and then inserting into the MultiComponentVector.
+    const auto precomputed_view = precomputed.view();
     const auto callable = [&](const auto &p) { return initial_precomputed(p); };
     for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
       VectorTools::interpolate(offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);
-      precomputed.insert_component(temp, d);
+      precomputed_view.insert_component(temp, d);
     }
 
-    precomputed.update_ghost_values();
+    precomputed_view.update_ghost_values();
     return precomputed;
   }
 

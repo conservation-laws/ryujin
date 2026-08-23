@@ -118,11 +118,7 @@ int main(int argc, char *argv[])
   sparse_matrix.copy_to_memory_space<HostSpace>();
   print_status();
 
-  /*
-   * Note: After a (logically const) copy to the host the inherited
-   * direct-access interface remains detached, so we read through a
-   * freshly created view:
-   */
+  /* Read the data back through a read only host view: */
 
   const auto &const_matrix = sparse_matrix;
   const auto host_view = const_matrix.view<HostSpace>();

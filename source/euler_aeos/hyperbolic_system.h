@@ -284,8 +284,12 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+      using PrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          dealii::MemorySpace::Host,
+          /*writable=*/false>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed initial
@@ -299,9 +303,12 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber,
-                                            n_initial_precomputed_values>;
+      using InitialPrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_initial_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          dealii::MemorySpace::Host,
+          /*writable=*/false>;
 
       //@}
       /**
@@ -946,8 +953,8 @@ namespace ryujin
           offline_data.sparsity_pattern_simd().view();
       using VA = dealii::VectorizedArray<ScalarNumber>;
 
-      const auto &U = std::get<0>(state_vector);
-      auto &precomputed = std::get<1>(state_vector);
+      const auto U_view = std::get<0>(state_vector).view();
+      const auto precomputed_view = std::get<1>(state_vector).view();
 
       /* Compute values over the diagonal: */
 
@@ -960,7 +967,7 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template read_tensor<T>(i);
+        const auto U_i = U_view.template read_tensor<T>(i);
         const auto view = this->view<dim, T>();
         const auto rho_i = view.density(U_i);
         const auto e_i = view.internal_energy(U_i) / rho_i;
@@ -971,11 +978,11 @@ namespace ryujin
         const auto gamma_i = view.surrogate_gamma(U_i, p_i);
         using PT = precomputed_type;
         const PT prec_i{p_i, gamma_i, T(0.), T(0.)};
-        precomputed.template write_tensor<T>(prec_i, i);
+        precomputed_view.template write_tensor<T>(prec_i, i);
       };
 
       cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
-      precomputed.update_ghost_values();
+      precomputed_view.update_ghost_values();
 
       /* Compute gamma_min over the stencil: */
 
@@ -988,8 +995,8 @@ namespace ryujin
         if (skip_constrained_dofs && row_length == 1)
           return;
 
-        const auto U_i = U.template read_tensor<T>(i);
-        auto prec_i = precomputed.template read_tensor<T, PT>(i);
+        const auto U_i = U_view.template read_tensor<T>(i);
+        auto prec_i = precomputed_view.template read_tensor<T, PT>(i);
         /* Previous loop: gamma_min_i == gamma_i, s_i == 0, eta_i == 0 */
         auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
 
@@ -1000,8 +1007,8 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = U.template read_tensor<T>(js);
-          const auto prec_j = precomputed.template read_tensor<T, PT>(js);
+          const auto U_j = U_view.template read_tensor<T>(js);
+          const auto prec_j = precomputed_view.template read_tensor<T, PT>(js);
           const auto p_j = std::get<0>(prec_j);
           const auto gamma_j = view.surrogate_gamma(U_j, p_j);
           gamma_min_i = std::min(gamma_min_i, gamma_j);
@@ -1009,7 +1016,7 @@ namespace ryujin
 
         s_i = view.surrogate_specific_entropy(U_i, gamma_min_i);
         eta_i = view.surrogate_harten_entropy(U_i, gamma_min_i);
-        precomputed.template write_tensor<T>(prec_i, i);
+        precomputed_view.template write_tensor<T>(prec_i, i);
       };
 
       cpu_simd_loop<ScalarNumber>(

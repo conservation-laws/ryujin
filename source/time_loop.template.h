@@ -756,7 +756,7 @@ namespace ryujin
 
       const auto index = std::distance(std::begin(names), pos);
 
-      analytic_U.extract_component(analytic_component, index);
+      analytic_U.view().extract_component(analytic_component, index);
 
       /* Compute norms of analytic solution: */
 
@@ -796,7 +796,7 @@ namespace ryujin
 
       /* Compute norms of error: */
 
-      U.extract_component(error_component, index);
+      U.view().extract_component(error_component, index);
       /* Populate constrained dofs due to periodicity: */
       offline_data_.affine_constraints().distribute(error_component);
       error_component.update_ghost_values();

@@ -123,7 +123,7 @@ namespace ryujin
 
           const auto &U = std::get<0>(old_state_vector);
           /* precomputed needs to be valid for bounds computation */
-          const auto &precomputed = std::get<1>(old_state_vector);
+          const auto precomputed_view = std::get<1>(old_state_vector).view();
 
           const auto limiter_view = limiter_.template view<dim, Number>();
 
@@ -236,7 +236,7 @@ namespace ryujin
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
                 bounds = limiter_view.projection_bounds_from_state(
-                    precomputed, local_i, U_i);
+                    precomputed_view, local_i, U_i);
               }
 
               for (auto &it : state_values_quad)
@@ -248,7 +248,7 @@ namespace ryujin
                 const auto local_i =
                     scalar_partitioner->global_to_local(global_i);
                 const auto bounds_i = limiter_view.projection_bounds_from_state(
-                    precomputed, local_i, U_i);
+                    precomputed_view, local_i, U_i);
                 bounds = limiter_view.combine_bounds(bounds, bounds_i);
 
                 for (unsigned int q = 0; q < quadrature.size(); ++q) {
@@ -643,8 +643,10 @@ namespace ryujin
           }
         });
 
+    const auto projected_state_view = projected_state.view();
+
     projected_mass.compress(dealii::VectorOperation::add);
-    projected_state.compress(dealii::VectorOperation::add);
+    projected_state_view.compress(dealii::VectorOperation::add);
 
     /*
      * -----------------------------------------------------------------------
@@ -660,7 +662,7 @@ namespace ryujin
      * -----------------------------------------------------------------------
      */
 
-    auto &new_U = std::get<0>(new_state_vector);
+    const auto new_U_view = std::get<0>(new_state_vector).view();
 
     /*
      * A small lambda that takes the weighted average of all degrees of
@@ -669,7 +671,7 @@ namespace ryujin
     const auto update_new_state_vector = [&]() {
       for (unsigned int local_i = 0; local_i < n_locally_owned; ++local_i) {
 
-        const auto mU_i = projected_state.read_tensor(local_i);
+        const auto mU_i = projected_state_view.read_tensor(local_i);
         const auto m_i = projected_mass.local_element(local_i);
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
@@ -680,21 +682,21 @@ namespace ryujin
                                "update_new_state_vector()"));
 #endif
 
-        new_U.write_tensor(mU_i / m_i, local_i);
+        new_U_view.write_tensor(mU_i / m_i, local_i);
       }
-      new_U.update_ghost_values();
+      new_U_view.update_ghost_values();
     };
 
     update_new_state_vector();
 
-    auto &precomputed = std::get<1>(new_state_vector);
+    const auto precomputed_view = std::get<1>(new_state_vector).view();
 
     /* The limiter requires valid precomputed values. Therefore, update: */
     const auto update_precomputed_values = [&]() {
-      new_U.update_ghost_values();
+      new_U_view.update_ghost_values();
       hyperbolic_system_->fill_precomputed_values(
           *offline_data_, new_state_vector, /*skip_constrainted_dofs*/ false);
-      precomputed.update_ghost_values();
+      precomputed_view.update_ghost_values();
     };
 
     update_precomputed_values();
@@ -722,29 +724,30 @@ namespace ryujin
 
       /* The result of the mass projection: */
       const auto m_i_star = projected_mass.local_element(local_i);
-      const auto U_i_star = projected_state.read_tensor(local_i) / m_i_star;
+      const auto U_i_star =
+          projected_state_view.read_tensor(local_i) / m_i_star;
 
       auto &bounds = bounds_map[local_i]; /* by reference */
       bounds = limiter_view.projection_bounds_from_state(
-          precomputed, local_i, U_i_star);
+          precomputed_view, local_i, U_i_star);
 
       /* The value obtained from the affine constraints object: */
       state_type U_i_interp;
       for (const auto &[global_k, c_k] : line.entries) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        U_i_interp += c_k * new_U.read_tensor(local_k);
+        U_i_interp += c_k * new_U_view.read_tensor(local_k);
       }
 
       /* And redistribute low order update: */
       for (const auto &[global_k, c_k] : line.entries) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        const auto U_k = new_U.read_tensor(local_k);
+        const auto U_k = new_U_view.read_tensor(local_k);
 
         const auto bounds_k = limiter_view.projection_bounds_from_state(
-            precomputed, local_k, U_k);
+            precomputed_view, local_k, U_k);
         bounds = limiter_view.combine_bounds(bounds, bounds_k);
 
-        projected_state.add_tensor(c_k * m_i_star * U_i_star, local_k);
+        projected_state_view.add_tensor(c_k * m_i_star * U_i_star, local_k);
         projected_mass.local_element(local_k) += c_k * m_i_star;
 
         kappa.local_element(local_k) += Number(1.);
@@ -754,7 +757,7 @@ namespace ryujin
 
     /* Compress vectors, recalculate unconstrained states: */
     projected_mass.compress(dealii::VectorOperation::add);
-    projected_state.compress(dealii::VectorOperation::add);
+    projected_state_view.compress(dealii::VectorOperation::add);
     kappa.compress(dealii::VectorOperation::add);
     update_new_state_vector();
 
@@ -795,9 +798,9 @@ namespace ryujin
         auto total_mass = Number(0.);
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
-          const auto U_k = new_U.read_tensor(local_k);
+          const auto U_k = new_U_view.read_tensor(local_k);
           const auto bounds_k = limiter_view.projection_bounds_from_state(
-              precomputed, local_k, U_k);
+              precomputed_view, local_k, U_k);
           bounds = limiter_view.combine_bounds(bounds, bounds_k);
 
           const auto m_k = projected_mass.local_element(local_k);
@@ -816,7 +819,7 @@ namespace ryujin
           const auto local_k = scalar_partitioner->global_to_local(global_k);
           const auto kappa_k = kappa.local_element(local_k);
           const auto m_k = projected_mass.local_element(local_k);
-          const auto U_k = new_U.read_tensor(local_k);
+          const auto U_k = new_U_view.read_tensor(local_k);
           const auto P_ik = pik_matrix[{local_i, local_k}] * kappa_k / m_k;
 
           const auto &[l_k, check] =
@@ -829,13 +832,13 @@ namespace ryujin
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
           auto &mP_ik = pik_matrix[{local_i, local_k}];
-          projected_state.add_tensor(l * mP_ik, local_k);
+          projected_state_view.add_tensor(l * mP_ik, local_k);
           mP_ik -= l * mP_ik;
         }
       }
 
       /* Compress state vector, recalculate unconstrained states: */
-      projected_state.compress(dealii::VectorOperation::add);
+      projected_state_view.compress(dealii::VectorOperation::add);
       update_new_state_vector();
     }
 
@@ -843,9 +846,9 @@ namespace ryujin
     for (unsigned int local_i = 0; local_i < n_locally_owned; ++local_i) {
       const auto global_i = scalar_partitioner->local_to_global(local_i);
       if (affine_constraints.is_constrained(global_i))
-        new_U.write_tensor(state_type{}, local_i);
+        new_U_view.write_tensor(state_type{}, local_i);
     }
-    new_U.update_ghost_values();
+    new_U_view.update_ghost_values();
 
 #ifdef DEBUG_SYMMETRY_CHECK
     /*
@@ -858,7 +861,7 @@ namespace ryujin
         continue;
 
       const auto m_i = projected_mass.local_element(local_i);
-      const auto m_i_reference = lumped_mass_matrix.read_entry(local_i);
+      const auto m_i_reference = lumped_mass_matrix.view().read_entry(local_i);
       Assert(std::abs(m_i - m_i_reference) < 1.e-10,
              dealii::ExcMessage(
                  "SolutionTransfer::projection(): something went wrong. Final "
@@ -878,16 +881,17 @@ namespace ryujin
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto local_i = scalar_partitioner->global_to_local(global_i);
+    const auto U_view = U.view();
     if (affine_constraints.is_constrained(global_i)) {
       state_type result;
       const auto &line = *affine_constraints.get_constraint_entries(global_i);
       for (const auto &[global_k, c_k] : line) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        result += c_k * U.read_tensor(local_k);
+        result += c_k * U_view.read_tensor(local_k);
       }
       return result;
     } else {
-      return U.read_tensor(local_i);
+      return U_view.read_tensor(local_i);
     }
   }
 
@@ -901,6 +905,6 @@ namespace ryujin
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto local_i = scalar_partitioner->global_to_local(global_i);
-    U.add_tensor(new_U_i, local_i);
+    U.view().add_tensor(new_U_i, local_i);
   }
 } // namespace ryujin

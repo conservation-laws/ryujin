@@ -89,19 +89,22 @@ namespace ryujin
       const unsigned int n_relevant = offline_data.n_locally_relevant();
       const auto &partitioner = offline_data.scalar_partitioner();
 
+      const auto U_view = U.view();
+      const auto prec_view = prec.view();
+
       for (unsigned int i = 0; i < n_owned; ++i) {
-        prec.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
+        prec_view.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
 
         if (!offline_data.affine_constraints().is_constrained(
                 partitioner->local_to_global(i)))
           continue;
-        U.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
+        U_view.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
       }
 
       for (unsigned int i = n_owned; i < n_relevant; ++i) {
-        prec.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
+        prec_view.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
 
-        U.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
+        U_view.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
       }
 #endif
     }
