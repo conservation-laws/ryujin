@@ -210,7 +210,6 @@ namespace ryujin
       template <typename MemorySpace>
       void deallocate_storage();
 
-      void refresh_direct_interface();
 
       friend class MirroredStorage<
           MultiComponentVector<Number, n_comp, simd_length>>;
@@ -752,13 +751,6 @@ namespace ryujin
       } else {
         default_vector_.reinit(0);
       }
-    }
-
-
-    template <typename Number, int n_comp, int simd_length>
-    void MultiComponentVector<Number, n_comp, simd_length>::
-        refresh_direct_interface()
-    {
     }
 
 

@@ -185,7 +185,6 @@ namespace ryujin
     template <typename MemorySpace>
     void deallocate_storage();
 
-    void refresh_direct_interface();
 
     friend class MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>;
 
@@ -638,13 +637,6 @@ namespace ryujin
       data_default_ = {};
       exchange_buffer_default_ = {};
     }
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  void
-  SparseMatrix<Number, n_components, simd_length>::refresh_direct_interface()
-  {
   }
 
 

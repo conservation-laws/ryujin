@@ -86,16 +86,10 @@ namespace ryujin
    *   template <typename MemorySpace> void allocate_storage() const;
    *   template <typename To, typename From> void deep_copy_storage() const;
    *   template <typename MemorySpace> void deallocate_storage();
-   *   void refresh_direct_interface();
    * ```
    * allocate_storage() and deep_copy_storage() must be const and may only
    * modify `mutable` members: they are reachable from a const view()
-   * under the TransferPolicy::implicit_transfers policy. In addition,
-   * deallocate_storage<Host>() must also release the inherited
-   * direct-access (host) view subobject that all derived classes carry.
-   * Conversely, refresh_direct_interface() re-attaches the inherited
-   * direct-access view; it is called by move_to_memory_space<Host>()
-   * whenever host residency changes.
+   * under the TransferPolicy::implicit_transfers policy.
    *
    * @note Under TransferPolicy::implicit_transfers a const object mutates
    * internal (mutable) state when a view is requested for a non-resident
@@ -105,13 +99,6 @@ namespace ryujin
    * counted) storage of the corresponding memory space; they dangle after
    * a move_to_memory_space() away from that memory space. Managing view
    * lifetime is the caller's responsibility.
-   *
-   * @note After a *const* implicit copy to the host memory space the
-   * inherited direct-access interface of the derived class remains
-   * detached (the base-class view subobject cannot be modified under
-   * const). Access the data through the view returned by view<Host>()
-   * instead; a non-const move_to_memory_space<Host>() or reinit()
-   * re-attaches the direct interface.
    *
    * @ingroup GPU
    */
@@ -379,8 +366,6 @@ namespace ryujin
     template <typename MemorySpace>
     void deallocate_storage();
 
-    void refresh_direct_interface();
-
     std::string label_;
 
     mutable KokkosView<HostSpace> host_;
@@ -464,8 +449,7 @@ namespace ryujin
     } else {
       using OtherSpace = other_space_t<MemorySpace>;
 
-      const bool needs_copy = !is_resident<MemorySpace>();
-      if (needs_copy) {
+      if (!is_resident<MemorySpace>()) {
         Assert(is_resident<OtherSpace>(),
                dealii::ExcMessage(
                    "Unable to move to the chosen memory space: the object has "
@@ -482,22 +466,9 @@ namespace ryujin
        * the "writable access invalidates the stale mirror" primitive used
        * by prepare_write_access().
        */
-      const bool needs_deallocate = residency_flag<OtherSpace>();
-      if (needs_deallocate) {
+      if (residency_flag<OtherSpace>()) {
         derived().template deallocate_storage<OtherSpace>();
         residency_flag<OtherSpace>() = false;
-      }
-
-      /*
-       * Re-attach the direct-access (host) interface of the derived class
-       * whenever the residency state changed. Note that a preceding const
-       * copy_to_memory_space<HostSpace>() leaves the direct interface
-       * detached, which we repair here as well (in this case needs_copy is
-       * false but needs_deallocate is true).
-       */
-      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        if (needs_copy || needs_deallocate)
-          derived().refresh_direct_interface();
       }
     }
   }
@@ -677,12 +648,6 @@ namespace ryujin
     storage<MemorySpace>() = KokkosView<MemorySpace>();
   }
 
-
-  template <typename T>
-  inline void Mirrored<T>::refresh_direct_interface()
-  {
-    // do nothing
-  }
 
 #endif
 } // namespace ryujin

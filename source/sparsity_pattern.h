@@ -177,7 +177,6 @@ namespace ryujin
     template <typename MemorySpace>
     void deallocate_storage();
 
-    void refresh_direct_interface();
 
     friend class MirroredStorage<SparsityPattern<simd_length>>;
 
@@ -478,12 +477,6 @@ namespace ryujin
       column_indices_default_ = {};
       indices_transposed_default_ = {};
     }
-  }
-
-
-  template <int simd_length>
-  void SparsityPattern<simd_length>::refresh_direct_interface()
-  {
   }
 
 
