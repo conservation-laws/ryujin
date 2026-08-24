@@ -508,8 +508,11 @@ namespace ryujin
      * pattern from global deal.II (typical) dof indexing to local indices.
      */
 
-    sparsity_pattern_simd_.reinit(
-        n_locally_internal_, sparsity_pattern_, scalar_partitioner_);
+    sparsity_pattern_simd_.reinit(n_locally_internal_,
+                                  sparsity_pattern_,
+                                  scalar_partitioner_,
+                                  /*symmetrize_ghost_range*/ true,
+                                  TransferPolicy::implicit_transfers);
   }
 
 
@@ -521,21 +524,27 @@ namespace ryujin
 #endif
 
     /*
-     * First, (re)initialize all local matrices:
+     * First, (re)initialize all local matrices. All of them are assembled
+     * on the host memory space and read on either memory space, so we
+     * select the implicit_transfers policy and let the first view() on the
+     * default memory space perform the transfer:
      */
 
-    mass_matrix_.reinit(sparsity_pattern_simd_);
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_.reinit(sparsity_pattern_simd_);
+    constexpr auto policy = TransferPolicy::implicit_transfers;
 
-    lumped_mass_matrix_.reinit_with_scalar_partitioner(scalar_partitioner_);
+    mass_matrix_.reinit(sparsity_pattern_simd_, policy);
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_.reinit(sparsity_pattern_simd_, policy);
+
+    lumped_mass_matrix_.reinit_with_scalar_partitioner(scalar_partitioner_,
+                                                       policy);
     lumped_mass_matrix_inverse_.reinit_with_scalar_partitioner(
-        scalar_partitioner_);
+        scalar_partitioner_, policy);
 
-    betaij_matrix_.reinit(sparsity_pattern_simd_);
-    cij_matrix_.reinit(sparsity_pattern_simd_);
+    betaij_matrix_.reinit(sparsity_pattern_simd_, policy);
+    cij_matrix_.reinit(sparsity_pattern_simd_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      incidence_matrix_.reinit(sparsity_pattern_simd_);
+      incidence_matrix_.reinit(sparsity_pattern_simd_, policy);
 
     /*
      * Now, assemble all matrices:
