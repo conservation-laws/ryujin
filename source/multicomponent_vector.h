@@ -615,10 +615,6 @@ namespace ryujin
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
 
-      /*
-       * If both memory spaces coincide the single host allocation is
-       * trivially resident on both of them:
-       */
       this->reset_residency(/*host*/ true,
                             /*default*/ !have_separate_memory_spaces);
 

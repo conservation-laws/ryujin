@@ -73,9 +73,9 @@ int main(int argc, char *argv[])
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
   /*
-   * An object constructed with the array mode constructor is left
-   * uninitialized: no storage is allocated and neither memory space is
-   * resident.
+   * An object constructed with the array mode constructor holds a zero
+   * sized array: the storage is allocated (and resident) on the host
+   * memory space.
    */
 
   ryujin::Mirrored<Payload *> mirrored("test payload array");

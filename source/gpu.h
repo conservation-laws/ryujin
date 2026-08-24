@@ -976,10 +976,11 @@ namespace ryujin
      * Note: If the host and default memory spaces coincide then only the
      * host storage is ever allocated.
      */
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>)
-      return host_;
-    else
+    if constexpr (have_separate_memory_spaces &&
+                  !std::is_same_v<MemorySpace, HostSpace>)
       return default_;
+    else
+      return host_;
   }
 
 

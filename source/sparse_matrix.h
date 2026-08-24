@@ -535,10 +535,6 @@ namespace ryujin
     data_default_ = {};
     exchange_buffer_default_ = {};
 
-    /*
-     * If both memory spaces coincide the single host allocation is
-     * trivially resident on both of them:
-     */
     this->reset_residency(/*host*/ true,
                           /*default*/ !have_separate_memory_spaces);
 

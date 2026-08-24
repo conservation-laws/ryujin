@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "gpu.h"
 #include "simd.h"
 #include "sparsity_pattern.h"
 
@@ -399,7 +400,8 @@ namespace ryujin
       }
     }
 
-    this->reset_residency(/*host*/ true, /*default*/ false);
+    this->reset_residency(/*host*/ true,
+                          /*default*/ !have_separate_memory_spaces);
 
     /* The transfer policy is selected last, see MirroredStorage: */
     this->set_transfer_policy(transfer_policy);

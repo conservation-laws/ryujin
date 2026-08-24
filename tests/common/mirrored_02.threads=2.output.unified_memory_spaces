@@ -1,7 +1,7 @@
 After construction:
 size == 0
-HostSpace resident == 0
-DefaultSpace resident == 0
+HostSpace resident == 1
+DefaultSpace resident == 1
 
 After reinit(3):
 size == 3
