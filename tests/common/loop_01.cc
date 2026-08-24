@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     dealii::Tensor<1, n_comp, double> U_i;
     U_i[0] = 1. + 0.5 * i;
     U_i[1] = -2. + 0.25 * i;
-    U.write_tensor<double>(U_i, i);
+    U.view().write_tensor<double>(U_i, i);
   }
 
   /*
@@ -80,17 +80,17 @@ int main(int argc, char *argv[])
                         0,
                         /*no vectorization*/ 0,
                         n_states,
-                        U.get_view<HostSpace>(),
-                        results.get_view<HostSpace>());
+                        U.view<HostSpace>(),
+                        results.view<HostSpace>());
 
   std::array<dealii::Tensor<1, n_comp, double>, n_states> host_results;
   for (unsigned int i = 0; i < n_states; ++i)
-    host_results[i] = results.read_tensor<double>(i);
+    host_results[i] = results.view().read_tensor<double>(i);
 
   /* Reset the results vector and compute the same on the device: */
 
   for (unsigned int i = 0; i < n_states; ++i)
-    results.write_tensor<double>(dealii::Tensor<1, n_comp, double>(), i);
+    results.view().write_tensor<double>(dealii::Tensor<1, n_comp, double>(), i);
 
   U.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 
   std::array<dealii::Tensor<1, n_comp, double>, n_states> device_results;
   for (unsigned int i = 0; i < n_states; ++i)
-    device_results[i] = results.read_tensor<double>(i);
+    device_results[i] = results.view().read_tensor<double>(i);
 
   /* Print all results: */
 

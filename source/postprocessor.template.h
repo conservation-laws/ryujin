@@ -112,15 +112,17 @@ namespace ryujin
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
 
-    const auto &U = std::get<0>(state_vector);
+    const auto U_view = std::get<0>(state_vector).view();
 
     using VA = dealii::VectorizedArray<Number>;
 
     const auto &affine_constraints = offline_data_->affine_constraints();
 
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const auto &cij_matrix = offline_data_->cij_matrix();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
+    const auto lumped_mass_matrix_view =
+        offline_data_->lumped_mass_matrix().view();
+    const auto cij_matrix_view = offline_data_->cij_matrix().view();
 
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -144,7 +146,7 @@ namespace ryujin
       constexpr unsigned int stride_size = get_stride_size<T>;
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
@@ -156,15 +158,15 @@ namespace ryujin
       for (auto &it : local_vorticity_values)
         it = curl_type<T>();
 
-      const unsigned int *js = sparsity_simd.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 
-        const auto U_j = U.template read_tensor<T>(js);
+        const auto U_j = U_view.template read_tensor<T>(js);
         const auto view = hyperbolic_system_->template view<dim, T>();
         const auto prim_j = view.to_primitive_state(U_j);
 
-        const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+        const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
         unsigned int k = 0;
         for (const auto &[is_primitive, index] : schlieren_indices_) {
@@ -187,7 +189,7 @@ namespace ryujin
       }
 
       /* Populate quantities: */
-      const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
+      const auto m_i = lumped_mass_matrix_view.template read_entry<T>(i);
 
       unsigned int k = 0;
       for (const auto &schlieren : local_schlieren_values) {

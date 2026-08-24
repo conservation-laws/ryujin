@@ -47,8 +47,7 @@ namespace ryujin
             int n_comp = 1,
             int simd_length = dealii::VectorizedArray<Number>::size()>
   class SparseMatrix
-      : public SparseMatrixView<Number, n_comp, simd_length>,
-        public MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>
+      : public MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>
   {
   public:
     /**
@@ -186,7 +185,6 @@ namespace ryujin
     template <typename MemorySpace>
     void deallocate_storage();
 
-    void refresh_direct_interface();
 
     friend class MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>;
 
@@ -232,6 +230,23 @@ namespace ryujin
     SparseMatrixView(
         const SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
       requires(!writable);
+
+    /**
+     * Converting constructor creating a read only view from a writable
+     * view (mirroring the conversion from `T *` to `const T *`).
+     *
+     * @note We need to make this a templated constructor, otherwise the
+     * writable-converting constructor here would suppress the default copy
+     * constructor.
+     */
+    template <bool other_writable>
+    DEAL_II_HOST_DEVICE
+    SparseMatrixView(const SparseMatrixView<Number,
+                                            n_comp,
+                                            simd_length,
+                                            MemorySpace,
+                                            other_writable> &other)
+      requires(!writable && other_writable);
 
     template <typename SparseMatrix>
     void reinit(SparseMatrix &sparse_matrix)
@@ -415,6 +430,9 @@ namespace ryujin
     using KokkosSpace = typename MemorySpace::kokkos_space;
     Kokkos::View<Number *, KokkosSpace> data_;
 
+    template <typename, int, int, typename, bool>
+    friend class SparseMatrixView;
+
     //@}
   };
 
@@ -485,11 +503,14 @@ namespace ryujin
 
     this->sparsity_pattern_ = &sparsity;
 
+    const auto sparsity_view = sparsity.view();
+
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
     data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-        "sparse_matrix_data", sparsity.n_nonzero_elements() * n_components);
+        "sparse_matrix_data",
+        sparsity_view.n_nonzero_elements() * n_components);
 
     const std::size_t n_indices = sparsity.entries_to_be_sent().size();
 
@@ -505,9 +526,6 @@ namespace ryujin
     data_default_ = {};
     exchange_buffer_default_ = {};
     this->reset_residency(/*host*/ true, /*default*/ false);
-
-    /* reinitialize the view: */
-    SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
   }
 
 
@@ -544,13 +562,15 @@ namespace ryujin
 
     Assert(sparsity_pattern_ != nullptr, dealii::ExcNotInitialized());
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     /*
      * Note: We allocate without initializing because a deep_copy_storage()
      * always follows.
      */
 
     const std::size_t n_data =
-        sparsity_pattern_->n_nonzero_elements() * n_components;
+        sparsity_view.n_nonzero_elements() * n_components;
     const std::size_t n_exchange =
         n_components * sparsity_pattern_->entries_to_be_sent().size();
 
@@ -613,31 +633,10 @@ namespace ryujin
       data_host_ = {};
       exchange_buffer_host_ = {};
 
-      /*
-       * The inherited direct-access view holds a reference counted copy
-       * of the host data view. Release the view subobject as well so
-       * that the host memory is actually freed:
-       */
-      static_cast<SparseMatrixView<Number, n_components, simd_length> &>(
-          *this) = SparseMatrixView<Number, n_components, simd_length>{};
-
     } else {
       data_default_ = {};
       exchange_buffer_default_ = {};
     }
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  void
-  SparseMatrix<Number, n_components, simd_length>::refresh_direct_interface()
-  {
-    /*
-     * Note: This calls sparsity_pattern_->view<Host>() internally.
-     * Moving a matrix to the host memory space thus requires a sparsity
-     * pattern that is resident on the host memory space.
-     */
-    SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
   }
 
 
@@ -655,10 +654,11 @@ namespace ryujin
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     const auto ghost_offset =
-        sparsity_pattern_->template ghost_offset<n_components>();
-    const auto end_offset =
-        sparsity_pattern_->n_nonzero_elements() * n_components;
+        sparsity_view.template ghost_offset<n_components>();
+    const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
     std::fill(data_host_.data() + ghost_offset,
               data_host_.data() + end_offset,
               Number{});
@@ -679,6 +679,8 @@ namespace ryujin
     Assert(this->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
     const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
@@ -694,7 +696,7 @@ namespace ryujin
     std::vector<MPI_Request> requests(n_requests);
 
     const auto ghost_offset =
-        sparsity_pattern_->template ghost_offset<n_components>();
+        sparsity_view.template ghost_offset<n_components>();
 
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
       const auto receive_offset =
@@ -724,8 +726,8 @@ namespace ryujin
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset = sparsity_pattern_->template offset<n_components>(
-            row, column_index, d);
+        const auto offset =
+            sparsity_view.template offset<n_components>(row, column_index, d);
         exchange_buffer_host_(n_components * c + d) = data_host_(offset);
       }
     }
@@ -784,6 +786,8 @@ namespace ryujin
     Assert(this->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
+    const auto sparsity_view = sparsity_pattern_->view();
+
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
     const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
@@ -829,7 +833,7 @@ namespace ryujin
     }
 
     const auto ghost_offset =
-        sparsity_pattern_->template ghost_offset<n_components>();
+        sparsity_view.template ghost_offset<n_components>();
 
     /*
      * Note: For the compress() operation we send our ghost range to the
@@ -875,8 +879,8 @@ namespace ryujin
     for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset = sparsity_pattern_->template offset<n_components>(
-            row, column_index, d);
+        const auto offset =
+            sparsity_view.template offset<n_components>(row, column_index, d);
         data_host_(offset) += exchange_buffer_host_(n_components * c + d);
       }
     }
@@ -909,6 +913,27 @@ namespace ryujin
     requires(!writable)
   {
     reinit(sparse_matrix);
+  }
+
+
+  template <typename Number,
+            int n_comp,
+            int simd_length,
+            typename MemorySpace,
+            bool writable>
+  template <bool other_writable>
+  DEAL_II_HOST_DEVICE
+  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+      SparseMatrixView(const SparseMatrixView<Number,
+                                              n_comp,
+                                              simd_length,
+                                              MemorySpace,
+                                              other_writable> &other)
+    requires(!writable && other_writable)
+      : sparse_matrix_(other.sparse_matrix_)
+      , sparsity_pattern_(other.sparsity_pattern_)
+      , data_(other.data_)
+  {
   }
 
 
@@ -1370,7 +1395,10 @@ namespace ryujin
       }
     }
 
+    const auto sparse_matrix_view = sparse_matrix.view();
+
     const auto &sparsity_pattern = sparse_matrix.sparsity_pattern();
+    const auto sparsity_pattern_view = sparsity_pattern.view();
     const auto &partitioner = sparsity_pattern.partitioner();
 
     /*
@@ -1385,16 +1413,16 @@ namespace ryujin
             const Number &entry = cell_matrix(r, c);
             if (entry == Number{})
               return;
-            const auto col_idx = sparsity_pattern.column_index(i, j);
-            sparse_matrix.add_entry(c_ij * entry, i, col_idx);
+            const auto col_idx = sparsity_pattern_view.column_index(i, j);
+            sparse_matrix_view.add_entry(c_ij * entry, i, col_idx);
           } else if constexpr (is_array) {
             dealii::Tensor<1, n_comp, Number> entry;
             for (unsigned int k = 0; k < n_comp; ++k)
               entry[k] = cell_matrix[k](r, c);
             if (entry == dealii::Tensor<1, n_comp>{})
               return;
-            const auto col_idx = sparsity_pattern.column_index(i, j);
-            sparse_matrix.add_tensor(c_ij * entry, i, col_idx);
+            const auto col_idx = sparsity_pattern_view.column_index(i, j);
+            sparse_matrix_view.add_tensor(c_ij * entry, i, col_idx);
           }
         };
 

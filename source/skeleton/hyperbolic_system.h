@@ -226,8 +226,12 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber, n_precomputed_values>;
+      using PrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          dealii::MemorySpace::Host,
+          /*writable=*/false>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed initial
@@ -241,9 +245,12 @@ namespace ryujin
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView =
-          Vectors::MultiComponentVectorView<ScalarNumber,
-                                            n_initial_precomputed_values>;
+      using InitialPrecomputedVectorView = Vectors::MultiComponentVectorView<
+          ScalarNumber,
+          n_initial_precomputed_values,
+          dealii::VectorizedArray<ScalarNumber>::size(),
+          dealii::MemorySpace::Host,
+          /*writable=*/false>;
 
       //@}
       /**

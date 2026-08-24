@@ -63,8 +63,7 @@ namespace ryujin
               int n_comp,
               int simd_length = dealii::VectorizedArray<Number>::size()>
     class MultiComponentVector
-        : public MultiComponentVectorView<Number, n_comp, simd_length>,
-          public MirroredStorage<
+        : public MirroredStorage<
               MultiComponentVector<Number, n_comp, simd_length>>
     {
     public:
@@ -211,7 +210,6 @@ namespace ryujin
       template <typename MemorySpace>
       void deallocate_storage();
 
-      void refresh_direct_interface();
 
       friend class MirroredStorage<
           MultiComponentVector<Number, n_comp, simd_length>>;
@@ -260,6 +258,23 @@ namespace ryujin
           const MultiComponentVector<Number, n_comp, simd_length>
               &multi_component_vector)
         requires(!writable);
+
+      /**
+       * Converting constructor creating a read only view from a writable
+       * view (mirroring the conversion from `T *` to `const T *`).
+       *
+       * @note We need to make this a templated constructor, otherwise the
+       * writable-converting constructor here would suppress the default
+       * copy constructor.
+       */
+      template <bool other_writable>
+      DEAL_II_HOST_DEVICE MultiComponentVectorView(
+          const MultiComponentVectorView<Number,
+                                         n_comp,
+                                         simd_length,
+                                         MemorySpace,
+                                         other_writable> &other)
+        requires(!writable && other_writable);
 
       template <typename MultiComponentVector>
       void reinit(MultiComponentVector &multi_component_vector)
@@ -347,7 +362,11 @@ namespace ryujin
        */
       void sadd(const Number s,
                 const Number a,
-                const MultiComponentVectorView &v) const
+                const MultiComponentVectorView<Number,
+                                               n_comp,
+                                               simd_length,
+                                               MemorySpace,
+                                               /*writable=*/false> &v) const
         requires writable;
 
       //@}
@@ -523,6 +542,9 @@ namespace ryujin
       unsigned int n_locally_owned_;
       unsigned int n_locally_relevant_;
 
+      template <typename, int, int, typename, bool>
+      friend class MultiComponentVectorView;
+
       //@}
     };
 
@@ -538,7 +560,6 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
         const MultiComponentVector &other)
-        : MultiComponentVectorView<Number, n_comp, simd_length>()
     {
       *this = other;
     }
@@ -547,7 +568,6 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
         MultiComponentVector &&other) noexcept
-        : MultiComponentVectorView<Number, n_comp, simd_length>()
     {
       *this = other;
     }
@@ -580,9 +600,6 @@ namespace ryujin
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
       this->reset_residency(/*host*/ true, /*default*/ false);
-
-      /* Reinitialize view to point to the correct vector data: */
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 
@@ -620,9 +637,6 @@ namespace ryujin
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
       this->reset_residency(/*host*/ true, /*default*/ false);
-
-      /* Reinitialize view to point to the correct vector data: */
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 
@@ -636,13 +650,6 @@ namespace ryujin
       host_vector_ = other.host_vector_;
       if constexpr (have_separate_memory_spaces)
         default_vector_ = other.default_vector_;
-
-      /* Reinitialize view to point to the correct vector data: */
-      if (this->template is_resident<dealii::MemorySpace::Host>())
-        MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
-      else
-        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
-            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
 
       return *this;
     }
@@ -658,13 +665,6 @@ namespace ryujin
       host_vector_ = std::move(other.host_vector_);
       if constexpr (have_separate_memory_spaces)
         default_vector_ = std::move(other.default_vector_);
-
-      /* Reinitialize view to point to the correct vector data: */
-      if (this->template is_resident<dealii::MemorySpace::Host>())
-        MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
-      else
-        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
-            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
 
       return *this;
     }
@@ -748,24 +748,9 @@ namespace ryujin
       if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
         host_vector_.reinit(0);
 
-        /*
-         * The inherited direct-access view holds a raw pointer into the
-         * host vector. Reset the view subobject as well:
-         */
-        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
-            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
-
       } else {
         default_vector_.reinit(0);
       }
-    }
-
-
-    template <typename Number, int n_comp, int simd_length>
-    void MultiComponentVector<Number, n_comp, simd_length>::
-        refresh_direct_interface()
-    {
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 
@@ -864,6 +849,29 @@ namespace ryujin
       requires(!writable)
     {
       reinit(multi_component_vector);
+    }
+
+
+    template <typename Number,
+              int n_comp,
+              int simd_l,
+              typename MemorySpace,
+              bool writable>
+    template <bool other_writable>
+    DEAL_II_HOST_DEVICE
+    MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+        MultiComponentVectorView(
+            const MultiComponentVectorView<Number,
+                                           n_comp,
+                                           simd_l,
+                                           MemorySpace,
+                                           other_writable> &other)
+      requires(!writable && other_writable)
+        : multi_component_vector_(other.multi_component_vector_)
+        , data_(other.data_)
+        , n_locally_owned_(other.n_locally_owned_)
+        , n_locally_relevant_(other.n_locally_relevant_)
+    {
     }
 
 
@@ -1018,7 +1026,13 @@ namespace ryujin
 
     template <typename Num, int n_comp, int simd_l, typename MS, bool writable>
     void MultiComponentVectorView<Num, n_comp, simd_l, MS, writable>::sadd(
-        const Num s, const Num a, const MultiComponentVectorView &v) const
+        const Num s,
+        const Num a,
+        const MultiComponentVectorView<Num,
+                                       n_comp,
+                                       simd_l,
+                                       MS,
+                                       /*writable=*/false> &v) const
       requires writable
     {
       using HS = dealii::MemorySpace::Host;

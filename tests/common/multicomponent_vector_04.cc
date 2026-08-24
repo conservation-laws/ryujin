@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.write_tensor<double>(tensor, i);
+    state_vector.view().write_tensor<double>(tensor, i);
   }
 
   /* A read-only view performs an implicit copy: */
@@ -80,9 +80,7 @@ int main(int argc, char *argv[])
   }
 
   /*
-   * A read-only host view performs an implicit copy back. Note: After
-   * the (logically const) copy the inherited direct-access interface
-   * remains detached, so we read through the returned view:
+   * A read-only host view performs an implicit copy back:
    */
 
   {
@@ -104,10 +102,10 @@ int main(int argc, char *argv[])
   std::cout << "After writable view<HostSpace>:" << std::endl;
   print_status();
 
-  /* The direct-access interface has been re-attached: */
+  /* Read the data back through a host view: */
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 8; i += 1) {
-    std::cout << state_vector.read_tensor<double>(i) << "\n";
+    std::cout << state_vector.view().read_tensor<double>(i) << "\n";
   }
 }

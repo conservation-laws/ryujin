@@ -280,6 +280,8 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
+    const auto smoothness_indicators_view = smoothness_indicators_.view();
+
     const auto &dof_handler = offline_data_->dof_handler();
     for (const auto &cell : dof_handler.active_cell_iterators()) {
       if (!cell->is_locally_owned())
@@ -296,7 +298,7 @@ namespace ryujin
         const auto global_i = local_dof_indices[i];
         const auto local_i = scalar_partitioner->global_to_local(global_i);
         auto alpha_i =
-            smoothness_indicators_.template read_entry<Number>(local_i);
+            smoothness_indicators_view.template read_entry<Number>(local_i);
         alpha_cell += alpha_i;
       }
       alpha_cell *= scale;
@@ -431,8 +433,9 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
+    const auto betaij_matrix_view = offline_data_->betaij_matrix().view();
     using VA = dealii::VectorizedArray<Number>;
 
     /*
@@ -484,7 +487,7 @@ namespace ryujin
       unsigned int stride_size = get_stride_size<T>;
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
@@ -496,7 +499,7 @@ namespace ryujin
       boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
       boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
 
-      const unsigned int *js = sparsity_simd.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 
@@ -504,7 +507,8 @@ namespace ryujin
         if (col_idx == 0)
           continue;
 
-        const auto beta_ij = betaij_matrix.template read_entry<T>(i, col_idx);
+        const auto beta_ij =
+            betaij_matrix_view.template read_entry<T>(i, col_idx);
 
         for (unsigned int k = 0; k < n_entries; ++k) {
           const auto value_j_k = read_entry<T>(quantities[k], js);
@@ -542,7 +546,7 @@ namespace ryujin
       using T = decltype(sentinel);
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
@@ -576,13 +580,13 @@ namespace ryujin
       unsigned int stride_size = get_stride_size<T>;
 
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         return;
 
       auto alpha_i = read_entry<T>(numerator[0], i);
 
-      const unsigned int *js = sparsity_simd.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += stride_size) {
 
@@ -613,7 +617,8 @@ namespace ryujin
      */
 
     smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
-    smoothness_indicators_.insert_component(numerator[0], 0);
-    smoothness_indicators_.update_ghost_values();
+    const auto smoothness_indicators_view = smoothness_indicators_.view();
+    smoothness_indicators_view.insert_component(numerator[0], 0);
+    smoothness_indicators_view.update_ghost_values();
   }
 } // namespace ryujin

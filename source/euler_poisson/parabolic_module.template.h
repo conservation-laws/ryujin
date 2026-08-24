@@ -546,7 +546,7 @@ namespace ryujin
       std::cout << "ParabolicModule<dim, Number>::compute_potential()"
                 << std::endl;
 #endif
-      auto &U = std::get<0>(state_vector);
+      const auto U_view = std::get<0>(state_vector).view();
       auto &V = std::get<2>(state_vector);
       auto &potential = V.block(0);
 
@@ -568,7 +568,7 @@ namespace ryujin
       const auto body_copy = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
         const auto view = hyperbolic_system_->template view<dim, T>();
-        const auto U_i = U.template read_tensor<T>(i);
+        const auto U_i = U_view.template read_tensor<T>(i);
         const auto rho_i = view.density(U_i);
         write_entry<T>(density_, rho_i, i);
       };
@@ -687,14 +687,14 @@ namespace ryujin
           << std::endl;
 #endif
 
-      auto &U = std::get<0>(state_vector);
+      const auto U_view = std::get<0>(state_vector).view();
       auto &V = std::get<2>(state_vector);
       auto &potential = V.block(0);
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      const auto &lumped_mass_matrix_inverse =
-          offline_data_->lumped_mass_matrix_inverse();
+      const auto lumped_mass_matrix_inverse_view =
+          offline_data_->lumped_mass_matrix_inverse().view();
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -739,9 +739,9 @@ namespace ryujin
         const auto view = hyperbolic_system_->template view<dim, T>();
 
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template read_entry<T>(i);
+            lumped_mass_matrix_inverse_view.template read_entry<T>(i);
 
-        auto U_i = U.template read_tensor<T>(i);
+        auto U_i = U_view.template read_tensor<T>(i);
         const auto rho_i = view.density(U_i);
         const auto m_i = view.momentum(U_i);
         const auto v_i = m_i / rho_i;
@@ -773,7 +773,7 @@ namespace ryujin
           U_i[1 + dim] +=
               Number(0.5) * rho_i * (new_v_i.norm_square() - v_i.norm_square());
 
-        U.template write_tensor<T>(U_i, i);
+        U_view.template write_tensor<T>(U_i, i);
       };
 
       cpu_simd_loop<Number>(
@@ -799,6 +799,7 @@ namespace ryujin
       const Number alpha = parabolic_system_->alpha();
 
       const auto &old_U = std::get<0>(old_state_vector);
+      const auto old_U_view = old_U.view();
       const auto &old_V = std::get<2>(old_state_vector);
       const auto &old_potential = old_V.block(0);
 
@@ -808,8 +809,8 @@ namespace ryujin
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      const auto &lumped_mass_matrix_inverse =
-          offline_data_->lumped_mass_matrix_inverse();
+      const auto lumped_mass_matrix_inverse_view =
+          offline_data_->lumped_mass_matrix_inverse().view();
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -860,7 +861,7 @@ namespace ryujin
           using T = decltype(sentinel);
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          const auto U_i = old_U.template read_tensor<T>(i);
+          const auto U_i = old_U_view.template read_tensor<T>(i);
           const auto rho_i = view.density(U_i);
           const auto m_i = view.momentum(U_i);
 
@@ -1092,6 +1093,7 @@ namespace ryujin
        */
 
       new_U = old_U;
+      const auto new_U_view = new_U.view();
 
       if (crank_nicolson_extrapolation) {
         new_potential *= Number(2.);
@@ -1107,9 +1109,9 @@ namespace ryujin
         const auto view = hyperbolic_system_->template view<dim, T>();
 
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template read_entry<T>(i);
+            lumped_mass_matrix_inverse_view.template read_entry<T>(i);
 
-        const auto old_U_i = old_U.template read_tensor<T>(i);
+        const auto old_U_i = old_U_view.template read_tensor<T>(i);
         const auto rho_i = view.density(old_U_i);
         const auto old_m_i = view.momentum(old_U_i);
         const auto old_v_i = old_m_i / rho_i;
@@ -1138,7 +1140,7 @@ namespace ryujin
           new_U_i[1 + dim] += Number(0.5) * rho_i *
                               (new_v_i.norm_square() - old_v_i.norm_square());
 
-        new_U.template write_tensor<T>(new_U_i, i);
+        new_U_view.template write_tensor<T>(new_U_i, i);
       };
 
       cpu_simd_loop<Number>(

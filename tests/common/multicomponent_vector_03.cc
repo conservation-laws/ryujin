@@ -39,12 +39,12 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.write_tensor<double>(tensor, i);
+    state_vector.view().write_tensor<double>(tensor, i);
   }
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 8; i += 1) {
-    std::cout << state_vector.read_tensor<double>(i) << "\n";
+    std::cout << state_vector.view().read_tensor<double>(i) << "\n";
   }
 
   std::cout << "After move to DefaultSpace:" << std::endl;
@@ -71,6 +71,6 @@ int main(int argc, char *argv[])
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 8; i += 1) {
-    std::cout << state_vector.read_tensor<double>(i) << "\n";
+    std::cout << state_vector.view().read_tensor<double>(i) << "\n";
   }
 }

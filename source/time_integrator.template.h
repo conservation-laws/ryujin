@@ -7,6 +7,8 @@
 
 #include "time_integrator.h"
 
+#include <utility>
+
 namespace ryujin
 {
   using namespace dealii;
@@ -15,10 +17,10 @@ namespace ryujin
   void
   sadd(StateVector &dst, const Number s, const Number b, const StateVector &src)
   {
-    auto &dst_U = std::get<0>(dst);
-    auto &src_U = std::get<0>(src);
-    dst_U.zero_out_ghost_values();
-    dst_U.sadd(s, b, src_U);
+    const auto dst_U_view = std::get<0>(dst).view();
+    const auto src_U_view = std::get<0>(std::as_const(src)).view();
+    dst_U_view.zero_out_ghost_values();
+    dst_U_view.sadd(s, b, src_U_view);
 
     auto &dst_V = std::get<2>(dst);
     auto &src_V = std::get<2>(src);

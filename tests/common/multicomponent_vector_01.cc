@@ -26,23 +26,26 @@ int main(int argc, char *argv[])
 
   state_vector.reinit_with_vector_partitioner(vector_partitioner);
 
+  const auto scalar_vector_view = scalar_vector.view();
+  const auto state_vector_view = state_vector.view();
+
   for (unsigned int i = 0; i < 12; ++i) {
-    scalar_vector.write_entry<double>(static_cast<double>(i), i);
+    scalar_vector_view.write_entry<double>(static_cast<double>(i), i);
 
     dealii::Tensor<1, 4, double> tensor{{static_cast<double>(10 * i),
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.write_tensor<double>(tensor, i);
+    state_vector_view.write_tensor<double>(tensor, i);
   }
 
   std::cout << "Scalar vector:\n";
   for (unsigned int i = 0; i < 12; ++i) {
-    std::cout << scalar_vector.read_entry<double>(i) << "\n";
+    std::cout << scalar_vector_view.read_entry<double>(i) << "\n";
   }
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 12; ++i) {
-    std::cout << state_vector.read_tensor<double>(i) << "\n";
+    std::cout << state_vector_view.read_tensor<double>(i) << "\n";
   }
 }

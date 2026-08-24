@@ -171,11 +171,12 @@ int main(int argc, char *argv[])
   using VA = dealii::VectorizedArray<double>;
   constexpr auto simd_width = VA::size();
   ryujin::Debug<simd_width> sparsity_pattern(0, dsp, partitioner);
+  const auto sparsity_pattern_view = sparsity_pattern.view();
   const auto print_sparsity = [&]() {
     for (unsigned int i = 0; i < n_locally_relevant; ++i) {
       const auto i_global = partitioner->local_to_global(i);
-      const unsigned int row_length = sparsity_pattern.row_length(i);
-      const unsigned int *js = sparsity_pattern.columns(i);
+      const unsigned int row_length = sparsity_pattern_view.row_length(i);
+      const unsigned int *js = sparsity_pattern_view.columns(i);
       std::cout << "[" << i_global;
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
         const auto j_global = partitioner->local_to_global(*js);
@@ -213,25 +214,26 @@ int main(int argc, char *argv[])
 
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);
+  const auto sparse_matrix_view = sparse_matrix.view();
 
   for (unsigned int i = 0; i < n_locally_relevant; ++i) {
-    const unsigned int row_length = sparsity_pattern.row_length(i);
+    const unsigned int row_length = sparsity_pattern_view.row_length(i);
     for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-      sparse_matrix.write_entry(std::pow(10., mpi_rank), i, col_idx);
+      sparse_matrix_view.write_entry(std::pow(10., mpi_rank), i, col_idx);
     }
   }
 
-  sparse_matrix.compress(dealii::VectorOperation::add);
+  sparse_matrix_view.compress(dealii::VectorOperation::add);
 
   const auto print_matrix = [&]() {
     for (unsigned int i = 0; i < n_locally_relevant; ++i) {
       const auto i_global = partitioner->local_to_global(i);
-      const unsigned int row_length = sparsity_pattern.row_length(i);
-      const unsigned int *js = sparsity_pattern.columns(i);
+      const unsigned int row_length = sparsity_pattern_view.row_length(i);
+      const unsigned int *js = sparsity_pattern_view.columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
         const auto j_global = partitioner->local_to_global(*js);
         std::cout << "(" << i_global << "," << j_global << ") "
-                  << sparse_matrix.read_entry(i, col_idx) << std::endl;
+                  << sparse_matrix_view.read_entry(i, col_idx) << std::endl;
       }
     }
   };

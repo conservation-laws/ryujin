@@ -322,17 +322,19 @@ namespace ryujin
 #endif
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const auto &old_U = std::get<0>(old_state_vector);
-      auto &new_U = std::get<0>(new_state_vector);
+      const auto old_U_view = std::get<0>(old_state_vector).view();
+      const auto new_U_view = std::get<0>(new_state_vector).view();
 
-      const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+      const auto lumped_mass_matrix_view =
+          offline_data_->lumped_mass_matrix().view();
       const auto &affine_constraints = offline_data_->affine_constraints();
 
       /* Index ranges for the iteration over the sparsity pattern : */
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+      const auto sparsity_simd_view =
+          offline_data_->sparsity_pattern_simd().view();
 
       DiagonalMatrix<dim, Number> diagonal_matrix;
 
@@ -390,11 +392,11 @@ namespace ryujin
 
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          const auto U_i = old_U.template read_tensor<T>(i);
+          const auto U_i = old_U_view.template read_tensor<T>(i);
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
           const auto rho_e_i = view.internal_energy(U_i);
-          const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
+          const auto m_i = lumped_mass_matrix_view.template read_entry<T>(i);
 
           write_entry<T>(density_, rho_i, i);
           /* (5.4a) */
@@ -485,7 +487,7 @@ namespace ryujin
         /* Prepare preconditioner: */
 
         diagonal_matrix.reinit(
-            lumped_mass_matrix, density_, affine_constraints);
+            lumped_mass_matrix_view, density_, affine_constraints);
 
         if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
@@ -669,7 +671,8 @@ namespace ryujin
             velocity_,
             /* zero destination */ true);
 
-        const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+        const auto lumped_mass_matrix_view =
+            offline_data_->lumped_mass_matrix().view();
 
         const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
@@ -677,11 +680,11 @@ namespace ryujin
           const auto view = hyperbolic_system_->template view<dim, T>();
 
           const auto rhs_i = read_entry<T>(internal_energy_rhs_, i);
-          const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
+          const auto m_i = lumped_mass_matrix_view.template read_entry<T>(i);
           const auto rho_i = read_entry<T>(density_, i);
           const auto e_i = read_entry<T>(internal_energy_, i);
 
-          const auto U_i = old_U.template read_tensor<T>(i);
+          const auto U_i = old_U_view.template read_tensor<T>(i);
           const auto V_i = view.momentum(U_i) / rho_i;
 
           dealii::Tensor<1, dim, T> V_i_new;
@@ -868,11 +871,11 @@ namespace ryujin
           const auto view = hyperbolic_system_->template view<dim, T>();
 
           /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
           if (row_length == 1)
             return;
 
-          auto U_i = old_U.template read_tensor<T>(i);
+          auto U_i = old_U_view.template read_tensor<T>(i);
           const auto rho_i = view.density(U_i);
 
           Tensor<1, dim, T> m_i_new;
@@ -930,13 +933,13 @@ namespace ryujin
             U_i[1 + d] = m_i_new[d];
           U_i[1 + dim] = E_i_new;
 
-          new_U.template write_tensor<T>(U_i, i);
+          new_U_view.template write_tensor<T>(U_i, i);
         };
 
         cpu_simd_loop<Number>(
             "time_step_parabolic_3", body, 0, n_owned, n_owned);
 
-        new_U.update_ghost_values();
+        new_U_view.update_ghost_values();
       }
 
       {

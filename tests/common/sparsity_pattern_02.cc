@@ -62,12 +62,15 @@ int main(int argc, char *argv[])
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);
 
-  sparse_matrix.write_entry(22.0, 0, 1);
-  sparse_matrix.write_entry(20.0, 0, 2);
-  sparse_matrix.write_entry(220.0, 1, 1);
-  sparse_matrix.write_entry(200.0, 1, 2);
-  sparse_matrix.write_entry(2200.0, 2, 1);
-  sparse_matrix.write_entry(2000.0, 2, 2);
+  {
+    const auto host_view = sparse_matrix.view();
+    host_view.write_entry(22.0, 0, 1);
+    host_view.write_entry(20.0, 0, 2);
+    host_view.write_entry(220.0, 1, 1);
+    host_view.write_entry(200.0, 1, 2);
+    host_view.write_entry(2200.0, 2, 1);
+    host_view.write_entry(2000.0, 2, 2);
+  }
 
   /*
    * Creating a device view of the sparse matrix requires a device
@@ -98,7 +101,8 @@ int main(int argc, char *argv[])
 
   sparse_matrix.move_to_memory_space<HostSpace>();
 
-  std::cout << "Entry (0, 0): " << sparse_matrix.read_entry(0, 0) << std::endl;
-  std::cout << "Entry (1, 0): " << sparse_matrix.read_entry(1, 0) << std::endl;
-  std::cout << "Entry (2, 0): " << sparse_matrix.read_entry(2, 0) << std::endl;
+  const auto host_view = sparse_matrix.view();
+  std::cout << "Entry (0, 0): " << host_view.read_entry(0, 0) << std::endl;
+  std::cout << "Entry (1, 0): " << host_view.read_entry(1, 0) << std::endl;
+  std::cout << "Entry (2, 0): " << host_view.read_entry(2, 0) << std::endl;
 }

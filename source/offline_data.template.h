@@ -793,15 +793,15 @@ namespace ryujin
                     AssemblyScratchData<dim>(*discretization_),
                     AssemblyCopyData<dim, Number>());
 
-    mass_matrix_.compress(VectorOperation::add);
-    mass_matrix_.update_ghost_rows();
-    cij_matrix_.compress(VectorOperation::add);
-    cij_matrix_.update_ghost_rows();
-    betaij_matrix_.compress(VectorOperation::add);
-    betaij_matrix_.update_ghost_rows();
+    mass_matrix_.view().compress(VectorOperation::add);
+    mass_matrix_.view().update_ghost_rows();
+    cij_matrix_.view().compress(VectorOperation::add);
+    cij_matrix_.view().update_ghost_rows();
+    betaij_matrix_.view().compress(VectorOperation::add);
+    betaij_matrix_.view().update_ghost_rows();
     if (discretization_->have_discontinuous_ansatz()) {
-      mass_matrix_inverse_.compress(VectorOperation::add);
-      mass_matrix_inverse_.update_ghost_rows();
+      mass_matrix_inverse_.view().compress(VectorOperation::add);
+      mass_matrix_inverse_.view().update_ghost_rows();
     }
 
     measure_of_omega_ = Utilities::MPI::sum(
@@ -812,34 +812,40 @@ namespace ryujin
      */
 
     {
+      const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+      const auto mass_matrix_view = mass_matrix_.view();
+      const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+      const auto lumped_mass_matrix_inverse_view =
+          lumped_mass_matrix_inverse_.view();
+
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
         constexpr unsigned int stride_size = get_stride_size<T>;
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
         T m_i{};
 
-        const unsigned int *js = sparsity_pattern_simd_.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto m_ij = mass_matrix_.template read_entry<T>(i, col_idx);
+          const auto m_ij = mass_matrix_view.template read_entry<T>(i, col_idx);
           m_i += m_ij;
         }
 
-        lumped_mass_matrix_.template write_entry<T>(m_i, i);
-        lumped_mass_matrix_inverse_. //
+        lumped_mass_matrix_view.template write_entry<T>(m_i, i);
+        lumped_mass_matrix_inverse_view. //
             template write_entry<T>(Number(1.) / m_i, i);
       };
 
       cpu_simd_loop<Number>("", body, 0, n_locally_internal_, n_locally_owned_);
 
-      lumped_mass_matrix_.update_ghost_values();
-      lumped_mass_matrix_inverse_.update_ghost_values();
+      lumped_mass_matrix_view.update_ghost_values();
+      lumped_mass_matrix_inverse_view.update_ghost_values();
     }
 
     /*
@@ -847,6 +853,8 @@ namespace ryujin
      */
 
     if (discretization_->have_discontinuous_ansatz()) {
+      const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+
       /* The local, per-cell assembly routine: */
       const auto local_assemble_system = [&](const auto &cell,
                                              auto &scratch,
@@ -947,8 +955,8 @@ namespace ryujin
                       scalar_partitioner_->global_to_local(global_i);
                   const auto local_j =
                       scalar_partitioner_->global_to_local(global_j);
-                  const auto m_i = lumped_mass_matrix_.read_entry(local_i);
-                  const auto m_j = lumped_mass_matrix_.read_entry(local_j);
+                  const auto m_i = lumped_mass_matrix_view.read_entry(local_i);
+                  const auto m_j = lumped_mass_matrix_view.read_entry(local_j);
                   const auto hd_ij =
                       Number(0.5) * (m_i + m_j) / measure_of_omega_;
 
@@ -1013,7 +1021,7 @@ namespace ryujin
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
 
-      incidence_matrix_.compress(VectorOperation::add);
+      incidence_matrix_.view().compress(VectorOperation::add);
     }
 
     /*
@@ -1047,24 +1055,28 @@ namespace ryujin
      * Verify that the mij_matrix_ object is consistent:
      */
 
+    const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+    const auto mass_matrix_view = mass_matrix_.view();
+    const auto cij_matrix_view = cij_matrix_.view();
+
     for (unsigned int i = 0; i < n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         continue;
 
       auto sum =
-          mass_matrix_.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
+          mass_matrix_view.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
                                                  : js + col_idx);
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
-        const auto m_ij = mass_matrix_.read_entry(i, col_idx);
+        const auto m_ij = mass_matrix_view.read_entry(i, col_idx);
         if (discretization_->have_discontinuous_ansatz()) {
           // Interfacial coupling terms are present in the stencil but zero
           // in the mass matrix
@@ -1074,7 +1086,7 @@ namespace ryujin
         }
         sum += m_ij;
 
-        const auto m_ji = mass_matrix_.read_transposed_entry(i, col_idx);
+        const auto m_ji = mass_matrix_view.read_transposed_entry(i, col_idx);
         if (std::abs(m_ij - m_ji) >= 1.e-12) {
           // The m_ij matrix is not symmetric
           std::stringstream ss;
@@ -1092,25 +1104,25 @@ namespace ryujin
 
     for (unsigned int i = 0; i < n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
         continue;
 
-      auto sum = cij_matrix_.read_tensor(i, 0);
+      auto sum = cij_matrix_view.read_tensor(i, 0);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
                                                  : js + col_idx);
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
-        const auto c_ij = cij_matrix_.read_tensor(i, col_idx);
+        const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
         Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
         sum += c_ij;
 
-        const auto c_ji = cij_matrix_.read_transposed_tensor(i, col_idx);
+        const auto c_ji = cij_matrix_view.read_transposed_tensor(i, col_idx);
         if ((c_ij + c_ji).norm() >= 1.e-12) {
           // The c_ij matrix is not symmetric, this can only happen if i
           // and j are both located on the boundary.
@@ -1223,6 +1235,8 @@ namespace ryujin
               << std::endl;
 #endif
 
+    const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+
     /*
      * Create a temporary multimap with the (local) dof index as key:
      */
@@ -1334,8 +1348,7 @@ namespace ryujin
             continue;
 
           /* Skip constrained degrees of freedom: */
-          const unsigned int row_length =
-              sparsity_pattern_simd_.row_length(index);
+          const unsigned int row_length = sparsity_simd_view.row_length(index);
           if (row_length == 1)
             continue;
 
@@ -1512,6 +1525,8 @@ namespace ryujin
      * Now, collect all coupling boundary pairs:
      */
 
+    const auto sparsity_simd_view = sparsity_pattern_simd_.view();
+
     CouplingBoundaryPairs result;
 
     for (const auto i : locally_relevant_boundary_indices) {
@@ -1520,13 +1535,13 @@ namespace ryujin
       if (i >= n_locally_owned_)
         continue;
 
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int row_length = sparsity_simd_view.row_length(i);
 
       /* Skip all constrained degrees of freedom: */
       if (row_length == 1)
         continue;
 
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      const unsigned int *js = sparsity_simd_view.columns(i);
       constexpr auto simd_length = VectorizedArray<Number>::size();
       /* skip diagonal: */
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {

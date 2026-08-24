@@ -99,7 +99,10 @@ namespace ryujin
     time_series_cycle_.reset();
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
+    const auto lumped_mass_matrix_view =
+        offline_data_->lumped_mass_matrix().view();
 
     /*
      * Create interior maps and allocate statistics.
@@ -112,7 +115,8 @@ namespace ryujin
         interior_manifolds_.begin(),
         interior_manifolds_.end(),
         std::inserter(interior_maps_, interior_maps_.end()),
-        [this, n_owned, &sparsity_simd](auto it) {
+        [this, n_owned, &sparsity_simd_view, &lumped_mass_matrix_view](
+            auto it) {
           const auto &[name, expression, option] = it;
           FunctionParser<dim> level_set_function(expression);
 
@@ -160,7 +164,8 @@ namespace ryujin
                       global_index);
 
               /* Skip constrained degrees of freedom: */
-              const unsigned int row_length = sparsity_simd.row_length(index);
+              const unsigned int row_length =
+                  sparsity_simd_view.row_length(index);
               if (row_length == 1)
                 continue;
 
@@ -168,7 +173,7 @@ namespace ryujin
                 continue;
 
               const Number interior_mass =
-                  offline_data_->lumped_mass_matrix().read_entry(index);
+                  lumped_mass_matrix_view.read_entry(index);
               // FIXME: change to std::set
               preliminary_map[index] = {index, interior_mass, position};
             }
@@ -564,7 +569,7 @@ namespace ryujin
       const std::vector<point_type> &points_vector,
       std::vector<value_type> &val_new)
   {
-    const auto &U = std::get<0>(state_vector);
+    const auto U_view = std::get<0>(state_vector).view();
 
     value_type spatial_average;
     Number mass_sum = Number(0.);
@@ -583,7 +588,7 @@ namespace ryujin
               std::is_same_v<point_type, interior_point> ? 1 : 3;
           const auto mass_i = std::get<index>(point);
 
-          const auto U_i = U.read_tensor(i);
+          const auto U_i = U_view.read_tensor(i);
           const auto view = hyperbolic_system_->template view<dim, Number>();
           const auto primitive_state = view.to_primitive_state(U_i);
 

@@ -122,9 +122,11 @@ namespace ryujin
     constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
+    const auto U_view = U.view();
+    const auto precomputed_view = precomputed.view();
     for (unsigned int i = 0; i < n_owned; ++i) {
-      U.write_tensor(state_type{} * nan, i);
-      precomputed.write_tensor(
+      U_view.write_tensor(state_type{} * nan, i);
+      precomputed_view.write_tensor(
           dealii::Tensor<1, n_precomputed_values, Number>() * nan, i);
     }
 #endif
@@ -148,7 +150,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    auto &U = std::get<0>(state_vector);
+    const auto U_view = std::get<0>(state_vector).view();
 
     const auto &boundary_map = offline_data_->boundary_map();
     using VA = VectorizedArray<Number>;
@@ -168,7 +170,7 @@ namespace ryujin
       if (id == Boundary::do_nothing)
         continue;
 
-      auto U_i = U.read_tensor(i);
+      auto U_i = U_view.read_tensor(i);
 
       /* Use a lambda to avoid computing unnecessary state values */
       auto get_dirichlet_data = [position = position, t = t, this]() {
@@ -177,10 +179,10 @@ namespace ryujin
 
       const auto view = hyperbolic_system_->template view<dim, Number>();
       U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet_data);
-      U.write_tensor(U_i, i);
+      U_view.write_tensor(U_i, i);
     }
 
-    U.update_ghost_values();
+    U_view.update_ghost_values();
 
     /*
      * Compute and populate precomputed values.
@@ -188,8 +190,7 @@ namespace ryujin
 
     hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
 
-    auto &precomputed = std::get<1>(state_vector);
-    precomputed.update_ghost_values();
+    std::get<1>(state_vector).view().update_ghost_values();
   }
 
 
@@ -247,9 +248,9 @@ namespace ryujin
               << std::endl;
 #endif
 
-    auto &old_U = std::get<0>(old_state_vector);
-    auto &old_precomputed = std::get<1>(old_state_vector);
-    auto &new_U = std::get<0>(new_state_vector);
+    const auto old_U_view = std::get<0>(old_state_vector).view();
+    const auto old_precomputed_view = std::get<1>(old_state_vector).view();
+    const auto new_U_view = std::get<0>(new_state_vector).view();
 
     /*
      * Workaround: A constexpr boolean storing the fact whether we
@@ -278,16 +279,40 @@ namespace ryujin
 
     /* References to precomputed matrices and the stencil: */
 
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto sparsity_simd_view =
+        offline_data_->sparsity_pattern_simd().view();
 
-    const auto &mass_matrix = offline_data_->mass_matrix();
-    const auto &mass_matrix_inverse = offline_data_->mass_matrix_inverse();
-    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const auto &lumped_mass_matrix_inverse =
-        offline_data_->lumped_mass_matrix_inverse();
+    const auto mass_matrix_view = offline_data_->mass_matrix().view();
+    const auto lumped_mass_matrix_view =
+        offline_data_->lumped_mass_matrix().view();
+    const auto lumped_mass_matrix_inverse_view =
+        offline_data_->lumped_mass_matrix_inverse().view();
 
-    const auto &cij_matrix = offline_data_->cij_matrix();
-    const auto &incidence_matrix = offline_data_->incidence_matrix();
+    const auto cij_matrix_view = offline_data_->cij_matrix().view();
+
+    /*
+     * The mass_matrix_inverse and incidence_matrix objects are only
+     * initialized (and accessed) for a discontinuous ansatz:
+     */
+    const bool have_discontinuous_ansatz =
+        offline_data_->discretization().have_discontinuous_ansatz();
+    using MatrixReadView = decltype(offline_data_->mass_matrix().view());
+    const auto mass_matrix_inverse_view =
+        have_discontinuous_ansatz ? offline_data_->mass_matrix_inverse().view()
+                                  : MatrixReadView{};
+    const auto incidence_matrix_view =
+        have_discontinuous_ansatz ? offline_data_->incidence_matrix().view()
+                                  : MatrixReadView{};
+
+    const auto initial_precomputed_view = initial_precomputed_.view();
+    const auto alpha_view = alpha_.view();
+    const auto bounds_view = bounds_.view();
+    const auto r_view = r_.view();
+
+    const auto dij_matrix_view = dij_matrix_.view();
+    const auto lij_matrix_view = lij_matrix_.view();
+    const auto lij_matrix_next_view = lij_matrix_next_.view();
+    const auto pij_matrix_view = pij_matrix_.view();
 
     const auto &coupling_boundary_pairs =
         offline_data_->coupling_boundary_pairs();
@@ -352,23 +377,23 @@ namespace ryujin
         auto indicator_view = indicator_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
-        const auto U_i = old_U.template read_tensor<T>(i);
+        const auto U_i = old_U_view.template read_tensor<T>(i);
 
-        indicator_view.reset(old_precomputed, i, U_i);
+        indicator_view.reset(old_precomputed_view, i, U_i);
 
-        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = old_U.template read_tensor<T>(js);
+          const auto U_j = old_U_view.template read_tensor<T>(js);
 
-          const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+          const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
-          indicator_view.accumulate(old_precomputed, js, U_j, c_ij);
+          indicator_view.accumulate(old_precomputed_view, js, U_j, c_ij);
 
           /* Skip diagonal. */
           if (col_idx == 0)
@@ -381,20 +406,20 @@ namespace ryujin
           const auto norm = c_ij.norm();
           const auto n_ij = c_ij / norm;
           const auto lambda_max = wave_speed_estimator_view.compute(
-              old_precomputed, U_i, U_j, i, js, n_ij);
+              old_precomputed_view, U_i, U_j, i, js, n_ij);
           const auto d_ij = norm * lambda_max;
 
-          dij_matrix_.write_entry(d_ij, i, col_idx, true);
+          dij_matrix_view.write_entry(d_ij, i, col_idx, true);
         }
 
-        const auto mass = lumped_mass_matrix.template read_entry<T>(i);
+        const auto mass = lumped_mass_matrix_view.template read_entry<T>(i);
         const auto hd_i = mass * measure_of_omega_inverse;
-        alpha_.template write_entry<T>(indicator_view.alpha(hd_i), i);
+        alpha_view.template write_entry<T>(indicator_view.alpha(hd_i), i);
       };
 
       cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
-      alpha_.update_ghost_values();
+      alpha_view.update_ghost_values();
     }
 
     /*
@@ -438,21 +463,21 @@ namespace ryujin
         if (j < i)
           return;
 
-        const auto U_i = old_U.read_tensor(i);
-        const auto U_j = old_U.read_tensor(j);
+        const auto U_i = old_U_view.read_tensor(i);
+        const auto U_j = old_U_view.read_tensor(j);
 
-        const auto c_ji = cij_matrix.read_transposed_tensor(i, col_idx);
+        const auto c_ji = cij_matrix_view.read_transposed_tensor(i, col_idx);
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm_ji = c_ji.norm();
         const auto n_ji = c_ji / norm_ji;
 
-        const auto d_ij = dij_matrix_.read_entry(i, col_idx);
+        const auto d_ij = dij_matrix_view.read_entry(i, col_idx);
 
         const auto lambda_max = wave_speed_estimator_view.compute(
-            old_precomputed, U_j, U_i, j, &i, n_ji);
+            old_precomputed_view, U_j, U_i, j, &i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
 
-        dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
+        dij_matrix_view.write_entry(std::max(d_ij, d_ji), i, col_idx);
       };
 
       cpu_simd_loop<Number>(loop_name(),
@@ -472,35 +497,35 @@ namespace ryujin
 #endif
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
         Number d_sum = Number(0.);
 
         /* skip diagonal: */
-        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
-            const auto d_ji = dij_matrix_.read_transposed_entry(i, col_idx);
+            const auto d_ji = dij_matrix_view.read_transposed_entry(i, col_idx);
 
 #ifdef DEBUG_SYMMETRY_CHECK
             /* Verify that d_ji == std::max(d_ij, d_ji): */
 
-            const auto U_i = old_U.read_tensor(i);
-            const auto U_j = old_U.read_tensor(j);
+            const auto U_i = old_U_view.read_tensor(i);
+            const auto U_j = old_U_view.read_tensor(j);
 
-            const auto c_ij = cij_matrix.read_tensor(i, col_idx);
+            const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
             Assert(c_ij.norm() > 1.e-12, ExcInternalError());
             const auto norm_ij = c_ij.norm();
             const auto n_ij = c_ij / norm_ij;
 
             const auto lambda_max = wave_speed_estimator_view.compute(
-                old_precomputed, U_i, U_j, i, &j, n_ij);
+                old_precomputed_view, U_i, U_j, i, &j, n_ij);
             const auto d_ij = norm_ij * lambda_max;
 
             Assert(d_ij <= d_ji + 1.0e-12,
@@ -508,10 +533,10 @@ namespace ryujin
                                       "boundary degrees of freedom."));
 #endif
 
-            dij_matrix_.write_entry(d_ji, i, col_idx);
+            dij_matrix_view.write_entry(d_ji, i, col_idx);
           }
 
-          d_sum -= dij_matrix_.read_entry(i, col_idx);
+          d_sum -= dij_matrix_view.read_entry(i, col_idx);
         }
 
         /*
@@ -523,9 +548,9 @@ namespace ryujin
             std::min(d_sum, Number(-1.e6) * std::numeric_limits<Number>::min());
 
         /* write diagonal element */
-        dij_matrix_.write_entry(d_sum, i, 0);
+        dij_matrix_view.write_entry(d_sum, i, 0);
 
-        const Number mass = lumped_mass_matrix.read_entry(i);
+        const Number mass = lumped_mass_matrix_view.read_entry(i);
         const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
 
         Number current_value = local_tau_max.load();
@@ -582,7 +607,7 @@ namespace ryujin
 
 #ifdef DEBUG
     /*  Exchange d_ij so that we can check for symmetry: */
-    dij_matrix_.update_ghost_rows();
+    dij_matrix_view.update_ghost_rows();
 #endif
 
     /*
@@ -613,33 +638,36 @@ namespace ryujin
         auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
-        const auto U_i = old_U.template read_tensor<T>(i);
+        const auto U_i = old_U_view.template read_tensor<T>(i);
         auto U_i_new = U_i;
 
-        const auto alpha_i = alpha_.template read_entry<T>(i);
-        const auto m_i = lumped_mass_matrix.template read_entry<T>(i);
+        const auto alpha_i = alpha_view.template read_entry<T>(i);
+        const auto m_i = lumped_mass_matrix_view.template read_entry<T>(i);
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template read_entry<T>(i);
+            lumped_mass_matrix_inverse_view.template read_entry<T>(i);
 
         const auto flux_i = view.flux_contribution(
-            old_precomputed, initial_precomputed_, i, U_i);
+            old_precomputed_view, initial_precomputed_view, i, U_i);
 
         std::array<flux_contribution_type, stages> flux_iHs;
         [[maybe_unused]] state_type S_iH;
 
         for (int s = 0; s < stages; ++s) {
           const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+          const auto U_s_view = U_s.view();
+          const auto prec_s_view = prec_s.view();
 
-          const auto U_iHs = U_s.template read_tensor<T>(i);
-          flux_iHs[s] =
-              view.flux_contribution(prec_s, initial_precomputed_, i, U_iHs);
+          const auto U_iHs = U_s_view.template read_tensor<T>(i);
+          flux_iHs[s] = view.flux_contribution(
+              prec_s_view, initial_precomputed_view, i, U_iHs);
 
           if constexpr (View::have_source_terms) {
-            S_iH += stage_weights[s] * view.nodal_source(prec_s, i, U_iHs, tau);
+            S_iH += stage_weights[s] *
+                    view.nodal_source(prec_s_view, i, U_iHs, tau);
           }
         }
 
@@ -647,13 +675,13 @@ namespace ryujin
         state_type F_iH;
 
         if constexpr (View::have_source_terms) {
-          S_i = view.nodal_source(old_precomputed, i, U_i, tau);
+          S_i = view.nodal_source(old_precomputed_view, i, U_i, tau);
           S_iH += weight * S_i;
           U_i_new += tau * /* m_i_inv * m_i */ S_i;
           F_iH += m_i * S_iH;
         }
 
-        limiter_view.reset(old_precomputed, i, U_i, flux_i);
+        limiter_view.reset(old_precomputed_view, i, U_i, flux_i);
 
         [[maybe_unused]] state_type affine_shift;
 
@@ -663,17 +691,19 @@ namespace ryujin
          * before we can compute limiter bounds.
          */
 
-        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int *js = sparsity_simd_view.columns(i);
         if constexpr (shallow_water) {
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
-            const auto U_j = old_U.template read_tensor<T>(js);
+            const auto U_j = old_U_view.template read_tensor<T>(js);
             const auto flux_j = view.flux_contribution(
-                old_precomputed, initial_precomputed_, js, U_j);
+                old_precomputed_view, initial_precomputed_view, js, U_j);
 
-            const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
-            const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+            const auto d_ij =
+                dij_matrix_view.template read_entry<T>(i, col_idx);
+            const auto c_ij =
+                cij_matrix_view.template read_tensor<T>(i, col_idx);
 
             const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
             affine_shift += B_ij;
@@ -686,20 +716,20 @@ namespace ryujin
           affine_shift += tau * /* m_i_inv * m_i */ S_i;
         }
 
-        js = sparsity_simd.columns(i);
+        js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          const auto U_j = old_U.template read_tensor<T>(js);
+          const auto U_j = old_U_view.template read_tensor<T>(js);
 
-          const auto alpha_j = alpha_.template read_entry<T>(js);
+          const auto alpha_j = alpha_view.template read_entry<T>(js);
 
-          const auto d_ij = dij_matrix_.template read_entry<T>(i, col_idx);
+          const auto d_ij = dij_matrix_view.template read_entry<T>(i, col_idx);
           auto factor = (alpha_i + alpha_j) * Number(.5);
 
           if constexpr (have_discontinuous_ansatz) {
             const auto incidence_ij =
-                incidence_matrix.template read_entry<T>(i, col_idx);
+                incidence_matrix_view.template read_entry<T>(i, col_idx);
             factor = std::max(factor, incidence_ij);
           }
 
@@ -713,13 +743,13 @@ namespace ryujin
            * that the (local) values of d_ij and d_ji match.
            */
           const auto d_ji =
-              dij_matrix_.template read_transposed_entry<T>(i, col_idx);
+              dij_matrix_view.template read_transposed_entry<T>(i, col_idx);
           Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
                  dealii::ExcMessage(
                      "d_ij not symmetrized correctly over MPI ranks"));
 #endif
 
-          const auto c_ij = cij_matrix.template read_tensor<T>(i, col_idx);
+          const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
           constexpr auto eps = std::numeric_limits<Number>::epsilon();
           const auto scale =
               dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
@@ -727,9 +757,9 @@ namespace ryujin
           const auto scaled_c_ij = c_ij * scale;
 
           const auto flux_j = view.flux_contribution(
-              old_precomputed, initial_precomputed_, js, U_j);
+              old_precomputed_view, initial_precomputed_view, js, U_j);
 
-          const auto m_ij = mass_matrix.template read_entry<T>(i, col_idx);
+          const auto m_ij = mass_matrix_view.template read_entry<T>(i, col_idx);
 
           /*
            * Compute low-order flux and limiter bounds:
@@ -751,7 +781,7 @@ namespace ryujin
             F_iH += d_ijH * (U_star_ji - U_star_ij);
             P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
-            limiter_view.accumulate(old_precomputed,
+            limiter_view.accumulate(old_precomputed_view,
                                     U_j,
                                     U_star_ij,
                                     U_star_ji,
@@ -764,8 +794,12 @@ namespace ryujin
             F_iH += d_ijH * (U_j - U_i);
             P_ij += (d_ijH - d_ij) * (U_j - U_i);
 
-            limiter_view.accumulate(
-                old_precomputed, js, U_j, flux_j, scaled_c_ij, affine_shift);
+            limiter_view.accumulate(old_precomputed_view,
+                                    js,
+                                    U_j,
+                                    flux_j,
+                                    scaled_c_ij,
+                                    affine_shift);
           }
 
           if constexpr (View::have_source_terms) {
@@ -788,17 +822,20 @@ namespace ryujin
           }
 
           if constexpr (View::have_source_terms) {
-            const auto S_j = view.nodal_source(old_precomputed, js, U_j, tau);
+            const auto S_j =
+                view.nodal_source(old_precomputed_view, js, U_j, tau);
             F_iH += weight * m_ij * S_j;
             P_ij += weight * m_ij * S_j;
           }
 
           for (int s = 0; s < stages; ++s) {
             const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+            const auto U_s_view = U_s.view();
+            const auto prec_s_view = prec_s.view();
 
-            const auto U_jHs = U_s.template read_tensor<T>(js);
-            const auto flux_jHs =
-                view.flux_contribution(prec_s, initial_precomputed_, js, U_jHs);
+            const auto U_jHs = U_s_view.template read_tensor<T>(js);
+            const auto flux_jHs = view.flux_contribution(
+                prec_s_view, initial_precomputed_view, js, U_jHs);
 
             if constexpr (View::have_high_order_flux) {
               const auto high_order_flux_ij =
@@ -813,13 +850,13 @@ namespace ryujin
             }
 
             if constexpr (View::have_source_terms) {
-              const auto S_js = view.nodal_source(prec_s, js, U_jHs, tau);
+              const auto S_js = view.nodal_source(prec_s_view, js, U_jHs, tau);
               F_iH += stage_weights[s] * m_ij * S_js;
               P_ij += stage_weights[s] * m_ij * S_js;
             }
           }
 
-          pij_matrix_.template write_tensor<T>(P_ij, i, col_idx, true);
+          pij_matrix_view.template write_tensor<T>(P_ij, i, col_idx, true);
         }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
@@ -828,12 +865,12 @@ namespace ryujin
         }
 #endif
 
-        new_U.template write_tensor<T>(U_i_new, i);
-        r_.template write_tensor<T>(F_iH, i);
+        new_U_view.template write_tensor<T>(U_i_new, i);
+        r_view.template write_tensor<T>(F_iH, i);
 
         const auto hd_i = m_i * measure_of_omega_inverse;
         const auto relaxed_bounds = limiter_view.bounds(hd_i);
-        bounds_.template write_tensor<T>(relaxed_bounds, i);
+        bounds_view.template write_tensor<T>(relaxed_bounds, i);
       };
 
       /*
@@ -850,14 +887,14 @@ namespace ryujin
             loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
-      r_.update_ghost_values();
+      r_view.update_ghost_values();
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
         /*
          * In case we extend bounds over the stencil, we have to ensure
          * that ghost ranges are properly communicated over all MPI
          * ranks.
          */
-        bounds_.update_ghost_values();
+        bounds_view.update_ghost_values();
       }
     }
 
@@ -881,12 +918,12 @@ namespace ryujin
         auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
         auto bounds =
-            bounds_.template read_tensor<T, std::array<T, n_bounds>>(i);
+            bounds_view.template read_tensor<T, std::array<T, n_bounds>>(i);
 
         /*
          * In case of a discontinuous finite element ansatz we need to
@@ -895,37 +932,38 @@ namespace ryujin
          */
         if constexpr (have_discontinuous_ansatz) {
           /* Skip diagonal. */
-          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+          const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
           for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
             bounds = limiter_view.combine_bounds(
                 bounds,
-                bounds_.template read_tensor<T, std::array<T, n_bounds>>(js));
+                bounds_view.template read_tensor<T, std::array<T, n_bounds>>(
+                    js));
           }
-          bounds_.template write_tensor<T>(bounds, i);
+          bounds_view.template write_tensor<T>(bounds, i);
         }
 
         [[maybe_unused]] T m_i;
         if constexpr (have_discontinuous_ansatz)
-          m_i = lumped_mass_matrix.template read_entry<T>(i);
+          m_i = lumped_mass_matrix_view.template read_entry<T>(i);
 
         const auto m_i_inv =
-            lumped_mass_matrix_inverse.template read_entry<T>(i);
+            lumped_mass_matrix_inverse_view.template read_entry<T>(i);
 
-        const auto U_i_new = new_U.template read_tensor<T>(i);
+        const auto U_i_new = new_U_view.template read_tensor<T>(i);
 
-        const auto F_iH = r_.template read_tensor<T>(i);
+        const auto F_iH = r_view.template read_tensor<T>(i);
 
         const auto lambda_inv = Number(row_length - 1);
         const auto factor = tau * m_i_inv * lambda_inv;
 
         /* Skip diagonal. */
-        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+        const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          auto P_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
-          const auto F_jH = r_.template read_tensor<T>(js);
+          auto P_ij = pij_matrix_view.template read_tensor<T>(i, col_idx);
+          const auto F_jH = r_view.template read_tensor<T>(js);
 
           /*
            * Mass matrix correction:
@@ -936,9 +974,9 @@ namespace ryujin
           if constexpr (have_discontinuous_ansatz) {
             /* Use full consistent mass matrix inverse: */
 
-            const auto m_j = lumped_mass_matrix.template read_entry<T>(js);
+            const auto m_j = lumped_mass_matrix_view.template read_entry<T>(js);
             const auto m_ij_inv =
-                mass_matrix_inverse.template read_entry<T>(i, col_idx);
+                mass_matrix_inverse_view.template read_entry<T>(i, col_idx);
             const auto b_ij = m_i * m_ij_inv - kronecker_ij;
             const auto b_ji = m_j * m_ij_inv - kronecker_ij;
 
@@ -948,8 +986,9 @@ namespace ryujin
             /* Use Neumann series expansion: */
 
             const auto m_j_inv =
-                lumped_mass_matrix_inverse.template read_entry<T>(js);
-            const auto m_ij = mass_matrix.template read_entry<T>(i, col_idx);
+                lumped_mass_matrix_inverse_view.template read_entry<T>(js);
+            const auto m_ij =
+                mass_matrix_view.template read_entry<T>(i, col_idx);
             const auto b_ij = kronecker_ij - m_ij * m_j_inv;
             const auto b_ji = kronecker_ij - m_ij * m_i_inv;
 
@@ -957,7 +996,7 @@ namespace ryujin
           }
 
           P_ij *= factor;
-          pij_matrix_.template write_tensor<T>(P_ij, i, col_idx);
+          pij_matrix_view.template write_tensor<T>(P_ij, i, col_idx);
 
           /*
            * Compute limiter coefficients:
@@ -965,7 +1004,7 @@ namespace ryujin
 
           const auto &[l_ij, success] =
               limiter_view.limit(bounds, U_i_new, P_ij);
-          lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
+          lij_matrix_view.template write_entry<T>(l_ij, i, col_idx, true);
 
           /*
            * If the success is set to false then the low-order update
@@ -995,7 +1034,7 @@ namespace ryujin
             loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
-      lij_matrix_.update_ghost_rows();
+      lij_matrix_view.update_ghost_rows();
     }
 
     /*
@@ -1017,8 +1056,9 @@ namespace ryujin
           computing_timer_,
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
-      const auto &lij_matrix =
-          (n_iterations == 2 && last_round) ? lij_matrix_next_ : lij_matrix_;
+      const auto lij_view = (n_iterations == 2 && last_round)
+                                ? lij_matrix_next_view
+                                : lij_matrix_view;
 
       auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
@@ -1027,11 +1067,11 @@ namespace ryujin
         auto limiter_view = limiter_.template view<dim, T>();
 
         /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
-        auto U_i_new = new_U.template read_tensor<T>(i);
+        auto U_i_new = new_U_view.template read_tensor<T>(i);
 
         const Number lambda = Number(1.) / Number(row_length - 1);
 
@@ -1041,11 +1081,11 @@ namespace ryujin
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
-          const auto l_ij = std::min(
-              lij_matrix.template read_entry<T>(i, col_idx),
-              lij_matrix.template read_transposed_entry<T>(i, col_idx));
+          const auto l_ij =
+              std::min(lij_view.template read_entry<T>(i, col_idx),
+                       lij_view.template read_transposed_entry<T>(i, col_idx));
 
-          const auto p_ij = pij_matrix_.template read_tensor<T>(i, col_idx);
+          const auto p_ij = pij_matrix_view.template read_tensor<T>(i, col_idx);
 
           U_i_new += l_ij * lambda * p_ij;
 
@@ -1060,21 +1100,22 @@ namespace ryujin
         }
 #endif
 
-        new_U.template write_tensor<T>(U_i_new, i);
+        new_U_view.template write_tensor<T>(U_i_new, i);
 
         /* Skip computating l_ij and updating p_ij in the last round */
         if (last_round)
           return;
 
         const auto bounds =
-            bounds_.template read_tensor<T, std::array<T, n_bounds>>(i);
+            bounds_view.template read_tensor<T, std::array<T, n_bounds>>(i);
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
           const auto old_l_ij = lij_row[col_idx];
 
-          const auto new_p_ij = (T(1.) - old_l_ij) *
-                                pij_matrix_.template read_tensor<T>(i, col_idx);
+          const auto new_p_ij =
+              (T(1.) - old_l_ij) *
+              pij_matrix_view.template read_tensor<T>(i, col_idx);
 
           const auto &[new_l_ij, success] =
               limiter_view.limit(bounds, U_i_new, new_p_ij);
@@ -1101,14 +1142,14 @@ namespace ryujin
            * This approach only works for at most two limiting steps.
            */
           const auto entry = (T(1.) - old_l_ij) * new_l_ij;
-          lij_matrix_next_.write_entry(entry, i, col_idx, true);
+          lij_matrix_next_view.write_entry(entry, i, col_idx, true);
         }
       };
 
       cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
       if (!last_round) {
-        lij_matrix_next_.update_ghost_rows();
+        lij_matrix_next_view.update_ghost_rows();
       }
     } /* limiter_iter_ */
 

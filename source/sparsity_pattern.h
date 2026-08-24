@@ -47,8 +47,7 @@ namespace ryujin
    * @ingroup LinearAlgebra
    */
   template <int simd_length>
-  class SparsityPattern : public SparsityPatternView<simd_length>,
-                          public MirroredStorage<SparsityPattern<simd_length>>
+  class SparsityPattern : public MirroredStorage<SparsityPattern<simd_length>>
   {
   public:
     /**
@@ -178,7 +177,6 @@ namespace ryujin
     template <typename MemorySpace>
     void deallocate_storage();
 
-    void refresh_direct_interface();
 
     friend class MirroredStorage<SparsityPattern<simd_length>>;
 
@@ -474,26 +472,11 @@ namespace ryujin
       column_indices_host_ = {};
       indices_transposed_host_ = {};
 
-      /*
-       * The inherited direct-access view holds reference counted copies
-       * of the host views. Release the view subobject as well so that the
-       * host memory is actually freed:
-       */
-      static_cast<SparsityPatternView<simd_length> &>(*this) =
-          SparsityPatternView<simd_length>{};
-
     } else {
       row_starts_default_ = {};
       column_indices_default_ = {};
       indices_transposed_default_ = {};
     }
-  }
-
-
-  template <int simd_length>
-  void SparsityPattern<simd_length>::refresh_direct_interface()
-  {
-    SparsityPatternView<simd_length>::reinit(*this);
   }
 
 
