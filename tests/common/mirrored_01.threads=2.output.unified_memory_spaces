@@ -34,3 +34,32 @@ DefaultSpace resident == 1
 Parameters on DefaultSpace: 3.5 0.285714 3
 HostSpace resident == 1
 DefaultSpace resident == 1
+
+Using TransferPolicy::implicit_transfers_host_resident:
+HostSpace pinned == 0
+DefaultSpace pinned == 0
+Parameters on DefaultSpace: 4.5 0.222222 4
+HostSpace resident == 1
+DefaultSpace resident == 1
+After a writable view on HostSpace:
+HostSpace resident == 1
+DefaultSpace resident == 1
+HostSpace pointer stable == 1
+Parameters on DefaultSpace: 4.5 0.222222 5
+HostSpace resident == 1
+DefaultSpace resident == 1
+
+Using TransferPolicy::implicit_transfers_default_resident:
+HostSpace pinned == 0
+DefaultSpace pinned == 0
+After a read only view on DefaultSpace:
+HostSpace resident == 1
+DefaultSpace resident == 1
+After a writable view on DefaultSpace:
+HostSpace resident == 1
+DefaultSpace resident == 1
+DefaultSpace pointer stable == 1
+Parameters on DefaultSpace: 5.5 0.181818 6
+Parameters on HostSpace: 5.5 0.181818 6
+HostSpace resident == 1
+DefaultSpace resident == 1
