@@ -100,8 +100,8 @@ int main(int argc, char *argv[])
                    0,
                    /*ignored*/ 0,
                    n_states,
-                   U.get_view<DefaultSpace>(),
-                   results.get_view<DefaultSpace>());
+                   U.view<DefaultSpace>(),
+                   results.view<DefaultSpace>());
 
   results.move_to_memory_space<HostSpace>();
 
