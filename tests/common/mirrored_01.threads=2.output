@@ -1,0 +1,36 @@
+After construction:
+HostSpace resident == 1
+DefaultSpace resident == 0
+
+Parameters on HostSpace: 1.5 0.666667 42
+
+After copy to DefaultSpace:
+HostSpace resident == 1
+DefaultSpace resident == 1
+Parameters on DefaultSpace: 1.5 0.666667 42
+
+After move to HostSpace:
+HostSpace resident == 1
+DefaultSpace resident == 0
+
+After copy to DefaultSpace:
+HostSpace resident == 1
+DefaultSpace resident == 1
+Parameters on DefaultSpace: 2.5 0.4 42
+
+Using TransferPolicy::implicit_transfers:
+After a writable view on HostSpace:
+HostSpace resident == 1
+DefaultSpace resident == 0
+Parameters on HostSpace: 2.5 0.4 7
+After a read only view on DefaultSpace:
+Parameters on DefaultSpace: 2.5 0.4 7
+HostSpace resident == 1
+DefaultSpace resident == 1
+
+A second object constructed with implicit transfers:
+HostSpace resident == 1
+DefaultSpace resident == 0
+Parameters on DefaultSpace: 3.5 0.285714 3
+HostSpace resident == 1
+DefaultSpace resident == 1

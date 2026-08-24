@@ -36,9 +36,10 @@
  * This module contains classes and functions used for managing data
  * mirrored between the host and default (device) memory spaces: the
  * MirroredStorage base class implementing a unified interface for
- * querying residency and transferring data between memory spaces, and
- * the TransferPolicy describing whether such transfers happen explicitly
- * or implicitly.
+ * querying residency and transferring data between memory spaces, the
+ * TransferPolicy describing whether such transfers happen explicitly or
+ * implicitly, and the Mirrored convenience wrapper that maintains a
+ * single "POD style" object on both memory spaces.
  */
 
 
