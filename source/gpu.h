@@ -395,11 +395,12 @@ namespace ryujin
                   "can move it into device memory");
 
     /**
-     * Constructor. Allocates the storage in the host memory space. The
-     * @p label is used as the Kokkos allocation label and
-     * @p transfer_policy selects the transfer policy, see the
-     * documentation of TransferPolicy.
+     * Constructor. Allocates the storage on the templated memory space
+     * (Defaults to the host memory space). The @p label is used as the
+     * Kokkos allocation label and @p transfer_policy selects the transfer
+     * policy, see the documentation of TransferPolicy.
      */
+    template <typename InitializedMemorySpace = dealii::MemorySpace::Host>
     Mirrored(const std::string &label = "mirrored object",
              const TransferPolicy transfer_policy =
                  TransferPolicy::explicit_transfers);
@@ -740,20 +741,26 @@ namespace ryujin
 
 
   template <typename T>
+  template <typename MemorySpace>
   Mirrored<T>::Mirrored(const std::string &label,
                         const TransferPolicy transfer_policy)
       : label_(label)
   {
-    allocate_storage<HostSpace>();
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected memory space");
 
-    /*
-     * If both memory spaces coincide the single host allocation is trivially
-     * resident on both of them:
-     */
-    this->reset_residency(/*host*/ true,
-                          /*default*/ !have_separate_memory_spaces);
+    if (have_separate_memory_spaces &&
+        !std::is_same_v<MemorySpace, HostSpace>) {
+      allocate_storage<DefaultSpace>();
+      this->reset_residency(/*host*/ false, /*default*/ true);
 
-    /* The transfer policy is selected last, see MirroredStorage: */
+    } else {
+      allocate_storage<HostSpace>();
+      this->reset_residency(/*host*/ true,
+                            /*default*/ !have_separate_memory_spaces);
+    }
+
     this->set_transfer_policy(transfer_policy);
   }
 
