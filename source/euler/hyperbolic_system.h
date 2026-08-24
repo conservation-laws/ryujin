@@ -758,13 +758,15 @@ namespace ryujin
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
         , parameters_("euler_hyperbolic_system_parameters",
-                      TransferPolicy::implicit_transfers)
+                      TransferPolicy::implicit_transfers_host_resident)
     {
       /*
        * Note: We bind the parameters directly to the storage held by the
        * Mirrored object. The corresponding memory is allocated once in the
-       * constructor and never reallocated, so the addresses remain valid
-       * for the lifetime of this object.
+       * constructor and never reallocated, and the
+       * implicit_transfers_host_resident policy guarantees that the host
+       * storage is never deallocated: the addresses thus remain valid for
+       * the lifetime of this object.
        */
       auto &parameters = *parameters_.view();
 

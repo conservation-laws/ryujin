@@ -99,14 +99,16 @@ namespace ryujin
               const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
           , parameters_("euler_limiter_parameters",
-                        TransferPolicy::implicit_transfers)
+                        TransferPolicy::implicit_transfers_host_resident)
           , hyperbolic_system_(&hyperbolic_system)
       {
         /*
          * Note: We bind the parameters directly to the storage held by the
          * Mirrored object. The corresponding memory is allocated once in
-         * the constructor and never reallocated, so the addresses remain
-         * valid for the lifetime of this object.
+         * the constructor and never reallocated, and the
+         * implicit_transfers_host_resident policy guarantees that the host
+         * storage is never deallocated: the addresses thus remain valid
+         * for the lifetime of this object.
          */
         auto &parameters = *parameters_.view();
 
@@ -134,6 +136,15 @@ namespace ryujin
                       parameters.relaxation_factor,
                       "Factor for scaling the relaxation window with r_i = "
                       "factor * (m_i/|Omega|)^(1.5/d).");
+
+        /*
+         * A parameter file read writes directly through the addresses
+         * bound above and bypasses the view() mechanism. Request a
+         * writable view on the host memory space to invalidate the (now
+         * stale) mirror of the parameters in the default memory space:
+         */
+        ParameterAcceptor::parse_parameters_call_back.connect(
+            [this] { parameters_.view(); });
       }
 
       /**
