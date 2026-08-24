@@ -84,7 +84,12 @@ namespace ryujin
        *
        * After reinit the vector is resident on the host memory space only;
        * device storage is allocated lazily on the first
-       * copy_to_memory_space() / move_to_memory_space().
+       * copy_to_memory_space() / move_to_memory_space(). (If the host and
+       * default memory spaces coincide the vector is resident on both.)
+       *
+       * @note Because the vector ends up resident on the host memory space
+       * only, TransferPolicy::implicit_transfers_default_resident is not an
+       * admissible @p transfer_policy for this function.
        */
       void reinit_with_vector_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
@@ -99,7 +104,12 @@ namespace ryujin
        *
        * After reinit the vector is resident on the host memory space only;
        * device storage is allocated lazily on the first
-       * copy_to_memory_space() / move_to_memory_space().
+       * copy_to_memory_space() / move_to_memory_space(). (If the host and
+       * default memory spaces coincide the vector is resident on both.)
+       *
+       * @note Because the vector ends up resident on the host memory space
+       * only, TransferPolicy::implicit_transfers_default_resident is not an
+       * admissible @p transfer_policy for this function.
        */
       void reinit_with_scalar_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
@@ -580,12 +590,17 @@ namespace ryujin
                 &vector_partitioner,
             const TransferPolicy transfer_policy)
     {
-      this->set_transfer_policy(transfer_policy);
+      /*
+       * Drop the transfer policy for the duration of the reinit so that a
+       * pinned memory space of a previous policy does not interfere:
+       */
+      this->set_transfer_policy(TransferPolicy::explicit_transfers);
 
       /* Special case of a zero component vector */
       if (n_comp == 0) {
         /* A zero component vector is trivially resident everywhere: */
         this->reset_residency(/*host*/ true, /*default*/ true);
+        this->set_transfer_policy(transfer_policy);
         return;
       }
 
@@ -599,7 +614,11 @@ namespace ryujin
        */
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
-      this->reset_residency(/*host*/ true, /*default*/ false);
+
+      this->reset_residency(/*host*/ true,
+                            /*default*/ !have_separate_memory_spaces);
+
+      this->set_transfer_policy(transfer_policy);
     }
 
 
@@ -610,12 +629,17 @@ namespace ryujin
                 &scalar_partitioner,
             const TransferPolicy transfer_policy)
     {
-      this->set_transfer_policy(transfer_policy);
+      /*
+       * Drop the transfer policy for the duration of the reinit so that a
+       * pinned memory space of a previous policy does not interfere:
+       */
+      this->set_transfer_policy(TransferPolicy::explicit_transfers);
 
       /* Special case of a zero component vector: */
       if (n_comp == 0) {
         /* A zero component vector is trivially resident everywhere: */
         this->reset_residency(/*host*/ true, /*default*/ true);
+        this->set_transfer_policy(transfer_policy);
         return;
       }
 
@@ -636,7 +660,15 @@ namespace ryujin
        */
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
-      this->reset_residency(/*host*/ true, /*default*/ false);
+
+      /*
+       * If both memory spaces coincide the single host allocation is
+       * trivially resident on both of them:
+       */
+      this->reset_residency(/*host*/ true,
+                            /*default*/ !have_separate_memory_spaces);
+
+      this->set_transfer_policy(transfer_policy);
     }
 
 

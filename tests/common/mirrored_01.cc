@@ -5,8 +5,12 @@
 #include <iostream>
 
 /*
- * A "POD style" payload:
+ * Test ryujin::Mirrored: residency handling and read/write access via
+ * view() on both memory spaces.
  */
+
+
+/* A "POD style" payload: */
 struct Parameters {
   double gamma;
   double gamma_inverse;
@@ -37,9 +41,6 @@ void print_on_host_space(const ryujin::Mirrored<Parameters> &mirrored)
 }
 
 
-/*
- * Read the parameters back on the default memory space.
- */
 void print_on_default_space(const ryujin::Mirrored<Parameters> &mirrored)
 {
   const auto *parameters = mirrored.view<DefaultSpace>();
@@ -65,11 +66,6 @@ void print_on_default_space(const ryujin::Mirrored<Parameters> &mirrored)
 
 int main(int argc, char *argv[])
 {
-  //
-  // Test ryujin::Mirrored: residency handling and read/write access via
-  // view() on both memory spaces.
-  //
-
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
   ryujin::Mirrored<Parameters> mirrored("test parameters");
@@ -152,4 +148,101 @@ int main(int argc, char *argv[])
   print_status(mirrored_2);
   print_on_default_space(mirrored_2);
   print_status(mirrored_2);
+
+  /*
+   * The TransferPolicy::implicit_transfers_host_resident policy: The host
+   * memory space is pinned, i.e., all operations that would deallocate the
+   * host storage are disallowed. The pointer returned by view() on the
+   * host memory space thus remains valid.
+   */
+
+  std::cout << "\nUsing TransferPolicy::implicit_transfers_host_resident:"
+            << std::endl;
+
+  ryujin::Mirrored<Parameters> mirrored_3(
+      "test parameters 3",
+      ryujin::TransferPolicy::implicit_transfers_host_resident);
+
+  std::cout << "HostSpace pinned == " << mirrored_3.is_pinned<HostSpace>()
+            << std::endl
+            << "DefaultSpace pinned == " << mirrored_3.is_pinned<DefaultSpace>()
+            << std::endl;
+
+  Parameters *host_pointer = mirrored_3.view();
+  host_pointer->gamma = 4.5;
+  host_pointer->gamma_inverse = 1. / 4.5;
+  host_pointer->n_iterations = 4;
+
+  print_on_default_space(mirrored_3);
+  print_status(mirrored_3);
+
+  /*
+   * A writable view on the host memory space still drops the (now stale)
+   * mirror in the default memory space, but it never touches the host
+   * storage:
+   */
+
+  mirrored_3.view()->n_iterations = 5;
+
+  std::cout << "After a writable view on HostSpace:" << std::endl;
+  print_status(mirrored_3);
+  std::cout << "HostSpace pointer stable == "
+            << (mirrored_3.view() == host_pointer) << std::endl;
+  print_on_default_space(mirrored_3);
+  print_status(mirrored_3);
+
+  /*
+   * The TransferPolicy::implicit_transfers_default_resident policy is the
+   * converse: the default memory space is pinned. A writable view on the
+   * host memory space is disallowed under this policy, so we populate the
+   * payload first and select the transfer policy afterwards.
+   */
+
+  std::cout << "\nUsing TransferPolicy::implicit_transfers_default_resident:"
+            << std::endl;
+
+  ryujin::Mirrored<Parameters> mirrored_4("test parameters 4");
+
+  {
+    auto *parameters = mirrored_4.view();
+    parameters->gamma = 5.5;
+    parameters->gamma_inverse = 1. / 5.5;
+    parameters->n_iterations = 6;
+  }
+
+  /*
+   * The policy pins the default memory space, so the payload has to be put
+   * in place before the policy is selected:
+   */
+  mirrored_4.copy_to_memory_space<DefaultSpace>();
+  mirrored_4.set_transfer_policy(
+      ryujin::TransferPolicy::implicit_transfers_default_resident);
+
+  std::cout << "HostSpace pinned == " << mirrored_4.is_pinned<HostSpace>()
+            << std::endl
+            << "DefaultSpace pinned == " << mirrored_4.is_pinned<DefaultSpace>()
+            << std::endl;
+
+  /* The default memory space is resident, a read only view is a no-op: */
+
+  const auto &const_mirrored_4 = mirrored_4;
+  const Parameters *default_pointer = const_mirrored_4.view<DefaultSpace>();
+
+  std::cout << "After a read only view on DefaultSpace:" << std::endl;
+  print_status(mirrored_4);
+
+  /* A writable view on the default memory space drops the host mirror: */
+
+  auto *writable_pointer = mirrored_4.view<DefaultSpace>();
+
+  std::cout << "After a writable view on DefaultSpace:" << std::endl;
+  print_status(mirrored_4);
+  std::cout << "DefaultSpace pointer stable == "
+            << (writable_pointer == default_pointer) << std::endl;
+  print_on_default_space(mirrored_4);
+
+  /* A read only view on the host memory space copies the payload back: */
+
+  print_on_host_space(mirrored_4);
+  print_status(mirrored_4);
 }

@@ -74,7 +74,12 @@ namespace ryujin
      * @note Construction and initialization always happen in the host
      * memory space. After reinit() the matrix is resident on the host
      * memory space only; device storage is allocated lazily on the first
-     * copy_to_memory_space() / move_to_memory_space().
+     * copy_to_memory_space() / move_to_memory_space(). (If the host and
+     * default memory spaces coincide the matrix is resident on both.)
+     *
+     * @note Because the matrix ends up resident on the host memory space
+     * only, TransferPolicy::implicit_transfers_default_resident is not an
+     * admissible @p transfer_policy for this function.
      */
     void reinit(const SparsityPattern<simd_length> &sparsity,
                 const TransferPolicy transfer_policy =
@@ -499,7 +504,11 @@ namespace ryujin
       const SparsityPattern<simd_length> &sparsity,
       const TransferPolicy transfer_policy)
   {
-    this->set_transfer_policy(transfer_policy);
+    /*
+     * Drop the transfer policy for the duration of the reinit so that a
+     * pinned memory space of a previous policy does not interfere:
+     */
+    this->set_transfer_policy(TransferPolicy::explicit_transfers);
 
     this->sparsity_pattern_ = &sparsity;
 
@@ -525,7 +534,11 @@ namespace ryujin
      */
     data_default_ = {};
     exchange_buffer_default_ = {};
-    this->reset_residency(/*host*/ true, /*default*/ false);
+
+    this->reset_residency(/*host*/ true,
+                          /*default*/ !have_separate_memory_spaces);
+
+    this->set_transfer_policy(transfer_policy);
   }
 
 

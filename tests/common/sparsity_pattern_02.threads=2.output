@@ -1,5 +1,5 @@
 HostSpace resident == 1
-DefaultSpace resident == 1
+DefaultSpace resident == 0
 After move to HostSpace:
 HostSpace resident == 1
 DefaultSpace resident == 0

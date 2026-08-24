@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "gpu.h"
 #include "simd.h"
 #include "sparsity_pattern.h"
 
@@ -47,7 +48,11 @@ namespace ryujin
       const bool symmetrize_ghost_range,
       const TransferPolicy transfer_policy)
   {
-    this->set_transfer_policy(transfer_policy);
+    /*
+     * Drop the transfer policy for the duration of the reinit so that a
+     * pinned memory space of a previous policy does not interfere:
+     */
+    this->set_transfer_policy(TransferPolicy::explicit_transfers);
 
     this->n_internal_dofs_ = n_internal_dofs;
     this->n_locally_owned_dofs_ = partitioner->locally_owned_size();
@@ -395,14 +400,10 @@ namespace ryujin
       }
     }
 
-    /*
-     * Copy the data over to the device so that the sparsity pattern ends
-     * up resident on both memory spaces. If the host and default memory
-     * spaces coincide this is a no-op: views for both memory spaces
-     * simply reference the host storage.
-     */
+    this->reset_residency(/*host*/ true,
+                          /*default*/ !have_separate_memory_spaces);
 
-    this->reset_residency(/*host*/ true, /*default*/ false);
-    this->template copy_to_memory_space<dealii::MemorySpace::Default>();
+    /* The transfer policy is selected last, see MirroredStorage: */
+    this->set_transfer_policy(transfer_policy);
   }
 } // namespace ryujin

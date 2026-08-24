@@ -31,13 +31,14 @@ int main(int argc, char *argv[])
   auto partitioner = std::make_shared<dealii::Utilities::MPI::Partitioner>(
       locally_owned, locally_relevant, MPI_COMM_SELF);
 
+  using HostSpace = dealii::MemorySpace::Host;
+  using DefaultSpace = dealii::MemorySpace::Default;
+
   ryujin::SparsityPattern<simd_width> sparsity_pattern(0, dsp, partitioner);
+  sparsity_pattern.copy_to_memory_space<DefaultSpace>();
 
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);
-
-  using HostSpace = dealii::MemorySpace::Host;
-  using DefaultSpace = dealii::MemorySpace::Default;
 
   const auto print_status = [&]() {
     std::cout << "HostSpace resident == "
