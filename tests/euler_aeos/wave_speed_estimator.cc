@@ -12,8 +12,10 @@ using namespace ryujin::EulerAEOS;
 using namespace ryujin;
 using namespace dealii;
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;

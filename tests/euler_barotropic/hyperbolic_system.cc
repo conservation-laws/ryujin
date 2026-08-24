@@ -81,8 +81,10 @@ void test()
             << std::endl;                    //
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   const auto set_eos = [&](const std::string &eos) {
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"

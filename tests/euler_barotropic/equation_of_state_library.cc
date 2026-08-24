@@ -74,8 +74,10 @@ void test(
   }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   /* isothermal */
 
   std::cout << "\nIsothermal with c=2" << std::endl;

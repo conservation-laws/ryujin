@@ -339,7 +339,7 @@ namespace ryujin
 
             /* Step 4: compute l_ij matrix and apply limited update: */
 
-            const auto n_iterations = limiter_.iterations();
+            const auto n_iterations = limiter_view.iterations();
             for (unsigned int pass = 0; pass < n_iterations; ++pass) {
 
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
@@ -767,7 +767,7 @@ namespace ryujin
 
     /* Step 2: Apply limiter: */
 
-    const auto n_iterations = limiter_.iterations();
+    const auto n_iterations = limiter_view.iterations();
     for (unsigned int pass = 0; pass < n_iterations; ++pass) {
 
       /* Update precomputed values for bounds correction: */

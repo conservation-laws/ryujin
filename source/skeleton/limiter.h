@@ -62,14 +62,6 @@ namespace ryujin
             "iterations", iterations_, "Number of limiter iterations");
       }
 
-      //@}
-      /**
-       * @name Information and statistics
-       */
-      //@{
-
-      ACCESSOR_READ_ONLY(iterations);
-
       /**
        * Return a view on the Limiter for a given dimension @p dim and
        * choice of number type @p Number (which can be a scalar float, or
@@ -100,6 +92,9 @@ namespace ryujin
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
       //@}
+
+      template <int, typename>
+      friend class LimiterView;
     };
 
 
@@ -153,6 +148,14 @@ namespace ryujin
           : view_(view)
           , limiter_(limiter)
       {
+      }
+
+      /**
+       * Return the number of limiter iterations.
+       */
+      unsigned int iterations() const
+      {
+        return limiter_.iterations_;
       }
 
       /**

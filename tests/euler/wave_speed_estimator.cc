@@ -5,8 +5,9 @@
 #include <multicomponent_vector.h>
 #define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <simd.h>
+
+#include <deal.II/base/mpi.h>
 #include <wave_speed_estimator.h>
-#include <wave_speed_estimator.template.h>
 
 #ifndef NEWTON_ITERATIONS
 #define NEWTON_ITERATIONS "0"
@@ -20,8 +21,10 @@ using namespace ryujin::Euler;
 using namespace ryujin;
 using namespace dealii;
 
-int main()
+int main(int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   constexpr int dim = 1;
   using Number = NUMBER;
 
