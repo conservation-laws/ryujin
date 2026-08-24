@@ -83,9 +83,6 @@ namespace ryujin
      * then all transpose entries (j, i) are added to the sparsity pattern,
      * where i is within the locally owned range. This access is required
      * for our stencil based methods.
-     *
-     * After reinit() the sparsity pattern is resident on both the host
-     * and default (device) memory spaces.
      */
     void reinit(const unsigned int n_internal_dofs,
                 const dealii::DynamicSparsityPattern &sparsity,
@@ -397,11 +394,7 @@ namespace ryujin
     using HostSpace = dealii::MemorySpace::Host;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
-    /*
-     * Note: We allocate without initializing because a deep_copy_storage()
-     * always follows. The extents are queried from the other (resident)
-     * memory space.
-     */
+    /* Note: We allocate without initializing. */
 
     if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
       row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(

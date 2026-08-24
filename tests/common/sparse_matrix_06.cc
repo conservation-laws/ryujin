@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
       locally_owned, locally_relevant, MPI_COMM_SELF);
 
   ryujin::SparsityPattern<simd_width> sparsity_pattern(0, dsp, partitioner);
+  sparsity_pattern.copy_to_memory_space<dealii::MemorySpace::Default>();
 
   ryujin::SparseMatrix<double, 1, simd_width> sparse_matrix;
   sparse_matrix.reinit(sparsity_pattern);

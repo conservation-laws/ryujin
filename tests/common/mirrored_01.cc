@@ -5,8 +5,12 @@
 #include <iostream>
 
 /*
- * A "POD style" payload:
+ * Test ryujin::Mirrored: residency handling and read/write access via
+ * view() on both memory spaces.
  */
+
+
+/* A "POD style" payload: */
 struct Parameters {
   double gamma;
   double gamma_inverse;
@@ -37,9 +41,6 @@ void print_on_host_space(const ryujin::Mirrored<Parameters> &mirrored)
 }
 
 
-/*
- * Read the parameters back on the default memory space.
- */
 void print_on_default_space(const ryujin::Mirrored<Parameters> &mirrored)
 {
   const auto *parameters = mirrored.view<DefaultSpace>();
@@ -65,11 +66,6 @@ void print_on_default_space(const ryujin::Mirrored<Parameters> &mirrored)
 
 int main(int argc, char *argv[])
 {
-  //
-  // Test ryujin::Mirrored: residency handling and read/write access via
-  // view() on both memory spaces.
-  //
-
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
   ryujin::Mirrored<Parameters> mirrored("test parameters");
@@ -214,6 +210,11 @@ int main(int argc, char *argv[])
     parameters->n_iterations = 6;
   }
 
+  /*
+   * The policy pins the default memory space, so the payload has to be put
+   * in place before the policy is selected:
+   */
+  mirrored_4.copy_to_memory_space<DefaultSpace>();
   mirrored_4.set_transfer_policy(
       ryujin::TransferPolicy::implicit_transfers_default_resident);
 
@@ -222,7 +223,7 @@ int main(int argc, char *argv[])
             << "DefaultSpace pinned == " << mirrored_4.is_pinned<DefaultSpace>()
             << std::endl;
 
-  /* A read only view on the default memory space copies the payload over: */
+  /* The default memory space is resident, a read only view is a no-op: */
 
   const auto &const_mirrored_4 = mirrored_4;
   const Parameters *default_pointer = const_mirrored_4.view<DefaultSpace>();
