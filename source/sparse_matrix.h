@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include "gpu.h"
 #include "sparsity_pattern.h"
 
 #include <deal.II/base/exceptions.h>
@@ -45,7 +46,9 @@ namespace ryujin
   template <typename Number,
             int n_comp = 1,
             int simd_length = dealii::VectorizedArray<Number>::size()>
-  class SparseMatrix : public SparseMatrixView<Number, n_comp, simd_length>
+  class SparseMatrix
+      : public SparseMatrixView<Number, n_comp, simd_length>,
+        public MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>
   {
   public:
     /**
@@ -61,16 +64,22 @@ namespace ryujin
     /**
      * Constructor taking a SIMD sparsity pattern as an argument.
      */
-    SparseMatrix(const SparsityPattern<simd_length> &sparsity);
+    SparseMatrix(const SparsityPattern<simd_length> &sparsity,
+                 const TransferPolicy transfer_policy =
+                     TransferPolicy::explicit_transfers);
 
     /**
      * Reinit function reinitializes the matrix with the given SIMD
      * sparsity pattern. The locally owned and ghost ranges are zeroed.
      *
      * @note Construction and initialization always happen in the host
-     * memory space.
+     * memory space. After reinit() the matrix is resident on the host
+     * memory space only; device storage is allocated lazily on the first
+     * copy_to_memory_space() / move_to_memory_space().
      */
-    void reinit(const SparsityPattern<simd_length> &sparsity);
+    void reinit(const SparsityPattern<simd_length> &sparsity,
+                const TransferPolicy transfer_policy =
+                    TransferPolicy::explicit_transfers);
 
     /**
      * Return the underlying sparsity pattern.
@@ -85,32 +94,31 @@ namespace ryujin
 
     /**
      * Return a writable view on the sparse matrix for the selected memory
-     * space.
+     * space. Depending on the selected TransferPolicy the method either
+     * asserts that the memory space is resident
+     * (TransferPolicy::explicit_transfers), or performs an implicit
+     * move_to_memory_space() invalidating the other memory space
+     * (TransferPolicy::implicit_transfers).
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true> get_view();
+    SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true> view();
 
     /**
      * Return a read-only view on the sparse matrix for the selected memory
-     * space.
+     * space. Depending on the selected TransferPolicy the method either
+     * asserts that the memory space is resident
+     * (TransferPolicy::explicit_transfers), or performs an implicit
+     * copy_to_memory_space() (TransferPolicy::implicit_transfers).
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
     SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
-    get_view() const;
+    view() const;
 
-    /**
-     * Returns true if the templated memory space is the currently active
-     * memory space.
+    /*
+     * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
+     * transfer_policy(), and set_transfer_policy() methods are inherited
+     * from the MirroredStorage base class.
      */
-    template <typename MemorySpace>
-    bool is_active_memory_space() const;
-
-    /**
-     * Move internal data from the currently active memory space to the
-     * templated memory space.
-     */
-    template <typename MemorySpace>
-    void move_to_memory_space();
 
     //@}
     /**
@@ -149,17 +157,38 @@ namespace ryujin
     const SparsityPattern<simd_length> *sparsity_pattern_ =
         nullptr; // FIXME shared_ptr
 
+    /*
+     * Note: The storage is marked mutable so that the (logically const)
+     * copy_to_memory_space() operation can populate a mirror from within
+     * a const view() under the implicit_transfers policy.
+     */
+
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    Kokkos::View<Number *, KokkosHost> data_host_;
-    Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
+    mutable Kokkos::View<Number *, KokkosHost> data_host_;
+    mutable Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
 
     using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
-    Kokkos::View<Number *, KokkosDefault> data_default_;
-    Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
-
-    bool host_space_active_ = true;
+    mutable Kokkos::View<Number *, KokkosDefault> data_default_;
+    mutable Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
 
     std::vector<MPI_Request> requests_;
+
+    /*
+     * Storage primitives used by the MirroredStorage base class:
+     */
+
+    template <typename MemorySpace>
+    void allocate_storage() const;
+
+    template <typename To, typename From>
+    void deep_copy_storage() const;
+
+    template <typename MemorySpace>
+    void deallocate_storage();
+
+    void refresh_direct_interface();
+
+    friend class MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>;
 
     template <typename, int, int, typename, bool>
     friend class SparseMatrixView;
@@ -440,36 +469,42 @@ namespace ryujin
 
   template <typename Number, int n_components, int simd_length>
   SparseMatrix<Number, n_components, simd_length>::SparseMatrix(
-      const SparsityPattern<simd_length> &sparsity)
+      const SparsityPattern<simd_length> &sparsity,
+      const TransferPolicy transfer_policy)
   {
-    reinit(sparsity);
+    reinit(sparsity, transfer_policy);
   }
 
 
   template <typename Number, int n_components, int simd_length>
   void SparseMatrix<Number, n_components, simd_length>::reinit(
-      const SparsityPattern<simd_length> &sparsity)
+      const SparsityPattern<simd_length> &sparsity,
+      const TransferPolicy transfer_policy)
   {
+    this->set_transfer_policy(transfer_policy);
+
     this->sparsity_pattern_ = &sparsity;
-    this->host_space_active_ = true;
 
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
     data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_data", sparsity.n_nonzero_elements() * n_components);
-
-    data_default_ = Kokkos::create_mirror_view(
-        typename KokkosDefault::execution_space(), data_host_);
 
     const std::size_t n_indices = sparsity.entries_to_be_sent().size();
 
     exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_exchange_buffer", n_components * n_indices);
 
-    exchange_buffer_default_ = Kokkos::create_mirror_view(
-        typename KokkosDefault::execution_space(), exchange_buffer_host_);
+    /*
+     * The matrix is resident on the host memory space only. Device
+     * storage is allocated lazily on the first copy_to_memory_space() /
+     * move_to_memory_space(); drop possibly stale device storage from a
+     * previous reinit():
+     */
+    data_default_ = {};
+    exchange_buffer_default_ = {};
+    this->reset_residency(/*host*/ true, /*default*/ false);
 
     /* reinitialize the view: */
     SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
@@ -479,10 +514,9 @@ namespace ryujin
   template <typename Number, int n_comp, int simd_length>
   template <typename MemorySpace>
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>
-  SparseMatrix<Number, n_comp, simd_length>::get_view()
+  SparseMatrix<Number, n_comp, simd_length>::view()
   {
-    Assert(is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    this->template prepare_write_access<MemorySpace>();
 
     return SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>(
         *this);
@@ -492,10 +526,9 @@ namespace ryujin
   template <typename Number, int n_comp, int simd_length>
   template <typename MemorySpace>
   SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
-  SparseMatrix<Number, n_comp, simd_length>::get_view() const
+  SparseMatrix<Number, n_comp, simd_length>::view() const
   {
-    Assert(is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    this->template prepare_read_access<MemorySpace>();
 
     return SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>(
         *this);
@@ -504,51 +537,107 @@ namespace ryujin
 
   template <typename Number, int n_components, int simd_length>
   template <typename MemorySpace>
-  bool SparseMatrix<Number, n_components, simd_length>::is_active_memory_space()
-      const
+  void SparseMatrix<Number, n_components, simd_length>::allocate_storage() const
   {
     using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
+    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
-    return host_space_active_ == std::is_same_v<MemorySpace, HostSpace>;
+    Assert(sparsity_pattern_ != nullptr, dealii::ExcNotInitialized());
+
+    /*
+     * Note: We allocate without initializing because a deep_copy_storage()
+     * always follows.
+     */
+
+    const std::size_t n_data =
+        sparsity_pattern_->n_nonzero_elements() * n_components;
+    const std::size_t n_exchange =
+        n_components * sparsity_pattern_->entries_to_be_sent().size();
+
+    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+      data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing, "sparse_matrix_data"),
+          n_data);
+
+      exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparse_matrix_exchange_buffer"),
+          n_exchange);
+
+    } else {
+      data_default_ = Kokkos::View<Number *, KokkosDefault>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing, "sparse_matrix_data"),
+          n_data);
+
+      exchange_buffer_default_ = Kokkos::View<Number *, KokkosDefault>(
+          Kokkos::view_alloc(Kokkos::WithoutInitializing,
+                             "sparse_matrix_exchange_buffer"),
+          n_exchange);
+    }
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  template <typename To, typename From>
+  void
+  SparseMatrix<Number, n_components, simd_length>::deep_copy_storage() const
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+
+    /*
+     * Note: The exchange buffer is transient scratch used for MPI
+     * synchronization; copying it over conservatively preserves the
+     * previous move_to_memory_space() semantics. The copy could
+     * potentially be dropped.
+     */
+
+    if constexpr (std::is_same_v<To, HostSpace>) {
+      Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
+      Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
+                        /*src*/ exchange_buffer_default_);
+    } else {
+      Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
+      Kokkos::deep_copy(/*dst*/ exchange_buffer_default_,
+                        /*src*/ exchange_buffer_host_);
+    }
   }
 
 
   template <typename Number, int n_components, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::move_to_memory_space()
+  void SparseMatrix<Number, n_components, simd_length>::deallocate_storage()
   {
     using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
-    if (is_active_memory_space<MemorySpace>())
-      return;
-
-    /* No copy required if default and host are the same memory spaces: */
-    constexpr bool move_required =
-        !std::is_same_v<HostSpace::kokkos_space, DefaultSpace::kokkos_space>;
 
     if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      host_space_active_ = true;
-      if constexpr (move_required) {
-        Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
-        Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
-                          /*src*/ exchange_buffer_default_);
-      }
-    } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
-      host_space_active_ = false;
-      if constexpr (move_required) {
-        Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
-        Kokkos::deep_copy(/*dst*/ exchange_buffer_default_,
-                          /*src*/ exchange_buffer_host_);
-      }
+      data_host_ = {};
+      exchange_buffer_host_ = {};
+
+      /*
+       * The inherited direct-access view holds a reference counted copy
+       * of the host data view. Release the view subobject as well so
+       * that the host memory is actually freed:
+       */
+      static_cast<SparseMatrixView<Number, n_components, simd_length> &>(
+          *this) = SparseMatrixView<Number, n_components, simd_length>{};
+
+    } else {
+      data_default_ = {};
+      exchange_buffer_default_ = {};
     }
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  void
+  SparseMatrix<Number, n_components, simd_length>::refresh_direct_interface()
+  {
+    /*
+     * Note: This calls sparsity_pattern_->view<Host>() internally.
+     * Moving a matrix to the host memory space thus requires a sparsity
+     * pattern that is resident on the host memory space.
+     */
+    SparseMatrixView<Number, n_components, simd_length>::reinit(*this);
   }
 
 
@@ -560,8 +649,8 @@ namespace ryujin
     using HostSpace = dealii::MemorySpace::Host;
     using DefaultSpace = dealii::MemorySpace::Default;
 
-    Assert(is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    Assert(this->template is_resident<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not resident."));
 
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
@@ -587,8 +676,8 @@ namespace ryujin
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
 
-    Assert(is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    Assert(this->template is_resident<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not resident."));
 
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
@@ -692,8 +781,8 @@ namespace ryujin
     AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
                 dealii::ExcNotImplemented());
 
-    Assert(is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    Assert(this->template is_resident<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not resident."));
 
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
@@ -843,14 +932,19 @@ namespace ryujin
 
     sparse_matrix_ = &sparse_matrix;
 
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      data_ = sparse_matrix.data_host_;
-    } else {
+    /*
+     * Note: If the host and default memory spaces coincide all views
+     * reference the host storage.
+     */
+    if constexpr (have_separate_memory_spaces &&
+                  !std::is_same_v<MemorySpace, HostSpace>) {
       data_ = sparse_matrix.data_default_;
+    } else {
+      data_ = sparse_matrix.data_host_;
     }
 
     sparsity_pattern_ =
-        sparse_matrix.sparsity_pattern_->template get_view<MemorySpace>();
+        sparse_matrix.sparsity_pattern_->template view<MemorySpace>();
   }
 
 
@@ -1194,10 +1288,10 @@ namespace ryujin
                       std::is_same_v<MemorySpace, DefaultSpace>,
                   "Unexpected Kokkos memory space");
 
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    Assert(sparse_matrix_->template is_resident<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not resident."));
 
-    sparse_matrix_->template zero_out_ghost_rows<MemorySpace>();
+    sparse_matrix_->template zero_out_ghost_rows_on_memory_space<MemorySpace>();
   }
 
 
@@ -1217,8 +1311,8 @@ namespace ryujin
                       std::is_same_v<MemorySpace, DefaultSpace>,
                   "Unexpected Kokkos memory space");
 
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    Assert(sparse_matrix_->template is_resident<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not resident."));
 
     sparse_matrix_->template update_ghost_rows_on_memory_space<MemorySpace>();
   }
@@ -1240,8 +1334,8 @@ namespace ryujin
                       std::is_same_v<MemorySpace, DefaultSpace>,
                   "Unexpected Kokkos memory space");
 
-    Assert(sparse_matrix_->template is_active_memory_space<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not active."));
+    Assert(sparse_matrix_->template is_resident<MemorySpace>(),
+           dealii::ExcMessage("The chosen memory space is not resident."));
 
     sparse_matrix_->template compress_on_memory_space<MemorySpace>(operation);
   }

@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include "gpu.h"
+
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/partitioner.h>
 #include <deal.II/base/vectorization.h>
@@ -61,7 +63,9 @@ namespace ryujin
               int n_comp,
               int simd_length = dealii::VectorizedArray<Number>::size()>
     class MultiComponentVector
-        : public MultiComponentVectorView<Number, n_comp, simd_length>
+        : public MultiComponentVectorView<Number, n_comp, simd_length>,
+          public MirroredStorage<
+              MultiComponentVector<Number, n_comp, simd_length>>
     {
     public:
       /**
@@ -78,19 +82,31 @@ namespace ryujin
       /**
        * Reinitializes the MultiComponentVector with a vector MPI partitioner
        * that was created first with create_vector_partitioner().
+       *
+       * After reinit the vector is resident on the host memory space only;
+       * device storage is allocated lazily on the first
+       * copy_to_memory_space() / move_to_memory_space().
        */
       void reinit_with_vector_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-              &vector_partitioner);
+              &vector_partitioner,
+          const TransferPolicy transfer_policy =
+              TransferPolicy::explicit_transfers);
 
       /**
        * Reinitializes the MultiComponentVector with a scalar MPI partitioner.
        * The function calls create_vector_partitioner() internally to
        * create and store a corresponding "vector" MPI partitioner.
+       *
+       * After reinit the vector is resident on the host memory space only;
+       * device storage is allocated lazily on the first
+       * copy_to_memory_space() / move_to_memory_space().
        */
       void reinit_with_scalar_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-              &scalar_partitioner);
+              &scalar_partitioner,
+          const TransferPolicy transfer_policy =
+              TransferPolicy::explicit_transfers);
 
       MultiComponentVector &operator=(const MultiComponentVector &other);
 
@@ -103,34 +119,33 @@ namespace ryujin
       //@{
 
       /**
-       * Return a writable view on the sparse matrix for the selected memory
-       * space.
+       * Return a writable view on the vector for the selected memory
+       * space. Depending on the selected TransferPolicy the method either
+       * asserts that the memory space is resident
+       * (TransferPolicy::explicit_transfers), or performs an implicit
+       * move_to_memory_space() invalidating the other memory space
+       * (TransferPolicy::implicit_transfers).
        */
       template <typename MemorySpace = dealii::MemorySpace::Host>
       MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
-      get_view();
+      view();
 
       /**
-       * Return a read-only view on the sparse matrix for the selected memory
-       * space.
+       * Return a read-only view on the vector for the selected memory
+       * space. Depending on the selected TransferPolicy the method either
+       * asserts that the memory space is resident
+       * (TransferPolicy::explicit_transfers), or performs an implicit
+       * copy_to_memory_space() (TransferPolicy::implicit_transfers).
        */
       template <typename MemorySpace = dealii::MemorySpace::Host>
       MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
-      get_view() const;
+      view() const;
 
-      /**
-       * Returns true if the templated memory space is the currently active
-       * memory space.
+      /*
+       * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
+       * transfer_policy(), and set_transfer_policy() methods are inherited
+       * from the MirroredStorage base class.
        */
-      template <typename MemorySpace>
-      bool is_active_memory_space() const;
-
-      /**
-       * Move internal data from the currently active memory space to the
-       * templated memory space.
-       */
-      template <typename MemorySpace>
-      void move_to_memory_space();
 
       //@}
       /**
@@ -166,23 +181,40 @@ namespace ryujin
        */
       //@{
 
-      dealii::LinearAlgebra::distributed::Vector<Number,
-                                                 dealii::MemorySpace::Host>
-          host_vector_;
+      /*
+       * Note: The storage is marked mutable so that the (logically const)
+       * copy_to_memory_space() operation can populate a mirror from within
+       * a const view() under the implicit_transfers policy.
+       *
+       * We avoid setting up the default_vector_ if default and host happen
+       * to be the same memory space (see have_separate_memory_spaces).
+       */
+
+      mutable dealii::LinearAlgebra::distributed::
+          Vector<Number, dealii::MemorySpace::Host>
+              host_vector_;
+
+      mutable dealii::LinearAlgebra::distributed::
+          Vector<Number, dealii::MemorySpace::Default>
+              default_vector_;
 
       /*
-       * We avoid setting up the default_vector_ if default and host happen
-       * to be the same memory space.
+       * Storage primitives used by the MirroredStorage base class:
        */
-      static constexpr bool have_separate_memory_spaces =
-          !std::is_same_v<dealii::MemorySpace::Host::kokkos_space,
-                          dealii::MemorySpace::Default::kokkos_space>;
 
-      dealii::LinearAlgebra::distributed::Vector<Number,
-                                                 dealii::MemorySpace::Default>
-          default_vector_;
+      template <typename MemorySpace>
+      void allocate_storage() const;
 
-      bool host_space_active_ = true;
+      template <typename To, typename From>
+      void deep_copy_storage() const;
+
+      template <typename MemorySpace>
+      void deallocate_storage();
+
+      void refresh_direct_interface();
+
+      friend class MirroredStorage<
+          MultiComponentVector<Number, n_comp, simd_length>>;
 
       template <typename, int, int, typename, bool>
       friend class MultiComponentVectorView;
@@ -525,15 +557,29 @@ namespace ryujin
     void MultiComponentVector<Number, n_comp, simd_length>::
         reinit_with_vector_partitioner(
             const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &vector_partitioner)
+                &vector_partitioner,
+            const TransferPolicy transfer_policy)
     {
+      this->set_transfer_policy(transfer_policy);
+
       /* Special case of a zero component vector */
-      if (n_comp == 0)
+      if (n_comp == 0) {
+        /* A zero component vector is trivially resident everywhere: */
+        this->reset_residency(/*host*/ true, /*default*/ true);
         return;
+      }
 
       host_vector_.reinit(vector_partitioner);
+
+      /*
+       * The vector is resident on the host memory space only. Device
+       * storage is allocated lazily on the first copy_to_memory_space() /
+       * move_to_memory_space(); drop possibly stale device storage from a
+       * previous reinit:
+       */
       if constexpr (have_separate_memory_spaces)
-        default_vector_.reinit(vector_partitioner);
+        default_vector_.reinit(0);
+      this->reset_residency(/*host*/ true, /*default*/ false);
 
       /* Reinitialize view to point to the correct vector data: */
       MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
@@ -544,11 +590,17 @@ namespace ryujin
     void MultiComponentVector<Number, n_comp, simd_length>::
         reinit_with_scalar_partitioner(
             const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &scalar_partitioner)
+                &scalar_partitioner,
+            const TransferPolicy transfer_policy)
     {
+      this->set_transfer_policy(transfer_policy);
+
       /* Special case of a zero component vector: */
-      if (n_comp == 0)
+      if (n_comp == 0) {
+        /* A zero component vector is trivially resident everywhere: */
+        this->reset_residency(/*host*/ true, /*default*/ true);
         return;
+      }
 
       /* Special case of a scalar vector: */
       if (n_comp == 1)
@@ -558,8 +610,16 @@ namespace ryujin
           create_vector_partitioner(scalar_partitioner, n_comp);
 
       host_vector_.reinit(vector_partitioner);
+
+      /*
+       * The vector is resident on the host memory space only. Device
+       * storage is allocated lazily on the first copy_to_memory_space() /
+       * move_to_memory_space(); drop possibly stale device storage from a
+       * previous reinit:
+       */
       if constexpr (have_separate_memory_spaces)
-        default_vector_.reinit(vector_partitioner);
+        default_vector_.reinit(0);
+      this->reset_residency(/*host*/ true, /*default*/ false);
 
       /* Reinitialize view to point to the correct vector data: */
       MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
@@ -570,13 +630,19 @@ namespace ryujin
     auto MultiComponentVector<Number, n_comp, simd_length>::operator=(
         const MultiComponentVector &other) -> MultiComponentVector &
     {
+      /* Copy residency state and transfer policy: */
+      static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
+
       host_vector_ = other.host_vector_;
       if constexpr (have_separate_memory_spaces)
         default_vector_ = other.default_vector_;
-      host_space_active_ = other.host_space_active_;
 
       /* Reinitialize view to point to the correct vector data: */
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+      if (this->template is_resident<dealii::MemorySpace::Host>())
+        MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+      else
+        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
+            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
 
       return *this;
     }
@@ -586,13 +652,19 @@ namespace ryujin
     auto MultiComponentVector<Number, n_comp, simd_length>::operator=(
         MultiComponentVector &&other) noexcept -> MultiComponentVector &
     {
+      /* Copy residency state and transfer policy: */
+      static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
+
       host_vector_ = std::move(other.host_vector_);
       if constexpr (have_separate_memory_spaces)
         default_vector_ = std::move(other.default_vector_);
-      host_space_active_ = other.host_space_active_;
 
       /* Reinitialize view to point to the correct vector data: */
-      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+      if (this->template is_resident<dealii::MemorySpace::Host>())
+        MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
+      else
+        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
+            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
 
       return *this;
     }
@@ -601,10 +673,9 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     template <typename MemorySpace>
     MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
-    MultiComponentVector<Number, n_comp, simd_length>::get_view()
+    MultiComponentVector<Number, n_comp, simd_length>::view()
     {
-      Assert(is_active_memory_space<MemorySpace>(),
-             dealii::ExcMessage("The chosen memory space is not active."));
+      this->template prepare_write_access<MemorySpace>();
 
       return MultiComponentVectorView<Number,
                                       n_comp,
@@ -617,10 +688,9 @@ namespace ryujin
     template <typename Number, int n_comp, int simd_length>
     template <typename MemorySpace>
     MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
-    MultiComponentVector<Number, n_comp, simd_length>::get_view() const
+    MultiComponentVector<Number, n_comp, simd_length>::view() const
     {
-      Assert(is_active_memory_space<MemorySpace>(),
-             dealii::ExcMessage("The chosen memory space is not active."));
+      this->template prepare_read_access<MemorySpace>();
 
       return MultiComponentVectorView<Number,
                                       n_comp,
@@ -632,46 +702,70 @@ namespace ryujin
 
     template <typename Number, int n_comp, int simd_length>
     template <typename MemorySpace>
-    bool
-    MultiComponentVector<Number, n_comp, simd_length>::is_active_memory_space()
-        const
+    void
+    MultiComponentVector<Number, n_comp, simd_length>::allocate_storage() const
     {
       using HostSpace = dealii::MemorySpace::Host;
-      using DefaultSpace = dealii::MemorySpace::Default;
-      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                        std::is_same_v<MemorySpace, DefaultSpace>,
-                    "Unexpected memory space");
 
-      return host_space_active_ == std::is_same_v<MemorySpace, HostSpace>;
+      /*
+       * The partitioner is recovered from the other (still resident)
+       * vector:
+       */
+
+      if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+        Assert(default_vector_.size() != 0, dealii::ExcNotInitialized());
+        host_vector_.reinit(default_vector_.get_partitioner());
+      } else {
+        Assert(host_vector_.size() != 0, dealii::ExcNotInitialized());
+        default_vector_.reinit(host_vector_.get_partitioner());
+      }
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename To, typename From>
+    void
+    MultiComponentVector<Number, n_comp, simd_length>::deep_copy_storage() const
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+
+      if constexpr (std::is_same_v<To, HostSpace>) {
+        host_vector_.import_elements(default_vector_,
+                                     dealii::VectorOperation::insert);
+      } else {
+        default_vector_.import_elements(host_vector_,
+                                        dealii::VectorOperation::insert);
+      }
     }
 
 
     template <typename Number, int n_comp, int simd_length>
     template <typename MemorySpace>
-    void
-    MultiComponentVector<Number, n_comp, simd_length>::move_to_memory_space()
+    void MultiComponentVector<Number, n_comp, simd_length>::deallocate_storage()
     {
       using HostSpace = dealii::MemorySpace::Host;
-      using DefaultSpace = dealii::MemorySpace::Default;
-      static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                        std::is_same_v<MemorySpace, DefaultSpace>,
-                    "Unexpected memory space");
-
-      if (is_active_memory_space<MemorySpace>())
-        return;
 
       if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-        if constexpr (have_separate_memory_spaces)
-          host_vector_.import_elements(default_vector_,
-                                       dealii::VectorOperation::insert);
-        host_space_active_ = true;
+        host_vector_.reinit(0);
 
-      } else if constexpr (std::is_same_v<MemorySpace, DefaultSpace>) {
-        if constexpr (have_separate_memory_spaces)
-          default_vector_.import_elements(host_vector_,
-                                          dealii::VectorOperation::insert);
-        host_space_active_ = false;
+        /*
+         * The inherited direct-access view holds a raw pointer into the
+         * host vector. Reset the view subobject as well:
+         */
+        static_cast<MultiComponentVectorView<Number, n_comp, simd_length> &>(
+            *this) = MultiComponentVectorView<Number, n_comp, simd_length>{};
+
+      } else {
+        default_vector_.reinit(0);
       }
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    void MultiComponentVector<Number, n_comp, simd_length>::
+        refresh_direct_interface()
+    {
+      MultiComponentVectorView<Number, n_comp, simd_length>::reinit(*this);
     }
 
 
@@ -685,6 +779,9 @@ namespace ryujin
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
+
+      Assert(this->template is_resident<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not resident."));
 
       if constexpr (have_separate_memory_spaces &&
                     !std::is_same_v<MemorySpace, HostSpace>) {
@@ -706,6 +803,9 @@ namespace ryujin
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
+      Assert(this->template is_resident<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not resident."));
+
       if constexpr (have_separate_memory_spaces &&
                     !std::is_same_v<MemorySpace, HostSpace>) {
         default_vector_.update_ghost_values();
@@ -725,6 +825,9 @@ namespace ryujin
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
+
+      Assert(this->template is_resident<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not resident."));
 
       if constexpr (have_separate_memory_spaces &&
                     !std::is_same_v<MemorySpace, HostSpace>) {
@@ -782,10 +885,6 @@ namespace ryujin
                     "Unexpected memory space");
 
       multi_component_vector_ = &multi_component_vector;
-
-      constexpr bool have_separate_memory_spaces =
-          ::ryujin::Vectors::MultiComponentVector<Number, n_comp, simd_l>::
-              have_separate_memory_spaces;
 
       if constexpr (have_separate_memory_spaces &&
                     !std::is_same_v<MemorySpace, HostSpace>) {
@@ -927,12 +1026,16 @@ namespace ryujin
       static_assert(std::is_same_v<MS, HS> || std::is_same_v<MS, DS>,
                     "Unexpected memory space");
 
-      if constexpr (std::is_same_v<MS, HS>) {
-        const auto &other = v.multi_component_vector_->host_vector_;
-        multi_component_vector_->host_vector_.sadd(s, a, other);
-      } else if constexpr (std::is_same_v<MS, DS>) {
+      /*
+       * Note: If the host and default memory spaces coincide all views
+       * reference the host storage.
+       */
+      if constexpr (have_separate_memory_spaces && !std::is_same_v<MS, HS>) {
         const auto &other = v.multi_component_vector_->default_vector_;
         multi_component_vector_->default_vector_.sadd(s, a, other);
+      } else {
+        const auto &other = v.multi_component_vector_->host_vector_;
+        multi_component_vector_->host_vector_.sadd(s, a, other);
       }
     }
 
@@ -1242,9 +1345,8 @@ namespace ryujin
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
-      Assert(multi_component_vector_
-                 ->template is_active_memory_space<MemorySpace>(),
-             dealii::ExcMessage("The chosen memory space is not active."));
+      Assert(multi_component_vector_->template is_resident<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not resident."));
 
       multi_component_vector_
           ->template zero_out_ghost_values_on_memory_space<MemorySpace>();
@@ -1267,9 +1369,8 @@ namespace ryujin
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
-      Assert(multi_component_vector_
-                 ->template is_active_memory_space<MemorySpace>(),
-             dealii::ExcMessage("The chosen memory space is not active."));
+      Assert(multi_component_vector_->template is_resident<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not resident."));
 
       multi_component_vector_
           ->template update_ghost_values_on_memory_space<MemorySpace>();
@@ -1292,9 +1393,8 @@ namespace ryujin
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
 
-      Assert(multi_component_vector_
-                 ->template is_active_memory_space<MemorySpace>(),
-             dealii::ExcMessage("The chosen memory space is not active."));
+      Assert(multi_component_vector_->template is_resident<MemorySpace>(),
+             dealii::ExcMessage("The chosen memory space is not resident."));
 
       multi_component_vector_->template compress_on_memory_space<MemorySpace>(
           operation);

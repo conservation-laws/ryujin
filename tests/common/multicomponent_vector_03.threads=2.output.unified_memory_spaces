@@ -1,5 +1,5 @@
 HostSpace resident == 1
-DefaultSpace resident == 0
+DefaultSpace resident == 1
 
 State vector:
 0 1 2 3
@@ -11,14 +11,14 @@ State vector:
 60 61 62 63
 70 71 72 73
 After move to DefaultSpace:
-HostSpace resident == 0
+HostSpace resident == 1
 DefaultSpace resident == 1
 After repeated move to DefaultSpace:
-HostSpace resident == 0
+HostSpace resident == 1
 DefaultSpace resident == 1
 After move to HostSpace:
 HostSpace resident == 1
-DefaultSpace resident == 0
+DefaultSpace resident == 1
 
 State vector:
 0 10 20 30
