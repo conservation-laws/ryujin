@@ -297,9 +297,9 @@ namespace ryujin
 
 
   /**
-   * A convenience wrapper around MirroredStorage that maintains a single
-   * (trivially copyable) object of type @p T mirrored between the host and
-   * default (device) memory spaces.
+   * A convenience wrapper around MirroredStorage that maintains a
+   * (trivially copyable) payload mirrored between the host and default
+   * (device) memory spaces.
    *
    * This allows to encapsulate a "POD style" payload (such as the runtime
    * parameters of a class) in a single structure that is moved into device
@@ -307,7 +307,14 @@ namespace ryujin
    * into a "view" object that is then captured by value in a computation
    * loop.
    *
-   * Intended usage, here with the
+   * The class operates in one of two modes that are selected by the
+   * template argument:
+   *  - Mirrored<T> maintains a single object of type @p T.
+   *  - Mirrored<T *> maintains a one dimensional array of objects of type
+   *    @p T. The length is set in the constructor, or with reinit() and
+   *    queried with size().
+   *
+   * Intended usage of the scalar mode, here with the
    * TransferPolicy::implicit_transfers_host_resident policy so that the
    * payload is transferred on demand and the host storage - into which the
    * runtime parameters are bound - is never deallocated:
@@ -358,6 +365,29 @@ namespace ryujin
    * };
    * ```
    *
+   * The array mode uses the same raw pointer interface, but the storage is
+   * sized explicitly with reinit():
+   * ```
+   * class Stencil {
+   * public:
+   *   struct Entry { unsigned int index; double weight; };
+   *
+   *   Stencil() : entries_("stencil entries") {}
+   *
+   *   void prepare(const std::size_t n_entries)
+   *   {
+   *     entries_.reinit(n_entries, TransferPolicy::implicit_transfers);
+   *
+   *     auto *entries = entries_.view();
+   *     for (std::size_t i = 0; i < entries_.size(); ++i)
+   *       entries[i] = {static_cast<unsigned int>(i), 1.};
+   *   }
+   *
+   * private:
+   *   Mirrored<Entry *> entries_;
+   * };
+   * ```
+   *
    * @note The transfer policy defaults to
    * TransferPolicy::explicit_transfers, where view() never triggers a
    * memory transfer on its own and all transfers have to be requested
@@ -367,7 +397,9 @@ namespace ryujin
    * and a copy_to_memory_space<Default>() afterwards.
    *
    * @note The pointer returned by view() may only be dereferenced on the
-   * selected memory space.
+   * selected memory space. In the array mode the pointer references the
+   * first of size() contiguously stored objects; the length is not part of
+   * the returned pointer and has to be carried along by the caller.
    *
    * @note In contrast to a copied Kokkos::View the pointer returned by
    * view() does not pin the underlying storage: it dangles after a
@@ -390,34 +422,102 @@ namespace ryujin
   class Mirrored : public MirroredStorage<Mirrored<T>>
   {
   public:
-    static_assert(std::is_trivially_copyable_v<T>,
+    /**
+     * True if the class maintains a one dimensional array of objects, i.e.,
+     * if the template argument is of the form `T *`, and false if the class
+     * maintains a single object of type `T`.
+     */
+    static constexpr bool is_array = std::is_pointer_v<T>;
+
+    /**
+     * The type of the stored object: `T` itself in the scalar mode, and the
+     * pointee type in the array mode.
+     */
+    using value_type = std::remove_pointer_t<T>;
+
+    static_assert(std::is_trivially_copyable_v<value_type>,
                   "The stored type has to be trivially copyable so that we "
                   "can move it into device memory");
 
+    static_assert(!std::is_pointer_v<value_type>,
+                  "Only a single level of indirection is supported: a "
+                  "Mirrored<T *> object maintains a one dimensional array of "
+                  "objects of type T");
+
+    static_assert(!std::is_array_v<T>,
+                  "An array of objects is spelled Mirrored<T *>, and not "
+                  "Mirrored<T[]>");
+
     /**
-     * Constructor. Allocates the storage on the templated memory space
-     * (Defaults to the host memory space). The @p label is used as the
-     * Kokkos allocation label and @p transfer_policy selects the transfer
-     * policy, see the documentation of TransferPolicy.
+     * Constructor for the scalar mode. Allocates the storage of a single
+     * object on the selected memory space. The @p label is used as the
+     * Kokkos allocation label, @p transfer_policy selects the transfer
+     * policy, see the documentation of TransferPolicy, and the (defaulted)
+     * last argument selects the memory space that is initialized.
+     *
+     * @note The selected memory space has to be consistent with the
+     * transfer policy: a policy that pins the other memory space is not
+     * admissible, see MirroredStorage.
      */
     template <typename InitializedMemorySpace = dealii::MemorySpace::Host>
     Mirrored(const std::string &label = "mirrored object",
              const TransferPolicy transfer_policy =
-                 TransferPolicy::explicit_transfers);
+                 TransferPolicy::explicit_transfers,
+             InitializedMemorySpace = {})
+      requires(!is_array);
+
+    /**
+     * Constructor for the array mode. Allocates the storage of a single
+     * object on the selected memory space. The @p label is used as the
+     * Kokkos allocation label, @p transfer_policy selects the transfer
+     * policy, see the documentation of TransferPolicy, and the (defaulted)
+     * last argument selects the memory space that is initialized.
+     *
+     * @note The selected memory space has to be consistent with the
+     * transfer policy: a policy that pins the other memory space is not
+     * admissible, see MirroredStorage.
+     */
+    template <typename InitializedMemorySpace = dealii::MemorySpace::Host>
+    Mirrored(const std::string &label = "mirrored array",
+             const std::size_t size = 0,
+             const TransferPolicy transfer_policy =
+                 TransferPolicy::explicit_transfers,
+             InitializedMemorySpace = {})
+      requires(is_array);
+
+    /**
+     * Reinitialize the object to maintain @p size objects. The storage is
+     * (re)allocated (and zero initialized) on the selected default memory
+     * space.
+     */
+    template <typename InitializedMemorySpace = dealii::MemorySpace::Host>
+    void reinit(const std::size_t size,
+                const TransferPolicy transfer_policy =
+                    TransferPolicy::explicit_transfers,
+                InitializedMemorySpace = {})
+      requires(is_array);
+
+    /**
+     * Return the number of stored objects.
+     */
+    std::size_t size() const
+      requires(is_array);
 
     /**
      * Return a writable pointer to the stored object residing in the
-     * selected memory space.
+     * selected memory space. In the array mode the pointer references the
+     * first of size() contiguously stored objects.
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    T *view();
+    value_type *view();
 
     /**
      * Return a read only pointer to the stored object residing in the
-     * selected memory space.
+     * selected memory space. In the array mode the pointer references the
+     * first of size() contiguously stored objects.
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    const T *view() const;
+    const value_type *view() const;
 
   private:
     /**
@@ -437,6 +537,14 @@ namespace ryujin
     template <typename MemorySpace>
     KokkosView<MemorySpace> &storage() const;
 
+    /**
+     * Allocate the storage on the selected memory space, drop the storage
+     * of the other memory space, and reset the residency flags
+     * accordingly.
+     */
+    template <typename InitializedMemorySpace>
+    void initialize_storage();
+
     /*
      * Storage primitives required by the MirroredStorage base class:
      */
@@ -451,6 +559,9 @@ namespace ryujin
     void deallocate_storage();
 
     std::string label_;
+
+    /* The number of stored objects, only used in the array mode: */
+    std::size_t size_ = 0;
 
     mutable KokkosView<HostSpace> host_;
     mutable KokkosView<DefaultSpace> default_;
@@ -741,65 +852,115 @@ namespace ryujin
 
 
   template <typename T>
-  template <typename MemorySpace>
+  template <typename InitializedMemorySpace>
   Mirrored<T>::Mirrored(const std::string &label,
-                        const TransferPolicy transfer_policy)
+                        const TransferPolicy transfer_policy,
+                        InitializedMemorySpace)
+    requires(!is_array)
       : label_(label)
   {
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
+    initialize_storage<InitializedMemorySpace>();
 
-    if (have_separate_memory_spaces &&
-        !std::is_same_v<MemorySpace, HostSpace>) {
-      allocate_storage<DefaultSpace>();
-      this->reset_residency(/*host*/ false, /*default*/ true);
-
-    } else {
-      allocate_storage<HostSpace>();
-      this->reset_residency(/*host*/ true,
-                            /*default*/ !have_separate_memory_spaces);
-    }
-
+    /* The transfer policy is selected last, see MirroredStorage: */
     this->set_transfer_policy(transfer_policy);
   }
 
 
   template <typename T>
-  template <typename MemorySpace>
-  inline T *Mirrored<T>::view()
+  template <typename InitializedMemorySpace>
+  Mirrored<T>::Mirrored(const std::string &label,
+                        const std::size_t size,
+                        const TransferPolicy transfer_policy,
+                        InitializedMemorySpace)
+    requires(is_array)
+      : label_(label)
   {
-    this->template prepare_write_access<MemorySpace>();
+    reinit(size, transfer_policy, InitializedMemorySpace{});
+  }
+
+
+  template <typename T>
+  template <typename InitializedMemorySpace>
+  void Mirrored<T>::reinit(const std::size_t size,
+                           const TransferPolicy transfer_policy,
+                           InitializedMemorySpace)
+    requires(is_array)
+  {
+    /*
+     * Drop the transfer policy for the duration of the reinit so that a
+     * pinned memory space of a previous policy does not interfere:
+     */
+    this->set_transfer_policy(TransferPolicy::explicit_transfers);
+
+    size_ = size;
+
+    initialize_storage<InitializedMemorySpace>();
+
+    /* The transfer policy is selected last, see MirroredStorage: */
+    this->set_transfer_policy(transfer_policy);
+  }
+
+
+  template <typename T>
+  inline std::size_t Mirrored<T>::size() const
+    requires(is_array)
+  {
+    return size_;
+  }
+
+
+  template <typename T>
+  template <typename InitializedMemorySpace>
+  void Mirrored<T>::initialize_storage()
+  {
+    static_assert(std::is_same_v<InitializedMemorySpace, HostSpace> ||
+                      std::is_same_v<InitializedMemorySpace, DefaultSpace>,
+                  "Unexpected memory space");
 
     /*
-     * Note: The returned pointer must only be dereferenced on the selected
-     * memory space.
-     *
      * Note: If the host and default memory spaces coincide then only the
      * host storage is ever allocated.
      */
     if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      return default_.data();
+                  !std::is_same_v<InitializedMemorySpace, HostSpace>) {
+      /* Drop possibly stale storage from a previous reinit(): */
+      deallocate_storage<HostSpace>();
+      allocate_storage<DefaultSpace>();
+
+      this->reset_residency(/*host*/ false, /*default*/ true);
+
     } else {
-      return host_.data();
+      if constexpr (have_separate_memory_spaces)
+        deallocate_storage<DefaultSpace>();
+      allocate_storage<HostSpace>();
+
+      /*
+       * If both memory spaces coincide the single host allocation is
+       * trivially resident on both of them:
+       */
+      this->reset_residency(/*host*/ true,
+                            /*default*/ !have_separate_memory_spaces);
     }
   }
 
 
   template <typename T>
   template <typename MemorySpace>
-  inline const T *Mirrored<T>::view() const
+  inline auto Mirrored<T>::view() -> value_type *
+  {
+    this->template prepare_write_access<MemorySpace>();
+
+    return storage<MemorySpace>().data();
+  }
+
+
+  template <typename T>
+  template <typename MemorySpace>
+  inline auto Mirrored<T>::view() const -> const value_type *
   {
     this->template prepare_read_access<MemorySpace>();
 
-    /* See the comment in the writable view() variant above. */
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      return default_.data();
-    } else {
-      return host_.data();
-    }
+    return storage<MemorySpace>().data();
   }
 
 
@@ -811,6 +972,10 @@ namespace ryujin
                       std::is_same_v<MemorySpace, DefaultSpace>,
                   "Unexpected memory space");
 
+    /*
+     * Note: If the host and default memory spaces coincide then only the
+     * host storage is ever allocated.
+     */
     if constexpr (std::is_same_v<MemorySpace, HostSpace>)
       return host_;
     else
@@ -822,7 +987,10 @@ namespace ryujin
   template <typename MemorySpace>
   inline void Mirrored<T>::allocate_storage() const
   {
-    storage<MemorySpace>() = KokkosView<MemorySpace>(label_);
+    if constexpr (is_array)
+      storage<MemorySpace>() = KokkosView<MemorySpace>(label_, size_);
+    else
+      storage<MemorySpace>() = KokkosView<MemorySpace>(label_);
   }
 
 
