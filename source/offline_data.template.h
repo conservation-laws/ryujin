@@ -1055,9 +1055,11 @@ namespace ryujin
      * Verify that we have consistent mass:
      */
 
+    const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+
     double total_mass = 0.;
     for (unsigned int i = 0; i < n_locally_owned_; ++i)
-      total_mass += lumped_mass_matrix_.read_entry(i);
+      total_mass += lumped_mass_matrix_view.read_entry(i);
     total_mass =
         Utilities::MPI::sum(total_mass, mpi_ensemble_.ensemble_communicator());
 
@@ -1080,8 +1082,8 @@ namespace ryujin
       if (row_length == 1)
         continue;
 
-      auto sum =
-          mass_matrix_view.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
+      auto sum = mass_matrix_view.read_entry(i, 0) -
+                 lumped_mass_matrix_view.read_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
