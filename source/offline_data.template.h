@@ -1040,8 +1040,14 @@ namespace ryujin
       boundary_map_ = construct_boundary_map(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
-      coupling_boundary_pairs_ = collect_coupling_boundary_pairs(
+      const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
+
+      coupling_boundary_pairs_.reinit(coupling_boundary_pairs.size(),
+                                      TransferPolicy::implicit_transfers);
+      std::copy(coupling_boundary_pairs.begin(),
+                coupling_boundary_pairs.end(),
+                coupling_boundary_pairs_.view());
     }
 
 #ifdef DEBUG_SYMMETRY_CHECK
@@ -1136,11 +1142,10 @@ namespace ryujin
           // The c_ij matrix is not symmetric, this can only happen if i
           // and j are both located on the boundary.
 
-          CouplingDescription coupling{i, col_idx, j};
-          const auto it = std::find(coupling_boundary_pairs_.begin(),
-                                    coupling_boundary_pairs_.end(),
-                                    coupling);
-          if (it == coupling_boundary_pairs_.end()) {
+          const CouplingDescription coupling{i, col_idx, j};
+          const auto *begin = coupling_boundary_pairs_.view();
+          const auto *end = begin + coupling_boundary_pairs_.size();
+          if (std::find(begin, end, coupling) == end) {
             std::stringstream ss;
             ss << "c_ij matrix is not anti-symmetric: " << c_ij << " <-> "
                << c_ji;

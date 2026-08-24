@@ -318,8 +318,10 @@ namespace ryujin
     const auto n_limiter_iterations =
         limiter_.template view<dim, Number>().iterations();
 
-    const auto &coupling_boundary_pairs =
-        offline_data_->coupling_boundary_pairs();
+    const auto *coupling_boundary_pairs =
+        offline_data_->coupling_boundary_pairs().view();
+    const auto n_coupling_boundary_pairs =
+        offline_data_->coupling_boundary_pairs().size();
 
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
@@ -488,7 +490,7 @@ namespace ryujin
                             body_boundary,
                             0,
                             /*no vectorization*/ 0,
-                            coupling_boundary_pairs.size());
+                            n_coupling_boundary_pairs);
 
       std::atomic<Number> local_tau_max = tau_max;
 
