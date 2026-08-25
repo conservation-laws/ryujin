@@ -9,6 +9,7 @@
 
 #include "convenience_macros.h"
 #include "discretization.h"
+#include "gpu.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "sparse_matrix.h"
@@ -71,12 +72,17 @@ namespace ryujin
                    dealii::Point<dim>> /*position*/;
 
     /**
-     * A tuple describing coupling boundary degrees of freedom on directly
-     * enforced boundaries for which we have to symmetrize the d_ij matrix.
+     * A structure describing coupling boundary degrees of freedom on
+     * directly enforced boundaries for which we have to symmetrize the
+     * d_ij matrix.
      */
-    using CouplingDescription = std::tuple<unsigned int /*i*/, //
-                                           unsigned int /*col_idx*/,
-                                           unsigned int /*j*/>;
+    struct CouplingDescription {
+      unsigned int i;
+      unsigned int col_idx;
+      unsigned int j;
+
+      bool operator==(const CouplingDescription &) const = default;
+    };
 
     //@}
     /**
@@ -267,10 +273,12 @@ namespace ryujin
     ACCESSOR_READ_ONLY(boundary_map)
 
     /**
-     * A vector of tuples describing coupling degrees of freedom i and j
-     * where both degrees of freedom are collocated at the boundary (and
-     * hence the d_ij matrix has to be symmetrized). The function returns a
-     * reference to a vector of tuples consisting of (i, col_idx, j).
+     * An array of CouplingDescription structures describing coupling
+     * degrees of freedom i and j where both degrees of freedom are
+     * collocated at the boundary (and hence the d_ij matrix has to be
+     * symmetrized). The function returns a reference to a Mirrored object
+     * holding (i, col_idx, j) triples that can be accessed on both memory
+     * spaces with view() and size().
      */
     ACCESSOR_READ_ONLY(coupling_boundary_pairs)
 
@@ -401,7 +409,8 @@ namespace ryujin
     std::vector<BoundaryMap> level_boundary_map_;
 
     using CouplingBoundaryPairs = std::vector<CouplingDescription>;
-    CouplingBoundaryPairs coupling_boundary_pairs_;
+    Mirrored<CouplingDescription *> coupling_boundary_pairs_{
+        "offline_data_coupling_boundary_pairs"};
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 

@@ -508,8 +508,11 @@ namespace ryujin
      * pattern from global deal.II (typical) dof indexing to local indices.
      */
 
-    sparsity_pattern_simd_.reinit(
-        n_locally_internal_, sparsity_pattern_, scalar_partitioner_);
+    sparsity_pattern_simd_.reinit(n_locally_internal_,
+                                  sparsity_pattern_,
+                                  scalar_partitioner_,
+                                  /*symmetrize_ghost_range*/ true,
+                                  TransferPolicy::implicit_transfers);
   }
 
 
@@ -521,21 +524,27 @@ namespace ryujin
 #endif
 
     /*
-     * First, (re)initialize all local matrices:
+     * First, (re)initialize all local matrices. All of them are assembled
+     * on the host memory space and read on either memory space, so we
+     * select the implicit_transfers policy and let the first view() on the
+     * default memory space perform the transfer:
      */
 
-    mass_matrix_.reinit(sparsity_pattern_simd_);
-    if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_.reinit(sparsity_pattern_simd_);
+    constexpr auto policy = TransferPolicy::implicit_transfers;
 
-    lumped_mass_matrix_.reinit_with_scalar_partitioner(scalar_partitioner_);
+    mass_matrix_.reinit(sparsity_pattern_simd_, policy);
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_.reinit(sparsity_pattern_simd_, policy);
+
+    lumped_mass_matrix_.reinit_with_scalar_partitioner(scalar_partitioner_,
+                                                       policy);
     lumped_mass_matrix_inverse_.reinit_with_scalar_partitioner(
-        scalar_partitioner_);
+        scalar_partitioner_, policy);
 
-    betaij_matrix_.reinit(sparsity_pattern_simd_);
-    cij_matrix_.reinit(sparsity_pattern_simd_);
+    betaij_matrix_.reinit(sparsity_pattern_simd_, policy);
+    cij_matrix_.reinit(sparsity_pattern_simd_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      incidence_matrix_.reinit(sparsity_pattern_simd_);
+      incidence_matrix_.reinit(sparsity_pattern_simd_, policy);
 
     /*
      * Now, assemble all matrices:
@@ -1031,8 +1040,14 @@ namespace ryujin
       boundary_map_ = construct_boundary_map(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
-      coupling_boundary_pairs_ = collect_coupling_boundary_pairs(
+      const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
+
+      coupling_boundary_pairs_.reinit(coupling_boundary_pairs.size(),
+                                      TransferPolicy::implicit_transfers);
+      std::copy(coupling_boundary_pairs.begin(),
+                coupling_boundary_pairs.end(),
+                coupling_boundary_pairs_.view());
     }
 
 #ifdef DEBUG_SYMMETRY_CHECK
@@ -1040,9 +1055,11 @@ namespace ryujin
      * Verify that we have consistent mass:
      */
 
+    const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+
     double total_mass = 0.;
     for (unsigned int i = 0; i < n_locally_owned_; ++i)
-      total_mass += lumped_mass_matrix_.read_entry(i);
+      total_mass += lumped_mass_matrix_view.read_entry(i);
     total_mass =
         Utilities::MPI::sum(total_mass, mpi_ensemble_.ensemble_communicator());
 
@@ -1065,8 +1082,8 @@ namespace ryujin
       if (row_length == 1)
         continue;
 
-      auto sum =
-          mass_matrix_view.read_entry(i, 0) - lumped_mass_matrix_.read_entry(i);
+      auto sum = mass_matrix_view.read_entry(i, 0) -
+                 lumped_mass_matrix_view.read_entry(i);
 
       /* skip diagonal */
       constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -1127,11 +1144,10 @@ namespace ryujin
           // The c_ij matrix is not symmetric, this can only happen if i
           // and j are both located on the boundary.
 
-          CouplingDescription coupling{i, col_idx, j};
-          const auto it = std::find(coupling_boundary_pairs_.begin(),
-                                    coupling_boundary_pairs_.end(),
-                                    coupling);
-          if (it == coupling_boundary_pairs_.end()) {
+          const CouplingDescription coupling{i, col_idx, j};
+          const auto *begin = coupling_boundary_pairs_.view();
+          const auto *end = begin + coupling_boundary_pairs_.size();
+          if (std::find(begin, end, coupling) == end) {
             std::stringstream ss;
             ss << "c_ij matrix is not anti-symmetric: " << c_ij << " <-> "
                << c_ji;
