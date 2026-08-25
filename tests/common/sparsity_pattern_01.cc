@@ -47,8 +47,10 @@ namespace ryujin
         ss << left << " : " << right << "\n";
 
       ss << "Entries to be sent:\n";
-      for (const auto &[left, right] : this->entries_to_be_sent())
-        ss << left << " : " << right << "\n";
+      const auto *entries_to_be_sent = this->entries_to_be_sent().view();
+      for (std::size_t c = 0; c < this->entries_to_be_sent().size(); ++c)
+        ss << entries_to_be_sent[c].row << " : "
+           << entries_to_be_sent[c].column_index << "\n";
 
       std::cout << ss.str() << std::endl;
     }

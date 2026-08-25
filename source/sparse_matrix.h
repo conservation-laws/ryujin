@@ -696,7 +696,10 @@ namespace ryujin
 
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
-    const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
+    const auto *entries_to_be_sent =
+        sparsity_pattern_->entries_to_be_sent().view();
+    const auto n_entries_to_be_sent =
+        sparsity_pattern_->entries_to_be_sent().size();
 
     const unsigned int mpi_tag =
         dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
@@ -736,7 +739,7 @@ namespace ryujin
       AssertThrowMPI(ierr);
     }
 
-    for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
+    for (std::size_t c = 0; c < n_entries_to_be_sent; ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
         const auto offset =
@@ -803,7 +806,10 @@ namespace ryujin
 
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
-    const auto &entries_to_be_sent = sparsity_pattern_->entries_to_be_sent();
+    const auto *entries_to_be_sent =
+        sparsity_pattern_->entries_to_be_sent().view();
+    const auto n_entries_to_be_sent =
+        sparsity_pattern_->entries_to_be_sent().size();
 
     const unsigned int mpi_tag =
         dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
@@ -889,7 +895,7 @@ namespace ryujin
 
     /* Add back contributions and clear ghost range: */
 
-    for (std::size_t c = 0; c < entries_to_be_sent.size(); ++c) {
+    for (std::size_t c = 0; c < n_entries_to_be_sent; ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
         const auto offset =

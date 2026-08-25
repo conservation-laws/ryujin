@@ -181,7 +181,8 @@ namespace ryujin
 
     receive_targets_.clear();
     send_targets_.clear();
-    entries_to_be_sent_.clear();
+
+    std::vector<ExchangeDescription> entries_to_be_sent;
 
     if (sparsity.n_rows() > n_locally_owned_dofs_) {
       const unsigned int mpi_tag =
@@ -379,7 +380,7 @@ namespace ryujin
         AssertThrowMPI(ierr);
       }
 
-      entries_to_be_sent_.clear();
+      entries_to_be_sent.reserve(n_entries_to_be_sent);
       for (unsigned int e = 0; e < n_entries_to_be_sent; ++e) {
         const auto i_global = entries_buffer[2 * e];
         const auto j_global = entries_buffer[2 * e + 1];
@@ -396,9 +397,23 @@ namespace ryujin
         const std::size_t position_diag = sparsity(i, i);
         const std::size_t position_within_row = position - position_diag;
 
-        entries_to_be_sent_.emplace_back(i, position_within_row);
+        entries_to_be_sent.emplace_back(ExchangeDescription{
+            i, static_cast<unsigned int>(position_within_row)});
       }
     }
+
+    /*
+     * FIXME: entries_to_be_sent_ should inherit the same "transfer_policy"
+     * at this point. Unfortunately, we do not support calling
+     * copy_to_memory_space<>(), or move_to_memory_space<>() of dependent
+     * data fields in an elegant way... Work around this issue by setting
+     * the transfer policy to "implicit_transfers".
+     */
+    entries_to_be_sent_.reinit(entries_to_be_sent.size(),
+                               TransferPolicy::implicit_transfers);
+    std::copy(entries_to_be_sent.begin(),
+              entries_to_be_sent.end(),
+              entries_to_be_sent_.view());
 
     this->reset_residency(/*host*/ true,
                           /*default*/ !have_separate_memory_spaces);
