@@ -169,13 +169,28 @@ namespace ryujin
 
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
     mutable Kokkos::View<Number *, KokkosHost> data_host_;
-    mutable Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
 
     using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
     mutable Kokkos::View<Number *, KokkosDefault> data_default_;
+
+    /*
+     * Note: For the time being, let's assume MPI only operates on host
+     * memory. Meaning, when we populate exchange_buffer_default_ on the
+     * device, we will copy over to the host prior to sending.
+     */
+
+    mutable Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
+    mutable Kokkos::View<Number *, KokkosHost> ghost_buffer_host_;
     mutable Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
 
     std::vector<MPI_Request> requests_;
+
+    /**
+     * Gather all entries that have to be sent to neighboring MPI ranks
+     * into the exchange buffer of the selected memory space.
+     */
+    template <typename MemorySpace>
+    void populate_exchange_buffer_on_memory_space();
 
     /*
      * Storage primitives used by the MirroredStorage base class:
@@ -526,6 +541,15 @@ namespace ryujin
     exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_exchange_buffer", n_components * n_indices);
 
+    if constexpr (have_separate_memory_spaces) {
+      const auto ghost_offset =
+          sparsity_view.template ghost_offset<n_components>();
+      const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
+
+      ghost_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
+          "sparse_matrix_ghost_buffer", end_offset - ghost_offset);
+    }
+
     /*
      * The matrix is resident on the host memory space only. Device
      * storage is allocated lazily on the first copy_to_memory_space() /
@@ -592,11 +616,6 @@ namespace ryujin
           Kokkos::view_alloc(Kokkos::WithoutInitializing, "sparse_matrix_data"),
           n_data);
 
-      exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparse_matrix_exchange_buffer"),
-          n_exchange);
-
     } else {
       data_default_ = Kokkos::View<Number *, KokkosDefault>(
           Kokkos::view_alloc(Kokkos::WithoutInitializing, "sparse_matrix_data"),
@@ -617,21 +636,10 @@ namespace ryujin
   {
     using HostSpace = dealii::MemorySpace::Host;
 
-    /*
-     * Note: The exchange buffer is transient scratch used for MPI
-     * synchronization; copying it over conservatively preserves the
-     * previous move_to_memory_space() semantics. The copy could
-     * potentially be dropped.
-     */
-
     if constexpr (std::is_same_v<To, HostSpace>) {
       Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
-      Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
-                        /*src*/ exchange_buffer_default_);
     } else {
       Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
-      Kokkos::deep_copy(/*dst*/ exchange_buffer_default_,
-                        /*src*/ exchange_buffer_host_);
     }
   }
 
@@ -644,7 +652,6 @@ namespace ryujin
 
     if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
       data_host_ = {};
-      exchange_buffer_host_ = {};
 
     } else {
       data_default_ = {};
@@ -681,25 +688,77 @@ namespace ryujin
   template <typename Number, int n_components, int simd_length>
   template <typename MemorySpace>
   void SparseMatrix<Number, n_components, simd_length>::
+      populate_exchange_buffer_on_memory_space()
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+
+    const auto sparsity_view = sparsity_pattern_->template view<MemorySpace>();
+
+    const auto *entries_to_be_sent =
+        sparsity_pattern_->entries_to_be_sent().template view<MemorySpace>();
+    const std::size_t n_entries_to_be_sent =
+        sparsity_pattern_->entries_to_be_sent().size();
+
+    /*
+     * Note: If the host and default memory spaces coincide all views
+     * reference the host storage.
+     */
+    constexpr bool on_host =
+        !have_separate_memory_spaces || std::is_same_v<MemorySpace, HostSpace>;
+
+    const auto data = [&]() {
+      if constexpr (on_host)
+        return data_host_;
+      else
+        return data_default_;
+    }();
+
+    const auto exchange_buffer = [&]() {
+      if constexpr (on_host)
+        return exchange_buffer_host_;
+      else
+        return exchange_buffer_default_;
+    }();
+
+    using ExecutionSpace = typename MemorySpace::kokkos_space::execution_space;
+    using Policy =
+        Kokkos::RangePolicy<ExecutionSpace, Kokkos::IndexType<std::size_t>>;
+
+    const auto exec = ExecutionSpace{};
+
+    Kokkos::parallel_for(
+        "sparse_matrix_populate_exchange_buffer",
+        Policy(exec, 0, n_entries_to_be_sent),
+        KOKKOS_LAMBDA(const std::size_t c) {
+          const auto &[row, column_index] = entries_to_be_sent[c];
+          for (unsigned int d = 0; d < n_components; ++d) {
+            const auto offset = sparsity_view.template offset<n_components>(
+                row, column_index, d);
+            exchange_buffer(n_components * c + d) = data(offset);
+          }
+        });
+
+    exec.fence();
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  template <typename MemorySpace>
+  void SparseMatrix<Number, n_components, simd_length>::
       update_ghost_rows_on_memory_space()
   {
     using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-
-    AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
-                dealii::ExcNotImplemented());
 
     Assert(this->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
+
+    constexpr bool on_host =
+        !have_separate_memory_spaces || std::is_same_v<MemorySpace, HostSpace>;
 
     const auto sparsity_view = sparsity_pattern_->view();
 
     const auto &receive_targets = sparsity_pattern_->receive_targets();
     const auto &send_targets = sparsity_pattern_->send_targets();
-    const auto *entries_to_be_sent =
-        sparsity_pattern_->entries_to_be_sent().view();
-    const auto n_entries_to_be_sent =
-        sparsity_pattern_->entries_to_be_sent().size();
 
     const unsigned int mpi_tag =
         dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
@@ -713,6 +772,11 @@ namespace ryujin
 
     const auto ghost_offset =
         sparsity_view.template ghost_offset<n_components>();
+    const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
+
+    Number *const receive_pointer =
+        on_host ? data_host_.data() + ghost_offset : ghost_buffer_host_.data();
+    Number *const send_pointer = exchange_buffer_host_.data();
 
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
       const auto receive_offset =
@@ -729,7 +793,7 @@ namespace ryujin
 #endif
 
       const int ierr =
-          MPI_Irecv(data_host_.data() + ghost_offset + receive_offset,
+          MPI_Irecv(receive_pointer + receive_offset,
                     receive_size,
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     receive_targets[p].first,
@@ -739,14 +803,11 @@ namespace ryujin
       AssertThrowMPI(ierr);
     }
 
-    for (std::size_t c = 0; c < n_entries_to_be_sent; ++c) {
-      const auto &[row, column_index] = entries_to_be_sent[c];
-      for (unsigned int d = 0; d < n_components; ++d) {
-        const auto offset =
-            sparsity_view.template offset<n_components>(row, column_index, d);
-        exchange_buffer_host_(n_components * c + d) = data_host_(offset);
-      }
-    }
+    populate_exchange_buffer_on_memory_space<MemorySpace>();
+
+    if constexpr (!on_host)
+      Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
+                        /*src*/ exchange_buffer_default_);
 
     for (unsigned int p = 0; p < send_targets.size(); ++p) {
       const auto send_offset =
@@ -763,7 +824,7 @@ namespace ryujin
 #endif
 
       const int ierr =
-          MPI_Isend(exchange_buffer_host_.data() + send_offset,
+          MPI_Isend(send_pointer + send_offset,
                     send_size,
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     send_targets[p].first,
@@ -781,6 +842,15 @@ namespace ryujin
     const int ierr =
         MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
     AssertThrowMPI(ierr);
+
+    if constexpr (!on_host) {
+      /* Copy the received ghost range back into device memory: */
+      const auto ghost_range =
+          Kokkos::subview(data_default_,
+                          Kokkos::make_pair(std::size_t(ghost_offset),
+                                            std::size_t(end_offset)));
+      Kokkos::deep_copy(/*dst*/ ghost_range, /*src*/ ghost_buffer_host_);
+    }
   }
 
 
