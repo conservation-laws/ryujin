@@ -369,6 +369,31 @@ namespace ryujin
   private:
     //@}
     /**
+     * @name Internal methods
+     */
+    //@{
+
+    using HyperbolicVector =
+        Vectors::MultiComponentVector<Number, problem_dimension>;
+
+    /**
+     * Update all boundary values of the hyperbolic state vector component
+     * @p U for the supplied time @p t.
+     *
+     * The boundary map and the initial state functions are host-only data
+     * structures. We therefore gather all boundary states of @p U into a
+     * compact, mirrored buffer, apply boundary conditions on the host
+     * memory space, and scatter the updated states back. This avoids
+     * transferring the entire state vector to the host memory space and
+     * back on every time step.
+     *
+     * @note The function does not update ghost values.
+     */
+    template <typename MemorySpace>
+    void apply_boundary_conditions(HyperbolicVector &U, const Number t) const;
+
+    //@}
+    /**
      * @name Run time options
      */
     //@{
@@ -410,9 +435,14 @@ namespace ryujin
         Limiter::template View<dim, Number>::n_bounds;
     mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
 
-    using HyperbolicVector =
-        Vectors::MultiComponentVector<Number, problem_dimension>;
     mutable HyperbolicVector r_;
+
+    /*
+     * A compact buffer holding all boundary states of the hyperbolic state
+     * vector, see apply_boundary_conditions().
+     */
+    mutable Mirrored<Number *> boundary_states_{
+        "hyperbolic_module_boundary_states"};
 
     mutable SparseMatrix<Number> dij_matrix_;
     mutable SparseMatrix<Number> lij_matrix_;

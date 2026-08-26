@@ -5,13 +5,15 @@
 
 #pragma once
 
+#include "gpu.h"
 #include "hyperbolic_module.h"
 #include "loop.h"
 #include "mpi_ensemble.h"
 #include "scope.h"
 #include "simd.h"
 
-#include <atomic>
+#include <numeric>
+#include <utility>
 
 namespace ryujin
 {
@@ -63,13 +65,25 @@ namespace ryujin
                 dealii::ExcMessage(
                     "The number of limiter iterations must be between [0,2]"));
 
+    using MemorySpace = dealii::MemorySpace::Default;
+
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    alpha_.reinit_with_scalar_partitioner(scalar_partitioner);
+
+    /* The alpha vector is also read on the host memory space: */
+    alpha_.reinit_with_scalar_partitioner(scalar_partitioner,
+                                          TransferPolicy::implicit_transfers);
+
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
     r_.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner());
+
+    /* Initialize the compact buffer used for updating boundary values: */
+
+    boundary_states_.reinit(offline_data_->boundary_indices().size() *
+                                problem_dimension,
+                            TransferPolicy::implicit_transfers);
 
     /* Initialize matrices: */
 
@@ -83,6 +97,23 @@ namespace ryujin
 
     initial_precomputed_ =
         initial_values_->interpolate_initial_precomputed_vector();
+
+    /*
+     * Move all temporary data structures to the correct memory space:
+     */
+
+    if constexpr (have_separate_memory_spaces) {
+      bounds_.template move_to_memory_space<MemorySpace>();
+      r_.template move_to_memory_space<MemorySpace>();
+
+      dij_matrix_.template move_to_memory_space<MemorySpace>();
+      lij_matrix_.template move_to_memory_space<MemorySpace>();
+      lij_matrix_next_.template move_to_memory_space<MemorySpace>();
+      pij_matrix_.template move_to_memory_space<MemorySpace>();
+
+      /* The initial_precomputed vector is also read on the host memory space:*/
+      initial_precomputed_.template copy_to_memory_space<MemorySpace>();
+    }
   }
 
 
@@ -151,47 +182,141 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto U_view = std::get<0>(state_vector).view();
+    auto &[U, precomputed, parabolic] = state_vector;
 
-    const auto &boundary_map = offline_data_->boundary_map();
-    using VA = VectorizedArray<Number>;
+    using MemorySpace = dealii::MemorySpace::Default;
+
+    /* Ensure all vectors are resident on the correct memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      Scope scope(computing_timer_, "time step [X] _ - memory space transfers");
+      U.template move_to_memory_space<MemorySpace>();
+      precomputed.template move_to_memory_space<MemorySpace>();
+    }
 
     Scope scope(computing_timer_,
                 "time step [H] 1 - update boundary values, precompute values");
 
-    /* FIXME: not thread parallel... */
-    for (const auto &entry : boundary_map) {
-      const auto &[i, normal, normal_mass, boundary_mass, id, position] = entry;
+    /*
+     * Update boundary values and distribute the result over all MPI ranks.
+     */
 
-      /*
-       * Relay the task of applying appropriate boundary conditions to the
-       * Problem Description.
-       */
+    apply_boundary_conditions<MemorySpace>(U, t);
 
-      if (id == Boundary::do_nothing)
-        continue;
-
-      auto U_i = U_view.read_tensor(i);
-
-      /* Use a lambda to avoid computing unnecessary state values */
-      auto get_dirichlet_data = [position = position, t = t, this]() {
-        return initial_values_->initial_state(position, t);
-      };
-
-      const auto view = hyperbolic_system_->template view<dim, Number>();
-      U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet_data);
-      U_view.write_tensor(U_i, i);
-    }
-
-    U_view.update_ghost_values();
+    U.template update_ghost_values_on_memory_space<MemorySpace>();
 
     /*
      * Compute and populate precomputed values.
      */
 
-    hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
+    hyperbolic_system_->template fill_precomputed_values<MemorySpace>(
+        *offline_data_, state_vector);
 
-    std::get<1>(state_vector).view().update_ghost_values();
+    precomputed.template view<MemorySpace>().update_ghost_values();
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  template <typename MemorySpace>
+  void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
+      HyperbolicVector &U, const Number t) const
+  {
+    constexpr auto n_comp = problem_dimension;
+
+    const auto &boundary_indices = offline_data_->boundary_indices();
+    const auto n_boundary_indices =
+        static_cast<unsigned int>(boundary_indices.size());
+
+    /*
+     * Gather all boundary states into the compact, mirrored buffer:
+     */
+    {
+      const auto U_view = std::as_const(U).template view<MemorySpace>();
+      const auto *indices = boundary_indices.template view<MemorySpace>();
+      auto *states = boundary_states_.template view<MemorySpace>();
+
+      const auto body = [=](auto /*sentinel*/, unsigned int k) {
+        const auto U_i = U_view.read_tensor(indices[k]);
+        for (unsigned int d = 0; d < n_comp; ++d)
+          states[k * n_comp + d] = U_i[d];
+      };
+
+      loop<MemorySpace, Number>("hyperbolic_module_gather_boundary_states",
+                                body,
+                                0,
+                                /*no vectorization*/ 0,
+                                n_boundary_indices);
+    }
+
+    /*
+     * Apply boundary conditions on the host memory space. Requesting a
+     * writable host view copies the buffer back from the default memory
+     * space.
+     */
+    {
+      auto *states =
+          boundary_states_.template view<dealii::MemorySpace::Host>();
+
+      const auto &boundary_map = offline_data_->boundary_map();
+      const auto &boundary_slots = offline_data_->boundary_slots();
+      const auto view = hyperbolic_system_->template view<dim, Number>();
+
+      /* FIXME: not thread parallel... */
+      for (std::size_t e = 0; e < boundary_map.size(); ++e) {
+        const auto &[i, normal, normal_mass, boundary_mass, id, position] =
+            boundary_map[e];
+
+        /*
+         * Relay the task of applying appropriate boundary conditions to the
+         * Problem Description.
+         */
+
+        if (id == Boundary::do_nothing)
+          continue;
+
+        /*
+         * Note: The boundary map can contain more than one entry for the
+         * same degree of freedom. All such entries share the same position
+         * in the buffer so that boundary conditions compose in the same way
+         * as they would when operating on the state vector directly.
+         */
+        const auto k = boundary_slots[e];
+
+        state_type U_i;
+        for (unsigned int d = 0; d < n_comp; ++d)
+          U_i[d] = states[k * n_comp + d];
+
+        /* Use a lambda to avoid computing unnecessary state values */
+        auto get_dirichlet = [position = position, t = t, this]() {
+          return initial_values_->initial_state(position, t);
+        };
+
+        U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet);
+
+        for (unsigned int d = 0; d < n_comp; ++d)
+          states[k * n_comp + d] = U_i[d];
+      }
+    }
+
+    /* Write back the updated boundary states: */
+    {
+      const auto U_view = U.template view<MemorySpace>();
+      const auto *indices = boundary_indices.template view<MemorySpace>();
+      const auto *states =
+          std::as_const(boundary_states_).template view<MemorySpace>();
+
+      const auto body = [=](auto /*sentinel*/, unsigned int k) {
+        state_type U_i;
+        for (unsigned int d = 0; d < n_comp; ++d)
+          U_i[d] = states[k * n_comp + d];
+        U_view.write_tensor(U_i, indices[k]);
+      };
+
+      loop<MemorySpace, Number>("hyperbolic_module_scatter_boundary_states",
+                                body,
+                                0,
+                                /*no vectorization*/ 0,
+                                n_boundary_indices);
+    }
   }
 
 
@@ -209,7 +334,8 @@ namespace ryujin
      * triangular part of the matrix.
      */
     template <typename T>
-    bool all_below_diagonal(unsigned int i, const unsigned int *js)
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool
+    all_below_diagonal(unsigned int i, const unsigned int *js)
     {
       if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
         /* Non-vectorized sequential access. */
@@ -249,9 +375,29 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto old_U_view = std::get<0>(old_state_vector).view();
-    const auto old_precomputed_view = std::get<1>(old_state_vector).view();
-    const auto new_U_view = std::get<0>(new_state_vector).view();
+    auto &[old_U, old_precomputed, old_parabolic] = old_state_vector;
+    auto &new_U = std::get<0>(new_state_vector);
+
+    using MemorySpace = dealii::MemorySpace::Default;
+
+    /* Ensure all vectors are resident on the correct memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      Scope scope(computing_timer_, "time step [X] _ - memory space transfers");
+      old_U.template copy_to_memory_space<MemorySpace>();
+      old_precomputed.template copy_to_memory_space<MemorySpace>();
+      for (int s = 0; s < stages; ++s) {
+        const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+        U_s.template copy_to_memory_space<MemorySpace>();
+        prec_s.template copy_to_memory_space<MemorySpace>();
+      }
+      new_U.template move_to_memory_space<MemorySpace>();
+    }
+
+    /*
+     * Taking a view<>() might imply implicit memory space transfers. Let's
+     * account for them in our computing timers.
+     */
+    computing_timer_["(re)initialize data structures"].start();
 
     /*
      * Workaround: A constexpr boolean storing the fact whether we
@@ -270,26 +416,26 @@ namespace ryujin
     constexpr bool shallow_water =
         std::is_same_v<Description, ShallowWater::Description>;
 
-    using VA = VectorizedArray<Number>;
-
     /* Index ranges for the iteration over the sparsity pattern : */
 
-    constexpr auto simd_length = VA::size();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
-    /* References to precomputed matrices and the stencil: */
+    /* Sparsity pattern, matrices, boundary information: */
 
     const auto sparsity_simd_view =
-        offline_data_->sparsity_pattern_simd().view();
+        offline_data_->sparsity_pattern_simd().template view<MemorySpace>();
 
-    const auto mass_matrix_view = offline_data_->mass_matrix().view();
+    const auto mass_matrix_view =
+        offline_data_->mass_matrix().template view<MemorySpace>();
     const auto lumped_mass_matrix_view =
-        offline_data_->lumped_mass_matrix().view();
+        offline_data_->lumped_mass_matrix().template view<MemorySpace>();
     const auto lumped_mass_matrix_inverse_view =
-        offline_data_->lumped_mass_matrix_inverse().view();
+        offline_data_->lumped_mass_matrix_inverse()
+            .template view<MemorySpace>();
 
-    const auto cij_matrix_view = offline_data_->cij_matrix().view();
+    const auto cij_matrix_view =
+        offline_data_->cij_matrix().template view<MemorySpace>();
 
     /*
      * The mass_matrix_inverse and incidence_matrix objects are only
@@ -297,34 +443,88 @@ namespace ryujin
      */
     const bool have_discontinuous_ansatz =
         offline_data_->discretization().have_discontinuous_ansatz();
-    using MatrixReadView = decltype(offline_data_->mass_matrix().view());
+    using MatrixReadView =
+        decltype(offline_data_->mass_matrix().template view<MemorySpace>());
     const auto mass_matrix_inverse_view =
-        have_discontinuous_ansatz ? offline_data_->mass_matrix_inverse().view()
-                                  : MatrixReadView{};
+        have_discontinuous_ansatz
+            ? offline_data_->mass_matrix_inverse().template view<MemorySpace>()
+            : MatrixReadView{};
     const auto incidence_matrix_view =
-        have_discontinuous_ansatz ? offline_data_->incidence_matrix().view()
-                                  : MatrixReadView{};
-
-    const auto initial_precomputed_view = initial_precomputed_.view();
-    const auto alpha_view = alpha_.view();
-    const auto bounds_view = bounds_.view();
-    const auto r_view = r_.view();
-
-    const auto dij_matrix_view = dij_matrix_.view();
-    const auto lij_matrix_view = lij_matrix_.view();
-    const auto lij_matrix_next_view = lij_matrix_next_.view();
-    const auto pij_matrix_view = pij_matrix_.view();
-
-    const auto n_limiter_iterations =
-        limiter_.template view<dim, Number>().iterations();
+        have_discontinuous_ansatz
+            ? offline_data_->incidence_matrix().template view<MemorySpace>()
+            : MatrixReadView{};
 
     const auto *coupling_boundary_pairs =
-        offline_data_->coupling_boundary_pairs().view();
+        offline_data_->coupling_boundary_pairs().template view<MemorySpace>();
     const auto n_coupling_boundary_pairs =
         offline_data_->coupling_boundary_pairs().size();
 
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
+
+    /* Temporary matrices: */
+
+    const auto dij_matrix_view = dij_matrix_.template view<MemorySpace>();
+    const auto lij_matrix_view = lij_matrix_.template view<MemorySpace>();
+    const auto lij_matrix_next_view =
+        lij_matrix_next_.template view<MemorySpace>();
+    const auto pij_matrix_view = pij_matrix_.template view<MemorySpace>();
+
+    /* Vectors: */
+
+    const auto initial_precomputed_view =
+        initial_precomputed_.template view<MemorySpace>();
+
+    const auto old_U_view = old_U.template view<MemorySpace>();
+    const auto old_precomputed_view =
+        old_precomputed.template view<MemorySpace>();
+
+    /*
+     * FIXME GPU: std::array::operator[] is not device capable. For the
+     * time being use a Kokkos::Array for wrapping:
+     */
+
+    using HyperbolicVectorView = std::remove_const_t<decltype(old_U_view)>;
+    using PrecomputedVectorView =
+        std::remove_const_t<decltype(old_precomputed_view)>;
+
+    Kokkos::Array<HyperbolicVectorView, stages> stage_U_view;
+    Kokkos::Array<PrecomputedVectorView, stages> stage_precomputed_view;
+    Kokkos::Array<Number, stages> stage_weight;
+    for (int s = 0; s < stages; ++s) {
+      const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+      stage_U_view[s] = U_s.template view<MemorySpace>();
+      stage_precomputed_view[s] = prec_s.template view<MemorySpace>();
+      stage_weight[s] = stage_weights[s];
+    }
+
+    const auto new_U_view = new_U.template view<MemorySpace>();
+
+    const auto alpha_view = alpha_.template view<MemorySpace>();
+    const auto bounds_view = bounds_.template view<MemorySpace>();
+    const auto r_view = r_.template view<MemorySpace>();
+
+    computing_timer_["(re)initialize data structures"].stop();
+
+    /*
+     * Create a local copy of cfl_ so that we do not capture "this" in the
+     * compute kernels
+     */
+    const Number cfl = cfl_;
+
+    const auto hyperbolic_system_views =
+        make_select_view<dim, Number, MemorySpace>(*hyperbolic_system_);
+
+    const auto indicator_views =
+        make_select_view<dim, Number, MemorySpace>(indicator_);
+
+    const auto limiter_views =
+        make_select_view<dim, Number, MemorySpace>(limiter_);
+    const auto n_limiter_iterations =
+        limiter_.template view<dim, Number>().iterations();
+
+    const auto wave_speed_estimator_views =
+        make_select_view<dim, Number, MemorySpace>(wave_speed_estimator_);
 
     /*
      * Lambdas for creating the computing timer and loop strings:
@@ -342,8 +542,10 @@ namespace ryujin
       return "time_step_" + std::to_string(step_no);
     };
 
-    /* A boolean signalling that a restart is necessary: */
-    std::atomic<bool> restart_needed = false;
+    /* A flag signalling that a restart is necessary. */
+    Mirrored<int> restart_needed("hyperbolic_module_restart_needed",
+                                 TransferPolicy::implicit_transfers);
+    *restart_needed.view() = 0;
 
     /*
      * -------------------------------------------------------------------------
@@ -373,14 +575,15 @@ namespace ryujin
     {
       Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
 
-      const auto body = [&](auto sentinel, unsigned int i) {
+      const auto body = [=](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        constexpr unsigned int stride_size = get_stride_size<T>;
+
+        const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
 
         const auto wave_speed_estimator_view =
-            wave_speed_estimator_.template view<dim, T>();
+            wave_speed_estimator_views.template view<T>();
 
-        auto indicator_view = indicator_.template view<dim, T>();
+        auto indicator_view = indicator_views.template view<T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd_view.row_length(i);
@@ -423,7 +626,7 @@ namespace ryujin
         alpha_view.template write_entry<T>(indicator_view.alpha(hd_i), i);
       };
 
-      cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
+      loop<MemorySpace, Number>(loop_name(), body, 0, n_internal, n_owned);
 
       alpha_view.update_ghost_values();
     }
@@ -452,11 +655,11 @@ namespace ryujin
        * accessing the element to make Apple's OpenMP implementation
        * happy.
        */
-      const auto body_boundary = [&](const auto &, const unsigned int k) {
+      const auto body_boundary = [=](auto, const unsigned int k) {
         const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
 
         const auto wave_speed_estimator_view =
-            wave_speed_estimator_.template view<dim, Number>();
+            wave_speed_estimator_views.template view<Number>();
 
         /*
          * Only work on index pairs "i < j" that point to the upper
@@ -486,20 +689,18 @@ namespace ryujin
         dij_matrix_view.write_entry(std::max(d_ij, d_ji), i, col_idx);
       };
 
-      cpu_simd_loop<Number>(loop_name(),
-                            body_boundary,
-                            0,
-                            /*no vectorization*/ 0,
-                            n_coupling_boundary_pairs);
+      loop<MemorySpace, Number>(loop_name(),
+                                body_boundary,
+                                0,
+                                /*no vectorization*/ 0,
+                                n_coupling_boundary_pairs);
 
-      std::atomic<Number> local_tau_max = tau_max;
-
-      /* Symmetrize d_ij: */
-      const auto body = [&](auto, unsigned int i) {
+      /* Symmetrize d_ij and compute the maximal time-step size: */
+      const auto body = [=](auto, unsigned int i, Number &result) {
 
 #ifdef DEBUG_SYMMETRY_CHECK
         const auto wave_speed_estimator_view =
-            wave_speed_estimator_.template view<dim, Number>();
+            wave_speed_estimator_views.template view<Number>();
 #endif
 
         /* Skip constrained degrees of freedom: */
@@ -510,10 +711,10 @@ namespace ryujin
         Number d_sum = Number(0.);
 
         /* skip diagonal: */
+        const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
         const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const auto j =
-              *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
+          const auto j = *(js + col_idx * stride_size);
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
@@ -557,18 +758,13 @@ namespace ryujin
         dij_matrix_view.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix_view.read_entry(i);
-        const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
+        const Number local_tau = cfl * mass / (Number(-2.) * d_sum);
 
-        Number current_value = local_tau_max.load();
-        while (current_value > local_tau &&
-               !local_tau_max.compare_exchange_weak(current_value, local_tau))
-          ;
+        result = std::min(result, local_tau);
       };
 
-      cpu_simd_loop<Number>(
-          loop_name(), body, 0, /*no vectorization*/ 0, n_owned);
-
-      tau_max = local_tau_max.load();
+      tau_max = reduction_loop<MemorySpace, Kokkos::Min<Number>>(
+          loop_name(), body, tau_max, 0, n_owned);
     }
 
     {
@@ -590,16 +786,16 @@ namespace ryujin
       tau = (tau == Number(0.) ? tau_max : tau);
 
 #ifdef DEBUG_OUTPUT
-      std::cout << "        computed tau_max = " << tau_max
-                << " (CFL = " << cfl_ << ")" << std::endl;
+      std::cout << "        computed tau_max = " << tau_max << " (CFL = " << cfl
+                << ")" << std::endl;
       std::cout << "        step with tau    = " << tau << std::endl;
 #endif
 
       /* We need to signal a restart if the enforced tau is too wacky: */
-      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max);
+      *restart_needed.view() = (tau > acceptable_tau_max_ratio_ * tau_max);
 
       /* Don't bother with computing the update step, signal a restart: */
-      if (restart_needed &&
+      if (*restart_needed.view() &&
           id_violation_strategy_ == IDViolationStrategy::raise_exception) {
         n_restarts_++;
         /* Suggest a restart with tau_max: */
@@ -607,9 +803,13 @@ namespace ryujin
         std::cout << "        signalling restart (suggested_tau_max = "
                   << tau_max << ")" << std::endl;
 #endif
+
         throw Restart{tau_max};
       }
     }
+
+    /* moves the "boolean" to device memory space: */
+    int *restart_needed_view = restart_needed.view<MemorySpace>();
 
 #ifdef DEBUG
     /*  Exchange d_ij so that we can check for symmetry: */
@@ -629,19 +829,20 @@ namespace ryujin
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
 
-      auto body = [&](auto sentinel,
-                      auto have_discontinuous_ansatz,
-                      const unsigned int i) {
+      const auto body = [=](auto sentinel,
+                            auto have_discontinuous_ansatz,
+                            const unsigned int i) {
         using T = decltype(sentinel);
-        using View = typename HyperbolicSystem::template View<dim, T>;
+        using View =
+            typename HyperbolicSystem::template View<dim, T, MemorySpace>;
         using flux_contribution_type = typename View::flux_contribution_type;
         using state_type = typename View::state_type;
 
-        constexpr unsigned int stride_size = get_stride_size<T>;
+        const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
 
-        const auto view = hyperbolic_system_->template view<dim, T>();
+        const auto view = hyperbolic_system_views.template view<T>();
 
-        auto limiter_view = limiter_.template view<dim, T>();
+        auto limiter_view = limiter_views.template view<T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd_view.row_length(i);
@@ -659,21 +860,17 @@ namespace ryujin
         const auto flux_i = view.flux_contribution(
             old_precomputed_view, initial_precomputed_view, i, U_i);
 
-        std::array<flux_contribution_type, stages> flux_iHs;
+        Kokkos::Array<flux_contribution_type, stages> flux_iHs;
         [[maybe_unused]] state_type S_iH;
 
         for (int s = 0; s < stages; ++s) {
-          const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
-          const auto U_s_view = U_s.view();
-          const auto prec_s_view = prec_s.view();
-
-          const auto U_iHs = U_s_view.template read_tensor<T>(i);
+          const auto U_iHs = stage_U_view[s].template read_tensor<T>(i);
           flux_iHs[s] = view.flux_contribution(
-              prec_s_view, initial_precomputed_view, i, U_iHs);
+              stage_precomputed_view[s], initial_precomputed_view, i, U_iHs);
 
           if constexpr (View::have_source_terms) {
-            S_iH += stage_weights[s] *
-                    view.nodal_source(prec_s_view, i, U_iHs, tau);
+            S_iH += stage_weight[s] *
+                    view.nodal_source(stage_precomputed_view[s], i, U_iHs, tau);
           }
         }
 
@@ -757,9 +954,11 @@ namespace ryujin
 
           const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
           constexpr auto eps = std::numeric_limits<Number>::epsilon();
+
           const auto scale =
-              dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                   std::abs(d_ij), T(eps * eps), T(0.), T(1.) / d_ij);
+
           const auto scaled_c_ij = c_ij * scale;
 
           const auto flux_j = view.flux_contribution(
@@ -835,30 +1034,27 @@ namespace ryujin
           }
 
           for (int s = 0; s < stages; ++s) {
-            const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
-            const auto U_s_view = U_s.view();
-            const auto prec_s_view = prec_s.view();
-
-            const auto U_jHs = U_s_view.template read_tensor<T>(js);
+            const auto U_jHs = stage_U_view[s].template read_tensor<T>(js);
             const auto flux_jHs = view.flux_contribution(
-                prec_s_view, initial_precomputed_view, js, U_jHs);
+                stage_precomputed_view[s], initial_precomputed_view, js, U_jHs);
 
             if constexpr (View::have_high_order_flux) {
               const auto high_order_flux_ij =
                   view.high_order_flux_divergence(flux_iHs[s], flux_jHs, c_ij);
-              F_iH += stage_weights[s] * high_order_flux_ij;
-              P_ij += stage_weights[s] * high_order_flux_ij;
+              F_iH += stage_weight[s] * high_order_flux_ij;
+              P_ij += stage_weight[s] * high_order_flux_ij;
             } else {
               const auto flux_ij =
                   view.flux_divergence(flux_iHs[s], flux_jHs, c_ij);
-              F_iH += stage_weights[s] * flux_ij;
-              P_ij += stage_weights[s] * flux_ij;
+              F_iH += stage_weight[s] * flux_ij;
+              P_ij += stage_weight[s] * flux_ij;
             }
 
             if constexpr (View::have_source_terms) {
-              const auto S_js = view.nodal_source(prec_s_view, js, U_jHs, tau);
-              F_iH += stage_weights[s] * m_ij * S_js;
-              P_ij += stage_weights[s] * m_ij * S_js;
+              const auto S_js =
+                  view.nodal_source(stage_precomputed_view[s], js, U_jHs, tau);
+              F_iH += stage_weight[s] * m_ij * S_js;
+              P_ij += stage_weight[s] * m_ij * S_js;
             }
           }
 
@@ -867,7 +1063,7 @@ namespace ryujin
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
         if (!view.is_admissible(U_i_new)) {
-          restart_needed = true;
+          Kokkos::atomic_store(restart_needed_view, 1);
         }
 #endif
 
@@ -885,16 +1081,16 @@ namespace ryujin
        * (constexpr) integral constant later on to avoid branching when
        * computing d_ijH.
        */
-      if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        cpu_simd_loop<Number>(
+      if (have_discontinuous_ansatz) {
+        loop<MemorySpace, Number>(
             loop_name(), body, 0, n_internal, n_owned, std::true_type{});
       } else {
-        cpu_simd_loop<Number>(
+        loop<MemorySpace, Number>(
             loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
       r_view.update_ghost_values();
-      if (offline_data_->discretization().have_discontinuous_ansatz()) {
+      if (have_discontinuous_ansatz) {
         /*
          * In case we extend bounds over the stencil, we have to ensure
          * that ghost ranges are properly communicated over all MPI
@@ -913,22 +1109,21 @@ namespace ryujin
     if (n_limiter_iterations != 0) {
       Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
 
-      auto body = [&](auto sentinel,
-                      auto have_discontinuous_ansatz,
-                      const unsigned int i) {
+      const auto body = [=](auto sentinel,
+                            auto have_discontinuous_ansatz,
+                            const unsigned int i) {
         using T = decltype(sentinel);
-        using View = typename HyperbolicSystem::template View<dim, T>;
 
-        constexpr unsigned int stride_size = get_stride_size<T>;
+        const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
 
-        auto limiter_view = limiter_.template view<dim, T>();
+        auto limiter_view = limiter_views.template view<T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
           return;
 
-        auto bounds =
+        auto local_bounds =
             bounds_view.template read_tensor<T, std::array<T, n_bounds>>(i);
 
         /*
@@ -941,12 +1136,12 @@ namespace ryujin
           const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
           for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
-            bounds = limiter_view.combine_bounds(
-                bounds,
+            local_bounds = limiter_view.combine_bounds(
+                local_bounds,
                 bounds_view.template read_tensor<T, std::array<T, n_bounds>>(
                     js));
           }
-          bounds_view.template write_tensor<T>(bounds, i);
+          bounds_view.template write_tensor<T>(local_bounds, i);
         }
 
         [[maybe_unused]] T m_i;
@@ -1009,20 +1204,19 @@ namespace ryujin
            */
 
           const auto &[l_ij, success] =
-              limiter_view.limit(bounds, U_i_new, P_ij);
+              limiter_view.limit(local_bounds, U_i_new, P_ij);
           lij_matrix_view.template write_entry<T>(l_ij, i, col_idx, true);
 
           /*
            * If the success is set to false then the low-order update
            * resulted in a state outside of the limiter bounds. This can
            * happen if we compute with an aggressive CFL number. We
-           * signal this condition by setting the restart_needed boolean
-           * to true and defer further action to the chosen
-           * IDViolationStrategy and the policy set in the
-           * TimeIntegrator.
+           * signal this condition by setting the restart_needed flag and
+           * defer further action to the chosen IDViolationStrategy and the
+           * policy set in the TimeIntegrator.
            */
           if (!success)
-            restart_needed = true;
+            Kokkos::atomic_store(restart_needed_view, 1);
         }
       };
 
@@ -1032,11 +1226,11 @@ namespace ryujin
        * (constexpr) integral constant later on to avoid branching when
        * computing d_ijH.
        */
-      if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        cpu_simd_loop<Number>(
+      if (have_discontinuous_ansatz) {
+        loop<MemorySpace, Number>(
             loop_name(), body, 0, n_internal, n_owned, std::true_type{});
       } else {
-        cpu_simd_loop<Number>(
+        loop<MemorySpace, Number>(
             loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
@@ -1065,11 +1259,10 @@ namespace ryujin
                                 ? lij_matrix_next_view
                                 : lij_matrix_view;
 
-      auto body = [&](auto sentinel, const unsigned int i) {
+      const auto body = [=](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
-        using View = typename HyperbolicSystem::template View<dim, T>;
 
-        auto limiter_view = limiter_.template view<dim, T>();
+        auto limiter_view = limiter_views.template view<T>();
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd_view.row_length(i);
@@ -1079,9 +1272,6 @@ namespace ryujin
         auto U_i_new = new_U_view.template read_tensor<T>(i);
 
         const Number lambda = Number(1.) / Number(row_length - 1);
-
-        /* Stored thread locally: */
-        boost::container::small_vector<T, 54> lij_row(row_length);
 
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
@@ -1093,15 +1283,12 @@ namespace ryujin
           const auto p_ij = pij_matrix_view.template read_tensor<T>(i, col_idx);
 
           U_i_new += l_ij * lambda * p_ij;
-
-          if (!last_round)
-            lij_row[col_idx] = l_ij;
         }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
-        const auto view = hyperbolic_system_->template view<dim, T>();
+        const auto view = hyperbolic_system_views.template view<T>();
         if (!view.is_admissible(U_i_new)) {
-          restart_needed = true;
+          Kokkos::atomic_store(restart_needed_view, 1);
         }
 #endif
 
@@ -1111,19 +1298,21 @@ namespace ryujin
         if (last_round)
           return;
 
-        const auto bounds =
+        const auto local_bounds =
             bounds_view.template read_tensor<T, std::array<T, n_bounds>>(i);
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
-          const auto old_l_ij = lij_row[col_idx];
+          const auto old_l_ij =
+              std::min(lij_view.template read_entry<T>(i, col_idx),
+                       lij_view.template read_transposed_entry<T>(i, col_idx));
 
           const auto new_p_ij =
               (T(1.) - old_l_ij) *
               pij_matrix_view.template read_tensor<T>(i, col_idx);
 
           const auto &[new_l_ij, success] =
-              limiter_view.limit(bounds, U_i_new, new_p_ij);
+              limiter_view.limit(local_bounds, U_i_new, new_p_ij);
 
           /*
            * This is the second pass of the limiter. Under rare
@@ -1137,7 +1326,7 @@ namespace ryujin
            */
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
           if (!success)
-            restart_needed = true;
+            Kokkos::atomic_store(restart_needed_view, 1);
 #endif
 
           /*
@@ -1151,7 +1340,7 @@ namespace ryujin
         }
       };
 
-      cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
+      loop<MemorySpace, Number>(loop_name(), body, 0, n_internal, n_owned);
 
       if (!last_round) {
         lij_matrix_next_view.update_ghost_rows();
@@ -1176,15 +1365,18 @@ namespace ryujin
       /*
        * Synchronize whether we have to restart the time step. Even though
        * the restart condition itself only affects the local ensemble we
-       * nevertheless need to synchronize the boolean in case we perform
+       * nevertheless need to synchronize the flag in case we perform
        * synchronized global time steps. (Otherwise different ensembles
        * might end up with a different time step.)
+       *
+       * The host view reads the flag back from the selected memory space.
        */
-      restart_needed.store(Utilities::MPI::logical_or(
-          restart_needed.load(), mpi_ensemble_.synchronization_communicator()));
+      int &restart_flag = *restart_needed.view();
+      restart_flag = Utilities::MPI::logical_or(
+          restart_flag != 0, mpi_ensemble_.synchronization_communicator());
     }
 
-    if (restart_needed) {
+    if (*restart_needed.view()) {
       switch (id_violation_strategy_) {
       case IDViolationStrategy::warn:
         n_warnings_++;
