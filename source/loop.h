@@ -416,4 +416,85 @@ namespace ryujin
                                          std::forward<Args>(args)...);
     }
   }
+
+
+  /**
+   * A small helper class that stores a scalar and a vectorized view of an
+   * equation object @p object (such as the hyperbolic system, the
+   * indicator, the limiter, or the wave speed estimator) and hands out the
+   * appropriate one depending on the number type @p T that the loop body
+   * operates on.
+   *
+   * This is meant to be used in conjunction with loop(): the loop body
+   * receives a "sentinel" of the number type it operates on and simply
+   * queries the matching view:
+   * ```
+   * const auto views = make_select_view<dim, Number, MemorySpace>(object);
+   *
+   * const auto body = [=](auto sentinel, unsigned int i) {
+   *   using T = decltype(sentinel);
+   *   const auto view = views.template view<T>();
+   *   // ...
+   * };
+   * ```
+   *
+   * @note This class is meant to be captured by value in computation loops
+   * with access to either the host or device memory space. Both views are
+   * created on the host in the constructor, the view() access operator is
+   * host and device callable.
+   *
+   * @ingroup GPU
+   */
+  template <int dim, typename Number, typename MemorySpace, typename Object>
+  class SelectView
+  {
+  private:
+    /* Do not instantiate VectorizedArray for device code */
+    using SimdNumber = std::conditional_t<
+        std::is_same_v<MemorySpace, dealii::MemorySpace::Host>,
+        dealii::VectorizedArray<Number>,
+        Number>;
+
+    using ScalarView = decltype(std::declval<const Object &>()
+                                    .template view<dim, Number, MemorySpace>());
+    using SimdView =
+        decltype(std::declval<const Object &>()
+                     .template view<dim, SimdNumber, MemorySpace>());
+
+  public:
+    SelectView(const Object &object)
+        : scalar_view_(object.template view<dim, Number, MemorySpace>())
+        , simd_view_(object.template view<dim, SimdNumber, MemorySpace>())
+    {
+    }
+
+    /**
+     * Return the scalar view if @p T is a scalar number type, and the
+     * vectorized view if @p T is a VectorizedArray.
+     */
+    template <typename T>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE const auto &view() const
+    {
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>)
+        return scalar_view_;
+      else
+        return simd_view_;
+    }
+
+  private:
+    ScalarView scalar_view_;
+    SimdView simd_view_;
+  };
+
+
+  /**
+   * Create a SelectView object, see the documentation of SelectView.
+   *
+   * @ingroup GPU
+   */
+  template <int dim, typename Number, typename MemorySpace, typename Object>
+  auto make_select_view(const Object &object)
+  {
+    return SelectView<dim, Number, MemorySpace, Object>(object);
+  }
 } // namespace ryujin
