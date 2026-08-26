@@ -124,7 +124,9 @@ namespace ryujin
        * vector. The precomputed part has to be synchronized by explicitly
        * calling the update ghost values function.
        */
-      template <int dim, typename ScalarNumber>
+      template <typename MemorySpace = dealii::MemorySpace::Host,
+                int dim,
+                typename ScalarNumber>
       void fill_precomputed_values(
           const OfflineData<dim, ScalarNumber> &offline_data,
           typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
@@ -812,7 +814,7 @@ namespace ryujin
     }
 
 
-    template <int dim, typename ScalarNumber>
+    template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
         typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
@@ -821,30 +823,38 @@ namespace ryujin
     {
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
+
       const auto sparsity_simd_view =
-          offline_data.sparsity_pattern_simd().view();
-      using VA = dealii::VectorizedArray<ScalarNumber>;
+          offline_data.sparsity_pattern_simd().template view<MemorySpace>();
 
-      const auto U_view = std::get<0>(state_vector).view();
-      const auto precomputed_view = std::get<1>(state_vector).view();
+      /* We only read the hyperbolic state vector: */
+      const auto U_view =
+          std::get<0>(std::as_const(state_vector)).template view<MemorySpace>();
+      const auto precomputed_view =
+          std::get<1>(state_vector).template view<MemorySpace>();
 
-      const auto body = [&](auto sentinel, unsigned int i) {
+      const auto hyperbolic_system_views =
+          make_select_view<dim, ScalarNumber, MemorySpace>(*this);
+
+      const auto body = [=](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        using View = HyperbolicSystemView<dim, T>;
+        using View = HyperbolicSystemView<dim, T, MemorySpace>;
         using precomputed_type = typename View::precomputed_type;
 
         const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (skip_constrained_dofs && row_length == 1)
           return;
 
+        const auto view = hyperbolic_system_views.template view<T>();
+
         const auto U_i = U_view.template read_tensor<T>(i);
-        const auto view = this->view<dim, T>();
         const precomputed_type prec_i{view.specific_entropy(U_i),
                                       view.harten_entropy(U_i)};
         precomputed_view.template write_tensor<T>(prec_i, i);
       };
 
-      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
+      loop<MemorySpace, ScalarNumber>(
+          "time_step_1", body, 0, n_internal, n_owned);
     }
 
 
