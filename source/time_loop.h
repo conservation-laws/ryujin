@@ -180,9 +180,9 @@ namespace ryujin
     void adapt_mesh_and_transfer_state_vector(
         StateVector &state_vector, const Callable &prepare_compute_kernels);
 
-    void compute_error(StateVector &state_vector, Number t);
+    void compute_error(const StateVector &state_vector, Number t);
 
-    void output(StateVector &state_vector,
+    void output(const StateVector &state_vector,
                 const std::string &name,
                 const Number t,
                 const unsigned int cycle);
