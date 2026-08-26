@@ -51,6 +51,23 @@ namespace ryujin
   {
   public:
     /**
+     * @name Types
+     */
+    //@{
+
+    /**
+     * A structure describing a single matrix entry (given by a row index
+     * and an index for the column within that row) that has to be sent to
+     * a neighboring MPI rank during an update_ghost_rows(), or compress()
+     * operation.
+     */
+    struct ExchangeDescription {
+      unsigned int row;
+      unsigned int column_index;
+    };
+
+    //@}
+    /**
      * @name Constructor and initialization
      */
     //@{
@@ -102,9 +119,11 @@ namespace ryujin
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner);
 
     /**
-     * Array listing all (locally owned) entries as a pair {row,
-     * column_index}, potentially duplicated, and arranged
-     * consecutively by send targets.
+     * An array of ExchangeDescription structures listing all (locally
+     * owned) entries, potentially duplicated, and arranged consecutively
+     * by send targets. The function returns a reference to a Mirrored
+     * object holding {row, column_index} pairs that can be accessed on
+     * both memory spaces.
      */
     ACCESSOR_READ_ONLY(entries_to_be_sent);
 
@@ -140,12 +159,6 @@ namespace ryujin
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 
-    /*
-     * Note: The storage is marked mutable so that the (logically const)
-     * copy_to_memory_space() operation can populate a mirror from within
-     * a const view() under the implicit_transfers policy.
-     */
-
     using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
     mutable Kokkos::View<unsigned int *, KokkosHost> row_starts_host_;
     mutable Kokkos::View<unsigned int *, KokkosHost> column_indices_host_;
@@ -157,7 +170,9 @@ namespace ryujin
     mutable Kokkos::View<unsigned int *, KokkosDefault>
         indices_transposed_default_;
 
-    std::vector<std::pair<unsigned int, unsigned int>> entries_to_be_sent_;
+    Mirrored<ExchangeDescription *> entries_to_be_sent_{
+        "sparsity_pattern_entries_to_be_sent"};
+
     std::vector<std::pair<unsigned int, unsigned int>> send_targets_;
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets_;
 
