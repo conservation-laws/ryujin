@@ -1040,6 +1040,36 @@ namespace ryujin
       boundary_map_ = construct_boundary_map(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
+      /*
+       * Compact the degrees of freedom stored in the boundary map into a
+       * strictly increasing index list (that is mirrored into the default
+       * memory space) and record for every entry of the boundary map the
+       * position of its degree of freedom in that index list. Note that the
+       * boundary map can contain more than one entry for the same degree of
+       * freedom.
+       */
+
+      std::vector<unsigned int> boundary_indices;
+      std::map<unsigned int, unsigned int> position_of_index;
+
+      boundary_slots_.clear();
+      boundary_slots_.reserve(boundary_map_.size());
+
+      for (const auto &entry : boundary_map_) {
+        const auto index = std::get<0>(entry);
+        const auto [it, inserted] =
+            position_of_index.try_emplace(index, boundary_indices.size());
+        if (inserted)
+          boundary_indices.push_back(index);
+        boundary_slots_.push_back(it->second);
+      }
+
+      boundary_indices_.reinit(boundary_indices.size(),
+                               TransferPolicy::implicit_transfers);
+      std::copy(boundary_indices.begin(),
+                boundary_indices.end(),
+                boundary_indices_.view());
+
       const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
