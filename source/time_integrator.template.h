@@ -17,8 +17,13 @@ namespace ryujin
   void
   sadd(StateVector &dst, const Number s, const Number b, const StateVector &src)
   {
-    const auto dst_U_view = std::get<0>(dst).view();
-    const auto src_U_view = std::get<0>(std::as_const(src)).view();
+    /* Perform sadd() on the default memory space: */
+
+    using MemorySpace = dealii::MemorySpace::Default;
+
+    const auto dst_U_view = std::get<0>(dst).template view<MemorySpace>();
+    const auto src_U_view =
+        std::get<0>(std::as_const(src)).template view<MemorySpace>();
     dst_U_view.zero_out_ghost_values();
     dst_U_view.sadd(s, b, src_U_view);
 
