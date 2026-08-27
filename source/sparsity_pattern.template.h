@@ -15,15 +15,15 @@
 
 namespace ryujin
 {
-  template <int simd_length>
-  SparsityPattern<simd_length>::SparsityPattern()
+  template <int warp_size>
+  SparsityPattern<warp_size>::SparsityPattern()
       : n_internal_dofs_(0)
   {
   }
 
 
-  template <int simd_length>
-  SparsityPattern<simd_length>::SparsityPattern(
+  template <int warp_size>
+  SparsityPattern<warp_size>::SparsityPattern(
       const unsigned int n_internal_dofs,
       const dealii::DynamicSparsityPattern &sparsity,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
@@ -39,8 +39,8 @@ namespace ryujin
   }
 
 
-  template <int simd_length>
-  void SparsityPattern<simd_length>::reinit(
+  template <int warp_size>
+  void SparsityPattern<warp_size>::reinit(
       const unsigned int n_internal_dofs,
       const dealii::DynamicSparsityPattern &dsp,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
@@ -84,7 +84,7 @@ namespace ryujin
     sparsity.copy_from(dsp_local);
 
     Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
-    Assert(n_internal_dofs % simd_length == 0, dealii::ExcInternalError());
+    Assert(n_internal_dofs % warp_size == 0, dealii::ExcInternalError());
     Assert(n_internal_dofs <= n_locally_owned_dofs_,
            dealii::ExcInternalError());
     Assert(n_locally_owned_dofs_ <= sparsity.n_rows(),
@@ -120,12 +120,12 @@ namespace ryujin
     unsigned int *col_ptr = column_indices_host_.data();
     unsigned int *transposed_ptr = indices_transposed_host_.data();
 
-    for (unsigned int i = 0; i < n_internal_dofs; i += simd_length) {
-      auto jts = generate_iterators<simd_length>(
+    for (unsigned int i = 0; i < n_internal_dofs; i += warp_size) {
+      auto jts = generate_iterators<warp_size>(
           [&](auto k) { return sparsity.begin(i + k); });
 
       for (; jts[0] != sparsity.end(i); increment_iterators(jts))
-        for (unsigned int k = 0; k < simd_length; ++k) {
+        for (unsigned int k = 0; k < warp_size; ++k) {
           const unsigned int column = jts[k]->column();
           *col_ptr++ = column;
           const std::size_t position = sparsity(column, i + k);
@@ -133,22 +133,22 @@ namespace ryujin
             const unsigned int my_row_length = sparsity.row_length(column);
             const std::size_t position_diag = sparsity(column, column);
             const std::size_t pos_within_row = position - position_diag;
-            const unsigned int simd_offset = column % simd_length;
-            *transposed_ptr++ = position - simd_offset * my_row_length -
-                                pos_within_row + simd_offset +
-                                pos_within_row * simd_length;
+            const unsigned int lane = column % warp_size;
+            *transposed_ptr++ = position - lane * my_row_length -
+                                pos_within_row + lane +
+                                pos_within_row * warp_size;
           } else
             *transposed_ptr++ = position;
         }
 
-      row_starts_host_[i / simd_length + 1] =
+      row_starts_host_[i / warp_size + 1] =
           col_ptr - column_indices_host_.data();
     }
 
     /* Rest: */
 
     row_starts_host_[n_internal_dofs] =
-        row_starts_host_[n_internal_dofs / simd_length];
+        row_starts_host_[n_internal_dofs / warp_size];
 
     for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i) {
       for (auto j = sparsity.begin(i); j != sparsity.end(i); ++j) {
@@ -159,10 +159,9 @@ namespace ryujin
           const unsigned int my_row_length = sparsity.row_length(column);
           const std::size_t position_diag = sparsity(column, column);
           const std::size_t pos_within_row = position - position_diag;
-          const unsigned int simd_offset = column % simd_length;
-          *transposed_ptr++ = position - simd_offset * my_row_length -
-                              pos_within_row + simd_offset +
-                              pos_within_row * simd_length;
+          const unsigned int lane = column % warp_size;
+          *transposed_ptr++ = position - lane * my_row_length - pos_within_row +
+                              lane + pos_within_row * warp_size;
         } else
           *transposed_ptr++ = position;
       }
