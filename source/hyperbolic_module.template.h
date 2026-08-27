@@ -1158,12 +1158,23 @@ namespace ryujin
         const auto lambda_inv = Number(row_length - 1);
         const auto factor = tau * m_i_inv * lambda_inv;
 
+        /*
+         * Note: We "software-pipeline" the read access into the p_ij
+         * matrix by one column index. This ensures that the P_ij entry of
+         * the next column index is loaded *before* we store the updated
+         * entry for the current column index. Otherwise we run into
+         * aliasing issues that force the (cuda) compiler to serialize the
+         * final store of P_ij and the read of the next entry.
+         */
+        auto P_ij = pij_matrix_view.template read_tensor<T>(i, 1);
+
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
-          auto P_ij = pij_matrix_view.template read_tensor<T>(i, col_idx);
+          const auto P_ij_next = pij_matrix_view.template read_tensor<T>(
+              i, col_idx + 1 < row_length ? col_idx + 1 : col_idx);
           const auto F_jH = r_view.template read_tensor<T>(js);
 
           /*
@@ -1217,6 +1228,8 @@ namespace ryujin
            */
           if (!success)
             Kokkos::atomic_store(restart_needed_view, 1);
+
+          P_ij = P_ij_next;
         }
       };
 
