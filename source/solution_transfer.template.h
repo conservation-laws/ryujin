@@ -96,6 +96,14 @@ namespace ryujin
             "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
 
 #else
+
+    /* Ensure that the state vector is resident on the host memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      const auto &[U, precomputed, parabolic] = old_state_vector;
+      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
+      precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
+    }
+
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
 
@@ -406,6 +414,13 @@ namespace ryujin
             "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
 
 #else
+
+    /* Ensure that the state vector is resident on the host memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      auto &[U, precomputed, parabolic] = new_state_vector;
+      U.template move_to_memory_space<dealii::MemorySpace::Host>();
+      precomputed.template move_to_memory_space<dealii::MemorySpace::Host>();
+    }
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */

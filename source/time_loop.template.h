@@ -725,6 +725,12 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
+    /* Ensure that the state vector is resident on the host memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      const auto &[U, precomputed, parabolic] = state_vector;
+      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
+    }
+
     Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
 

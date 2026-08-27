@@ -81,7 +81,14 @@ namespace ryujin
         const OfflineData &offline_data [[maybe_unused]])
     {
 #ifdef DEBUG
+
       auto &[U, prec, V] = state_vector;
+
+      /* Ensure that the state vector is resident on the host memory space. */
+      if constexpr (have_separate_memory_spaces) {
+        U.template move_to_memory_space<dealii::MemorySpace::Host>();
+        prec.template move_to_memory_space<dealii::MemorySpace::Host>();
+      }
 
       constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
 
