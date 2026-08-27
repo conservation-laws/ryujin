@@ -718,9 +718,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::compute_error(StateVector &state_vector,
-                                                    const Number t)
+  void TimeLoop<Description, dim, Number>::compute_error(
+      const StateVector &state_vector, const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
@@ -883,10 +882,11 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::output(StateVector &state_vector,
-                                                  const std::string &name,
-                                                  const Number t,
-                                                  const unsigned int cycle)
+  void
+  TimeLoop<Description, dim, Number>::output(const StateVector &state_vector,
+                                             const std::string &name,
+                                             const Number t,
+                                             const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;

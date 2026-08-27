@@ -13,6 +13,7 @@
 #include <deal.II/base/memory_space.h>
 #include <deal.II/base/parallel.h>
 
+#include <mutex>
 #include <string>
 #include <type_traits>
 
@@ -214,5 +215,286 @@ namespace ryujin
                              right,
                              std::forward<Args>(args)...);
     }
+  }
+
+
+  /*
+   * A thread-parallelized reduction loop running on the CPU. The loop
+   * traverses the index range [left, right) and reduces the contributions
+   * of the loop body with the supplied Kokkos @p Reducer (such as
+   * Kokkos::Min, Kokkos::Max, or Kokkos::Sum) into a single value that is
+   * returned.
+   *
+   * @note In contrast to cpu_simd_loop() the loop is not SIMD vectorized:
+   * the loop body is always called with a scalar sentinel type.
+   *
+   * @note Here, @p body is a functor that must accept a "sentinel" type as
+   * first argument, the current index i, and a reference to a thread-local
+   * accumulator as last arguments. Additional `args` may be specified in
+   * the cpu_reduction_loop() invocation that will be forwarded to the loop
+   * body:
+   * `body(ValueType(), std::forward<Args>(args)..., i, local_result);`
+   */
+  template <typename Reducer, typename Functor, typename... Args>
+  inline typename Reducer::value_type
+  cpu_reduction_loop(const std::string &region_name [[maybe_unused]],
+                     const Functor &body,
+                     const typename Reducer::value_type initial_value,
+                     const unsigned int left,
+                     const unsigned int right,
+                     Args &&...args)
+  {
+    Assert(
+        left <= right,
+        dealii::ExcMessage("Invalid index range: it must hold left <= right"));
+
+    using ValueType = typename Reducer::value_type;
+
+    ValueType result = initial_value;
+
+#if defined(WITH_OPENMP)
+    /* Variant using OpenMP: */
+
+    RYUJIN_PRAGMA(omp parallel default(shared))
+    {
+      ValueType local_result;
+      Reducer(local_result).init(local_result);
+
+      RYUJIN_PRAGMA(omp for nowait)
+      for (unsigned int i = left; i < right; ++i)
+        body(ValueType(), std::forward<Args>(args)..., i, local_result);
+
+      RYUJIN_PRAGMA(omp critical)
+      Reducer(result).join(result, local_result);
+    }
+
+#elif defined(WITH_DEAL_II_THREADS)
+    /* Variant using dealii's parallel for: */
+    {
+      std::mutex mutex;
+
+      dealii::parallel::apply_to_subranges(
+          left,
+          right,
+          [&](const unsigned int begin, const unsigned int end) {
+            ValueType local_result; /* per thread */
+            Reducer(local_result).init(local_result);
+
+            for (unsigned int i = begin; i < end; ++i)
+              body(ValueType(), std::forward<Args>(args)..., i, local_result);
+
+            std::lock_guard<std::mutex> lock(mutex);
+            Reducer(result).join(result, local_result);
+          },
+          1000);
+    }
+
+#else
+    /* Execute loop in serial: */
+    {
+      for (unsigned int i = left; i < right; ++i)
+        body(ValueType(), std::forward<Args>(args)..., i, result);
+    }
+#endif
+
+    return result;
+  }
+
+
+  /*
+   * A reduction loop running on the device (i.e., in the default memory
+   * space). The loop traverses the index range [left, right) with a
+   * Kokkos::parallel_reduce using a range policy and the supplied Kokkos
+   * @p Reducer (such as Kokkos::Min, Kokkos::Max, or Kokkos::Sum).
+   *
+   * @note Here, @p body is a functor that must accept a "sentinel" type as
+   * first argument, the current index i, and a reference to a thread-local
+   * accumulator as last arguments. Additional `args` may be specified in
+   * the gpu_reduction_loop() invocation that will be forwarded to the loop
+   * body:
+   * `body(ValueType(), args..., i, local_result);`
+   *
+   * @note The loop body (and everything it references) has to be callable
+   * on the device, see the discussion in gpu_loop().
+   *
+   * @note Kokkos::parallel_reduce() fences the execution space before
+   * returning. The function thus has the same (synchronous) semantics as
+   * cpu_reduction_loop().
+   */
+  template <typename Reducer, typename Functor, typename... Args>
+  inline typename Reducer::value_type
+  gpu_reduction_loop(const std::string &region_name,
+                     const Functor &body,
+                     const typename Reducer::value_type initial_value,
+                     const unsigned int left,
+                     const unsigned int right,
+                     Args &&...args)
+  {
+    Assert(
+        left <= right,
+        dealii::ExcMessage("Invalid index range: it must hold left <= right"));
+
+    using ValueType = typename Reducer::value_type;
+    using MemorySpace = dealii::MemorySpace::Default;
+    using ExecutionSpace = typename MemorySpace::kokkos_space::execution_space;
+    using Policy =
+        Kokkos::RangePolicy<ExecutionSpace, Kokkos::IndexType<unsigned int>>;
+
+    const auto exec = ExecutionSpace{};
+
+    ValueType result;
+
+    Kokkos::parallel_reduce(
+        region_name,
+        Policy(exec, left, right),
+        KOKKOS_LAMBDA(const unsigned int i, ValueType &local_result) {
+          body(ValueType(), args..., i, local_result);
+        },
+        Reducer(result));
+
+    ValueType combined = initial_value;
+    Reducer(combined).join(combined, result);
+    return combined;
+  }
+
+
+  /*
+   * A reduction loop running either on the CPU, or on the device depending
+   * on the selected memory space: For dealii::MemorySpace::Host the loop is
+   * dispatched to cpu_reduction_loop(), and for dealii::MemorySpace::Default to
+   * gpu_reduction_loop().
+   *
+   * The operation is selected with a @p Reducer (such as Kokkos::Min,
+   * Kokkos::Max, or Kokkos::Sum) whose value_type also determines the
+   * number type that the loop body accumulates into:
+   * ```
+   * const auto body = [=](auto, unsigned int i, Number &result) {
+   *   // ...
+   *   result = std::min(result, local_contribution);
+   * };
+   *
+   * value = reduction_loop<MemorySpace, Kokkos::Min<Number>>(
+   *     "loop name", body, value, 0, n_owned);
+   * ```
+   *
+   * @note Here, @p body is a functor that must accept a "sentinel" type as
+   * first argument, the current index i, and a reference to a thread-local
+   * accumulator as last argument. Additional `args` may be specified in
+   * the reduction_loop() invocation that will be forwarded to the loop body.
+   */
+  template <typename MemorySpace,
+            typename Reducer,
+            typename Functor,
+            typename... Args>
+  inline typename Reducer::value_type
+  reduction_loop(const std::string &region_name,
+                 const Functor &body,
+                 const typename Reducer::value_type initial_value,
+                 const unsigned int left,
+                 const unsigned int right,
+                 Args &&...args)
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected memory space");
+
+    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
+      return cpu_reduction_loop<Reducer>(region_name,
+                                         body,
+                                         initial_value,
+                                         left,
+                                         right,
+                                         std::forward<Args>(args)...);
+    } else {
+      return gpu_reduction_loop<Reducer>(region_name,
+                                         body,
+                                         initial_value,
+                                         left,
+                                         right,
+                                         std::forward<Args>(args)...);
+    }
+  }
+
+
+  /**
+   * A small helper class that stores a scalar and a vectorized view of an
+   * equation object @p object (such as the hyperbolic system, the
+   * indicator, the limiter, or the wave speed estimator) and hands out the
+   * appropriate one depending on the number type @p T that the loop body
+   * operates on.
+   *
+   * This is meant to be used in conjunction with loop(): the loop body
+   * receives a "sentinel" of the number type it operates on and simply
+   * queries the matching view:
+   * ```
+   * const auto views = make_select_view<dim, Number, MemorySpace>(object);
+   *
+   * const auto body = [=](auto sentinel, unsigned int i) {
+   *   using T = decltype(sentinel);
+   *   const auto view = views.template view<T>();
+   *   // ...
+   * };
+   * ```
+   *
+   * @note This class is meant to be captured by value in computation loops
+   * with access to either the host or device memory space. Both views are
+   * created on the host in the constructor, the view() access operator is
+   * host and device callable.
+   *
+   * @ingroup GPU
+   */
+  template <int dim, typename Number, typename MemorySpace, typename Object>
+  class SelectView
+  {
+  private:
+    /* Do not instantiate VectorizedArray for device code */
+    using SimdNumber = std::conditional_t<
+        std::is_same_v<MemorySpace, dealii::MemorySpace::Host>,
+        dealii::VectorizedArray<Number>,
+        Number>;
+
+    using ScalarView = decltype(std::declval<const Object &>()
+                                    .template view<dim, Number, MemorySpace>());
+    using SimdView =
+        decltype(std::declval<const Object &>()
+                     .template view<dim, SimdNumber, MemorySpace>());
+
+  public:
+    SelectView(const Object &object)
+        : scalar_view_(object.template view<dim, Number, MemorySpace>())
+        , simd_view_(object.template view<dim, SimdNumber, MemorySpace>())
+    {
+    }
+
+    /**
+     * Return the scalar view if @p T is a scalar number type, and the
+     * vectorized view if @p T is a VectorizedArray.
+     */
+    template <typename T>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE const auto &view() const
+    {
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>)
+        return scalar_view_;
+      else
+        return simd_view_;
+    }
+
+  private:
+    ScalarView scalar_view_;
+    SimdView simd_view_;
+  };
+
+
+  /**
+   * Create a SelectView object, see the documentation of SelectView.
+   *
+   * @ingroup GPU
+   */
+  template <int dim, typename Number, typename MemorySpace, typename Object>
+  auto make_select_view(const Object &object)
+  {
+    return SelectView<dim, Number, MemorySpace, Object>(object);
   }
 } // namespace ryujin
