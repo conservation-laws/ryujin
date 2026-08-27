@@ -455,16 +455,29 @@ namespace ryujin
         dealii::VectorizedArray<Number>,
         Number>;
 
-    using ScalarView = decltype(std::declval<const Object &>()
-                                    .template view<dim, Number, MemorySpace>());
+    /*
+     * FIXME: a little dance around calling the templated view<...>()
+     * operator in the equation classes. We do this to support equations
+     * that have not yet been ported and do not support MemorySpace.
+     */
+    template <typename T>
+    static auto create_view(const Object &object)
+    {
+      if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
+        return object.template view<dim, T>();
+      else
+        return object.template view<dim, T, MemorySpace>();
+    }
+
+    using ScalarView =
+        decltype(create_view<Number>(std::declval<const Object &>()));
     using SimdView =
-        decltype(std::declval<const Object &>()
-                     .template view<dim, SimdNumber, MemorySpace>());
+        decltype(create_view<SimdNumber>(std::declval<const Object &>()));
 
   public:
     SelectView(const Object &object)
-        : scalar_view_(object.template view<dim, Number, MemorySpace>())
-        , simd_view_(object.template view<dim, SimdNumber, MemorySpace>())
+        : scalar_view_(create_view<Number>(object))
+        , simd_view_(create_view<SimdNumber>(object))
     {
     }
 

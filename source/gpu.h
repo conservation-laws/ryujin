@@ -47,6 +47,23 @@ namespace ryujin
 
 
   /**
+   * The selected memory space for the compute kernels.
+   *
+   * @note We switch between the compute memory spaces in this manner to
+   * have a clear toggle for selecting our custom SIMD-vectorized loops on
+   * the CPU (instead of relying on the fact that the default space will
+   * point to the host space if ryujin is configured without device
+   * support.
+   *
+   * @ingroup GPU
+   */
+  using selected_memory_space_t =
+      std::conditional_t<have_separate_memory_spaces,
+                         dealii::MemorySpace::Default,
+                         dealii::MemorySpace::Host>;
+
+
+  /**
    * A template alias that maps a given memory space to the respective
    * other one: dealii::MemorySpace::Host maps to
    * dealii::MemorySpace::Default and vice versa.

@@ -19,7 +19,7 @@ namespace ryujin
   {
     /* Perform sadd() on the default memory space: */
 
-    using MemorySpace = dealii::MemorySpace::Default;
+    using MemorySpace = selected_memory_space_t;
 
     const auto dst_U_view = std::get<0>(dst).template view<MemorySpace>();
     const auto src_U_view =

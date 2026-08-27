@@ -65,8 +65,6 @@ namespace ryujin
                 dealii::ExcMessage(
                     "The number of limiter iterations must be between [0,2]"));
 
-    using MemorySpace = dealii::MemorySpace::Default;
-
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
@@ -103,6 +101,8 @@ namespace ryujin
      */
 
     if constexpr (have_separate_memory_spaces) {
+      using MemorySpace = selected_memory_space_t;
+
       bounds_.template move_to_memory_space<MemorySpace>();
       r_.template move_to_memory_space<MemorySpace>();
 
@@ -184,7 +184,7 @@ namespace ryujin
 
     auto &[U, precomputed, parabolic] = state_vector;
 
-    using MemorySpace = dealii::MemorySpace::Default;
+    using MemorySpace = selected_memory_space_t;
 
     /* Ensure all vectors are resident on the correct memory space. */
     if constexpr (have_separate_memory_spaces) {
@@ -208,8 +208,11 @@ namespace ryujin
      * Compute and populate precomputed values.
      */
 
-    hyperbolic_system_->template fill_precomputed_values<MemorySpace>(
-        *offline_data_, state_vector);
+    if constexpr (have_separate_memory_spaces)
+      hyperbolic_system_->template fill_precomputed_values<MemorySpace>(
+          *offline_data_, state_vector);
+    else
+      hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
 
     precomputed.template view<MemorySpace>().update_ghost_values();
   }
@@ -378,7 +381,7 @@ namespace ryujin
     auto &[old_U, old_precomputed, old_parabolic] = old_state_vector;
     auto &new_U = std::get<0>(new_state_vector);
 
-    using MemorySpace = dealii::MemorySpace::Default;
+    using MemorySpace = selected_memory_space_t;
 
     /* Ensure all vectors are resident on the correct memory space. */
     if constexpr (have_separate_memory_spaces) {
@@ -833,14 +836,14 @@ namespace ryujin
                             auto have_discontinuous_ansatz,
                             const unsigned int i) {
         using T = decltype(sentinel);
-        using View =
-            typename HyperbolicSystem::template View<dim, T, MemorySpace>;
+
+        const auto view = hyperbolic_system_views.template view<T>();
+
+        using View = decltype(view);
         using flux_contribution_type = typename View::flux_contribution_type;
         using state_type = typename View::state_type;
 
         const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
-
-        const auto view = hyperbolic_system_views.template view<T>();
 
         auto limiter_view = limiter_views.template view<T>();
 
