@@ -103,7 +103,7 @@ namespace ryujin
     unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
                                       const MPI_Comm &mpi_communicator,
                                       const unsigned int n_locally_internal,
-                                      const std::size_t group_size)
+                                      const std::size_t warp_size)
     {
       using namespace dealii;
 
@@ -147,9 +147,9 @@ namespace ryujin
 
       Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
 
-      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
         bool export_index_present = false;
-        for (unsigned int j = 0; j < group_size; ++j) {
+        for (unsigned int j = 0; j < warp_size; ++j) {
           if (export_indices.is_element(i + j)) {
             export_index_present = true;
             break;
@@ -157,13 +157,12 @@ namespace ryujin
         }
 
         if (export_index_present) {
-          Assert(n_export_indices % group_size == 0,
-                 dealii::ExcInternalError());
-          for (unsigned int j = 0; j < group_size; ++j) {
+          Assert(n_export_indices % warp_size == 0, dealii::ExcInternalError());
+          for (unsigned int j = 0; j < warp_size; ++j) {
             new_order[i + j] = offset + n_export_indices++;
           }
         } else {
-          for (unsigned int j = 0; j < group_size; ++j)
+          for (unsigned int j = 0; j < warp_size; ++j)
             new_order[i + j] = dealii::numbers::invalid_dof_index;
         }
       }
@@ -184,9 +183,9 @@ namespace ryujin
        * Second pass: append the rest:
        */
 
-      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
         if (new_order[i] == dealii::numbers::invalid_dof_index) {
-          for (unsigned int j = 0; j < group_size; ++j) {
+          for (unsigned int j = 0; j < warp_size; ++j) {
             Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
                    dealii::ExcInternalError());
             new_order[i + j] = offset + running_index++;
@@ -204,7 +203,7 @@ namespace ryujin
 
       dof_handler.renumber_dofs(new_order);
 
-      Assert(n_export_indices % group_size == 0, dealii::ExcInternalError());
+      Assert(n_export_indices % warp_size == 0, dealii::ExcInternalError());
       Assert(n_export_indices <= n_locally_internal,
              dealii::ExcInternalError());
       return n_export_indices;
@@ -222,7 +221,7 @@ namespace ryujin
     inconsistent_strides_last(dealii::DoFHandler<dim> &dof_handler,
                               const dealii::DynamicSparsityPattern &sparsity,
                               const unsigned int n_locally_internal,
-                              const std::size_t group_size)
+                              const std::size_t warp_size)
     {
       using namespace dealii;
 
@@ -249,23 +248,23 @@ namespace ryujin
 
       Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
 
-      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
 
         bool stride_is_consistent = true;
-        const auto group_row_length = sparsity.row_length(offset + i);
-        for (unsigned int j = 0; j < group_size; ++j) {
-          if (group_row_length != sparsity.row_length(offset + i + j)) {
+        const auto warp_row_length = sparsity.row_length(offset + i);
+        for (unsigned int j = 0; j < warp_size; ++j) {
+          if (warp_row_length != sparsity.row_length(offset + i + j)) {
             stride_is_consistent = false;
             break;
           }
         }
 
         if (stride_is_consistent) {
-          for (unsigned int j = 0; j < group_size; ++j) {
+          for (unsigned int j = 0; j < warp_size; ++j) {
             new_order[i + j] = offset + n_consistent_range++;
           }
         } else {
-          for (unsigned int j = 0; j < group_size; ++j)
+          for (unsigned int j = 0; j < warp_size; ++j)
             new_order[i + j] = dealii::numbers::invalid_dof_index;
         }
       }
@@ -276,9 +275,9 @@ namespace ryujin
 
       unsigned int running_index = n_consistent_range;
 
-      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
         if (new_order[i] == dealii::numbers::invalid_dof_index) {
-          for (unsigned int j = 0; j < group_size; ++j) {
+          for (unsigned int j = 0; j < warp_size; ++j) {
             Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
                    dealii::ExcInternalError());
             new_order[i + j] = offset + running_index++;
@@ -296,7 +295,7 @@ namespace ryujin
 
       dof_handler.renumber_dofs(new_order);
 
-      Assert(n_consistent_range % group_size == 0, dealii::ExcInternalError());
+      Assert(n_consistent_range % warp_size == 0, dealii::ExcInternalError());
       Assert(n_consistent_range <= n_locally_internal,
              dealii::ExcInternalError());
       return n_consistent_range;
@@ -307,11 +306,12 @@ namespace ryujin
      * Reorder indices:
      *
      * In order to traverse over multiple rows of a (to be constructed)
-     * sparsity pattern simultaneously using SIMD instructions we reorder
-     * all locally owned degrees of freedom to ensure that a local index
-     * range \f$[0, \text{n_locally_internal_}) \subset [0,
+     * sparsity pattern simultaneously (using SIMD instructions, or a warp
+     * of threads on the device) we reorder all locally owned degrees of
+     * freedom to ensure that a local index range \f$[0,
+     * \text{n_locally_internal_}) \subset [0,
      * \text{n_locally_owned})\f$ is available that groups dofs with same
-     * stencil size in groups of multiples of @p group_size
+     * stencil size in "warps" of @p warp_size consecutive indices.
      *
      * Returns the right boundary n_internal of the internal index range.
      *
@@ -320,7 +320,7 @@ namespace ryujin
     template <int dim>
     unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler,
                                 const dealii::DynamicSparsityPattern &sparsity,
-                                const std::size_t group_size)
+                                const std::size_t warp_size)
     {
       using namespace dealii;
 
@@ -342,8 +342,8 @@ namespace ryujin
 
       /*
        * Sort degrees of freedom into a map grouped by stencil size. Write
-       * out dof indices into the new_order vector in groups of group_size
-       * and with same stencil size.
+       * out dof indices into the new_order vector in warps of warp_size
+       * consecutive indices with same stencil size.
        */
 
       std::map<unsigned int, std::set<dof_type>> bins;
@@ -353,7 +353,7 @@ namespace ryujin
         const unsigned int row_length = sparsity.row_length(offset + index);
         bins[row_length].insert(index);
 
-        if (bins[row_length].size() == group_size) {
+        if (bins[row_length].size() == warp_size) {
           for (const auto &index : bins[row_length])
             new_order[index] = current_index++;
           bins.erase(row_length);
@@ -373,7 +373,7 @@ namespace ryujin
 
       dof_handler.renumber_dofs(new_order);
 
-      Assert(n_locally_internal % group_size == 0, ExcInternalError());
+      Assert(n_locally_internal % warp_size == 0, ExcInternalError());
       return n_locally_internal;
     }
   } // namespace DoFRenumbering

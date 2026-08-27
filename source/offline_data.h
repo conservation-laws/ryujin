@@ -436,8 +436,7 @@ namespace ryujin
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 
-    SparsityPattern<dealii::VectorizedArray<Number>::size()>
-        sparsity_pattern_simd_;
+    SparsityPattern<warp_size> sparsity_pattern_simd_;
 
     SparseMatrix<Number> mass_matrix_;
     SparseMatrix<Number> mass_matrix_inverse_;
