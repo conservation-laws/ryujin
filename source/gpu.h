@@ -9,6 +9,7 @@
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/memory_space.h>
+#include <deal.II/base/vectorization.h>
 
 #include <string>
 #include <type_traits>
@@ -26,6 +27,23 @@ namespace ryujin
   inline constexpr bool have_separate_memory_spaces =
       !std::is_same_v<dealii::MemorySpace::Host::kokkos_space,
                       dealii::MemorySpace::Default::kokkos_space>;
+
+
+  /**
+   * The "warp size": the number of consecutive row indices of the internal
+   * index range [0, n_internal_dofs) that a SparsityPattern bins together.
+   * All rows of a warp have the same stencil size and their matrix entries
+   * are stored contiguously (array-of-struct-of-array), see the
+   * documentation of the SparsityPattern class.
+   *
+   * @note Setting this to the wrong number severly degrades performance on
+   * GPU or CPU as the memory access is no longer consecutive.
+   *
+   * @ingroup GPU
+   */
+  inline constexpr unsigned int warp_size =
+      have_separate_memory_spaces ? 32
+                                  : dealii::VectorizedArray<NUMBER>::size();
 
 
   /**
