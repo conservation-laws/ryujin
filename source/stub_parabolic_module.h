@@ -13,7 +13,6 @@
 #include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 
 namespace ryujin
 {
@@ -49,7 +48,6 @@ namespace ryujin
      */
     StubParabolicModule(
         const MPIEnsemble & /*mpi_ensemble*/,
-        std::map<std::string, dealii::Timer> & /*computing_timer*/,
         const OfflineData<dim, Number> & /*offline_data*/,
         const HyperbolicSystem & /*hyperbolic_system*/,
         const ParabolicSystem & /*parabolic_system*/,

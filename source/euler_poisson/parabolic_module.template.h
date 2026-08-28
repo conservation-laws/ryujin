@@ -31,7 +31,6 @@ namespace ryujin
     template <typename Description, int dim, typename Number>
     ParabolicModule<Description, dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
-        std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
@@ -39,7 +38,6 @@ namespace ryujin
         const std::string &subsection)
         : ParameterAcceptor(subsection)
         , mpi_ensemble_(mpi_ensemble)
-        , computing_timer_(computing_timer)
         , hyperbolic_system_(&hyperbolic_system)
         , parabolic_system_(&parabolic_system)
         , offline_data_(&offline_data)

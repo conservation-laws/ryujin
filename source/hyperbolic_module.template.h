@@ -46,7 +46,6 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   HyperbolicModule<Description, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
-      std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const InitialValues<Description, dim, Number> &initial_values,
@@ -57,7 +56,6 @@ namespace ryujin
       , wave_speed_estimator_(hyperbolic_system,
                               subsection + "/wave speed estimator")
       , mpi_ensemble_(mpi_ensemble)
-      , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , initial_values_(&initial_values)

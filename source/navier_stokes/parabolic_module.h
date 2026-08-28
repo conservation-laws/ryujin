@@ -20,7 +20,6 @@
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 #include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
@@ -149,7 +148,6 @@ namespace ryujin
        */
       ParabolicModule(
           const MPIEnsemble &mpi_ensemble,
-          std::map<std::string, dealii::Timer> &computing_timer,
           const OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
           const ParabolicSystem &parabolic_system,
@@ -289,7 +287,6 @@ namespace ryujin
       static constexpr unsigned int order_quad = 2;
 
       const MPIEnsemble &mpi_ensemble_;
-      std::map<std::string, dealii::Timer> &computing_timer_;
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;

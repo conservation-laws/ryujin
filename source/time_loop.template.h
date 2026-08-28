@@ -51,13 +51,11 @@ namespace ryujin
                         hyperbolic_system_,
                         parabolic_system_)
       , hyperbolic_module_(mpi_ensemble_,
-                           computing_timer_,
                            offline_data_,
                            hyperbolic_system_,
                            initial_values_,
                            "/F - HyperbolicModule")
       , parabolic_module_(mpi_ensemble_,
-                          computing_timer_,
                           offline_data_,
                           hyperbolic_system_,
                           parabolic_system_,

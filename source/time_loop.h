@@ -22,7 +22,6 @@
 #include "vtu_output.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 
 #include <fstream>
 
@@ -116,8 +115,6 @@ namespace ryujin
     //@{
 
     MPIEnsemble mpi_ensemble_;
-
-    std::map<std::string, dealii::Timer> computing_timer_;
 
     MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
     MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
