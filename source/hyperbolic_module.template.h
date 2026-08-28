@@ -24,6 +24,25 @@ namespace ryujin
 
   using namespace dealii;
 
+  namespace
+  {
+    /**
+     * Internally used: a workaround for older Kokkos versions that do not
+     * provide Kokkos::atomic_store() yet. Prior to Kokkos 4.0 the name is
+     * only available if Kokkos was configured with desul atomics. In this
+     * case fall back to Kokkos::atomic_exchange() and discard the result.
+     */
+    template <typename T>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void atomic_store(T *ptr, const T value)
+    {
+#if KOKKOS_VERSION >= 40000 || defined(KOKKOS_ENABLE_IMPL_DESUL_ATOMICS)
+      Kokkos::atomic_store(ptr, value);
+#else
+      Kokkos::atomic_exchange(ptr, value);
+#endif
+    }
+  } // namespace
+
   template <typename Description, int dim, typename Number>
   HyperbolicModule<Description, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
@@ -1066,7 +1085,7 @@ namespace ryujin
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
         if (!view.is_admissible(U_i_new)) {
-          Kokkos::atomic_store(restart_needed_view, 1);
+          atomic_store(restart_needed_view, 1);
         }
 #endif
 
@@ -1230,7 +1249,7 @@ namespace ryujin
            * policy set in the TimeIntegrator.
            */
           if (!success)
-            Kokkos::atomic_store(restart_needed_view, 1);
+            atomic_store(restart_needed_view, 1);
 
           P_ij = P_ij_next;
         }
@@ -1304,7 +1323,7 @@ namespace ryujin
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
         const auto view = hyperbolic_system_views.template view<T>();
         if (!view.is_admissible(U_i_new)) {
-          Kokkos::atomic_store(restart_needed_view, 1);
+          atomic_store(restart_needed_view, 1);
         }
 #endif
 
@@ -1342,7 +1361,7 @@ namespace ryujin
            */
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
           if (!success)
-            Kokkos::atomic_store(restart_needed_view, 1);
+            atomic_store(restart_needed_view, 1);
 #endif
 
           /*
