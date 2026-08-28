@@ -6,6 +6,7 @@
 #pragma once
 
 #include <compile_time_options.h>
+#include <computing_timer.h>
 #include <convenience_macros.h>
 #include <simd.h>
 
@@ -149,6 +150,8 @@ namespace ryujin
                        const unsigned int right,
                        Args &&...args)
   {
+    DeviceTimer::Scope scope;
+
     Assert(left <= internal && internal <= right,
            dealii::ExcMessage("Invalid index range: it must hold left <= "
                               "internal, internal <= right"));
@@ -329,6 +332,8 @@ namespace ryujin
                      const unsigned int right,
                      Args &&...args)
   {
+    DeviceTimer::Scope scope;
+
     Assert(
         left <= right,
         dealii::ExcMessage("Invalid index range: it must hold left <= right"));

@@ -246,9 +246,8 @@ namespace ryujin
     const auto n_boundary_indices =
         static_cast<unsigned int>(boundary_indices.size());
 
-    /*
-     * Gather all boundary states into the compact, mirrored buffer:
-     */
+    /* Gather all boundary states into a mirrored buffer: */
+
     {
       const auto U_view = std::as_const(U).template view<MemorySpace>();
       const auto *indices = boundary_indices.template view<MemorySpace>();
@@ -267,14 +266,17 @@ namespace ryujin
                                 n_boundary_indices);
     }
 
-    /*
-     * Apply boundary conditions on the host memory space. Requesting a
-     * writable host view copies the buffer back from the default memory
-     * space.
-     */
+    /* Apply boundary conditions on the host memory space: */
+
     {
-      auto *states =
-          boundary_states_.template view<dealii::MemorySpace::Host>();
+      auto *states = [&]() {
+        if constexpr (have_separate_memory_spaces) {
+          ComputingTimer::Scope scope(
+              "time step [X] _ - memory space transfers");
+          return boundary_states_.template view<dealii::MemorySpace::Host>();
+        }
+        return boundary_states_.template view<dealii::MemorySpace::Host>();
+      }();
 
       const auto &boundary_map = offline_data_->boundary_map();
       const auto &boundary_slots = offline_data_->boundary_slots();
@@ -318,11 +320,18 @@ namespace ryujin
     }
 
     /* Write back the updated boundary states: */
+
     {
       const auto U_view = U.template view<MemorySpace>();
       const auto *indices = boundary_indices.template view<MemorySpace>();
-      const auto *states =
-          std::as_const(boundary_states_).template view<MemorySpace>();
+      const auto *states = [&]() {
+        if constexpr (have_separate_memory_spaces) {
+          ComputingTimer::Scope scope(
+              "time step [X] _ - memory space transfers");
+          return std::as_const(boundary_states_).template view<MemorySpace>();
+        }
+        return std::as_const(boundary_states_).template view<MemorySpace>();
+      }();
 
       const auto body = [=](auto /*sentinel*/, unsigned int k) {
         state_type U_i;
