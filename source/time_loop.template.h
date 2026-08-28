@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "computing_timer.h"
 #include "gpu.h"
 #include "mpi_ensemble_container.h"
-#include "scope.h"
 #include "state_vector.h"
 #include "time_loop.h"
 #include "version_info.h"
@@ -299,7 +299,7 @@ namespace ryujin
     };
 
     {
-      Scope scope(computing_timer_, "(re)initialize data structures");
+      ComputingTimer::Scope scope("(re)initialize data structures");
       print_info("initializing data structures");
 
       if (resume_) {
@@ -327,8 +327,8 @@ namespace ryujin
         hyperbolic_module_.reinit_state_vector(state_vector);
         parabolic_module_.reinit_state_vector(state_vector);
         {
-          Scope scope(computing_timer_,
-                      "time step [X]   - interpolate data vectors");
+          ComputingTimer::Scope scope(
+              "time step [X]   - interpolate data vectors");
           std::get<0>(state_vector) =
               initial_values_.get().interpolate_hyperbolic_vector();
         }
@@ -353,7 +353,7 @@ namespace ryujin
                                  : Number(0.);
 
     print_info("entering main loop");
-    computing_timer_["time loop"].start();
+    ComputingTimer::timer("time loop").start();
 
     constexpr Number relax =
         Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
@@ -368,8 +368,7 @@ namespace ryujin
       /* Accumulate quantities of interest: */
 
       if (enable_compute_quantities_) {
-        Scope scope(computing_timer_,
-                    "time step [X]   - accumulate quantities");
+        ComputingTimer::Scope scope("time step [X]   - accumulate quantities");
         quantities_.accumulate(state_vector, t);
       }
 
@@ -385,8 +384,8 @@ namespace ryujin
 
           StateVector analytic;
           {
-            Scope scope(computing_timer_,
-                        "time step [X]   - interpolate data vectors");
+            ComputingTimer::Scope scope(
+                "time step [X]   - interpolate data vectors");
             hyperbolic_module_.reinit_state_vector(analytic);
             parabolic_module_.reinit_state_vector(analytic);
             std::get<0>(analytic) =
@@ -405,8 +404,7 @@ namespace ryujin
 
         if (enable_compute_quantities_ &&
             (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
-          Scope scope(computing_timer_,
-                      "time step [X]   - write out quantities");
+          ComputingTimer::Scope scope("time step [X]   - write out quantities");
           quantities_.write_out(state_vector, t, timer_cycle);
         }
 
@@ -422,16 +420,16 @@ namespace ryujin
 
       if (enable_mesh_adaptivity_) {
         {
-          Scope scope(computing_timer_,
-                      "time step [X]   - analyze for mesh adaptation");
+          ComputingTimer::Scope scope(
+              "time step [X]   - analyze for mesh adaptation");
 
           mesh_adaptor_.analyze(state_vector, t, cycle);
         }
 
         if (mesh_adaptor_.need_mesh_adaptation()) {
-          Scope scope_1(computing_timer_, "(re)initialize data structures");
-          Scope scope_2(computing_timer_,
-                        "time step [X]   - perform mesh adaptation");
+          ComputingTimer::Scope scope_1("(re)initialize data structures");
+          ComputingTimer::Scope scope_2(
+              "time step [X]   - perform mesh adaptation");
           print_info("performing mesh adaptation");
 
           adapt_mesh_and_transfer_state_vector(state_vector,
@@ -457,10 +455,10 @@ namespace ryujin
 
       /* Synchronize wall time: */
 
-      auto wall_time = computing_timer_["time loop"].wall_time();
+      auto wall_time = ComputingTimer::timer("time loop").wall_time();
       {
-        Scope scope(computing_timer_,
-                    "time step [X] _ - synchronization barriers");
+        ComputingTimer::Scope scope(
+            "time step [X] _ - synchronization barriers");
         wall_time =
             Utilities::MPI::max(wall_time, mpi_ensemble_.world_communicator());
       }
@@ -475,8 +473,8 @@ namespace ryujin
           (wall_time >= last_terminal_output + terminal_update_interval_);
 
       if (write_to_log_file || update_terminal) {
-        Scope scope(computing_timer_,
-                    "time step [X] _ - synchronization barriers");
+        ComputingTimer::Scope scope(
+            "time step [X] _ - synchronization barriers");
         print_cycle_statistics(cycle,
                                t,
                                timer_cycle,
@@ -489,7 +487,7 @@ namespace ryujin
           (wall_time >= last_checkpoint + checkpoint_update_interval_);
 
       if (update_checkpoint) {
-        Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
+        ComputingTimer::Scope scop("time step [X]   - perform checkpointing");
 
         print_info("scheduling checkpointing");
         write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
@@ -501,13 +499,13 @@ namespace ryujin
     --cycle;
 
     if (checkpoint_update_interval_ != Number(0.)) {
-      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
+      ComputingTimer::Scope scope("time step [X]   - perform checkpointing");
 
       print_info("scheduling checkpointing");
       write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
     }
 
-    computing_timer_["time loop"].stop();
+    ComputingTimer::timer("time loop").stop();
 
     if (terminal_update_interval_ != Number(0.)) {
       /* Write final timing statistics to screen and logfile: */
@@ -911,7 +909,7 @@ namespace ryujin
 
     /* Data output: */
 
-    Scope scope(computing_timer_, "time step [X]   - perform vtu output");
+    ComputingTimer::Scope scope("time step [X]   - perform vtu output");
     print_info("scheduling output");
 
     postprocessor_.compute(state_vector);
@@ -1219,9 +1217,9 @@ namespace ryujin
     stream << "]\n";
 
     if (checkpoint_update_interval_ != Number(0.)) {
-      const auto wall_time =
-          Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
-                                      mpi_ensemble_.world_communicator());
+      const auto wall_time = Utilities::MPI::min_max_avg(
+          ComputingTimer::timer("time loop").wall_time(),
+          mpi_ensemble_.world_communicator());
 
       if (final_time) {
         stream << "             Last checkpoint at FINAL TIME\n";
@@ -1268,7 +1266,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_timers(std::ostream &stream)
   {
-    std::vector<std::ostringstream> output(computing_timer_.size());
+    std::vector<std::ostringstream> output(ComputingTimer::timers().size());
 
     const auto equalize = [&]() {
       const auto ptr =
@@ -1306,9 +1304,9 @@ namespace ryujin
              << wall_time.max_index << "]";
     };
 
-    const auto cpu_time_statistics =
-        Utilities::MPI::min_max_avg(computing_timer_["time loop"].cpu_time(),
-                                    mpi_ensemble_.world_communicator());
+    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+        ComputingTimer::timer("time loop").cpu_time(),
+        mpi_ensemble_.world_communicator());
     const double total_cpu_time = cpu_time_statistics.sum;
 
     const auto print_cpu_time =
@@ -1325,18 +1323,18 @@ namespace ryujin
         };
 
     auto jt = output.begin();
-    for (auto &it : computing_timer_)
+    for (auto &it : ComputingTimer::timers())
       *jt++ << "  " << it.first;
     equalize();
 
     jt = output.begin();
-    for (auto &it : computing_timer_)
+    for (auto &it : ComputingTimer::timers())
       print_wall_time(it.second, *jt++);
     equalize();
 
     jt = output.begin();
     bool compute_percentages = false;
-    for (auto &it : computing_timer_) {
+    for (auto &it : ComputingTimer::timers()) {
       print_cpu_time(it.second, *jt++, compute_percentages);
       if (it.first.starts_with("time loop"))
         compute_percentages = true;
@@ -1380,14 +1378,14 @@ namespace ryujin
       current.cycle = cycle;
       current.t = t;
 
-      const auto wall_time_statistics =
-          Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
-                                      mpi_ensemble_.world_communicator());
+      const auto wall_time_statistics = Utilities::MPI::min_max_avg(
+          ComputingTimer::timer("time loop").wall_time(),
+          mpi_ensemble_.world_communicator());
       current.wall_time = wall_time_statistics.max;
 
-      const auto cpu_time_statistics =
-          Utilities::MPI::min_max_avg(computing_timer_["time loop"].cpu_time(),
-                                      mpi_ensemble_.world_communicator());
+      const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+          ComputingTimer::timer("time loop").cpu_time(),
+          mpi_ensemble_.world_communicator());
       current.cpu_time_sum = cpu_time_statistics.sum;
       current.cpu_time_avg = cpu_time_statistics.avg;
       current.cpu_time_min = cpu_time_statistics.min;

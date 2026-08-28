@@ -7,8 +7,8 @@
 
 #include "parabolic_module.h"
 
+#include <computing_timer.h>
 #include <loop.h>
-#include <scope.h>
 #include <simd.h>
 
 #include <deal.II/lac/linear_operator.h>
@@ -383,7 +383,7 @@ namespace ryujin
        * update.
        */
       {
-        Scope scope(computing_timer_, "time step [P] 1 - update velocities");
+        ComputingTimer::Scope scope("time step [P] 1 - update velocities");
 
         const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
@@ -533,8 +533,8 @@ namespace ryujin
       Number e_min_old;
 
       {
-        Scope scope(computing_timer_,
-                    "time step [X] _ - synchronization barriers");
+        ComputingTimer::Scope scope(
+            "time step [X] _ - synchronization barriers");
 
         /* Compute the global minimum of the internal energy: */
 
@@ -554,7 +554,7 @@ namespace ryujin
        * Step 1: Solve velocity update:
        */
       {
-        Scope scope(computing_timer_, "time step [P] 1 - update velocities");
+        ComputingTimer::Scope scope("time step [P] 1 - update velocities");
 
         VelocityMatrix<dim, Number, Number> velocity_operator;
         velocity_operator.initialize(
@@ -621,8 +621,7 @@ namespace ryujin
        * Step 2: Build internal energy right hand side:
        */
       {
-        Scope scope(computing_timer_,
-                    "time step [P] 2 - update internal energy");
+        ComputingTimer::Scope scope("time step [P] 2 - update internal energy");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
         matrix_free_.template cell_loop<ScalarHostVector, BlockHostVector>(
@@ -791,8 +790,7 @@ namespace ryujin
        * Step 2: Solve internal energy update:
        */
       {
-        Scope scope(computing_timer_,
-                    "time step [P] 2 - update internal energy");
+        ComputingTimer::Scope scope("time step [P] 2 - update internal energy");
 
         EnergyMatrix<dim, Number, Number> energy_operator;
         const auto &kappa = parabolic_system_->cv_inverse_kappa();
@@ -861,7 +859,7 @@ namespace ryujin
        * FIXME: Memory access is suboptimal...
        */
       {
-        Scope scope(computing_timer_, "time step [P] 3 - write back vectors");
+        ComputingTimer::Scope scope("time step [P] 3 - write back vectors");
 
         const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
@@ -941,8 +939,8 @@ namespace ryujin
       }
 
       {
-        Scope scope(computing_timer_,
-                    "time step [X] _ - synchronization barriers");
+        ComputingTimer::Scope scope(
+            "time step [X] _ - synchronization barriers");
 
         /*
          * Synchronize whether we have to restart or correct the time step.

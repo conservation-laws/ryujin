@@ -8,9 +8,9 @@
 #include "laplace_operator.h"
 #include "parabolic_module.h"
 
+#include <computing_timer.h>
 #include <convenience_macros.h>
 #include <loop.h>
-#include <scope.h>
 #include <simd.h>
 
 #include <deal.II/dofs/dof_tools.h>
@@ -465,8 +465,7 @@ namespace ryujin
       std::cout << "        updating to t = " << t << std::endl;
 #endif
 
-      Scope scope(computing_timer_,
-                  "time step [X]   - interpolate data vectors");
+      ComputingTimer::Scope scope("time step [X]   - interpolate data vectors");
 
       const auto &discretization = offline_data_->discretization();
       background_density_.zero_out_ghost_values();
@@ -513,8 +512,7 @@ namespace ryujin
       std::cout << "        updating to t = " << t << std::endl;
 #endif
 
-      Scope scope(computing_timer_,
-                  "time step [X]   - interpolate data vectors");
+      ComputingTimer::Scope scope("time step [X]   - interpolate data vectors");
 
       const auto &discretization = offline_data_->discretization();
       for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
@@ -559,7 +557,7 @@ namespace ryujin
        * -----------------------------------------------------------------------
        */
 
-      Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
+      ComputingTimer::Scope scope("time step [P] 1 - enforce Gauss law");
 
       update_background_density(t);
 
@@ -845,7 +843,7 @@ namespace ryujin
          * ---------------------------------------------------------------------
          */
 
-        Scope scope(computing_timer_, "time step [P] 2 - update potential");
+        ComputingTimer::Scope scope("time step [P] 2 - update potential");
 
         /* Query the magnetic field at the time t + tau: */
         update_magnetic_field(t + tau);

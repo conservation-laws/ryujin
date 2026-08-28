@@ -5,11 +5,11 @@
 
 #pragma once
 
+#include "computing_timer.h"
 #include "gpu.h"
 #include "hyperbolic_module.h"
 #include "loop.h"
 #include "mpi_ensemble.h"
-#include "scope.h"
 #include "simd.h"
 
 #include <numeric>
@@ -205,13 +205,13 @@ namespace ryujin
 
     /* Ensure all vectors are resident on the correct memory space. */
     if constexpr (have_separate_memory_spaces) {
-      Scope scope(computing_timer_, "time step [X] _ - memory space transfers");
+      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
       U.template move_to_memory_space<MemorySpace>();
       precomputed.template move_to_memory_space<MemorySpace>();
     }
 
-    Scope scope(computing_timer_,
-                "time step [H] 1 - update boundary values, precompute values");
+    ComputingTimer::Scope scope(
+        "time step [H] 1 - update boundary values, precompute values");
 
     /*
      * Update boundary values and distribute the result over all MPI ranks.
@@ -402,7 +402,7 @@ namespace ryujin
 
     /* Ensure all vectors are resident on the correct memory space. */
     if constexpr (have_separate_memory_spaces) {
-      Scope scope(computing_timer_, "time step [X] _ - memory space transfers");
+      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
       old_U.template copy_to_memory_space<MemorySpace>();
       old_precomputed.template copy_to_memory_space<MemorySpace>();
       for (int s = 0; s < stages; ++s) {
@@ -417,7 +417,7 @@ namespace ryujin
      * Taking a view<>() might imply implicit memory space transfers. Let's
      * account for them in our computing timers.
      */
-    computing_timer_["(re)initialize data structures"].start();
+    ComputingTimer::timer("(re)initialize data structures").start();
 
     /*
      * Workaround: A constexpr boolean storing the fact whether we
@@ -524,7 +524,7 @@ namespace ryujin
     const auto bounds_view = bounds_.template view<MemorySpace>();
     const auto r_view = r_.template view<MemorySpace>();
 
-    computing_timer_["(re)initialize data structures"].stop();
+    ComputingTimer::timer("(re)initialize data structures").stop();
 
     /*
      * Create a local copy of cfl_ so that we do not capture "this" in the
@@ -593,7 +593,7 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
     {
-      Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
+      ComputingTimer::Scope scope(scoped_name("compute d_ij, and alpha_i"));
 
       const auto body = [=](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -658,8 +658,8 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
+      ComputingTimer::Scope scope(
+          scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
 
       /*
        * Complete d_ij at boundary:
@@ -788,8 +788,7 @@ namespace ryujin
     }
 
     {
-      Scope scope(computing_timer_,
-                  "time step [X] _ - synchronization barriers");
+      ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
 
       /*
        * MPI Barrier: Synchronize the maximal time-step size. This has to
@@ -843,8 +842,8 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  scoped_name("l.-o. update, compute bounds, r_i, and p_ij"));
+      ComputingTimer::Scope scope(
+          scoped_name("l.-o. update, compute bounds, r_i, and p_ij"));
 
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
@@ -1127,7 +1126,7 @@ namespace ryujin
      */
 
     if (n_limiter_iterations != 0) {
-      Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
+      ComputingTimer::Scope scope(scoped_name("compute p_ij, and l_ij"));
 
       const auto body = [=](auto sentinel,
                             auto have_discontinuous_ansatz,
@@ -1284,8 +1283,7 @@ namespace ryujin
       bool last_round = (pass + 1 == n_limiter_iterations);
 
       std::string additional_step = (last_round ? "" : ", next l_ij");
-      Scope scope(
-          computing_timer_,
+      ComputingTimer::Scope scope(
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
       const auto lij_view = (n_limiter_iterations == 2 && last_round)
@@ -1392,8 +1390,7 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  "time step [X] _ - synchronization barriers");
+      ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
 
       /*
        * Synchronize whether we have to restart the time step. Even though
