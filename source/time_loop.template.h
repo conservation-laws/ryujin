@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "gpu.h"
 #include "mpi_ensemble_container.h"
 #include "scope.h"
 #include "state_vector.h"
@@ -1088,21 +1089,24 @@ namespace ryujin
       std::ostream &stream,
       bool final_time)
   {
-    static const std::string vectorization_name = [] {
-      constexpr auto width = VectorizedArray<Number>::size();
+    static const std::string backend_name = [] {
+      const auto precision = [] {
+        if constexpr (std::is_same_v<Number, double>)
+          return std::string("FP64");
+        else if constexpr (std::is_same_v<Number, float>)
+          return std::string("FP32");
+        else
+          __builtin_trap();
+      }();
 
-      std::string result;
-      if (width == 1)
-        result = "scalar ";
-      else
-        result = std::to_string(width * 8 * sizeof(Number)) + "bit packed ";
+      constexpr auto simd_size = VectorizedArray<Number>::size();
 
-      if constexpr (std::is_same_v<Number, double>)
-        return result + "double";
-      else if constexpr (std::is_same_v<Number, float>)
-        return result + "float";
+      if constexpr (have_separate_memory_spaces)
+        return "GPU, " + precision + ", warp size " + std::to_string(warp_size);
+      else if constexpr (simd_size == 1)
+        return "scalar, " + precision;
       else
-        __builtin_trap();
+        return "SIMD, " + precision + ", width " + std::to_string(simd_size);
     }();
 
     stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
@@ -1123,7 +1127,7 @@ namespace ryujin
 #elif defined(WITH_DEAL_II_THREADS)
            << "/ " << MultithreadInfo::n_threads() << " threads "
 #endif
-           << "<" << vectorization_name << ">\n";
+           << "<" << backend_name << ">\n";
 
     stream << "             Last output cycle "                    //
            << timer_cycle - 1                                      //
