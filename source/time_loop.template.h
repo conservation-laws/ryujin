@@ -21,6 +21,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <set>
 
 #ifdef WITH_OPENMP
 #include "omp.h"
@@ -97,6 +98,8 @@ namespace ryujin
                     hyperbolic_system_,
                     parabolic_system_,
                     "/K - Quantities")
+      , n_global_dofs_(0)
+      , n_devices_(0)
   {
     base_name_ = "test";
     add_parameter("basename", base_name_, "Base name for all output files");
@@ -249,6 +252,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
+
+    DeviceTimer::reinit();
+    ComputingTimer::reinit();
 
     {
       base_name_ensemble_ = base_name_;
@@ -1049,12 +1055,30 @@ namespace ryujin
     if constexpr (!have_separate_memory_spaces)
       return;
 
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+    /*
+     * Determine how many distinct devices we are running on: Multiple
+     * ranks might be bound to the same device, so counting ranks would
+     * overreport. We thus count distinct (hostname, device id) pairs.
+     */
+    {
+      using Device = std::pair<std::string, int>;
+
+      const Device local{dealii::Utilities::System::get_hostname(),
+                         Kokkos::device_id()};
+      const auto all = dealii::Utilities::MPI::all_gather(
+          mpi_ensemble_.world_communicator(), local);
+      n_devices_ = std::set<Device>(all.begin(), all.end()).size();
+    }
+#endif
+
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
     std::ostringstream output;
 
-    const auto entry = [&output](const std::string &label) -> std::ostream & {
+    const auto entry [[maybe_unused]] =
+        [&output](const std::string &label) -> std::ostream & {
       output << std::endl
              << std::endl
              << "             " << std::left << std::setw(22) << label;
@@ -1077,6 +1101,8 @@ namespace ryujin
     entry("compute capability") << prop.major << "." << prop.minor;
     entry("device id") << Kokkos::device_id() << " of "
                        << Kokkos::num_devices();
+    entry("devices in use")
+        << n_devices_ << " on " << mpi_ensemble_.n_world_ranks() << " ranks";
     entry("multiprocessors") << prop.multiProcessorCount;
     entry("warp size") << prop.warpSize << " (hardware), " << warp_size
                        << " (ryujin::warp_size)";
@@ -1098,6 +1124,8 @@ namespace ryujin
     entry("architecture") << prop.gcnArchName;
     entry("device id") << Kokkos::device_id() << " of "
                        << Kokkos::num_devices();
+    entry("devices in use")
+        << n_devices_ << " on " << mpi_ensemble_.n_world_ranks() << " ranks";
     entry("compute units") << prop.multiProcessorCount;
     entry("warp size") << prop.warpSize << " (hardware), " << warp_size
                        << " (ryujin::warp_size)";
@@ -1367,6 +1395,7 @@ namespace ryujin
       double cpu_time_min = 0.;
       double cpu_time_max = 0.;
       double wall_time = 0.;
+      double device_time_sum = 0.;
     } previous, current;
 
     static double time_per_second_exp = 0.;
@@ -1391,6 +1420,12 @@ namespace ryujin
       current.cpu_time_avg = cpu_time_statistics.avg;
       current.cpu_time_min = cpu_time_statistics.min;
       current.cpu_time_max = cpu_time_statistics.max;
+
+      if constexpr (have_separate_memory_spaces) {
+        const auto device_time_statistics = Utilities::MPI::min_max_avg(
+            DeviceTimer::seconds(), mpi_ensemble_.world_communicator());
+        current.device_time_sum = device_time_statistics.sum;
+      }
     }
 
     if (final_time)
@@ -1408,32 +1443,6 @@ namespace ryujin
     double wall_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
                                  (current.wall_time - previous.wall_time);
 
-    double cpu_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
-                                (current.cpu_time_sum - previous.cpu_time_sum);
-
-    /* Determine whether we fudge the CPU timings: */
-    const bool fudge_cpu_timings = terminal_correct_for_hypertreadhing_ &&
-#if defined(WITH_OPENMP)
-                                   (omp_get_max_threads() == 2);
-#elif defined(WITH_DEAL_II_THREADS)
-                                   (MultithreadInfo::n_threads() == 2);
-#else
-                                   false;
-#endif
-
-    if (fudge_cpu_timings)
-      cpu_m_dofs_per_sec *= 2.;
-
-    double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
-                            previous.cpu_time_max + previous.cpu_time_min) /
-                           delta_cycles;
-    /* avoid printing small negative numbers: */
-    cpu_time_skew = std::max(0., cpu_time_skew);
-
-    const double cpu_time_skew_percentage =
-        cpu_time_skew * delta_cycles /
-        (current.cpu_time_avg - previous.cpu_time_avg);
-
     const double delta_time =
         (current.t - previous.t) / (current.cycle - previous.cycle);
     const double time_per_second =
@@ -1446,19 +1455,77 @@ namespace ryujin
     /* clang-format off */
     output << std::endl;
 
-    output << "Throughput:\n  "
-           << (fudge_cpu_timings ? "CPU*: " : "CPU : ")
-           << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
-           << " MQ/s  ("
-           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/substep)" << std::endl;
+    output << "Throughput:" << std::endl;
 
-    output << "        [cpu time skew: "
-           << std::setprecision(2) << std::scientific << cpu_time_skew
-           << "s/cycle ("
-           << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
-           << 100. * cpu_time_skew_percentage
-           << "%)]" << std::endl;
+    if constexpr (have_separate_memory_spaces) {
+      /* Write out some statistics about GPU utilization: */
+
+      const double delta_wall_time = current.wall_time - previous.wall_time;
+      const double delta_device_time =
+          current.device_time_sum - previous.device_time_sum;
+
+      const double utilization =
+          delta_device_time / (n_devices_ * delta_wall_time);
+
+      const double device_m_dofs_per_sec =
+          delta_cycles * n_dofs * efficiency / 1.e6 / delta_device_time;
+      output << "  GPU : "
+             << std::setprecision(4) << std::fixed << device_m_dofs_per_sec
+             << " MQ/s in compute kernels (on "
+             << n_devices_ << (n_devices_ == 1 ? " device)" : " devices)")
+             << std::endl;
+
+      output << "        ["
+             << std::setprecision(2) << std::fixed << delta_device_time
+             << "s device / "
+             << std::setprecision(2) << std::fixed << delta_wall_time
+             << "s wall = "
+             << std::setprecision(1) << std::fixed << 100. * utilization
+             << "% utilization ]" << std::endl;
+
+    } else {
+      /* Write out some statistics about CPU utilization: */
+
+      double cpu_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
+                                  (current.cpu_time_sum - previous.cpu_time_sum);
+
+      /* Determine whether we fudge the CPU timings: */
+      const bool fudge_cpu_timings = terminal_correct_for_hypertreadhing_ &&
+#if defined(WITH_OPENMP)
+                                     (omp_get_max_threads() == 2);
+#elif defined(WITH_DEAL_II_THREADS)
+                                     (MultithreadInfo::n_threads() == 2);
+#else
+                                     false;
+#endif
+
+      if (fudge_cpu_timings)
+        cpu_m_dofs_per_sec *= 2.;
+
+      double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
+                              previous.cpu_time_max + previous.cpu_time_min) /
+                             delta_cycles;
+      /* avoid printing small negative numbers: */
+      cpu_time_skew = std::max(0., cpu_time_skew);
+
+      const double cpu_time_skew_percentage =
+          cpu_time_skew * delta_cycles /
+          (current.cpu_time_avg - previous.cpu_time_avg);
+
+      output << "  "
+             << (fudge_cpu_timings ? "CPU*: " : "CPU : ")
+             << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
+             << " MQ/s  ("
+             << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
+             << " s/Qdof/substep)" << std::endl;
+
+      output << "        [cpu time skew: "
+             << std::setprecision(2) << std::scientific << cpu_time_skew
+             << "s/cycle ("
+             << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
+             << 100. * cpu_time_skew_percentage
+             << "%)]" << std::endl;
+    }
 
     output << "  WALL: "
            << std::setprecision(4) << std::fixed << wall_m_dofs_per_sec

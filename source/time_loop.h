@@ -132,6 +132,7 @@ namespace ryujin
     Quantities<Description, dim, Number> quantities_;
 
     dealii::types::global_dof_index n_global_dofs_;
+    unsigned int n_devices_;
 
     std::ofstream logfile_; /* log file */
 
