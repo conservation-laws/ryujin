@@ -189,6 +189,7 @@ namespace ryujin
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);
+    void print_device_information(std::ostream &stream);
 
     void print_info(const std::string &header);
 

@@ -338,6 +338,8 @@ namespace ryujin
       }
     }
 
+    print_device_information(logfile_);
+
     /* Prepare the state vector for time stepping. */
     time_integrator_.prepare_state_vector(state_vector, t);
 
@@ -1037,6 +1039,81 @@ namespace ryujin
 
     output << std::endl << "             ";
     print_snippet("rel", data[3]);
+
+    stream << output.str() << std::endl;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_device_information(
+      std::ostream &stream)
+  {
+    /* Device information is only meaningful for a device build: */
+    if constexpr (!have_separate_memory_spaces)
+      return;
+
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    std::ostringstream output;
+
+    const auto entry = [&output](const std::string &label) -> std::ostream & {
+      output << std::endl
+             << std::endl
+             << "             " << std::left << std::setw(22) << label;
+      return output;
+    };
+
+    output << std::endl
+           << "Device:      " << std::left << std::setw(22) << "backend"
+           << Kokkos::DefaultExecutionSpace::name();
+
+    /*
+     * Kokkos does not provide a portable device property class. We thus
+     * have to query the individual backends by hand:
+     */
+
+#if defined(KOKKOS_ENABLE_CUDA)
+    const auto &prop = Kokkos::Cuda{}.cuda_device_prop();
+
+    entry("device") << prop.name;
+    entry("compute capability") << prop.major << "." << prop.minor;
+    entry("device id") << Kokkos::device_id() << " of "
+                       << Kokkos::num_devices();
+    entry("multiprocessors") << prop.multiProcessorCount;
+    entry("warp size") << prop.warpSize << " (hardware), " << warp_size
+                       << " (ryujin::warp_size)";
+    entry("threads per SM")
+        << prop.maxThreadsPerMultiProcessor << " ("
+        << prop.maxThreadsPerMultiProcessor / prop.warpSize << " warps)";
+    entry("threads per block") << prop.maxThreadsPerBlock;
+    entry("concurrency") << Kokkos::DefaultExecutionSpace{}.concurrency();
+    entry("registers per SM") << prop.regsPerBlock;
+    entry("shared memory per SM")
+        << prop.sharedMemPerMultiprocessor / 1024 << " KiB";
+    entry("L2 cache") << prop.l2CacheSize / 1024 / 1024 << " MiB";
+    entry("global memory") << prop.totalGlobalMem / 1024 / 1024 << " MiB";
+
+#elif defined(KOKKOS_ENABLE_HIP)
+    const auto &prop = Kokkos::HIP::hip_device_prop();
+
+    entry("device") << prop.name;
+    entry("architecture") << prop.gcnArchName;
+    entry("device id") << Kokkos::device_id() << " of "
+                       << Kokkos::num_devices();
+    entry("compute units") << prop.multiProcessorCount;
+    entry("warp size") << prop.warpSize << " (hardware), " << warp_size
+                       << " (ryujin::warp_size)";
+    entry("threads per CU")
+        << prop.maxThreadsPerMultiProcessor << " ("
+        << prop.maxThreadsPerMultiProcessor / prop.warpSize << " warps)";
+    entry("threads per block") << prop.maxThreadsPerBlock;
+    entry("concurrency") << Kokkos::DefaultExecutionSpace{}.concurrency();
+    entry("registers per block") << prop.regsPerBlock;
+    entry("shared memory per block") << prop.sharedMemPerBlock / 1024 << " KiB";
+    entry("L2 cache") << prop.l2CacheSize / 1024 / 1024 << " MiB";
+    entry("global memory") << prop.totalGlobalMem / 1024 / 1024 << " MiB";
+#endif
 
     stream << output.str() << std::endl;
   }
