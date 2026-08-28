@@ -146,15 +146,15 @@ namespace ryujin
                                          1);
 
     /*
-     * Group degrees of freedom that have the same stencil size in groups
-     * of multiples of the VectorizedArray<Number>::size().
+     * Group degrees of freedom that have the same stencil size in warps of
+     * warp_size consecutive indices.
      *
      * In order to determine the stencil size we have to create a first,
      * temporary sparsity pattern:
      */
     create_constraints_and_sparsity_pattern();
     n_locally_internal_ = DoFRenumbering::internal_range(
-        dof_handler, sparsity_pattern_, VectorizedArray<Number>::size());
+        dof_handler, sparsity_pattern_, warp_size);
 
     /*
      * Reorder all (strides of) locally internal indices that contain
@@ -171,7 +171,7 @@ namespace ryujin
         dof_handler,
         mpi_ensemble_.ensemble_communicator(),
         n_locally_internal_,
-        VectorizedArray<Number>::size());
+        warp_size);
   }
 
 
@@ -341,22 +341,21 @@ namespace ryujin
      * index range:
      */
     const auto consistent_stride_range [[maybe_unused]] = [&]() {
-      constexpr auto group_size = VectorizedArray<Number>::size();
       const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
       const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
 
-      unsigned int group_row_length = 0;
+      unsigned int warp_row_length = 0;
       unsigned int i = 0;
       for (; i < n_locally_internal_; ++i) {
-        if (i % group_size == 0) {
-          group_row_length = sparsity_pattern_.row_length(offset + i);
+        if (i % warp_size == 0) {
+          warp_row_length = sparsity_pattern_.row_length(offset + i);
         } else {
-          if (group_row_length != sparsity_pattern_.row_length(offset + i)) {
+          if (warp_row_length != sparsity_pattern_.row_length(offset + i)) {
             break;
           }
         }
       }
-      return i / group_size * group_size;
+      return i / warp_size * warp_size;
     };
 
     /*
@@ -389,10 +388,7 @@ namespace ryujin
          * marker.
          */
         n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
-            dof_handler,
-            sparsity_pattern_,
-            n_locally_internal_,
-            VectorizedArray<Number>::size());
+            dof_handler, sparsity_pattern_, n_locally_internal_, warp_size);
         create_constraints_and_sparsity_pattern();
         n_locally_internal_ = consistent_stride_range();
       }
@@ -485,9 +481,8 @@ namespace ryujin
         if (it.second <= n_locally_internal_)
           n_export_indices_ = std::max(n_export_indices_, it.second);
 
-      constexpr auto simd_length = VectorizedArray<Number>::size();
       n_export_indices_ =
-          (n_export_indices_ + simd_length - 1) / simd_length * simd_length;
+          (n_export_indices_ + warp_size - 1) / warp_size * warp_size;
     }
 
 #ifdef DEBUG
@@ -1040,6 +1035,36 @@ namespace ryujin
       boundary_map_ = construct_boundary_map(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
+      /*
+       * Compact the degrees of freedom stored in the boundary map into a
+       * strictly increasing index list (that is mirrored into the default
+       * memory space) and record for every entry of the boundary map the
+       * position of its degree of freedom in that index list. Note that the
+       * boundary map can contain more than one entry for the same degree of
+       * freedom.
+       */
+
+      std::vector<unsigned int> boundary_indices;
+      std::map<unsigned int, unsigned int> position_of_index;
+
+      boundary_slots_.clear();
+      boundary_slots_.reserve(boundary_map_.size());
+
+      for (const auto &entry : boundary_map_) {
+        const auto index = std::get<0>(entry);
+        const auto [it, inserted] =
+            position_of_index.try_emplace(index, boundary_indices.size());
+        if (inserted)
+          boundary_indices.push_back(index);
+        boundary_slots_.push_back(it->second);
+      }
+
+      boundary_indices_.reinit(boundary_indices.size(),
+                               TransferPolicy::implicit_transfers);
+      std::copy(boundary_indices.begin(),
+                boundary_indices.end(),
+                boundary_indices_.view());
+
       const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
@@ -1086,11 +1111,10 @@ namespace ryujin
                  lumped_mass_matrix_view.read_entry(i);
 
       /* skip diagonal */
-      constexpr auto simd_length = VectorizedArray<Number>::size();
+      const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
       const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
-                                                 : js + col_idx);
+        const auto j = js[col_idx * stride_size];
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
         const auto m_ij = mass_matrix_view.read_entry(i, col_idx);
@@ -1128,11 +1152,10 @@ namespace ryujin
       auto sum = cij_matrix_view.read_tensor(i, 0);
 
       /* skip diagonal */
-      constexpr auto simd_length = VectorizedArray<Number>::size();
+      const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
       const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
-                                                 : js + col_idx);
+        const auto j = js[col_idx * stride_size];
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
         const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
@@ -1557,12 +1580,11 @@ namespace ryujin
       if (row_length == 1)
         continue;
 
+      const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
       const unsigned int *js = sparsity_simd_view.columns(i);
-      constexpr auto simd_length = VectorizedArray<Number>::size();
       /* skip diagonal: */
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
-                                                 : js + col_idx);
+        const auto j = js[col_idx * stride_size];
 
         if (locally_relevant_boundary_indices.count(j) != 0) {
           result.push_back({i, col_idx, j});

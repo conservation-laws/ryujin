@@ -273,6 +273,25 @@ namespace ryujin
     ACCESSOR_READ_ONLY(boundary_map)
 
     /**
+     * A compacted, strictly increasing list of all locally owned degrees of
+     * freedom that appear in the boundary_map(). The function returns a
+     * reference to a Mirrored object that can be accessed on both memory
+     * spaces with view() and size().
+     */
+    ACCESSOR_READ_ONLY(boundary_indices)
+
+    /**
+     * For every entry of the boundary_map() the position of its degree of
+     * freedom in boundary_indices(). Local numbering.
+     *
+     * @note The boundary map can contain more than one entry for the same
+     * degree of freedom (for example a corner that is simultaneously
+     * located on a slip and a dirichlet boundary). All such entries share
+     * the same position.
+     */
+    ACCESSOR_READ_ONLY(boundary_slots)
+
+    /**
      * An array of CouplingDescription structures describing coupling
      * degrees of freedom i and j where both degrees of freedom are
      * collocated at the boundary (and hence the d_ij matrix has to be
@@ -408,14 +427,16 @@ namespace ryujin
     BoundaryMap boundary_map_;
     std::vector<BoundaryMap> level_boundary_map_;
 
+    Mirrored<unsigned int *> boundary_indices_{"offline_data_boundary_indices"};
+    std::vector<unsigned int> boundary_slots_;
+
     using CouplingBoundaryPairs = std::vector<CouplingDescription>;
     Mirrored<CouplingDescription *> coupling_boundary_pairs_{
         "offline_data_coupling_boundary_pairs"};
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 
-    SparsityPattern<dealii::VectorizedArray<Number>::size()>
-        sparsity_pattern_simd_;
+    SparsityPattern<warp_size> sparsity_pattern_simd_;
 
     SparseMatrix<Number> mass_matrix_;
     SparseMatrix<Number> mass_matrix_inverse_;

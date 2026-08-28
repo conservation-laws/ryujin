@@ -27,6 +27,7 @@ namespace ryujin
 {
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace = dealii::MemorySpace::Host,
             bool writable = true>
@@ -41,15 +42,27 @@ namespace ryujin
    * region [n_internal_dofs, n_locally_relevant_dofs) we store the matrix in
    * CSR format (equivalent to the static dealii::SparsityPattern).
    *
+   * The two template parameters @p warp_size and @p simd_length describe
+   * two different concepts: @p warp_size is the number of rows that the
+   * underlying SparsityPattern groups together in the internal index
+   * range, whereas @p simd_length is the number of packed doubles/floats
+   * that the access operators of this class read and write at once. The
+   * warp size has to be an integer multiple of the SIMD length.
+   *
    * @ingroup LinearAlgebra
    */
   template <typename Number,
             int n_comp = 1,
+            int warp_size = ryujin::warp_size,
             int simd_length = dealii::VectorizedArray<Number>::size()>
-  class SparseMatrix
-      : public MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>
+  class SparseMatrix : public MirroredStorage<
+                           SparseMatrix<Number, n_comp, warp_size, simd_length>>
   {
   public:
+    static_assert(warp_size % simd_length == 0,
+                  "The warp size must be an integer multiple of the SIMD "
+                  "length");
+
     /**
      * @name Constructor and initialization
      */
@@ -63,7 +76,7 @@ namespace ryujin
     /**
      * Constructor taking a SIMD sparsity pattern as an argument.
      */
-    SparseMatrix(const SparsityPattern<simd_length> &sparsity,
+    SparseMatrix(const SparsityPattern<warp_size> &sparsity,
                  const TransferPolicy transfer_policy =
                      TransferPolicy::explicit_transfers);
 
@@ -81,7 +94,7 @@ namespace ryujin
      * only, TransferPolicy::implicit_transfers_default_resident is not an
      * admissible @p transfer_policy for this function.
      */
-    void reinit(const SparsityPattern<simd_length> &sparsity,
+    void reinit(const SparsityPattern<warp_size> &sparsity,
                 const TransferPolicy transfer_policy =
                     TransferPolicy::explicit_transfers);
 
@@ -105,7 +118,8 @@ namespace ryujin
      * (TransferPolicy::implicit_transfers).
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true> view();
+    SparseMatrixView<Number, n_comp, warp_size, simd_length, MemorySpace, true>
+    view();
 
     /**
      * Return a read-only view on the sparse matrix for the selected memory
@@ -115,7 +129,7 @@ namespace ryujin
      * copy_to_memory_space() (TransferPolicy::implicit_transfers).
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
+    SparseMatrixView<Number, n_comp, warp_size, simd_length, MemorySpace, false>
     view() const;
 
     /*
@@ -158,7 +172,7 @@ namespace ryujin
      */
     //@{
 
-    const SparsityPattern<simd_length> *sparsity_pattern_ =
+    const SparsityPattern<warp_size> *sparsity_pattern_ =
         nullptr; // FIXME shared_ptr
 
     /*
@@ -206,9 +220,10 @@ namespace ryujin
     void deallocate_storage();
 
 
-    friend class MirroredStorage<SparseMatrix<Number, n_comp, simd_length>>;
+    friend class MirroredStorage<
+        SparseMatrix<Number, n_comp, warp_size, simd_length>>;
 
-    template <typename, int, int, typename, bool>
+    template <typename, int, int, int, typename, bool>
     friend class SparseMatrixView;
 
     //@}
@@ -231,12 +246,17 @@ namespace ryujin
    */
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   class SparseMatrixView
   {
   public:
+    static_assert(warp_size % simd_length == 0,
+                  "The warp size must be an integer multiple of the SIMD "
+                  "length");
+
     /**
      * @name Constructor and initialization
      */
@@ -244,11 +264,12 @@ namespace ryujin
 
     SparseMatrixView() = default;
 
-    SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+    SparseMatrixView(
+        SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix)
       requires(writable);
 
-    SparseMatrixView(
-        const SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+    SparseMatrixView(const SparseMatrix<Number, n_comp, warp_size, simd_length>
+                         &sparse_matrix)
       requires(!writable);
 
     /**
@@ -263,6 +284,7 @@ namespace ryujin
     DEAL_II_HOST_DEVICE
     SparseMatrixView(const SparseMatrixView<Number,
                                             n_comp,
+                                            warp_size,
                                             simd_length,
                                             MemorySpace,
                                             other_writable> &other)
@@ -442,15 +464,15 @@ namespace ryujin
      */
     //@{
 
-    using SM = SparseMatrix<Number, n_comp, simd_length>;
+    using SM = SparseMatrix<Number, n_comp, warp_size, simd_length>;
     std::conditional_t<writable, SM *, const SM *> sparse_matrix_;
 
-    SparsityPatternView<simd_length, MemorySpace> sparsity_pattern_;
+    SparsityPatternView<warp_size, MemorySpace> sparsity_pattern_;
 
     using KokkosSpace = typename MemorySpace::kokkos_space;
     Kokkos::View<Number *, KokkosSpace> data_;
 
-    template <typename, int, int, typename, bool>
+    template <typename, int, int, int, typename, bool>
     friend class SparseMatrixView;
 
     //@}
@@ -472,13 +494,17 @@ namespace ryujin
    * must be a container with a subscript operator[] returning a matrix for
    * each component.
    */
-  template <typename Number, int n_comp, int simd_length, typename FullMatrix>
+  template <typename Number,
+            int n_comp,
+            int warp_size,
+            int simd_length,
+            typename FullMatrix>
   void distribute_local_to_global(
       const FullMatrix &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices_row,
       const std::vector<dealii::types::global_dof_index> &dof_indices_column,
       const dealii::AffineConstraints<Number> &affine_constraints,
-      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix);
+      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix);
 
 
   /*
@@ -487,6 +513,7 @@ namespace ryujin
    */
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename FullMatrix,
             typename Vector>
@@ -494,7 +521,7 @@ namespace ryujin
       const FullMatrix &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices,
       const dealii::AffineConstraints<Number> &affine_constraints,
-      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix);
+      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix);
 
 
 #ifndef DOXYGEN
@@ -505,18 +532,18 @@ namespace ryujin
    */
 
 
-  template <typename Number, int n_components, int simd_length>
-  SparseMatrix<Number, n_components, simd_length>::SparseMatrix(
-      const SparsityPattern<simd_length> &sparsity,
+  template <typename Number, int n_components, int warp_size, int simd_length>
+  SparseMatrix<Number, n_components, warp_size, simd_length>::SparseMatrix(
+      const SparsityPattern<warp_size> &sparsity,
       const TransferPolicy transfer_policy)
   {
     reinit(sparsity, transfer_policy);
   }
 
 
-  template <typename Number, int n_components, int simd_length>
-  void SparseMatrix<Number, n_components, simd_length>::reinit(
-      const SparsityPattern<simd_length> &sparsity,
+  template <typename Number, int n_components, int warp_size, int simd_length>
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::reinit(
+      const SparsityPattern<warp_size> &sparsity,
       const TransferPolicy transfer_policy)
   {
     /*
@@ -566,33 +593,43 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_comp, int simd_length>
+  template <typename Number, int n_comp, int warp_size, int simd_length>
   template <typename MemorySpace>
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>
-  SparseMatrix<Number, n_comp, simd_length>::view()
+  SparseMatrixView<Number, n_comp, warp_size, simd_length, MemorySpace, true>
+  SparseMatrix<Number, n_comp, warp_size, simd_length>::view()
   {
     this->template prepare_write_access<MemorySpace>();
 
-    return SparseMatrixView<Number, n_comp, simd_length, MemorySpace, true>(
-        *this);
+    return SparseMatrixView<Number,
+                            n_comp,
+                            warp_size,
+                            simd_length,
+                            MemorySpace,
+                            true>(*this);
   }
 
 
-  template <typename Number, int n_comp, int simd_length>
+  template <typename Number, int n_comp, int warp_size, int simd_length>
   template <typename MemorySpace>
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>
-  SparseMatrix<Number, n_comp, simd_length>::view() const
+  SparseMatrixView<Number, n_comp, warp_size, simd_length, MemorySpace, false>
+  SparseMatrix<Number, n_comp, warp_size, simd_length>::view() const
   {
     this->template prepare_read_access<MemorySpace>();
 
-    return SparseMatrixView<Number, n_comp, simd_length, MemorySpace, false>(
-        *this);
+    return SparseMatrixView<Number,
+                            n_comp,
+                            warp_size,
+                            simd_length,
+                            MemorySpace,
+                            false>(*this);
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::allocate_storage() const
+  void
+  SparseMatrix<Number, n_components, warp_size, simd_length>::allocate_storage()
+      const
   {
     using HostSpace = dealii::MemorySpace::Host;
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
@@ -629,10 +666,10 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename To, typename From>
-  void
-  SparseMatrix<Number, n_components, simd_length>::deep_copy_storage() const
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::
+      deep_copy_storage() const
   {
     using HostSpace = dealii::MemorySpace::Host;
 
@@ -644,9 +681,10 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::deallocate_storage()
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::
+      deallocate_storage()
   {
     using HostSpace = dealii::MemorySpace::Host;
 
@@ -660,9 +698,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::
       zero_out_ghost_rows_on_memory_space()
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -685,9 +723,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::
       populate_exchange_buffer_on_memory_space()
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -742,9 +780,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename MemorySpace>
-  void SparseMatrix<Number, n_components, simd_length>::
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::
       update_ghost_rows_on_memory_space()
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -854,11 +892,11 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_components, int simd_length>
+  template <typename Number, int n_components, int warp_size, int simd_length>
   template <typename MemorySpace>
-  void
-  SparseMatrix<Number, n_components, simd_length>::compress_on_memory_space(
-      dealii::VectorOperation::values operation [[maybe_unused]])
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::
+      compress_on_memory_space(dealii::VectorOperation::values operation
+                               [[maybe_unused]])
   {
     AssertThrow(operation == dealii::VectorOperation::add,
                 dealii::ExcNotImplemented());
@@ -980,11 +1018,18 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      SparseMatrixView(SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::
+      SparseMatrixView(
+          SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix)
     requires(writable)
   {
     reinit(sparse_matrix);
@@ -993,12 +1038,19 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::
       SparseMatrixView(
-          const SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+          const SparseMatrix<Number, n_comp, warp_size, simd_length>
+              &sparse_matrix)
     requires(!writable)
   {
     reinit(sparse_matrix);
@@ -1007,17 +1059,23 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <bool other_writable>
-  DEAL_II_HOST_DEVICE
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      SparseMatrixView(const SparseMatrixView<Number,
-                                              n_comp,
-                                              simd_length,
-                                              MemorySpace,
-                                              other_writable> &other)
+  DEAL_II_HOST_DEVICE SparseMatrixView<
+      Number,
+      n_comp,
+      warp_size,
+      simd_length,
+      MemorySpace,
+      writable>::SparseMatrixView(const SparseMatrixView<Number,
+                                                         n_comp,
+                                                         warp_size,
+                                                         simd_length,
+                                                         MemorySpace,
+                                                         other_writable> &other)
     requires(!writable && other_writable)
       : sparse_matrix_(other.sparse_matrix_)
       , sparsity_pattern_(other.sparsity_pattern_)
@@ -1028,13 +1086,17 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename SparseMatrix>
-  void
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::reinit(
-      SparseMatrix &sparse_matrix)
+  void SparseMatrixView<Number,
+                        n_comp,
+                        warp_size,
+                        simd_length,
+                        MemorySpace,
+                        writable>::reinit(SparseMatrix &sparse_matrix)
     requires(writable != std::is_const_v<SparseMatrix>)
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -1064,13 +1126,19 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_entry(const unsigned int row, const unsigned int column_index) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::read_entry(const unsigned int row,
+                                         const unsigned int column_index) const
   {
     static_assert(
         n_comp == 1,
@@ -1083,13 +1151,19 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_tensor(const unsigned int row, const unsigned int column_index) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::read_tensor(const unsigned int row,
+                                          const unsigned int column_index) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
@@ -1099,7 +1173,7 @@ namespace ryujin
 
     Tensor result;
 
-    using VA = dealii::VectorizedArray<Number>;
+    using VA = dealii::VectorizedArray<Number, simd_length>;
     if constexpr (std::is_same_v<VA, Number2>) {
       /*
        * Vectorized fast access. Indices must be in the range
@@ -1118,7 +1192,7 @@ namespace ryujin
           sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
       for (unsigned int d = 0; d < n_comp; ++d)
-        result[d].load(load_pos + d * simd_length);
+        result[d].load(load_pos + d * warp_size);
 
     } else {
       /*
@@ -1138,14 +1212,20 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_transposed_entry(const unsigned int row,
-                            const unsigned int column_index) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::read_transposed_entry(const unsigned int row,
+                                                    const unsigned int
+                                                        column_index) const
   {
     static_assert(
         n_comp == 1,
@@ -1158,14 +1238,20 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_transposed_tensor(const unsigned int row,
-                             const unsigned int column_index) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::read_transposed_tensor(const unsigned int row,
+                                                     const unsigned int
+                                                         column_index) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
@@ -1175,7 +1261,7 @@ namespace ryujin
 
     dealii::Tensor<1, n_comp, Number2> result;
 
-    using VA = dealii::VectorizedArray<Number>;
+    using VA = dealii::VectorizedArray<Number, simd_length>;
     if constexpr (std::is_same_v<VA, Number2> && (n_comp == 1)) {
       /*
        * Vectorized fast access. Indices must be in the range
@@ -1221,16 +1307,21 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      write_entry(const Number2 entry,
-                  const unsigned int row,
-                  const unsigned int column_index,
-                  const bool do_streaming_store) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::write_entry(const Number2 entry,
+                                          const unsigned int row,
+                                          const unsigned int column_index,
+                                          const bool do_streaming_store) const
     requires(writable)
   {
     static_assert(
@@ -1249,22 +1340,27 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      write_tensor(const Tensor &tensor,
-                   const unsigned int row,
-                   const unsigned int column_index,
-                   const bool do_streaming_store) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::write_tensor(const Tensor &tensor,
+                                           const unsigned int row,
+                                           const unsigned int column_index,
+                                           const bool do_streaming_store) const
     requires(writable)
   {
     AssertIndexRange(row, sparsity_pattern_.n_rows());
     AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
-    using VA = dealii::VectorizedArray<Number>;
+    using VA = dealii::VectorizedArray<Number, simd_length>;
     if constexpr (std::is_same_v<VA, Number2>) {
       /*
        * Vectorized fast access. Indices must be in the range [0,n_internal),
@@ -1284,10 +1380,10 @@ namespace ryujin
 
       if (do_streaming_store)
         for (unsigned int d = 0; d < n_comp; ++d)
-          tensor[d].streaming_store(store_pos + d * simd_length);
+          tensor[d].streaming_store(store_pos + d * warp_size);
       else
         for (unsigned int d = 0; d < n_comp; ++d)
-          tensor[d].store(store_pos + d * simd_length);
+          tensor[d].store(store_pos + d * warp_size);
 
     } else {
       /*
@@ -1305,15 +1401,20 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      add_entry(const Number2 entry,
-                const unsigned int row,
-                const unsigned int column_index) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::add_entry(const Number2 entry,
+                                        const unsigned int row,
+                                        const unsigned int column_index) const
     requires(writable)
   {
     static_assert(
@@ -1332,21 +1433,26 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      add_tensor(const Tensor &tensor,
-                 const unsigned int row,
-                 const unsigned int column_index) const
+  SparseMatrixView<Number,
+                   n_comp,
+                   warp_size,
+                   simd_length,
+                   MemorySpace,
+                   writable>::add_tensor(const Tensor &tensor,
+                                         const unsigned int row,
+                                         const unsigned int column_index) const
     requires(writable)
   {
     AssertIndexRange(row, sparsity_pattern_.n_rows());
     AssertIndexRange(column_index, sparsity_pattern_.row_length(row));
 
-    using VA = dealii::VectorizedArray<Number>;
+    using VA = dealii::VectorizedArray<Number, simd_length>;
     if constexpr (std::is_same_v<VA, Number2>) {
       /*
        * Vectorized fast access. Indices must be in the range [0,n_internal),
@@ -1366,9 +1472,9 @@ namespace ryujin
 
       for (unsigned int d = 0; d < n_comp; ++d) {
         auto temp = tensor[d];
-        temp.load(store_pos + d * simd_length);
+        temp.load(store_pos + d * warp_size);
         temp += tensor[d];
-        temp.store(store_pos + d * simd_length);
+        temp.store(store_pos + d * warp_size);
       }
 
     } else {
@@ -1388,11 +1494,16 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
-  void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      zero_out_ghost_rows() const
+  void SparseMatrixView<Number,
+                        n_comp,
+                        warp_size,
+                        simd_length,
+                        MemorySpace,
+                        writable>::zero_out_ghost_rows() const
     requires(writable)
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -1411,11 +1522,16 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
-  void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      update_ghost_rows() const
+  void SparseMatrixView<Number,
+                        n_comp,
+                        warp_size,
+                        simd_length,
+                        MemorySpace,
+                        writable>::update_ghost_rows() const
     requires(writable)
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -1434,11 +1550,17 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
+            int warp_size,
             int simd_length,
             typename MemorySpace,
             bool writable>
-  void SparseMatrixView<Number, n_comp, simd_length, MemorySpace, writable>::
-      compress(dealii::VectorOperation::values operation) const
+  void SparseMatrixView<Number,
+                        n_comp,
+                        warp_size,
+                        simd_length,
+                        MemorySpace,
+                        writable>::compress(dealii::VectorOperation::values
+                                                operation) const
     requires(writable)
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -1455,14 +1577,18 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_comp, int simd_length, typename FM>
+  template <typename Number,
+            int n_comp,
+            int warp_size,
+            int simd_length,
+            typename FM>
   void distribute_local_to_global(
       const FM &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices_row,
       const std::vector<dealii::types::global_dof_index> &dof_indices_column,
       const dealii::AffineConstraints<Number> &affine_constraints
       [[maybe_unused]],
-      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix)
   {
     constexpr bool is_matrix = std::is_same_v<FM, dealii::FullMatrix<Number>>;
     constexpr bool is_array =
@@ -1555,12 +1681,16 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_comp, int simd_length, typename FM>
+  template <typename Number,
+            int n_comp,
+            int warp_size,
+            int simd_length,
+            typename FM>
   void distribute_local_to_global(
       const FM &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices,
       const dealii::AffineConstraints<Number> &affine_constraints,
-      SparseMatrix<Number, n_comp, simd_length> &sparse_matrix)
+      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix)
   {
     constexpr bool is_matrix = std::is_same_v<FM, dealii::FullMatrix<Number>>;
     constexpr bool is_array =

@@ -569,6 +569,13 @@ namespace ryujin
       const std::vector<point_type> &points_vector,
       std::vector<value_type> &val_new)
   {
+    /* Ensure that the state vector is resident on the host memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      const auto &[U, precomputed, parabolic] = state_vector;
+      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
+      precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
+    }
+
     const auto U_view = std::get<0>(state_vector).view();
 
     value_type spatial_average;

@@ -10,14 +10,6 @@
 // space: We compute all runtime parameters and derived quantities of the
 // view on the host and on the default memory space and print both results.
 //
-// Not covered by this test:
-//  - fill_precomputed_values(): host only, this function drives a
-//    cpu_simd_loop() over OfflineData.
-//  - high_order_flux_divergence() and nodal_source(): deleted for the Euler
-//    equations.
-//  - component_names, primitive_component_names, precomputed_names: arrays
-//    of std::string that are host only by nature.
-//
 
 using namespace ryujin;
 

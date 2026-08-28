@@ -430,6 +430,13 @@ namespace ryujin
   void MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators(
       const StateVector &state_vector) const
   {
+    /* Ensure that the state vector is resident on the host memory space. */
+    if constexpr (have_separate_memory_spaces) {
+      const auto &[U, precomputed, parabolic] = state_vector;
+      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
+      precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
+    }
+
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
