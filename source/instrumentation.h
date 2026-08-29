@@ -25,7 +25,7 @@
 /**
  * Macro initializing likwid instrumentation on a worker thread. Used in main().
  */
-#define LIKWID_MARKER_THREAD_INIT
+#define LIKWID_MARKER_THREADINIT
 
 /**
  * Macro finalizing likwid instrumentation. Used in main().

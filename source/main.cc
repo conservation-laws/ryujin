@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 #ifdef WITH_OPENMP
   RYUJIN_PRAGMA(omp parallel)
   {
-    LIKWID_MARKER_THREAD_INIT;
+    LIKWID_MARKER_THREADINIT;
   }
 #endif
 
