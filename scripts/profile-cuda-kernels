@@ -1,0 +1,959 @@
+#!/usr/bin/env python
+##
+## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+## Copyright (C) 2026 by the ryujin authors
+##
+
+#
+# H E R E   B E   D R A G O N S
+#
+# This script was written together with Claude. If you find the spaghetti
+# code too horrible to read, feel free to delete it, rewrite it from
+# scratch, or print it out and set it on fire. Nobody will mourn it.
+#
+
+help_description = """
+This script collects hardware performance counters for individual device
+kernel invocations with NVIDIA Nsight Compute (ncu) and reports the derived
+quantities that are of interest for a compute kernel: achieved floating
+point throughput (GFLOP/s), memory throughput (MiB/s), arithmetic
+intensity, occupancy (theoretical and achieved), warps per SM, threads,
+register and shared memory usage.
+
+The script requires that ryujin has been configured with NVTX support
+(-DWITH_NVTX=ON). In that case every named device compute loop (see
+loop.h) opens an NVTX range and every kernel invocation can be attributed
+to the compute loop it was launched from. The loops of the hyperbolic
+update are named "hyperbolic_kernel_XX", where XX is the number of the
+step, with an optional trailing letter distinguishing the individual loops
+of a step, for example "hyperbolic_kernel_04", or "hyperbolic_kernel_03a".
+
+It is meant to be run in the directory that contains the ryujin executable
+and the parameter file.
+
+Example usage:
+
+> ./profile-cuda-kernels --kill
+
+Profiles the first 20 kernel invocations of "./ryujin ryujin.prm" and stops
+the simulation afterwards instead of letting it run to completion.
+
+> ./profile-cuda-kernels --kill --launch-skip 200 --launch-count 40
+
+Skips the first 200 kernel invocations (mesh setup and the first couple of
+time steps) and then profiles the next 40.
+
+> ./profile-cuda-kernels --kill --section 'hyperbolic_kernel_03*'
+
+Only profiles kernels launched from within the given compute loop.
+
+> ./profile-cuda-kernels -- mpirun -np 1 ./ryujin ryujin.prm
+
+Profiles a different command line.
+
+> ./profile-cuda-kernels --import ryujin-kernels.ncu-rep --csv kernels.csv
+
+Recomputes the tables from an already recorded report without profiling
+again and additionally writes the full, untruncated table to a csv file.
+
+The report that is written (ryujin-kernels.ncu-rep by default) can also be
+opened with ncu-ui. For that to be useful record the complete metric set
+with --metrics-set full, which is considerably slower but adds the source
+correlation, the roofline chart, and the memory workload diagram.
+
+If ncu aborts with ERR_NVGPUCTRPERM then the driver denies access to the
+performance counters. Either profile as root, or put
+
+  options nvidia NVreg_RestrictProfilingToAdminUsers=0
+
+into /etc/modprobe.d/nvidia.conf and reload the nvidia kernel module.
+"""
+
+import argparse, csv, io, os, re, shutil, subprocess, sys, textwrap
+from tabulate import tabulate
+
+#
+# The set of metrics we request from ncu. Requesting individual metrics
+# instead of a full section set (--set full) keeps the number of replay
+# passes - and thus the runtime - down.
+#
+
+METRICS = [
+    # wall time of the kernel:
+    "gpu__time_duration.sum",
+    # floating point instructions, by precision:
+    "sm__sass_thread_inst_executed_op_fadd_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_fmul_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_ffma_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_dadd_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_dmul_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_dfma_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_hadd_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_hmul_pred_on.sum",
+    "sm__sass_thread_inst_executed_op_hfma_pred_on.sum",
+    # memory traffic:
+    "dram__bytes_read.sum",
+    "dram__bytes_write.sum",
+    "lts__t_bytes.sum",
+    "l1tex__t_bytes.sum",
+    # speed of light:
+    "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+    "gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed",
+    # occupancy:
+    "sm__maximum_warps_per_active_cycle_pct",
+    "sm__warps_active.avg.pct_of_peak_sustained_active",
+    "sm__warps_active.avg.per_cycle_active",
+    # launch configuration:
+    "launch__grid_size",
+    "launch__block_size",
+    "launch__thread_count",
+    "launch__registers_per_thread",
+    "launch__shared_mem_per_block_static",
+    "launch__shared_mem_per_block_dynamic",
+    "launch__waves_per_multiprocessor",
+    "launch__occupancy_limit_registers",
+    "launch__occupancy_limit_shared_mem",
+    "launch__occupancy_limit_warps",
+    "launch__occupancy_limit_blocks",
+]
+
+#
+# Command line arguments:
+#
+
+parser = argparse.ArgumentParser(
+    prog="profile-cuda-kernels",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=textwrap.dedent(help_description),
+)
+
+parser.add_argument(
+    "command",
+    nargs="*",
+    default=[],
+    help="command to profile (default: ./ryujin ryujin.prm). Prefix with »--« "
+    "if the command line contains options of its own",
+)
+
+parser.add_argument(
+    "--section",
+    type=str,
+    default=None,
+    help="only profile kernels launched from within the given compute loop. "
+    "This is an NVTX range expression in which »*« acts as a wildcard, for "
+    "example 'hyperbolic_kernel_03*'",
+    required=False,
+)
+
+parser.add_argument(
+    "--kernel-name",
+    type=str,
+    default=None,
+    help="only profile kernels whose (mangled) name matches the given regular "
+    "expression",
+    required=False,
+)
+
+parser.add_argument(
+    "--launch-count",
+    type=int,
+    default=20,
+    help="number of kernel invocations to profile, 0 for no limit (default: 20)",
+    required=False,
+)
+
+parser.add_argument(
+    "--launch-skip",
+    type=int,
+    default=0,
+    help="number of kernel invocations to skip before profiling (default: 0)",
+    required=False,
+)
+
+parser.add_argument(
+    "--kill",
+    action="store_true",
+    help="terminate the application as soon as the requested number of kernel "
+    "invocations has been profiled instead of letting the simulation run to "
+    "completion",
+)
+
+parser.add_argument(
+    "--output",
+    type=str,
+    default="ryujin-kernels",
+    help="basename of the ncu report that is written (default: ryujin-kernels)",
+    required=False,
+)
+
+parser.add_argument(
+    "--import",
+    dest="import_file",
+    type=str,
+    default=None,
+    help="do not profile, but analyze an already recorded ncu report (or a csv "
+    "file recorded with »ncu --csv --page raw«)",
+    required=False,
+)
+
+parser.add_argument(
+    "--csv",
+    dest="csv_file",
+    type=str,
+    default=None,
+    help="additionally write the per invocation table to the given csv file",
+    required=False,
+)
+
+parser.add_argument(
+    "--dry-run",
+    action="store_true",
+    help="print the ncu command line that would be executed and exit",
+)
+
+parser.add_argument(
+    "--ncu",
+    type=str,
+    default="ncu",
+    help="the Nsight Compute command line profiler to use (default: ncu)",
+    required=False,
+)
+
+parser.add_argument(
+    "--metrics-set",
+    type=str,
+    choices=["default", "full"],
+    default="default",
+    help="»default« records the metrics needed for the tables below, »full« "
+    "records the complete »--set full« metric set which is considerably "
+    "slower but can be inspected with ncu-ui (default: default)",
+    required=False,
+)
+
+args = parser.parse_args()
+
+command = args.command if args.command else ["./ryujin", "ryujin.prm"]
+
+
+#
+# Unit handling: ncu annotates every metric with a unit. Normalize
+# durations to seconds and byte counts to bytes.
+#
+
+PREFIXES = {
+    "": 1.0,
+    "n": 1e-9,
+    "u": 1e-6,
+    "µ": 1e-6,
+    "m": 1e-3,
+    "k": 1e3,
+    "K": 1e3,
+    "M": 1e6,
+    "G": 1e9,
+    "T": 1e12,
+}
+
+
+def unit_scale(unit):
+    match = re.fullmatch(r"([nuµmkKMGT]?)(second|byte|s|B)", unit.strip())
+    if match:
+        return PREFIXES.get(match.group(1), 1.0)
+    return 1.0
+
+
+def to_float(value):
+    if value is None:
+        return None
+    value = value.strip().replace(",", "")
+    if value in ("", "N/A", "n/a", "-"):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+#
+# ncu invocation:
+#
+
+
+def ncu_command():
+    command_line = [args.ncu, "--target-processes", "all", "--replay-mode", "kernel"]
+
+    if args.metrics_set == "full":
+        command_line += ["--set", "full"]
+    else:
+        command_line += ["--metrics", ",".join(METRICS)]
+
+    if args.launch_count > 0:
+        command_line += ["--launch-count", str(args.launch_count)]
+        if args.kill:
+            command_line += ["--kill", "yes"]
+    if args.launch_skip > 0:
+        command_line += ["--launch-skip", str(args.launch_skip)]
+
+    #
+    # Always record the NVTX state: this is what allows us to attribute
+    # every kernel invocation to the compute loop it was launched from, see
+    # collect_records().
+    #
+    command_line += ["--nvtx"]
+
+    if args.section is not None:
+        section = args.section if args.section.endswith("/") else args.section + "/"
+        command_line += ["--nvtx-include", section]
+
+    if args.kernel_name is not None:
+        command_line += ["--kernel-name", "regex:" + args.kernel_name]
+
+    #
+    # Note: ncu does not accept a bare »--« separator, the application and
+    # its arguments are simply appended to the option list.
+    #
+    command_line += ["--force-overwrite", "--export", args.output]
+    command_line += command
+
+    return command_line
+
+
+def fail(command_line, output):
+    sys.stdout.flush()
+    if "ERR_NVGPUCTRPERM" in output:
+        print(
+            "[ERROR] The driver denies access to the GPU performance "
+            "counters. Either run this script as root, or lift the "
+            "restriction permanently by putting\n\n"
+            "  options nvidia NVreg_RestrictProfilingToAdminUsers=0\n\n"
+            "into /etc/modprobe.d/nvidia.conf and reloading the nvidia "
+            "kernel module (or rebooting).",
+            file=sys.stderr,
+        )
+    print(
+        "[ERROR] »%s« failed" % " ".join(command_line),
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def run(command_line, check=True):
+    """Run a command line and return the completed process. Used for the
+    (quick and quiet) ncu imports."""
+
+    environment = dict(os.environ, LC_ALL="C")
+    result = subprocess.run(
+        command_line, capture_output=True, text=True, env=environment
+    )
+    if check and result.returncode != 0:
+        if "ERR_NVGPUCTRPERM" not in result.stdout + result.stderr:
+            sys.stderr.write(result.stdout)
+            sys.stderr.write(result.stderr)
+        fail(command_line, result.stdout + result.stderr)
+    return result
+
+
+def run_profiler(command_line):
+    """Run the profiler and echo its output (and the output of the profiled
+    application) as it arrives, so that a long running simulation remains
+    observable."""
+
+    environment = dict(os.environ, LC_ALL="C")
+    process = subprocess.Popen(
+        command_line,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=environment,
+    )
+
+    #
+    # Read character by character: ryujin updates its status line with a
+    # carriage return and would otherwise only show up in large chunks.
+    #
+    output = []
+    while True:
+        character = process.stdout.read(1)
+        if not character:
+            break
+        sys.stdout.write(character)
+        sys.stdout.flush()
+        output.append(character)
+    process.wait()
+
+    if process.returncode != 0:
+        fail(command_line, "".join(output))
+
+
+def preflight():
+    if shutil.which(args.ncu) is None and not os.path.isfile(args.ncu):
+        print(
+            "[ERROR] Could not find »%s«. Nsight Compute is part of the CUDA "
+            "toolkit; make sure that the nsight-compute component is "
+            "installed and that its bin directory is in PATH, or point this "
+            "script to the binary with --ncu." % args.ncu,
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    executable = command[0]
+    if not os.path.isfile(executable):
+        return
+
+    #
+    # nm and ldd are not essential, silently skip the check if they are
+    # unavailable:
+    #
+    def inspect(command_line):
+        try:
+            result = subprocess.run(command_line, capture_output=True, text=True)
+        except OSError:
+            return None
+        return result.stdout if result.returncode == 0 else None
+
+    symbols = inspect(["nm", "-uC", executable])
+    if symbols is not None and "cudaProfilerStart" not in symbols:
+        print(
+            "[WARNING] »%s« does not reference cudaProfilerStart(), which "
+            "means it was built without -DWITH_NVTX=ON. Kernels will not be "
+            "attributed to a compute loop." % executable
+        )
+
+    libraries = inspect(["ldd", executable])
+    if libraries is not None and "not found" in libraries:
+        missing = [
+            line.split("=>")[0].strip()
+            for line in libraries.splitlines()
+            if "not found" in line
+        ]
+        print(
+            "[WARNING] »%s« has unresolved shared libraries (%s). The device "
+            "build needs LD_LIBRARY_PATH to point at the Kokkos installation."
+            % (executable, ", ".join(missing))
+        )
+
+
+#
+# Parsing of the ncu csv output. We support both the wide format of the
+# »raw« page (one row per kernel invocation, one column per metric,
+# followed by a row of units) and the long format of the »details« page
+# (one row per kernel invocation and metric).
+#
+
+
+def parse_csv(text):
+    """Return a list of dictionaries, one per kernel invocation, mapping
+    column name to a value normalized to seconds/bytes."""
+
+    #
+    # ncu prepends status messages such as "==PROF== Disconnected from
+    # process" to its csv output. Skip everything before the header line.
+    #
+    lines = text.splitlines()
+    start = 0
+    for index, line in enumerate(lines):
+        if line.startswith('"ID"') or line.startswith("ID,"):
+            start = index
+            break
+    else:
+        return []
+
+    rows = list(csv.reader(io.StringIO("\n".join(lines[start:]))))
+    if len(rows) < 2:
+        return []
+
+    header = [entry.strip() for entry in rows[0]]
+    body = rows[1:]
+
+    if "Metric Name" in header and "Metric Value" in header:
+        return parse_long_format(header, body)
+    return parse_wide_format(header, body)
+
+
+META_COLUMNS = (
+    "ID",
+    "Process ID",
+    "Process Name",
+    "Host Name",
+    "Kernel Name",
+    "Demangled Name",
+    "Function Name",
+    "Kernel Time",
+    "Context",
+    "Stream",
+    "Section",
+    "Nvtx",
+    "Block Size",
+    "Grid Size",
+    "Device",
+    "CC",
+    "Section Name",
+    "Rule Name",
+    "Rule Type",
+    "Rule Description",
+    "Estimated Speedup Type",
+    "Estimated Speedup",
+)
+
+
+def kernel_name(record):
+    for column in ("Kernel Name", "Demangled Name", "Function Name"):
+        if record.get(column):
+            return record[column]
+    return "unknown"
+
+
+def parse_wide_format(header, body):
+    #
+    # The raw page emits a row of units directly below the header. Detect
+    # it by checking that it carries no numeric entry at all.
+    #
+    units = {}
+    if body and all(to_float(entry) is None for entry in body[0]):
+        units = {name: value.strip() for name, value in zip(header, body[0])}
+        body = body[1:]
+
+    records = []
+    for row in body:
+        if len(row) < len(header):
+            continue
+        record = {}
+        for name, value in zip(header, row):
+            if name in META_COLUMNS:
+                record[name] = value.strip()
+                continue
+            number = to_float(value)
+            if number is not None:
+                number *= unit_scale(units.get(name, ""))
+            record[name] = number
+        records.append(record)
+    return records
+
+
+def parse_long_format(header, body):
+    index = {name: position for position, name in enumerate(header)}
+    records = {}
+    order = []
+    for row in body:
+        if len(row) < len(header):
+            continue
+        identifier = row[index["ID"]].strip()
+        if identifier not in records:
+            records[identifier] = {
+                name: row[index[name]].strip()
+                for name in META_COLUMNS
+                if name in index
+            }
+            order.append(identifier)
+        number = to_float(row[index["Metric Value"]])
+        if number is not None:
+            number *= unit_scale(row[index["Metric Unit"]])
+        records[identifier][row[index["Metric Name"]].strip()] = number
+    return [records[identifier] for identifier in order]
+
+
+def collect_records():
+    if args.import_file is not None:
+        report = args.import_file
+    else:
+        report = args.output + ".ncu-rep"
+
+    if report.endswith(".csv"):
+        with open(report) as handle:
+            records = parse_csv(handle.read())
+        return records, any(record.get("Section") for record in records)
+
+    if not os.path.isfile(report):
+        print("[ERROR] »%s« does not exist" % report, file=sys.stderr)
+        sys.exit(1)
+
+    metrics = run([args.ncu, "--import", report, "--csv", "--page", "raw"])
+    records = parse_csv(metrics.stdout)
+
+    #
+    # A second import with --print-nvtx-rename replaces the kernel name
+    # with the innermost enclosing NVTX range, i.e., with the name of the
+    # compute loop the kernel was launched from. Joining both imports on the
+    # launch ID attributes every invocation to its loop.
+    #
+    renamed = run(
+        [
+            args.ncu,
+            "--import",
+            report,
+            "--csv",
+            "--page",
+            "raw",
+            "--print-nvtx-rename",
+            "kernel",
+        ],
+        check=False,
+    )
+
+    if renamed.returncode != 0:
+        return records, False
+
+    sections = {
+        record.get("ID"): kernel_name(record) for record in parse_csv(renamed.stdout)
+    }
+    if not sections:
+        return records, False
+
+    #
+    # The renamed kernel name is the NVTX range stack with the kernel name
+    # appended, all separated by "/". Drop the kernel name again and keep
+    # the innermost range as loop name. If the report contains no NVTX
+    # ranges then nothing is prepended and we come up empty handed.
+    #
+    renamed_any = False
+    for record in records:
+        stack = sections.get(record.get("ID"), "").split("/")[:-1]
+        record["Nvtx"] = "/".join(stack)
+        record["Section"] = stack[-1] if stack else "-"
+        if stack:
+            renamed_any = True
+
+    return records, renamed_any
+
+
+#
+# Derived quantities:
+#
+
+
+def get(record, name):
+    value = record.get(name)
+    return 0.0 if value is None else value
+
+
+#
+# The occupancy limiters, in the order in which they are reported:
+#
+
+OCCUPANCY_LIMITS = {
+    "regs": "launch__occupancy_limit_registers",
+    "smem": "launch__occupancy_limit_shared_mem",
+    "warps": "launch__occupancy_limit_warps",
+    "blocks": "launch__occupancy_limit_blocks",
+}
+
+
+def analyze(record):
+    duration = get(record, "gpu__time_duration.sum")
+
+    def flops(add, mul, fma):
+        prefix = "sm__sass_thread_inst_executed_op_"
+        return (
+            get(record, prefix + add + "_pred_on.sum")
+            + get(record, prefix + mul + "_pred_on.sum")
+            + 2.0 * get(record, prefix + fma + "_pred_on.sum")
+        )
+
+    fp32 = flops("fadd", "fmul", "ffma")
+    fp64 = flops("dadd", "dmul", "dfma")
+    fp16 = flops("hadd", "hmul", "hfma")
+    flop = fp32 + fp64 + fp16
+
+    dram = get(record, "dram__bytes_read.sum") + get(record, "dram__bytes_write.sum")
+
+    limits = {
+        name: record.get(metric) for name, metric in OCCUPANCY_LIMITS.items()
+    }
+    limits = {name: value for name, value in limits.items() if value is not None}
+    limiter = min(limits, key=limits.get) if limits else "-"
+
+    result = {
+        "id": record.get("ID", "-"),
+        "section": record.get("Section", "-"),
+        "nvtx": record.get("Nvtx", ""),
+        "kernel": kernel_name(record),
+        "duration": duration,
+        "flop": flop,
+        "flop_fp32": fp32,
+        "flop_fp64": fp64,
+        "flop_fp16": fp16,
+        "gflops": flop / duration / 1e9 if duration else 0.0,
+        "fp64_percent": 100.0 * fp64 / flop if flop else 0.0,
+        "dram_bytes": dram,
+        "dram_mib_s": dram / 2**20 / duration if duration else 0.0,
+        "l2_mib_s": get(record, "lts__t_bytes.sum") / 2**20 / duration
+        if duration
+        else 0.0,
+        "l1_mib_s": get(record, "l1tex__t_bytes.sum") / 2**20 / duration
+        if duration
+        else 0.0,
+        "intensity": flop / dram if dram else 0.0,
+        "compute_sol": get(
+            record, "sm__throughput.avg.pct_of_peak_sustained_elapsed"
+        ),
+        "memory_sol": get(
+            record, "gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed"
+        ),
+        "occupancy": get(record, "sm__maximum_warps_per_active_cycle_pct"),
+        "achieved_occupancy": get(
+            record, "sm__warps_active.avg.pct_of_peak_sustained_active"
+        ),
+        "warps_per_sm": get(record, "sm__warps_active.avg.per_cycle_active"),
+        "waves_per_sm": get(record, "launch__waves_per_multiprocessor"),
+        "threads": get(record, "launch__thread_count"),
+        "block_size": get(record, "launch__block_size"),
+        "grid_size": get(record, "launch__grid_size"),
+        "registers": get(record, "launch__registers_per_thread"),
+        "shared_memory": get(record, "launch__shared_mem_per_block_static")
+        + get(record, "launch__shared_mem_per_block_dynamic"),
+        "limiter": limiter,
+    }
+    return result
+
+
+def truncate(text, width):
+    return text if len(text) <= width else text[: width - 3] + "..."
+
+
+def print_invocation_table(results):
+    table = [
+        [
+            truncate(result["section"], 38),
+            result["id"],
+            1e6 * result["duration"],
+            result["gflops"],
+            result["fp64_percent"],
+            result["dram_mib_s"],
+            result["intensity"],
+            result["occupancy"],
+            result["achieved_occupancy"],
+            result["warps_per_sm"],
+            result["registers"],
+            result["threads"],
+            result["block_size"],
+            result["grid_size"],
+            result["limiter"],
+        ]
+        for result in results
+    ]
+
+    headers = [
+        "section",
+        "id",
+        "dur [us]",
+        "GFLOP/s",
+        "fp64 [%]",
+        "DRAM [MiB/s]",
+        "AI",
+        "occ [%]",
+        "ach [%]",
+        "warps/SM",
+        "regs",
+        "threads",
+        "block",
+        "grid",
+        "limiter",
+    ]
+
+    print("\nPer invocation:\n")
+    print(
+        tabulate(
+            table,
+            headers=headers,
+            floatfmt=(
+                "",
+                "",
+                ".1f",
+                ".1f",
+                ".1f",
+                ".1f",
+                ".2f",
+                ".1f",
+                ".1f",
+                ".1f",
+                ".0f",
+                ".0f",
+                ".0f",
+                ".0f",
+                "",
+            ),
+        )
+    )
+
+
+def print_section_table(results):
+    sections = {}
+    for result in results:
+        sections.setdefault(result["section"], []).append(result)
+
+    table = []
+    for section, entries in sorted(sections.items()):
+        count = len(entries)
+        total = sum(entry["duration"] for entry in entries)
+
+        def mean(name):
+            return sum(entry[name] for entry in entries) / count
+
+        #
+        # The occupancy limiter can differ between the invocations of a
+        # compute loop (for example when a kernel is launched with a
+        # different grid size). Report the union instead of an arbitrary
+        # representative.
+        #
+        limiters = {entry["limiter"] for entry in entries}
+        limiter = ",".join(
+            name for name in list(OCCUPANCY_LIMITS) + ["-"] if name in limiters
+        )
+
+        table.append(
+            [
+                truncate(section, 46),
+                count,
+                1e3 * total,
+                1e6 * total / count,
+                mean("gflops"),
+                mean("dram_mib_s"),
+                mean("intensity"),
+                mean("occupancy"),
+                mean("achieved_occupancy"),
+                mean("warps_per_sm"),
+                mean("registers"),
+                mean("block_size"),
+                mean("grid_size"),
+                limiter,
+            ]
+        )
+
+    headers = [
+        "section",
+        "count",
+        "total [ms]",
+        "mean [us]",
+        "GFLOP/s",
+        "DRAM [MiB/s]",
+        "AI",
+        "occ [%]",
+        "ach [%]",
+        "warps/SM",
+        "regs",
+        "block",
+        "grid",
+        "limiter",
+    ]
+
+    print("\nAggregated by compute loop (mean over all invocations):\n")
+    print(
+        tabulate(
+            table,
+            headers=headers,
+            floatfmt=(
+                "",
+                "",
+                ".3f",
+                ".1f",
+                ".1f",
+                ".1f",
+                ".2f",
+                ".1f",
+                ".1f",
+                ".1f",
+                ".0f",
+                ".0f",
+                ".0f",
+                "",
+            ),
+        )
+    )
+
+
+def write_csv(results, filename):
+    columns = [
+        "id",
+        "section",
+        "nvtx",
+        "kernel",
+        "duration",
+        "flop",
+        "flop_fp32",
+        "flop_fp64",
+        "flop_fp16",
+        "gflops",
+        "fp64_percent",
+        "dram_bytes",
+        "dram_mib_s",
+        "l2_mib_s",
+        "l1_mib_s",
+        "intensity",
+        "compute_sol",
+        "memory_sol",
+        "occupancy",
+        "achieved_occupancy",
+        "warps_per_sm",
+        "waves_per_sm",
+        "threads",
+        "block_size",
+        "grid_size",
+        "registers",
+        "shared_memory",
+        "limiter",
+    ]
+
+    with open(filename, "w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for result in results:
+            writer.writerow({column: result[column] for column in columns})
+
+    print("\n[INFO] wrote »%s«" % filename)
+
+
+def main():
+    if args.import_file is None:
+        if args.dry_run:
+            print(" ".join(ncu_command()))
+            return
+
+        preflight()
+        command_line = ncu_command()
+
+        print("[INFO] running %s" % " ".join(command_line))
+        run_profiler(command_line)
+
+        if not os.path.isfile(args.output + ".ncu-rep"):
+            sys.stdout.flush()
+            print(
+                "[ERROR] ncu did not write a report: no kernel invocation was "
+                "profiled. Check the --section, --kernel-name, and "
+                "--launch-skip arguments.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        print("[INFO] wrote »%s.ncu-rep«" % args.output)
+
+    elif args.dry_run:
+        print("[INFO] nothing to do: --dry-run given together with --import")
+        return
+
+    records, renamed = collect_records()
+
+    if not records:
+        print(
+            "[ERROR] the report does not contain any kernel invocation. Check "
+            "the --section, --kernel-name, and --launch-skip arguments.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if not renamed:
+        print(
+            "[WARNING] could not attribute kernels to compute loops. "
+            "Either this ncu does not support --print-nvtx-rename, or ryujin "
+            "was built without -DWITH_NVTX=ON."
+        )
+
+    results = [analyze(record) for record in records]
+
+    print_invocation_table(results)
+    print_section_table(results)
+
+    if args.csv_file is not None:
+        write_csv(results, args.csv_file)
+
+
+if __name__ == "__main__":
+    main()
