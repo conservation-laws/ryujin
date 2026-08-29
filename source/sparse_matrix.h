@@ -165,6 +165,18 @@ namespace ryujin
     template <typename MemorySpace>
     void compress_on_memory_space(dealii::VectorOperation::values operation);
 
+    /**
+     * Gather all entries that have to be sent to neighboring MPI ranks
+     * into the exchange buffer of the selected memory space.
+     *
+     * Note: This function is an implementation detail of
+     * compress_on_memory_space(). It is public because nvcc does not
+     * allow an extended __host__ __device__ lambda in a member function
+     * with private or protected access.
+     */
+    template <typename MemorySpace>
+    void populate_exchange_buffer_on_memory_space();
+
   private:
     //@}
     /**
@@ -198,13 +210,6 @@ namespace ryujin
     mutable Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
 
     std::vector<MPI_Request> requests_;
-
-    /**
-     * Gather all entries that have to be sent to neighboring MPI ranks
-     * into the exchange buffer of the selected memory space.
-     */
-    template <typename MemorySpace>
-    void populate_exchange_buffer_on_memory_space();
 
     /*
      * Storage primitives used by the MirroredStorage base class:
