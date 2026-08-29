@@ -54,6 +54,56 @@
 
 //@}
 /**
+ * @name NVTX support
+ */
+//@{
+
+#ifdef WITH_NVTX
+#include <cuda_profiler_api.h>
+#include <nvtx3/nvToolsExt.h>
+
+#define NVTX_MARKER_INIT cudaProfilerStart()
+#define NVTX_MARKER_CLOSE cudaProfilerStop()
+#define NVTX_MARKER_START(opt) nvtxRangePushA(opt)
+#define NVTX_MARKER_STOP(opt) nvtxRangePop()
+
+#else
+
+/**
+ * Macro starting the CUDA profiler. Used in main().
+ */
+#define NVTX_MARKER_INIT
+
+/**
+ * Macro stopping the CUDA profiler. Used in main().
+ */
+#define NVTX_MARKER_CLOSE
+
+/**
+ * A set of macros that push and pop a named NVTX range (if support for NVTX
+ * is enabled). Such a range shows up as a labeled interval in the timeline
+ * of the CUDA profiler and allows to attribute individual kernel launches
+ * to the compute loop they originate from. We currently annotate all named
+ * device compute loops, i.e., gpu_loop() and gpu_reduction_loop() in
+ * loop.h. Usage:
+ *
+ * @code
+ * NVTX_MARKER_START("string identifier")
+ * // critical compute kernel section
+ * NVTX_MARKER_STOP("string identifier")
+ * @endcode
+ */
+#define NVTX_MARKER_START(opt)
+
+/**
+ * @copydoc NVTX_MARKER_START
+ */
+#define NVTX_MARKER_STOP(opt)
+
+#endif
+
+//@}
+/**
  * @name Clang LSAN support
  */
 //@{

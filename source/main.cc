@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
   LSAN_ENABLE
 
   LIKWID_MARKER_INIT;
+  NVTX_MARKER_INIT;
 #ifdef WITH_OPENMP
   RYUJIN_PRAGMA(omp parallel)
   {
@@ -98,6 +99,7 @@ int main(int argc, char *argv[])
     }
 
     LIKWID_MARKER_CLOSE;
+    NVTX_MARKER_CLOSE;
     LSAN_DISABLE;
     return 1;
   }
@@ -115,6 +117,7 @@ int main(int argc, char *argv[])
       }
 
       LIKWID_MARKER_CLOSE;
+      NVTX_MARKER_CLOSE;
       LSAN_DISABLE;
       return 1;
     }
@@ -132,6 +135,7 @@ int main(int argc, char *argv[])
     MPI_Barrier(mpi_communicator);
 
     LIKWID_MARKER_CLOSE;
+    NVTX_MARKER_CLOSE;
     LSAN_DISABLE;
     return 1;
   }
@@ -142,6 +146,7 @@ int main(int argc, char *argv[])
   }
 
   LIKWID_MARKER_CLOSE;
+  NVTX_MARKER_CLOSE;
   LSAN_DISABLE;
   return 0;
 }

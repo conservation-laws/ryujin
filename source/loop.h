@@ -180,6 +180,10 @@ namespace ryujin
      */
     const auto packed_args = std::make_tuple(std::forward<Args>(args)...);
 
+    if (!region_name.empty()) {
+      NVTX_MARKER_START(region_name.c_str());
+    }
+
     Kokkos::parallel_for(
         region_name,
         Policy(exec, left, right),
@@ -192,6 +196,10 @@ namespace ryujin
         });
 
     exec.fence();
+
+    if (!region_name.empty()) {
+      NVTX_MARKER_STOP(region_name.c_str());
+    }
   }
 
 
@@ -384,6 +392,10 @@ namespace ryujin
      */
     const auto packed_args = std::make_tuple(std::forward<Args>(args)...);
 
+    if (!region_name.empty()) {
+      NVTX_MARKER_START(region_name.c_str());
+    }
+
     Kokkos::parallel_reduce(
         region_name,
         Policy(exec, left, right),
@@ -395,6 +407,10 @@ namespace ryujin
               packed_args);
         },
         Reducer(result));
+
+    if (!region_name.empty()) {
+      NVTX_MARKER_STOP(region_name.c_str());
+    }
 
     ValueType combined = initial_value;
     Reducer(combined).join(combined, result);
