@@ -854,7 +854,7 @@ namespace ryujin
       };
 
       loop<MemorySpace, ScalarNumber>(
-          "time_step_1", body, 0, n_internal, n_owned);
+          "hyperbolic_kernel_01b", body, 0, n_internal, n_owned);
     }
 
 
