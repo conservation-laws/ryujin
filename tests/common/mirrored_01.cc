@@ -47,14 +47,14 @@ void print_on_default_space(const ryujin::Mirrored<Parameters> &mirrored)
 
   Kokkos::View<double *, DefaultSpace::kokkos_space> result("result", 3);
   const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for("mirrored_01",
-                       Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 1),
-                       [=](std::size_t) {
-                         result(0) = parameters->gamma;
-                         result(1) = parameters->gamma_inverse;
-                         result(2) =
-                             static_cast<double>(parameters->n_iterations);
-                       });
+  Kokkos::parallel_for(
+      "mirrored_01",
+      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 1),
+      KOKKOS_LAMBDA(std::size_t) {
+        result(0) = parameters->gamma;
+        result(1) = parameters->gamma_inverse;
+        result(2) = static_cast<double>(parameters->n_iterations);
+      });
 
   const auto result_host =
       Kokkos::create_mirror_view_and_copy(HostSpace::kokkos_space{}, result);

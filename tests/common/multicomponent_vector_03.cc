@@ -57,13 +57,14 @@ int main(int argc, char *argv[])
   const auto &view = state_vector.template view<DefaultSpace>();
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
   const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for("test",
-                       Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
-                       [=](std::size_t i) {
-                         auto a = view.read_tensor(i);
-                         a *= 10.;
-                         view.write_tensor(a, i);
-                       });
+  Kokkos::parallel_for(
+      "test",
+      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
+      KOKKOS_LAMBDA(std::size_t i) {
+        auto a = view.read_tensor(i);
+        a *= 10.;
+        view.write_tensor(a, i);
+      });
 
   std::cout << "After move to HostSpace:" << std::endl;
   state_vector.move_to_memory_space<HostSpace>();
