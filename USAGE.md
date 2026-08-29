@@ -132,4 +132,5 @@ configuration options here:
   - `WITH_DOXYGEN`: enable support for doxygen and build documentation
   - `WITH_EOSPAC`: enable support for the EOSPAC6/Sesame tabulated equation of state database (autodetection)
   - `WITH_LIKWID`: enable support for Likwid stetoscope mode (library for Intel performance counters, defaults to OFF)
+  - `WITH_NVTX`: enable NVTX instrumentation of timer sections for the CUDA profiler, i.e., nsys and ncu (defaults to OFF)
   - `WITH_OPENMP`: enable support for multithreading via OpenMP (autodetection)

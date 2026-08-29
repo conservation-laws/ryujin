@@ -83,6 +83,7 @@ option(WITH_DEAL_II_THREADS "Enable deal.II threading support" OFF)
 
 option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
 option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
+option(WITH_NVTX "Compile and link against the NVIDIA Tools Extension (NVTX) library and annotate compute sections for the CUDA profiler" OFF)
 
 if("${WITH_OPENMP}" STREQUAL "")
   find_package(OpenMP QUIET)
@@ -182,6 +183,11 @@ endif()
 if(WITH_LIKWID)
   find_package(LIKWID REQUIRED)
   list(APPEND EXTERNAL_TARGETS "Likwid::Likwid")
+endif()
+
+if(WITH_NVTX)
+  find_package(NVTX REQUIRED)
+  list(APPEND EXTERNAL_TARGETS "Nvtx::Nvtx")
 endif()
 
 if(WITH_OPENMP)
