@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 #include <computing_timer.h>
 #include <convenience_macros.h>
+#include <instrumentation.h>
 #include <simd.h>
 
 #include <deal.II/base/config.h>
@@ -52,6 +53,10 @@ namespace ryujin
     Assert(left <= internal && internal <= right,
            dealii::ExcMessage("Invalid index range: it must hold left <= "
                               "internal, internal <= right"));
+
+    if (!region_name.empty()) {
+      LIKWID_MARKER_START(region_name.c_str());
+    }
 
     using VA = dealii::VectorizedArray<ScalarNumber>;
 
@@ -116,6 +121,10 @@ namespace ryujin
         body(ScalarNumber(), std::forward<Args>(args)..., i);
     }
 #endif
+
+    if (!region_name.empty()) {
+      LIKWID_MARKER_STOP(region_name.c_str());
+    }
   }
 
 
@@ -262,6 +271,10 @@ namespace ryujin
         left <= right,
         dealii::ExcMessage("Invalid index range: it must hold left <= right"));
 
+    if (!region_name.empty()) {
+      LIKWID_MARKER_START(region_name.c_str());
+    }
+
     using ValueType = typename Reducer::value_type;
 
     ValueType result = initial_value;
@@ -310,6 +323,10 @@ namespace ryujin
         body(ValueType(), std::forward<Args>(args)..., i, result);
     }
 #endif
+
+    if (!region_name.empty()) {
+      LIKWID_MARKER_STOP(region_name.c_str());
+    }
 
     return result;
   }

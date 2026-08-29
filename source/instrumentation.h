@@ -34,9 +34,8 @@
 
 /**
  * A set of macros that start and stop likwid instrumentation (if support
- * for likwid is enabled). We currently wrap the hot paths in the
- * Euler and Navier-Stokes modules in the HyperbolicModule::step() and
- * DissipationModule::step() functions. Usage:
+ * for likwid is enabled). We currently annotate all named host compute
+ * loops, i.e., cpu_simd_loop() and cpu_reduction_loop() in loop.h. Usage:
  *
  * @code
  * LIKWID_MARKER_START("string identifier")
