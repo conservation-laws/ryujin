@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "computing_timer.h"
 #include "gpu.h"
 #include "mpi_ensemble_container.h"
-#include "scope.h"
 #include "state_vector.h"
 #include "time_loop.h"
 #include "version_info.h"
@@ -21,6 +21,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <set>
 
 #ifdef WITH_OPENMP
 #include "omp.h"
@@ -51,13 +52,11 @@ namespace ryujin
                         hyperbolic_system_,
                         parabolic_system_)
       , hyperbolic_module_(mpi_ensemble_,
-                           computing_timer_,
                            offline_data_,
                            hyperbolic_system_,
                            initial_values_,
                            "/F - HyperbolicModule")
       , parabolic_module_(mpi_ensemble_,
-                          computing_timer_,
                           offline_data_,
                           hyperbolic_system_,
                           parabolic_system_,
@@ -99,6 +98,8 @@ namespace ryujin
                     hyperbolic_system_,
                     parabolic_system_,
                     "/K - Quantities")
+      , n_global_dofs_(0)
+      , n_devices_(0)
   {
     base_name_ = "test";
     add_parameter("basename", base_name_, "Base name for all output files");
@@ -252,6 +253,9 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
+    DeviceTimer::reinit();
+    ComputingTimer::reinit();
+
     {
       base_name_ensemble_ = base_name_;
       if (mpi_ensemble_.n_ensembles() > 1) {
@@ -301,7 +305,7 @@ namespace ryujin
     };
 
     {
-      Scope scope(computing_timer_, "(re)initialize data structures");
+      ComputingTimer::Scope scope("(re)initialize data structures");
       print_info("initializing data structures");
 
       if (resume_) {
@@ -329,14 +333,16 @@ namespace ryujin
         hyperbolic_module_.reinit_state_vector(state_vector);
         parabolic_module_.reinit_state_vector(state_vector);
         {
-          Scope scope(computing_timer_,
-                      "time step [X]   - interpolate data vectors");
+          ComputingTimer::Scope scope(
+              "time step [X]   - interpolate data vectors");
           std::get<0>(state_vector) =
               initial_values_.get().interpolate_hyperbolic_vector();
         }
         Vectors::debug_poison_invalid_values(state_vector, offline_data_);
       }
     }
+
+    print_device_information(logfile_);
 
     /* Prepare the state vector for time stepping. */
     time_integrator_.prepare_state_vector(state_vector, t);
@@ -353,7 +359,7 @@ namespace ryujin
                                  : Number(0.);
 
     print_info("entering main loop");
-    computing_timer_["time loop"].start();
+    ComputingTimer::timer("time loop").start();
 
     constexpr Number relax =
         Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
@@ -368,8 +374,7 @@ namespace ryujin
       /* Accumulate quantities of interest: */
 
       if (enable_compute_quantities_) {
-        Scope scope(computing_timer_,
-                    "time step [X]   - accumulate quantities");
+        ComputingTimer::Scope scope("time step [X]   - accumulate quantities");
         quantities_.accumulate(state_vector, t);
       }
 
@@ -385,8 +390,8 @@ namespace ryujin
 
           StateVector analytic;
           {
-            Scope scope(computing_timer_,
-                        "time step [X]   - interpolate data vectors");
+            ComputingTimer::Scope scope(
+                "time step [X]   - interpolate data vectors");
             hyperbolic_module_.reinit_state_vector(analytic);
             parabolic_module_.reinit_state_vector(analytic);
             std::get<0>(analytic) =
@@ -405,8 +410,7 @@ namespace ryujin
 
         if (enable_compute_quantities_ &&
             (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
-          Scope scope(computing_timer_,
-                      "time step [X]   - write out quantities");
+          ComputingTimer::Scope scope("time step [X]   - write out quantities");
           quantities_.write_out(state_vector, t, timer_cycle);
         }
 
@@ -422,16 +426,16 @@ namespace ryujin
 
       if (enable_mesh_adaptivity_) {
         {
-          Scope scope(computing_timer_,
-                      "time step [X]   - analyze for mesh adaptation");
+          ComputingTimer::Scope scope(
+              "time step [X]   - analyze for mesh adaptation");
 
           mesh_adaptor_.analyze(state_vector, t, cycle);
         }
 
         if (mesh_adaptor_.need_mesh_adaptation()) {
-          Scope scope_1(computing_timer_, "(re)initialize data structures");
-          Scope scope_2(computing_timer_,
-                        "time step [X]   - perform mesh adaptation");
+          ComputingTimer::Scope scope_1("(re)initialize data structures");
+          ComputingTimer::Scope scope_2(
+              "time step [X]   - perform mesh adaptation");
           print_info("performing mesh adaptation");
 
           adapt_mesh_and_transfer_state_vector(state_vector,
@@ -457,10 +461,10 @@ namespace ryujin
 
       /* Synchronize wall time: */
 
-      auto wall_time = computing_timer_["time loop"].wall_time();
+      auto wall_time = ComputingTimer::timer("time loop").wall_time();
       {
-        Scope scope(computing_timer_,
-                    "time step [X] _ - synchronization barriers");
+        ComputingTimer::Scope scope(
+            "time step [X] _ - synchronization barriers");
         wall_time =
             Utilities::MPI::max(wall_time, mpi_ensemble_.world_communicator());
       }
@@ -475,8 +479,8 @@ namespace ryujin
           (wall_time >= last_terminal_output + terminal_update_interval_);
 
       if (write_to_log_file || update_terminal) {
-        Scope scope(computing_timer_,
-                    "time step [X] _ - synchronization barriers");
+        ComputingTimer::Scope scope(
+            "time step [X] _ - synchronization barriers");
         print_cycle_statistics(cycle,
                                t,
                                timer_cycle,
@@ -489,7 +493,7 @@ namespace ryujin
           (wall_time >= last_checkpoint + checkpoint_update_interval_);
 
       if (update_checkpoint) {
-        Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
+        ComputingTimer::Scope scop("time step [X]   - perform checkpointing");
 
         print_info("scheduling checkpointing");
         write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
@@ -501,13 +505,13 @@ namespace ryujin
     --cycle;
 
     if (checkpoint_update_interval_ != Number(0.)) {
-      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
+      ComputingTimer::Scope scope("time step [X]   - perform checkpointing");
 
       print_info("scheduling checkpointing");
       write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
     }
 
-    computing_timer_["time loop"].stop();
+    ComputingTimer::timer("time loop").stop();
 
     if (terminal_update_interval_ != Number(0.)) {
       /* Write final timing statistics to screen and logfile: */
@@ -728,6 +732,7 @@ namespace ryujin
 
     /* Ensure that the state vector is resident on the host memory space. */
     if constexpr (have_separate_memory_spaces) {
+      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
       const auto &[U, precomputed, parabolic] = state_vector;
       U.template copy_to_memory_space<dealii::MemorySpace::Host>();
     }
@@ -911,7 +916,7 @@ namespace ryujin
 
     /* Data output: */
 
-    Scope scope(computing_timer_, "time step [X]   - perform vtu output");
+    ComputingTimer::Scope scope("time step [X]   - perform vtu output");
     print_info("scheduling output");
 
     postprocessor_.compute(state_vector);
@@ -1043,6 +1048,103 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_device_information(
+      std::ostream &stream)
+  {
+    /* Device information is only meaningful for a device build: */
+    if constexpr (!have_separate_memory_spaces)
+      return;
+
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+    /*
+     * Determine how many distinct devices we are running on: Multiple
+     * ranks might be bound to the same device, so counting ranks would
+     * overreport. We thus count distinct (hostname, device id) pairs.
+     */
+    {
+      using Device = std::pair<std::string, int>;
+
+      const Device local{dealii::Utilities::System::get_hostname(),
+                         Kokkos::device_id()};
+      const auto all = dealii::Utilities::MPI::all_gather(
+          mpi_ensemble_.world_communicator(), local);
+      n_devices_ = std::set<Device>(all.begin(), all.end()).size();
+    }
+#endif
+
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    std::ostringstream output;
+
+    const auto entry [[maybe_unused]] =
+        [&output](const std::string &label) -> std::ostream & {
+      output << std::endl
+             << std::endl
+             << "             " << std::left << std::setw(22) << label;
+      return output;
+    };
+
+    output << std::endl
+           << "Device:      " << std::left << std::setw(22) << "backend"
+           << Kokkos::DefaultExecutionSpace::name();
+
+    /*
+     * Kokkos does not provide a portable device property class. We thus
+     * have to query the individual backends by hand:
+     */
+
+#if defined(KOKKOS_ENABLE_CUDA)
+    const auto &prop = Kokkos::Cuda{}.cuda_device_prop();
+
+    entry("device") << prop.name;
+    entry("compute capability") << prop.major << "." << prop.minor;
+    entry("device id") << Kokkos::device_id() << " of "
+                       << Kokkos::num_devices();
+    entry("devices in use")
+        << n_devices_ << " on " << mpi_ensemble_.n_world_ranks() << " ranks";
+    entry("multiprocessors") << prop.multiProcessorCount;
+    entry("warp size") << prop.warpSize << " (hardware), " << warp_size
+                       << " (ryujin::warp_size)";
+    entry("threads per SM")
+        << prop.maxThreadsPerMultiProcessor << " ("
+        << prop.maxThreadsPerMultiProcessor / prop.warpSize << " warps)";
+    entry("threads per block") << prop.maxThreadsPerBlock;
+    entry("concurrency") << Kokkos::DefaultExecutionSpace{}.concurrency();
+    entry("registers per SM") << prop.regsPerBlock;
+    entry("shared memory per SM")
+        << prop.sharedMemPerMultiprocessor / 1024 << " KiB";
+    entry("L2 cache") << prop.l2CacheSize / 1024 / 1024 << " MiB";
+    entry("global memory") << prop.totalGlobalMem / 1024 / 1024 << " MiB";
+
+#elif defined(KOKKOS_ENABLE_HIP)
+    const auto &prop = Kokkos::HIP::hip_device_prop();
+
+    entry("device") << prop.name;
+    entry("architecture") << prop.gcnArchName;
+    entry("device id") << Kokkos::device_id() << " of "
+                       << Kokkos::num_devices();
+    entry("devices in use")
+        << n_devices_ << " on " << mpi_ensemble_.n_world_ranks() << " ranks";
+    entry("compute units") << prop.multiProcessorCount;
+    entry("warp size") << prop.warpSize << " (hardware), " << warp_size
+                       << " (ryujin::warp_size)";
+    entry("threads per CU")
+        << prop.maxThreadsPerMultiProcessor << " ("
+        << prop.maxThreadsPerMultiProcessor / prop.warpSize << " warps)";
+    entry("threads per block") << prop.maxThreadsPerBlock;
+    entry("concurrency") << Kokkos::DefaultExecutionSpace{}.concurrency();
+    entry("registers per block") << prop.regsPerBlock;
+    entry("shared memory per block") << prop.sharedMemPerBlock / 1024 << " KiB";
+    entry("L2 cache") << prop.l2CacheSize / 1024 / 1024 << " MiB";
+    entry("global memory") << prop.totalGlobalMem / 1024 / 1024 << " MiB";
+#endif
+
+    stream << output.str() << std::endl;
+  }
+
+
+  template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
   {
     if (mpi_ensemble_.world_rank() != 0)
@@ -1144,9 +1246,9 @@ namespace ryujin
     stream << "]\n";
 
     if (checkpoint_update_interval_ != Number(0.)) {
-      const auto wall_time =
-          Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
-                                      mpi_ensemble_.world_communicator());
+      const auto wall_time = Utilities::MPI::min_max_avg(
+          ComputingTimer::timer("time loop").wall_time(),
+          mpi_ensemble_.world_communicator());
 
       if (final_time) {
         stream << "             Last checkpoint at FINAL TIME\n";
@@ -1193,7 +1295,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_timers(std::ostream &stream)
   {
-    std::vector<std::ostringstream> output(computing_timer_.size());
+    std::vector<std::ostringstream> output(ComputingTimer::timers().size());
 
     const auto equalize = [&]() {
       const auto ptr =
@@ -1231,9 +1333,9 @@ namespace ryujin
              << wall_time.max_index << "]";
     };
 
-    const auto cpu_time_statistics =
-        Utilities::MPI::min_max_avg(computing_timer_["time loop"].cpu_time(),
-                                    mpi_ensemble_.world_communicator());
+    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+        ComputingTimer::timer("time loop").cpu_time(),
+        mpi_ensemble_.world_communicator());
     const double total_cpu_time = cpu_time_statistics.sum;
 
     const auto print_cpu_time =
@@ -1250,18 +1352,18 @@ namespace ryujin
         };
 
     auto jt = output.begin();
-    for (auto &it : computing_timer_)
+    for (auto &it : ComputingTimer::timers())
       *jt++ << "  " << it.first;
     equalize();
 
     jt = output.begin();
-    for (auto &it : computing_timer_)
+    for (auto &it : ComputingTimer::timers())
       print_wall_time(it.second, *jt++);
     equalize();
 
     jt = output.begin();
     bool compute_percentages = false;
-    for (auto &it : computing_timer_) {
+    for (auto &it : ComputingTimer::timers()) {
       print_cpu_time(it.second, *jt++, compute_percentages);
       if (it.first.starts_with("time loop"))
         compute_percentages = true;
@@ -1293,6 +1395,7 @@ namespace ryujin
       double cpu_time_min = 0.;
       double cpu_time_max = 0.;
       double wall_time = 0.;
+      double device_time_sum = 0.;
     } previous, current;
 
     static double time_per_second_exp = 0.;
@@ -1305,18 +1408,24 @@ namespace ryujin
       current.cycle = cycle;
       current.t = t;
 
-      const auto wall_time_statistics =
-          Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
-                                      mpi_ensemble_.world_communicator());
+      const auto wall_time_statistics = Utilities::MPI::min_max_avg(
+          ComputingTimer::timer("time loop").wall_time(),
+          mpi_ensemble_.world_communicator());
       current.wall_time = wall_time_statistics.max;
 
-      const auto cpu_time_statistics =
-          Utilities::MPI::min_max_avg(computing_timer_["time loop"].cpu_time(),
-                                      mpi_ensemble_.world_communicator());
+      const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+          ComputingTimer::timer("time loop").cpu_time(),
+          mpi_ensemble_.world_communicator());
       current.cpu_time_sum = cpu_time_statistics.sum;
       current.cpu_time_avg = cpu_time_statistics.avg;
       current.cpu_time_min = cpu_time_statistics.min;
       current.cpu_time_max = cpu_time_statistics.max;
+
+      if constexpr (have_separate_memory_spaces) {
+        const auto device_time_statistics = Utilities::MPI::min_max_avg(
+            DeviceTimer::seconds(), mpi_ensemble_.world_communicator());
+        current.device_time_sum = device_time_statistics.sum;
+      }
     }
 
     if (final_time)
@@ -1334,32 +1443,6 @@ namespace ryujin
     double wall_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
                                  (current.wall_time - previous.wall_time);
 
-    double cpu_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
-                                (current.cpu_time_sum - previous.cpu_time_sum);
-
-    /* Determine whether we fudge the CPU timings: */
-    const bool fudge_cpu_timings = terminal_correct_for_hypertreadhing_ &&
-#if defined(WITH_OPENMP)
-                                   (omp_get_max_threads() == 2);
-#elif defined(WITH_DEAL_II_THREADS)
-                                   (MultithreadInfo::n_threads() == 2);
-#else
-                                   false;
-#endif
-
-    if (fudge_cpu_timings)
-      cpu_m_dofs_per_sec *= 2.;
-
-    double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
-                            previous.cpu_time_max + previous.cpu_time_min) /
-                           delta_cycles;
-    /* avoid printing small negative numbers: */
-    cpu_time_skew = std::max(0., cpu_time_skew);
-
-    const double cpu_time_skew_percentage =
-        cpu_time_skew * delta_cycles /
-        (current.cpu_time_avg - previous.cpu_time_avg);
-
     const double delta_time =
         (current.t - previous.t) / (current.cycle - previous.cycle);
     const double time_per_second =
@@ -1372,19 +1455,77 @@ namespace ryujin
     /* clang-format off */
     output << std::endl;
 
-    output << "Throughput:\n  "
-           << (fudge_cpu_timings ? "CPU*: " : "CPU : ")
-           << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
-           << " MQ/s  ("
-           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/substep)" << std::endl;
+    output << "Throughput:" << std::endl;
 
-    output << "        [cpu time skew: "
-           << std::setprecision(2) << std::scientific << cpu_time_skew
-           << "s/cycle ("
-           << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
-           << 100. * cpu_time_skew_percentage
-           << "%)]" << std::endl;
+    if constexpr (have_separate_memory_spaces) {
+      /* Write out some statistics about GPU utilization: */
+
+      const double delta_wall_time = current.wall_time - previous.wall_time;
+      const double delta_device_time =
+          current.device_time_sum - previous.device_time_sum;
+
+      const double utilization =
+          delta_device_time / (n_devices_ * delta_wall_time);
+
+      const double device_m_dofs_per_sec =
+          delta_cycles * n_dofs * efficiency / 1.e6 / delta_device_time;
+      output << "  GPU : "
+             << std::setprecision(4) << std::fixed << device_m_dofs_per_sec
+             << " MQ/s in compute kernels (on "
+             << n_devices_ << (n_devices_ == 1 ? " device)" : " devices)")
+             << std::endl;
+
+      output << "        ["
+             << std::setprecision(2) << std::fixed << delta_device_time
+             << "s device / "
+             << std::setprecision(2) << std::fixed << delta_wall_time
+             << "s wall = "
+             << std::setprecision(1) << std::fixed << 100. * utilization
+             << "% utilization ]" << std::endl;
+
+    } else {
+      /* Write out some statistics about CPU utilization: */
+
+      double cpu_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
+                                  (current.cpu_time_sum - previous.cpu_time_sum);
+
+      /* Determine whether we fudge the CPU timings: */
+      const bool fudge_cpu_timings = terminal_correct_for_hypertreadhing_ &&
+#if defined(WITH_OPENMP)
+                                     (omp_get_max_threads() == 2);
+#elif defined(WITH_DEAL_II_THREADS)
+                                     (MultithreadInfo::n_threads() == 2);
+#else
+                                     false;
+#endif
+
+      if (fudge_cpu_timings)
+        cpu_m_dofs_per_sec *= 2.;
+
+      double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
+                              previous.cpu_time_max + previous.cpu_time_min) /
+                             delta_cycles;
+      /* avoid printing small negative numbers: */
+      cpu_time_skew = std::max(0., cpu_time_skew);
+
+      const double cpu_time_skew_percentage =
+          cpu_time_skew * delta_cycles /
+          (current.cpu_time_avg - previous.cpu_time_avg);
+
+      output << "  "
+             << (fudge_cpu_timings ? "CPU*: " : "CPU : ")
+             << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
+             << " MQ/s  ("
+             << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
+             << " s/Qdof/substep)" << std::endl;
+
+      output << "        [cpu time skew: "
+             << std::setprecision(2) << std::scientific << cpu_time_skew
+             << "s/cycle ("
+             << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
+             << 100. * cpu_time_skew_percentage
+             << "%)]" << std::endl;
+    }
 
     output << "  WALL: "
            << std::setprecision(4) << std::fixed << wall_m_dofs_per_sec

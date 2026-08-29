@@ -5,11 +5,11 @@
 
 #pragma once
 
+#include "computing_timer.h"
 #include "gpu.h"
 #include "hyperbolic_module.h"
 #include "loop.h"
 #include "mpi_ensemble.h"
-#include "scope.h"
 #include "simd.h"
 
 #include <numeric>
@@ -46,7 +46,6 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   HyperbolicModule<Description, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
-      std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const InitialValues<Description, dim, Number> &initial_values,
@@ -57,7 +56,6 @@ namespace ryujin
       , wave_speed_estimator_(hyperbolic_system,
                               subsection + "/wave speed estimator")
       , mpi_ensemble_(mpi_ensemble)
-      , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , initial_values_(&initial_values)
@@ -207,13 +205,13 @@ namespace ryujin
 
     /* Ensure all vectors are resident on the correct memory space. */
     if constexpr (have_separate_memory_spaces) {
-      Scope scope(computing_timer_, "time step [X] _ - memory space transfers");
+      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
       U.template move_to_memory_space<MemorySpace>();
       precomputed.template move_to_memory_space<MemorySpace>();
     }
 
-    Scope scope(computing_timer_,
-                "time step [H] 1 - update boundary values, precompute values");
+    ComputingTimer::Scope scope(
+        "time step [H] 1 - update boundary values, precompute values");
 
     /*
      * Update boundary values and distribute the result over all MPI ranks.
@@ -248,9 +246,8 @@ namespace ryujin
     const auto n_boundary_indices =
         static_cast<unsigned int>(boundary_indices.size());
 
-    /*
-     * Gather all boundary states into the compact, mirrored buffer:
-     */
+    /* Gather all boundary states into a mirrored buffer: */
+
     {
       const auto U_view = std::as_const(U).template view<MemorySpace>();
       const auto *indices = boundary_indices.template view<MemorySpace>();
@@ -269,14 +266,17 @@ namespace ryujin
                                 n_boundary_indices);
     }
 
-    /*
-     * Apply boundary conditions on the host memory space. Requesting a
-     * writable host view copies the buffer back from the default memory
-     * space.
-     */
+    /* Apply boundary conditions on the host memory space: */
+
     {
-      auto *states =
-          boundary_states_.template view<dealii::MemorySpace::Host>();
+      auto *states = [&]() {
+        if constexpr (have_separate_memory_spaces) {
+          ComputingTimer::Scope scope(
+              "time step [X] _ - memory space transfers");
+          return boundary_states_.template view<dealii::MemorySpace::Host>();
+        }
+        return boundary_states_.template view<dealii::MemorySpace::Host>();
+      }();
 
       const auto &boundary_map = offline_data_->boundary_map();
       const auto &boundary_slots = offline_data_->boundary_slots();
@@ -320,11 +320,18 @@ namespace ryujin
     }
 
     /* Write back the updated boundary states: */
+
     {
       const auto U_view = U.template view<MemorySpace>();
       const auto *indices = boundary_indices.template view<MemorySpace>();
-      const auto *states =
-          std::as_const(boundary_states_).template view<MemorySpace>();
+      const auto *states = [&]() {
+        if constexpr (have_separate_memory_spaces) {
+          ComputingTimer::Scope scope(
+              "time step [X] _ - memory space transfers");
+          return std::as_const(boundary_states_).template view<MemorySpace>();
+        }
+        return std::as_const(boundary_states_).template view<MemorySpace>();
+      }();
 
       const auto body = [=](auto /*sentinel*/, unsigned int k) {
         state_type U_i;
@@ -404,7 +411,7 @@ namespace ryujin
 
     /* Ensure all vectors are resident on the correct memory space. */
     if constexpr (have_separate_memory_spaces) {
-      Scope scope(computing_timer_, "time step [X] _ - memory space transfers");
+      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
       old_U.template copy_to_memory_space<MemorySpace>();
       old_precomputed.template copy_to_memory_space<MemorySpace>();
       for (int s = 0; s < stages; ++s) {
@@ -419,7 +426,7 @@ namespace ryujin
      * Taking a view<>() might imply implicit memory space transfers. Let's
      * account for them in our computing timers.
      */
-    computing_timer_["(re)initialize data structures"].start();
+    ComputingTimer::timer("(re)initialize data structures").start();
 
     /*
      * Workaround: A constexpr boolean storing the fact whether we
@@ -526,7 +533,7 @@ namespace ryujin
     const auto bounds_view = bounds_.template view<MemorySpace>();
     const auto r_view = r_.template view<MemorySpace>();
 
-    computing_timer_["(re)initialize data structures"].stop();
+    ComputingTimer::timer("(re)initialize data structures").stop();
 
     /*
      * Create a local copy of cfl_ so that we do not capture "this" in the
@@ -595,7 +602,7 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
     {
-      Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
+      ComputingTimer::Scope scope(scoped_name("compute d_ij, and alpha_i"));
 
       const auto body = [=](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -660,8 +667,8 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
+      ComputingTimer::Scope scope(
+          scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
 
       /*
        * Complete d_ij at boundary:
@@ -790,8 +797,7 @@ namespace ryujin
     }
 
     {
-      Scope scope(computing_timer_,
-                  "time step [X] _ - synchronization barriers");
+      ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
 
       /*
        * MPI Barrier: Synchronize the maximal time-step size. This has to
@@ -845,8 +851,8 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  scoped_name("l.-o. update, compute bounds, r_i, and p_ij"));
+      ComputingTimer::Scope scope(
+          scoped_name("l.-o. update, compute bounds, r_i, and p_ij"));
 
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
@@ -1129,7 +1135,7 @@ namespace ryujin
      */
 
     if (n_limiter_iterations != 0) {
-      Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
+      ComputingTimer::Scope scope(scoped_name("compute p_ij, and l_ij"));
 
       const auto body = [=](auto sentinel,
                             auto have_discontinuous_ansatz,
@@ -1286,8 +1292,7 @@ namespace ryujin
       bool last_round = (pass + 1 == n_limiter_iterations);
 
       std::string additional_step = (last_round ? "" : ", next l_ij");
-      Scope scope(
-          computing_timer_,
+      ComputingTimer::Scope scope(
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
       const auto lij_view = (n_limiter_iterations == 2 && last_round)
@@ -1394,8 +1399,7 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  "time step [X] _ - synchronization barriers");
+      ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
 
       /*
        * Synchronize whether we have to restart the time step. Even though

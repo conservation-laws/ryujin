@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "computing_timer.h"
 #include "selected_components_extractor.h"
 #include "vtu_output.h"
 
@@ -95,6 +96,7 @@ namespace ryujin
 
     /* Ensure that the state vector is resident on the host memory space. */
     if constexpr (have_separate_memory_spaces) {
+      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
       const auto &[U, precomputed, parabolic] = state_vector;
       U.template copy_to_memory_space<dealii::MemorySpace::Host>();
       precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();

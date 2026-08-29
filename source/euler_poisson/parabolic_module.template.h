@@ -8,9 +8,9 @@
 #include "laplace_operator.h"
 #include "parabolic_module.h"
 
+#include <computing_timer.h>
 #include <convenience_macros.h>
 #include <loop.h>
-#include <scope.h>
 #include <simd.h>
 
 #include <deal.II/dofs/dof_tools.h>
@@ -31,7 +31,6 @@ namespace ryujin
     template <typename Description, int dim, typename Number>
     ParabolicModule<Description, dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
-        std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
@@ -39,7 +38,6 @@ namespace ryujin
         const std::string &subsection)
         : ParameterAcceptor(subsection)
         , mpi_ensemble_(mpi_ensemble)
-        , computing_timer_(computing_timer)
         , hyperbolic_system_(&hyperbolic_system)
         , parabolic_system_(&parabolic_system)
         , offline_data_(&offline_data)
@@ -467,8 +465,7 @@ namespace ryujin
       std::cout << "        updating to t = " << t << std::endl;
 #endif
 
-      Scope scope(computing_timer_,
-                  "time step [X]   - interpolate data vectors");
+      ComputingTimer::Scope scope("time step [X]   - interpolate data vectors");
 
       const auto &discretization = offline_data_->discretization();
       background_density_.zero_out_ghost_values();
@@ -515,8 +512,7 @@ namespace ryujin
       std::cout << "        updating to t = " << t << std::endl;
 #endif
 
-      Scope scope(computing_timer_,
-                  "time step [X]   - interpolate data vectors");
+      ComputingTimer::Scope scope("time step [X]   - interpolate data vectors");
 
       const auto &discretization = offline_data_->discretization();
       for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
@@ -561,7 +557,7 @@ namespace ryujin
        * -----------------------------------------------------------------------
        */
 
-      Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
+      ComputingTimer::Scope scope("time step [P] 1 - enforce Gauss law");
 
       update_background_density(t);
 
@@ -847,7 +843,7 @@ namespace ryujin
          * ---------------------------------------------------------------------
          */
 
-        Scope scope(computing_timer_, "time step [P] 2 - update potential");
+        ComputingTimer::Scope scope("time step [P] 2 - update potential");
 
         /* Query the magnetic field at the time t + tau: */
         update_magnetic_field(t + tau);

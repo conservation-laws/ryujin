@@ -22,7 +22,6 @@
 #include "vtu_output.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 
 #include <fstream>
 
@@ -117,8 +116,6 @@ namespace ryujin
 
     MPIEnsemble mpi_ensemble_;
 
-    std::map<std::string, dealii::Timer> computing_timer_;
-
     MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
     MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
     Discretization<dim> discretization_;
@@ -135,6 +132,7 @@ namespace ryujin
     Quantities<Description, dim, Number> quantities_;
 
     dealii::types::global_dof_index n_global_dofs_;
+    unsigned int n_devices_;
 
     std::ofstream logfile_; /* log file */
 
@@ -189,6 +187,7 @@ namespace ryujin
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);
+    void print_device_information(std::ostream &stream);
 
     void print_info(const std::string &header);
 

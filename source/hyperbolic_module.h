@@ -16,7 +16,6 @@
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
@@ -154,7 +153,6 @@ namespace ryujin
      */
     HyperbolicModule(
         const MPIEnsemble &mpi_ensemble,
-        std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const InitialValues<Description, dim, Number> &initial_values,
@@ -410,7 +408,6 @@ namespace ryujin
     //@{
 
     const MPIEnsemble &mpi_ensemble_;
-    std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;

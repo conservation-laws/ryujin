@@ -16,7 +16,6 @@
 #include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/matrix_free/matrix_free.h>
 
@@ -166,7 +165,6 @@ namespace ryujin
        */
       ParabolicModule(
           const MPIEnsemble &mpi_ensemle,
-          std::map<std::string, dealii::Timer> &computing_timer,
           const OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
           const ParabolicSystem &parabolic_system,
@@ -305,7 +303,6 @@ namespace ryujin
       static constexpr unsigned int order_quad = 2;
 
       const MPIEnsemble &mpi_ensemble_;
-      std::map<std::string, dealii::Timer> &computing_timer_;
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
