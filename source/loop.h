@@ -16,6 +16,7 @@
 
 #include <mutex>
 #include <string>
+#include <tuple>
 
 #ifdef WITH_OPENMP
 #include <omp.h>
@@ -163,11 +164,22 @@ namespace ryujin
 
     const auto exec = ExecutionSpace{};
 
+    /*
+     * Note: nvcc does not allow an extended __host__ __device__ lambda to
+     * capture an element of a parameter pack. We thus pack all arguments
+     * into a tuple and unpack them again in the loop body.
+     */
+    const auto packed_args = std::make_tuple(std::forward<Args>(args)...);
+
     Kokkos::parallel_for(
         region_name,
         Policy(exec, left, right),
         KOKKOS_LAMBDA(const unsigned int i) {
-          body(ScalarNumber(), args..., i);
+          std::apply(
+              [&](const auto &...unpacked) {
+                body(ScalarNumber(), unpacked..., i);
+              },
+              packed_args);
         });
 
     exec.fence();
@@ -348,11 +360,22 @@ namespace ryujin
 
     ValueType result;
 
+    /*
+     * Note: nvcc does not allow an extended __host__ __device__ lambda to
+     * capture an element of a parameter pack. We thus pack all arguments
+     * into a tuple and unpack them again in the loop body.
+     */
+    const auto packed_args = std::make_tuple(std::forward<Args>(args)...);
+
     Kokkos::parallel_reduce(
         region_name,
         Policy(exec, left, right),
         KOKKOS_LAMBDA(const unsigned int i, ValueType &local_result) {
-          body(ValueType(), args..., i, local_result);
+          std::apply(
+              [&](const auto &...unpacked) {
+                body(ValueType(), unpacked..., i, local_result);
+              },
+              packed_args);
         },
         Reducer(result));
 
