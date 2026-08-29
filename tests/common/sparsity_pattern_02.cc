@@ -88,13 +88,14 @@ int main(int argc, char *argv[])
   const auto &view = sparse_matrix.template view<DefaultSpace>();
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
   const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for("test",
-                       Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
-                       [=](std::size_t i) {
-                         const auto a = view.read_entry(i, 1);
-                         const auto b = view.read_entry(i, 2);
-                         view.write_entry(a + b, i, 0);
-                       });
+  Kokkos::parallel_for(
+      "test",
+      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
+      KOKKOS_LAMBDA(std::size_t i) {
+        const auto a = view.read_entry(i, 1);
+        const auto b = view.read_entry(i, 2);
+        view.write_entry(a + b, i, 0);
+      });
   exec.fence();
 
   /* Read entries on the host space: */
