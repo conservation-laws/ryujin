@@ -259,7 +259,7 @@ namespace ryujin
           states[k * n_comp + d] = U_i[d];
       };
 
-      loop<MemorySpace, Number>("hyperbolic_module_gather_boundary_states",
+      loop<MemorySpace, Number>("hyperbolic_kernel_01a",
                                 body,
                                 0,
                                 /*no vectorization*/ 0,
@@ -340,7 +340,7 @@ namespace ryujin
         U_view.write_tensor(U_i, indices[k]);
       };
 
-      loop<MemorySpace, Number>("hyperbolic_module_scatter_boundary_states",
+      loop<MemorySpace, Number>("hyperbolic_kernel_01a",
                                 body,
                                 0,
                                 /*no vectorization*/ 0,
@@ -568,7 +568,7 @@ namespace ryujin
     };
 
     const auto loop_name = [&step_no]() {
-      return "time_step_" + std::to_string(step_no);
+      return "hyperbolic_kernel_" + std::format("{:02}", step_no);
     };
 
     /* A flag signalling that a restart is necessary. */
@@ -718,7 +718,7 @@ namespace ryujin
         dij_matrix_view.write_entry(std::max(d_ij, d_ji), i, col_idx);
       };
 
-      loop<MemorySpace, Number>(loop_name(),
+      loop<MemorySpace, Number>(loop_name() + 'a',
                                 body_boundary,
                                 0,
                                 /*no vectorization*/ 0,
@@ -793,7 +793,7 @@ namespace ryujin
       };
 
       tau_max = reduction_loop<MemorySpace, Kokkos::Min<Number>>(
-          loop_name(), body, tau_max, 0, n_owned);
+          loop_name() + 'b', body, tau_max, 0, n_owned);
     }
 
     {

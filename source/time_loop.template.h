@@ -1066,12 +1066,12 @@ namespace ryujin
     const auto entry [[maybe_unused]] =
         [&output](const std::string &label) -> std::ostream & {
       output << std::endl
-             << std::endl
              << "             " << std::left << std::setw(22) << label;
       return output;
     };
 
     output << std::endl
+           << std::endl
            << "Device:      " << std::left << std::setw(22) << "backend"
            << Kokkos::DefaultExecutionSpace::name();
 
