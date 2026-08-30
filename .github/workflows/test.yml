@@ -19,16 +19,16 @@ permissions:
 jobs:
 
   #############################################
-  # ubuntu-lts-24.04 with gcc, deal.II master #
+  # ubuntu-lts-26.04 with gcc, deal.II master #
   #############################################
 
-  ubuntu-lts-2404-dealii-master-release:
+  ubuntu-lts-2604-dealii-master-release:
     name: tests-release-deal.II-master
-    runs-on: [ubuntu-24.04]
+    runs-on: [ubuntu-latest]
 
     container:
       options: --user root
-      image: dealii/dealii:master-noble
+      image: dealii/dealii:master-resolute
 
     steps:
     - uses: actions/checkout@v3
@@ -57,16 +57,16 @@ jobs:
           "(verification-isentropic_vortex.*l7|verification-becker_solution.*l7)"
 
   #############################################
-  # ubuntu-lts-24.04 with gcc, deal.II master #
+  # ubuntu-lts-26.04 with gcc, deal.II master #
   #############################################
 
-  ubuntu-lts-2404-dealii-master-debug:
+  ubuntu-lts-2604-dealii-master-debug:
     name: tests-debug-deal.II-master
-    runs-on: [ubuntu-24.04]
+    runs-on: [ubuntu-latest]
 
     container:
       options: --user root
-      image: dealii/dealii:master-noble
+      image: dealii/dealii:master-resolute
 
     steps:
     - uses: actions/checkout@v3
