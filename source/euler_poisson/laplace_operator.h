@@ -433,15 +433,10 @@ namespace ryujin
 
       const auto &dof_handler = offline_data.dof_handler_cg();
       for (unsigned int level = 0; level < n_levels; ++level) {
-#if DEAL_II_VERSION_GTE(9, 6, 0)
         relevant_sets[level] =
             dealii::DoFTools::extract_locally_relevant_level_dofs( //
                 dof_handler,
                 level);
-#else
-        dealii::DoFTools::extract_locally_relevant_level_dofs(
-            dof_handler, level, relevant_sets[level]);
-#endif
       }
 
       // First index CG, second index hyperbolic ansatz
@@ -468,20 +463,14 @@ namespace ryujin
       for (unsigned int level = min_level; level < n_levels; ++level) {
         additional_data_level.mg_level = level;
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
         AffineConstraints<float> level_constraints(relevant_sets[level],
                                                    relevant_sets[level]);
-#else
-        AffineConstraints<float> level_constraints(relevant_sets[level]);
-#endif
 
         if (!boundary_ids.empty()) {
           level_constraints.add_lines(
               mg_constrained_dofs_.get_boundary_indices(level));
-#if DEAL_II_VERSION_GTE(9, 6, 0)
           level_constraints.merge(
               mg_constrained_dofs_.get_level_constraints(level));
-#endif
         }
         level_constraints.close();
 
@@ -515,12 +504,10 @@ namespace ryujin
         level_laplace_matrices_[level].compute_diagonal(
             *smoother_data[level].preconditioner);
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
         if (boundary_ids.empty()) {
           smoother_data[level].eigenvalue_algorithm =
               dealii::internal::EigenvalueAlgorithm::power_iteration;
         }
-#endif
 
         if (level == level_matrix_free_.min_level()) {
           smoother_data[level].degree = numbers::invalid_unsigned_int;

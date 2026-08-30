@@ -570,16 +570,9 @@ namespace ryujin
      * Initialize discretization, read in the mesh, and initialize everything:
      */
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
     discretization_.refinement() = 0; /* do not refine */
     discretization_.prepare(base_name);
     discretization_.triangulation().load(base_name + "-checkpoint.mesh");
-
-#else
-    AssertThrow(false,
-                dealii::ExcMessage("write_checkpoint() is not available with "
-                                   "deal.II versions prior to 9.6.0"));
-#endif
 
     prepare_compute_kernels();
 
@@ -659,15 +652,8 @@ namespace ryujin
           std::filesystem::rename(name + suffix, name + suffix + "~");
     }
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
     const auto &triangulation = discretization_.triangulation();
     triangulation.save(name + ".mesh");
-
-#else
-    AssertThrow(false,
-                dealii::ExcMessage("write_checkpoint() is not available with "
-                                   "deal.II versions prior to 9.6.0"));
-#endif
 
     /*
      * Now, write out metadata on rank 0:

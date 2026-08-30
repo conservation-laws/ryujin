@@ -7,17 +7,13 @@
 
 #include "computing_timer.h"
 #include "solution_transfer.h"
-#if DEAL_II_VERSION_GTE(9, 6, 0)
 #include "tensor_product_point_kernels.h"
-#endif
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/dofs/dof_tools.h>
-#if DEAL_II_VERSION_GTE(9, 6, 0)
 #include <deal.II/grid/cell_status.h>
-#endif
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/lac/block_vector.h>
@@ -89,14 +85,6 @@ namespace ryujin
         << "SolutionTransfer<Description, dim, Number>::prepare_projection()"
         << std::endl;
 #endif
-
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    AssertThrow(
-        false,
-        dealii::ExcMessage(
-            "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
-
-#else
 
     /* Ensure that the state vector is resident on the host memory space. */
     if constexpr (have_separate_memory_spaces) {
@@ -396,7 +384,6 @@ namespace ryujin
           return pack_state_values(state_values);
         },
         /* returns_variable_size_data =*/false);
-#endif
   }
 
 
@@ -408,14 +395,6 @@ namespace ryujin
     std::cout << "SolutionTransfer<Description, dim, Number>::project()"
               << std::endl;
 #endif
-
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    AssertThrow(
-        false,
-        dealii::ExcMessage(
-            "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
-
-#else
 
     /* Ensure that the state vector is resident on the host memory space. */
     if constexpr (have_separate_memory_spaces) {
@@ -885,7 +864,6 @@ namespace ryujin
                  "SolutionTransfer::projection(): something went wrong. Final "
                  "masses do not agree with those computed in OfflineData."));
     }
-#endif
 #endif
   }
 

@@ -318,14 +318,6 @@ namespace ryujin
     Assert(&triangulation == &discretization.triangulation(),
            dealii::ExcInternalError());
 
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    AssertThrow(
-        false,
-        dealii::ExcMessage(
-            "The MeshAdaptor class needs deal.II version 9.6.0 or newer"));
-
-#else
-
     /*
      * Compute cell indicators with the chosen adaptation strategy:
      */
@@ -423,7 +415,6 @@ namespace ryujin
     for (const auto &cell :
          triangulation.active_cell_iterators_on_level(min_refinement_level_))
       cell->clear_coarsen_flag();
-#endif
   }
 
 
