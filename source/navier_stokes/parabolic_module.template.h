@@ -180,14 +180,9 @@ namespace ryujin
       const unsigned int min_level = std::min(gmg_min_level_, n_levels - 1);
       MGLevelObject<IndexSet> relevant_sets(0, n_levels - 1);
       for (unsigned int level = 0; level < n_levels; ++level)
-#if DEAL_II_VERSION_GTE(9, 6, 0)
         relevant_sets[level] =
             dealii::DoFTools::extract_locally_relevant_level_dofs(
                 offline_data_->dof_handler(), level);
-#else
-        dealii::DoFTools::extract_locally_relevant_level_dofs(
-            offline_data_->dof_handler(), level, relevant_sets[level]);
-#endif
       mg_constrained_dofs_.initialize(offline_data_->dof_handler(),
                                       relevant_sets);
       std::set<types::boundary_id> boundary_ids;
@@ -204,12 +199,8 @@ namespace ryujin
       level_density_.resize(min_level, n_levels - 1);
       for (unsigned int level = min_level; level < n_levels; ++level) {
         additional_data_level.mg_level = level;
-#if DEAL_II_VERSION_GTE(9, 6, 0)
         AffineConstraints<double> constraints(relevant_sets[level],
                                               relevant_sets[level]);
-#else
-        AffineConstraints<double> constraints(relevant_sets[level]);
-#endif
         // constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
         // constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
         constraints.close();

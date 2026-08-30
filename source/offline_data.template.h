@@ -193,21 +193,11 @@ namespace ryujin
 
     const auto populate_affine_constraints = //
         [&](const auto &dof_handler, auto &affine_constraints) {
-#if DEAL_II_VERSION_GTE(9, 6, 0)
           const auto locally_relevant =
               DoFTools::extract_locally_relevant_dofs(dof_handler);
-#else
-          IndexSet locally_relevant;
-          DoFTools::extract_locally_relevant_dofs(dof_handler,
-                                                  locally_relevant);
-#endif
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
           const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
           affine_constraints.reinit(locally_owned, locally_relevant);
-#else
-          affine_constraints.reinit(locally_relevant);
-#endif
           DoFTools::make_hanging_node_constraints(dof_handler,
                                                   affine_constraints);
 
@@ -240,13 +230,7 @@ namespace ryujin
                   dof_cell_right->face(right.second),
                   affine_constraints,
                   ComponentMask(),
-#if DEAL_II_VERSION_GTE(9, 6, 0)
                   orientation);
-#else
-                  /* orientation */ orientation[0],
-                  /* flip */ orientation[1],
-                  /* rotation */ orientation[2]);
-#endif
             } else {
               AssertThrow(false, dealii::ExcNotImplemented());
               __builtin_trap();
@@ -288,13 +272,8 @@ namespace ryujin
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
     const auto locally_relevant =
         DoFTools::extract_locally_relevant_dofs(dof_handler);
-#else
-    IndexSet locally_relevant;
-    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
-#endif
 
     sparsity_pattern_.reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
@@ -423,13 +402,8 @@ namespace ryujin
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
     auto locally_relevant =
         DoFTools::extract_locally_relevant_dofs(dof_handler);
-#else
-    IndexSet locally_relevant;
-    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
-#endif
     /* Enlarge the locally relevant set to include all additional couplings: */
     {
       IndexSet additional_dofs(dof_handler.n_dofs());
@@ -1214,15 +1188,9 @@ namespace ryujin
     for (unsigned int level = 0; level < n_levels; ++level) {
       /* Assemble lumped mass matrix vector: */
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
       const auto relevant_dofs =
           dealii::DoFTools::extract_locally_relevant_level_dofs(dof_handler,
                                                                 level);
-#else
-      IndexSet relevant_dofs;
-      dealii::DoFTools::extract_locally_relevant_level_dofs(
-          dof_handler, level, relevant_dofs);
-#endif
 
       const auto partitioner = std::make_shared<Utilities::MPI::Partitioner>(
           dof_handler.locally_owned_mg_dofs(level),

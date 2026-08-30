@@ -368,20 +368,11 @@ namespace ryujin
 
       affine_constraints_potential_.clear();
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
       const auto locally_relevant =
           DoFTools::extract_locally_relevant_dofs(dof_handler);
-#else
-      IndexSet locally_relevant;
-      DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
-#endif
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
       const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
       affine_constraints_potential_.reinit(locally_owned, locally_relevant);
-#else
-      affine_constraints_potential_.reinit(locally_relevant);
-#endif
 
       DoFTools::make_hanging_node_constraints(offline_data_->dof_handler_cg(),
                                               affine_constraints_potential_);
@@ -415,13 +406,7 @@ namespace ryujin
               dof_cell_right->face(right.second),
               affine_constraints_potential_,
               ComponentMask(),
-#if DEAL_II_VERSION_GTE(9, 6, 0)
               orientation);
-#else
-              /* orientation */ orientation[0],
-              /* flip */ orientation[1],
-              /* rotation */ orientation[2]);
-#endif
         } else {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
