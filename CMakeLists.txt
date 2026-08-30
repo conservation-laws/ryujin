@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-find_package(deal.II 9.5 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
+find_package(deal.II 9.6 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING
   "Choose the type of build, options are: Debug, Release"
