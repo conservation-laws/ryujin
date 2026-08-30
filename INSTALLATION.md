@@ -4,39 +4,37 @@ Installation instructions
 Necessary tools and library dependencies
 ----------------------------------------
 
-ryujin requires [deal.II](https://dealii.org) version 9.4.0 or newer
+ryujin requires [deal.II](https://dealii.org) version 9.6.0 or newer
 compiled with support enabled for MPI and P4est.
 
 On Debian and Ubuntu you can conveniently install all necessary libraries
 and tools with `apt`.
-  - On <b>Debian</b> you can run the following command (as root user) to
-    install deal.II, all development libraries and necessary tools:
+  - On <b>Debian 13 (trixie)</b> or newer you can run the following command
+    (as root user) to install deal.II, all development libraries and
+    necessary tools:
     ```
     apt install libdeal.ii-dev cmake cmake-curses-gui numdiff make g++ ninja-build git
     ```
-  - On <b>Ubuntu LTS 24.04</b> you can run the following command to install
+  - On <b>Ubuntu LTS 26.04</b> you can run the following command to install
     deal.II, all development libraries and necessary tools:
     ```
     sudo apt install libdeal.ii-dev cmake cmake-curses-gui numdiff make g++ ninja-build git
     ```
-  - On <b>Ubuntu LTS 22.04</b> you can install the current deal.II version
-    from a <a href="https://launchpad.net/~ginggs/+archive/ubuntu/deal.ii-9.5.1-backports">PPA</a>
-    ```
-    sudo add-apt-repository ppa:ginggs/deal.ii-9.5.1-backports
-    sudo apt update
-    sudo apt install libdeal.ii-dev cmake cmake-curses-gui numdiff make g++ ninja-build git
-    ```
+
+Older distribution releases package a deal.II version that is too old:
+Ubuntu LTS 24.04 ships deal.II 9.5.1 and Debian 12 (bookworm) ships 9.4.1.
+There you have to compile deal.II yourself, see below.
 
 If you are on a MAC it might be easiest to simply install our precompiled
 MAC bundle for deal.II which you can find on the [Github download
-page](https://github.com/dealii/dealii/releases/tag/v9.5.2).
+page](https://github.com/dealii/dealii/releases/tag/v9.7.1).
 
 If you are on Windows we strongly recommend to set up the [<b>Windows
 Subsystem for Linux v2</b>
 (WSL)](https://learn.microsoft.com/en-us/windows/wsl/about) and install
-<b>Ubuntu LTS 24.04</b> from the Microsoft store. Then, simply launch the
+<b>Ubuntu LTS 26.04</b> from the Microsoft store. Then, simply launch the
 Ubuntu App which starts a Bash shell. You can then proceed with the
-installation instructions for Ubuntu LTS 24.04 summarized above. You can
+installation instructions for Ubuntu LTS 26.04 summarized above. You can
 find a helpful tutorial on how to use the linux command line
 [here](https://ubuntu.com/tutorials/command-line-for-beginners#1-overview).
 
