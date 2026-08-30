@@ -79,6 +79,11 @@ Profiles »./ryujin« (with no parameter file argument, i.e. it must find
 Profiles »./ryujin« with 4 MPI ranks via likwid-mpirun, each rank pinned to
 its own physical core.
 
+> ./profile-cpu-kernels -n 4 --mpi slurm -mpiopts "--cpu-bind=none"
+
+The same, but launched through SLURM, with additional options handed to the
+launcher via »likwid-mpirun -mpiopts«.
+
 > ./profile-cpu-kernels --no-tma --csv kernels.csv
 
 Skips the frontend/backend breakdown and additionally writes the full,
@@ -131,6 +136,17 @@ parser.add_argument(
     type=str,
     default="openmpi",
     help="the MPI flavor to pass to »likwid-mpirun -mpi« (default: openmpi)",
+    required=False,
+)
+
+parser.add_argument(
+    "-mpiopts",
+    "--mpiopts",
+    type=str,
+    default=None,
+    help="a string of additional options for the MPI/SLURM command line, "
+    "passed on verbatim to »likwid-mpirun -mpiopts«, for example "
+    "»-mpiopts \"--cpu-bind=none\"« (only used with --np greater than 1)",
     required=False,
 )
 
@@ -245,6 +261,12 @@ parser.add_argument(
 args = parser.parse_args()
 
 command = args.command if args.command else ["./ryujin"]
+
+if args.mpiopts is not None and args.np <= 1:
+    print(
+        "[WARNING] -mpiopts is only meaningful with --np greater than 1 "
+        "(the likwid-mpirun code path); ignoring it"
+    )
 
 
 #
@@ -489,6 +511,9 @@ def mpirun_command(group):
     # still applies and makes it print a CSV-formatted report to stdout.
     #
     command_line = [args.likwid_mpirun, "-np", str(args.np), "-mpi", args.mpi]
+
+    if args.mpiopts is not None:
+        command_line += ["-mpiopts", args.mpiopts]
 
     pin = args.pin_list
     if pin is None:
