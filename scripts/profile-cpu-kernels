@@ -1,0 +1,1267 @@
+#!/usr/bin/env python
+##
+## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+## Copyright (C) 2026 by the ryujin authors
+##
+
+#
+# H E R E   B E   D R A G O N S
+#
+# This script was written together with Claude. If you find the spaghetti
+# code too horrible to read, feel free to delete it, rewrite it from
+# scratch, or print it out and set it on fire. Nobody will mourn it.
+#
+
+help_description = """
+This script collects hardware performance counters for individual host
+compute loops with likwid and reports the derived quantities that are of
+interest for a compute kernel: achieved floating point throughput
+(GFLOP/s), AVX/SIMD utilization, memory throughput (MiB/s), arithmetic
+intensity, power draw, and either a top-down frontend/backend breakdown or
+a branch misprediction ratio.
+
+The script requires that ryujin has been configured with likwid marker API
+support (-DWITH_LIKWID=ON). In that case every named host compute loop
+(see loop.h) opens a likwid marker region and results are reported per
+region. The loops of the hyperbolic update are named "hyperbolic_kernel_XX",
+where XX is the number of the step, with an optional trailing letter
+distinguishing the individual loops of a step, for example
+"hyperbolic_kernel_04", or "hyperbolic_kernel_03a".
+
+Which likwid performance groups are used is auto-detected from the output
+of »likwid-perfctr -a«: Intel hosts that provide the consolidated MEM_DP /
+MEM_SP groups get GFLOP/s, AVX/SIMD utilization, arithmetic intensity, and
+memory bandwidth from a single run per precision; hosts that only provide
+FLOPS_DP / FLOPS_SP / MEM (for example AMD Zen4/Zen4c) need three separate
+runs instead, arithmetic intensity is then computed from the combined raw
+counters, and AVX/SIMD utilization is unavailable. For the frontend/backend
+breakdown, TMA is preferred over BRANCH when available.
+
+All derived quantities (GFLOP/s, AVX/SIMD utilization, arithmetic intensity,
+memory bandwidth, power draw, frontend/backend or branch misprediction) are
+computed by this script from raw hardware counters, not from likwid's own
+precomputed metrics: with -n greater than 1, likwid-mpirun only assigns the
+socket-level uncore/RAPL counters (memory bandwidth, package/DRAM energy) to
+a single rank, which makes its own per-rank derived metrics wrong or noisy
+for every other rank. Summing raw counters across ranks first avoids that.
+Power/energy figures should be read as an order of magnitude, not a precise
+reading: RAPL counters update on a coarser cadence than a single compute
+loop typically runs for.
+
+Because likwid only switches between multiple performance groups in Marker
+API mode if the application calls LIKWID_MARKER_SWITCH (which ryujin does
+not), each performance group requires its own full run of the application;
+results are joined by region name afterwards.
+
+likwid-mpirun ignores -o (the report is written to stdout instead), so with
+-n greater than 1 this script captures stdout itself and saves the marker
+report portion to »<output>-<tag>.csv«, the same naming convention used for
+the real per-group CSV files that likwid-perfctr writes in serial mode -
+--import works the same way regardless of which mode produced the files.
+
+The script does not pass a parameter file on the command line. Instead it
+relies on ryujin's own default of looking for »<executable_name>.prm« (see
+main.cc), so make sure a suitable "ryujin.prm" is in place next to the
+executable.
+
+It is meant to be run in the directory that contains the ryujin executable
+and its parameter file.
+
+Example usage:
+
+> ./profile-cpu-kernels
+
+Profiles »./ryujin« (with no parameter file argument, i.e. it must find
+»ryujin.prm« on its own) pinned to CPU 0 in serial mode.
+
+> ./profile-cpu-kernels -n 4
+
+Profiles »./ryujin« with 4 MPI ranks via likwid-mpirun, each rank pinned to
+its own physical core.
+
+> ./profile-cpu-kernels --no-tma --csv kernels.csv
+
+Skips the frontend/backend breakdown and additionally writes the full,
+untruncated table to a csv file.
+
+> ./profile-cpu-kernels --import .
+
+Recomputes the table from already recorded »ryujin-kernels-*.csv« files
+without profiling again.
+
+> ./profile-cpu-kernels -- mpirun -np 1 ./ryujin
+
+Profiles a different command line (prefix with »--« if the command line
+contains options of its own).
+"""
+
+import argparse, csv, io, os, re, shutil, subprocess, sys, textwrap
+from tabulate import tabulate
+
+#
+# Command line arguments:
+#
+
+parser = argparse.ArgumentParser(
+    prog="profile-cpu-kernels",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=textwrap.dedent(help_description),
+)
+
+parser.add_argument(
+    "command",
+    nargs="*",
+    default=[],
+    help="command to profile (default: ./ryujin, no parameter file argument). "
+    "Prefix with »--« if the command line contains options of its own",
+)
+
+parser.add_argument(
+    "-n",
+    "--np",
+    type=int,
+    default=1,
+    help="number of MPI ranks. If greater than 1, likwid-mpirun is used "
+    "instead of likwid-perfctr (default: 1)",
+    required=False,
+)
+
+parser.add_argument(
+    "--mpi",
+    type=str,
+    default="openmpi",
+    help="the MPI flavor to pass to »likwid-mpirun -mpi« (default: openmpi)",
+    required=False,
+)
+
+parser.add_argument(
+    "-C",
+    "--cpu",
+    type=str,
+    default="0",
+    help="the CPU expression to pin to in serial mode, passed to "
+    "»likwid-perfctr -C« (default: 0)",
+    required=False,
+)
+
+parser.add_argument(
+    "--pin-list",
+    type=str,
+    default=None,
+    help="override the automatically computed per-rank pin list passed to "
+    "»likwid-mpirun -pin« (default: the first --np distinct physical cores)",
+    required=False,
+)
+
+parser.add_argument(
+    "--no-dp",
+    action="store_true",
+    help="skip the double precision arithmetic run",
+)
+
+parser.add_argument(
+    "--no-sp",
+    action="store_true",
+    help="skip the single precision arithmetic run",
+)
+
+parser.add_argument(
+    "--no-tma",
+    action="store_true",
+    help="skip the frontend/backend breakdown entirely",
+)
+
+parser.add_argument(
+    "--branch",
+    action="store_true",
+    help="use the BRANCH group (misprediction ratio) instead of TMA, even if "
+    "TMA is available",
+)
+
+parser.add_argument(
+    "--force",
+    action="store_true",
+    help="pass -f to likwid-perfctr/likwid-mpirun, forcing counter "
+    "registers to be reconfigured even if they are already in use",
+)
+
+parser.add_argument(
+    "--no-energy",
+    action="store_true",
+    help="skip the dedicated ENERGY run (irrelevant on hosts where Power [W] "
+    "already comes from the arithmetic groups)",
+)
+
+parser.add_argument(
+    "--output",
+    type=str,
+    default="ryujin-kernels",
+    help="basename of the per-group csv files that are written (default: "
+    "ryujin-kernels)",
+    required=False,
+)
+
+parser.add_argument(
+    "--import",
+    dest="import_dir",
+    type=str,
+    default=None,
+    help="do not profile, but analyze already recorded »<output>-<tag>.csv« "
+    "files in the given directory",
+    required=False,
+)
+
+parser.add_argument(
+    "--csv",
+    dest="csv_file",
+    type=str,
+    default=None,
+    help="additionally write the full per-region table to the given csv file",
+    required=False,
+)
+
+parser.add_argument(
+    "--dry-run",
+    action="store_true",
+    help="print the likwid command lines that would be executed and exit",
+)
+
+parser.add_argument(
+    "--likwid-perfctr",
+    type=str,
+    default="likwid-perfctr",
+    help="the likwid-perfctr binary to use (default: likwid-perfctr)",
+    required=False,
+)
+
+parser.add_argument(
+    "--likwid-mpirun",
+    type=str,
+    default="likwid-mpirun",
+    help="the likwid-mpirun binary to use (default: likwid-mpirun)",
+    required=False,
+)
+
+args = parser.parse_args()
+
+command = args.command if args.command else ["./ryujin"]
+
+
+#
+# Running commands:
+#
+
+
+def fail(command_line, output):
+    sys.stdout.flush()
+    print(
+        "[ERROR] »%s« failed" % " ".join(command_line),
+        file=sys.stderr,
+    )
+    sys.stderr.write(output)
+    sys.exit(1)
+
+
+def run(command_line, check=True):
+    """Run a short, quiet command line (topology/group queries) and return
+    the completed process."""
+
+    try:
+        result = subprocess.run(command_line, capture_output=True, text=True)
+    except OSError as exception:
+        if check:
+            fail(command_line, str(exception))
+        raise
+    if check and result.returncode != 0:
+        fail(command_line, result.stdout + result.stderr)
+    return result
+
+
+def run_profiler(command_line):
+    """Run the profiler and echo its output (and the output of the profiled
+    application) as it arrives, so that a long running simulation remains
+    observable. Returns the full captured output."""
+
+    process = subprocess.Popen(
+        command_line,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    #
+    # Read character by character: ryujin updates its status line with a
+    # carriage return and would otherwise only show up in large chunks.
+    #
+    output = []
+    while True:
+        character = process.stdout.read(1)
+        if not character:
+            break
+        sys.stdout.write(character)
+        sys.stdout.flush()
+        output.append(character)
+    process.wait()
+
+    text = "".join(output)
+    if process.returncode != 0:
+        fail(command_line, text)
+    return text
+
+
+def preflight():
+    likwid = args.likwid_mpirun if args.np > 1 else args.likwid_perfctr
+    if shutil.which(likwid) is None:
+        print(
+            "[ERROR] Could not find »%s«. Make sure likwid is installed and "
+            "its bin directory is in PATH, or point this script to the "
+            "binary with --likwid-perfctr/--likwid-mpirun." % likwid,
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    executable = command[0]
+    if executable.startswith("./") or executable.startswith("/"):
+        if not os.path.isfile(executable):
+            print(
+                "[ERROR] »%s« does not exist." % executable,
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+
+#
+# Performance group discovery: which groups are available depends on the
+# CPU microarchitecture (compare e.g. /usr/share/likwid/perfgroups/skylakeX
+# with .../zen4), so we probe instead of hardcoding a vendor's group names.
+#
+
+GROUP_NAME = re.compile(r"[A-Z][A-Z0-9_]*")
+
+
+def discover_groups():
+    result = run([args.likwid_perfctr, "-a"], check=False)
+    if result.returncode != 0:
+        return set()
+    groups = set()
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("-"):
+            continue
+        token = line.split()[0]
+        if GROUP_NAME.fullmatch(token):
+            groups.add(token)
+    return groups
+
+
+def select_groups(available):
+    consolidated = "MEM_DP" in available and "MEM_SP" in available
+    fallback = (
+        "FLOPS_DP" in available and "FLOPS_SP" in available and "MEM" in available
+    )
+
+    precision = {}
+    if consolidated:
+        precision = {"dp": "MEM_DP", "sp": "MEM_SP"}
+    elif fallback:
+        precision = {"dp": "FLOPS_DP", "sp": "FLOPS_SP", "mem": "MEM"}
+    else:
+        print(
+            "[WARNING] neither MEM_DP/MEM_SP nor FLOPS_DP/FLOPS_SP/MEM are "
+            "available on this host; arithmetic/memory/AI columns will be "
+            "empty. Run »likwid-perfctr -a« to see the available groups."
+        )
+
+    if args.branch:
+        frontend = ("BRANCH", "branch") if "BRANCH" in available else (None, None)
+    elif args.no_tma:
+        frontend = (None, None)
+    elif "TMA" in available:
+        frontend = ("TMA", "tma")
+    elif "BRANCH" in available:
+        frontend = ("BRANCH", "branch")
+    else:
+        frontend = (None, None)
+
+    want_energy = not consolidated and "ENERGY" in available and not args.no_energy
+
+    return {
+        "consolidated": consolidated,
+        "precision": precision,
+        "frontend_group": frontend[0],
+        "frontend_mode": frontend[1],
+        "want_energy": want_energy,
+    }
+
+
+def planned_runs(groups_plan):
+    """Return the ordered list of (tag, likwid group name) runs needed."""
+
+    runs = []
+    precision = groups_plan["precision"]
+    if "dp" in precision and not args.no_dp:
+        runs.append(("dp", precision["dp"]))
+    if "sp" in precision and not args.no_sp:
+        runs.append(("sp", precision["sp"]))
+    if "mem" in precision:
+        runs.append(("mem", precision["mem"]))
+    if groups_plan["frontend_group"]:
+        runs.append(("frontend", groups_plan["frontend_group"]))
+    if groups_plan["want_energy"]:
+        runs.append(("energy", "ENERGY"))
+    return runs
+
+
+#
+# CPU pinning for the likwid-mpirun path: give each rank a distinct
+# physical core, i.e. avoid pinning two ranks to hyperthread siblings.
+#
+
+CORE_ROW = re.compile(r"^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+")
+
+
+def physical_core_list(count):
+    likwid_topology = shutil.which("likwid-topology")
+    if likwid_topology is None:
+        print(
+            "[WARNING] likwid-topology not found on PATH: letting "
+            "likwid-mpirun choose the CPU pinning"
+        )
+        return None
+
+    result = run([likwid_topology, "-c"], check=False)
+    if result.returncode != 0:
+        return None
+
+    cores = []
+    seen = set()
+    for line in result.stdout.splitlines():
+        match = CORE_ROW.match(line)
+        if not match:
+            continue
+        hwthread, _thread, core, _die, _socket = match.groups()
+        if core not in seen:
+            seen.add(core)
+            cores.append(hwthread)
+
+    if len(cores) < count:
+        print(
+            "[WARNING] only %d physical cores available, requested %d "
+            "ranks; letting likwid-mpirun choose the CPU pinning"
+            % (len(cores), count)
+        )
+        return None
+
+    return cores[:count]
+
+
+#
+# likwid invocation:
+#
+
+
+def output_csv(tag):
+    return "%s-%s.csv" % (args.output, tag)
+
+
+def perfctr_command(group, csv_file):
+    command_line = [
+        args.likwid_perfctr,
+        "-C",
+        args.cpu,
+        "-g",
+        group,
+        "-m",
+        "-O",
+        "-o",
+        csv_file,
+    ]
+    if args.force:
+        command_line += ["-f"]
+    command_line += command
+    return command_line
+
+
+def mpirun_command(group):
+    #
+    # likwid-mpirun ignores -o/--output (confirmed: "WARN: The output file
+    # option is currently ignored"), so there is no file to point it at; -O
+    # still applies and makes it print a CSV-formatted report to stdout.
+    #
+    command_line = [args.likwid_mpirun, "-np", str(args.np), "-mpi", args.mpi]
+
+    pin = args.pin_list
+    if pin is None:
+        cores = physical_core_list(args.np)
+        pin = "_".join(cores) if cores is not None else None
+    if pin is not None:
+        command_line += ["-pin", pin]
+
+    command_line += ["-g", group, "-m", "-O"]
+    if args.force:
+        command_line += ["-f"]
+    command_line += command
+    return command_line
+
+
+def build_command(group, csv_file):
+    if args.np > 1:
+        return mpirun_command(group)
+    return perfctr_command(group, csv_file)
+
+
+#
+# Parsing of the likwid marker-mode CSV output. There are two shapes
+# (confirmed empirically; neither is documented in the likwid-perfctr man
+# page), and this parser handles both, dispatching per TABLE block:
+#
+# Serial (»likwid-perfctr -o file.csv«), 2 TABLE blocks per region:
+#   TABLE,Region <name>,Group 1 Raw,<GROUP>,<n>
+#   Region Info,HWThread 0
+#   RDTSC Runtime [s],<value>
+#   call count,<value>
+#   Event,Counter,HWThread 0
+#   <n event rows>
+#   TABLE,Region <name>,Group 1 Metric,<GROUP>,<n>   (not read; see below)
+#   Metric,HWThread 0
+#   <n metric rows>
+#
+# MPI (»likwid-mpirun«, no -o support, stdout only), 4 TABLE blocks/region:
+#   TABLE,Region <name>,Group 1 Raw,<GROUP>,<n>
+#   Event,Counter,<rank1>,<rank2>,...
+#   <n rows, first one "Region calls,CTR,...">
+#   TABLE,Region <name>,Group 1 Raw STAT,<GROUP>,<n>          (not read)
+#   TABLE,Region <name>,Group 1 Metric,<GROUP>,<n>            (not read)
+#   TABLE,Region <name>,Group 1 Metric STAT,<GROUP>,<n>
+#   Metric,Sum,Min,Max,Avg,%ile 25,%ile 50,%ile 75
+#   <n rows, first one "Runtime (RDTSC) [s] STAT,...">
+#
+# <n> counts only the data rows that follow the header line of that table,
+# not the header itself. Only two quantities are ever taken from likwid's own
+# precomputed tables: the region's runtime (a plain RDTSC delta, safe to
+# trust) and its call count (a software-incremented counter, not an MSR
+# read); every derived quantity (GFLOP/s, AI, ...) is instead computed by
+# this script from raw event counters -- see FORMULAS below and the script's
+# --help text for why.
+#
+# In MPI mode the per-rank raw event values (not likwid's own "Raw STAT"
+# Sum, which is computed over the same unfiltered data) are combined with
+# an outlier-robust sum: likwid/the access-daemon occasionally returns a
+# corrupted sentinel-like value for a handful of ranks under many concurrent
+# ranks (confirmed independently of this script, in likwid-mpirun's own
+# human-readable output -- the identical implausible constant recurs across
+# totally unrelated counter classes, e.g. as both an instruction count and
+# an energy-in-joules reading). See robust_sum() below.
+#
+
+
+def clean(row):
+    while row and row[-1] == "":
+        row = row[:-1]
+    return row
+
+
+def to_float(value):
+    value = value.strip()
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def mean_floats(values):
+    numbers = [n for n in (to_float(v) for v in values) if n is not None]
+    return sum(numbers) / len(numbers) if numbers else None
+
+
+def strip_stat_suffix(name):
+    return name[: -len(" STAT")] if name.endswith(" STAT") else name
+
+
+#
+# A per-rank raw counter reading is rejected as corrupted if it implies a
+# per-second rate above this, given that same rank's own measured runtime
+# for the region. This is an *absolute* physical bound, not a ratio to the
+# other ranks' values -- an early ratio-to-median approach (reject anything
+# more than 1000x the median) missed real corruption where the genuine
+# per-rank value already happened to be large (e.g. a heavily-used AVX-512
+# instruction counter around 1.8e8, with corrupted ranks at ~1.5e10 -- only
+# ~85x off, comfortably under a 1000x cutoff). What's actually diagnostic is
+# that the corrupted value clusters around the same ~1.5e10 magnitude
+# regardless of which counter or region it supposedly belongs to (confirmed:
+# the identical value shows up as an instruction count in one region and as
+# an energy-in-joules reading in another) -- i.e. it's a fixed-magnitude
+# sentinel from a failed read, not a scaled-up real value. No single core on
+# this class of hardware can retire anywhere near 2e10 of any one event type
+# per second, so bounding by (that rank's runtime * this ceiling) reliably
+# separates the two regardless of how large the real per-rank value is.
+#
+MAX_EVENTS_PER_SECOND = 2e10
+
+#
+# PWR_PKG_ENERGY/PWR_DRAM_ENERGY are read in Joules, not "events" -- the
+# events/second ceiling above is meaningless for them (a corrupted ~4.7e7 J
+# reading over well under a second sails right under it). Bound those
+# instead by an absurdly generous power envelope; no real CPU/DRAM draws
+# anywhere near this.
+#
+ENERGY_EVENTS = ("PWR_PKG_ENERGY", "PWR_DRAM_ENERGY")
+MAX_WATTS = 2000.0
+
+#
+# CAS_COUNT_RD/CAS_COUNT_WR (Intel) and CAS_CMD_RD/CAS_CMD_WR (AMD) each
+# count one 64-byte DRAM transaction -- again not bounded by an
+# instruction-rate ceiling. A single very short, single-rank-attributed
+# region (~1.7us mean call, in practice) showed a CAS count implying ~1.7
+# TB/s, ~10x this host's real peak DRAM bandwidth; that's the same
+# coarse-uncore-granularity effect as the energy counters, not the sentinel
+# corruption, but it's equally implausible and equally worth dropping
+# rather than displaying. Bounded by an equally generous bandwidth ceiling
+# (real peak on this class of hardware is roughly 60-150 GB/s).
+#
+MEMORY_EVENTS = ("CAS_COUNT_RD", "CAS_COUNT_WR", "CAS_CMD_RD", "CAS_CMD_WR")
+MAX_BYTES_PER_SECOND = 5e11
+BYTES_PER_CAS_COMMAND = 64.0
+
+#
+# Floor for the plausibility bound when a rank's own measured runtime for
+# the region rounds to (near) zero, so a genuinely tiny nonzero reading on
+# an extremely short call isn't rejected for lack of any time to compare
+# against.
+#
+MIN_PLAUSIBLE_VALUE = 1e6
+MIN_PLAUSIBLE_ENERGY = 1.0
+MIN_PLAUSIBLE_CAS_COUNT = 1e4
+
+
+def robust_sum(name, values, runtimes):
+    """Sum per-rank raw counter values, discarding readings that could not
+    physically have been produced within that same rank's own measured
+    runtime for the region. Returns (sum, number_of_values_dropped)."""
+
+    if name in ENERGY_EVENTS:
+        rate, floor = MAX_WATTS, MIN_PLAUSIBLE_ENERGY
+    elif name in MEMORY_EVENTS:
+        rate = MAX_BYTES_PER_SECOND / BYTES_PER_CAS_COMMAND
+        floor = MIN_PLAUSIBLE_CAS_COUNT
+    else:
+        rate, floor = MAX_EVENTS_PER_SECOND, MIN_PLAUSIBLE_VALUE
+
+    kept = []
+    dropped = 0
+    for value, runtime in zip(values, runtimes):
+        if value is None:
+            continue
+        limit = max((runtime or 0.0) * rate, floor)
+        if value > limit:
+            dropped += 1
+        else:
+            kept.append(value)
+    return sum(kept), dropped
+
+
+def parse_marker_csv(text):
+    #
+    # MPI mode's stdout has the profiled application's own terminal output
+    # (status screens, timer tables, ...) ahead of the likwid report; skip
+    # to the first marker-report line. A no-op for the serial CSV file,
+    # which starts with a marker-report line already.
+    #
+    lines = text.splitlines()
+    for start, line in enumerate(lines):
+        if line.startswith("TABLE,") or line.startswith("STRUCT,"):
+            text = "\n".join(lines[start:])
+            break
+    else:
+        return {}, []
+
+    rows = list(csv.reader(io.StringIO(text)))
+    regions = {}
+    warnings = []
+
+    index = 0
+    while index < len(rows):
+        row = clean(rows[index])
+        if len(row) >= 5 and row[0] == "TABLE" and row[1].startswith("Region "):
+            region = row[1][len("Region ") :]
+            table_kind = row[2]
+            count = int(row[4])
+            entry = regions.setdefault(
+                region, {"runtime": None, "call_count": None, "events": {}}
+            )
+
+            if table_kind == "Group 1 Raw":
+                #
+                # Two different layouts share this exact TABLE-kind string:
+                # serial mode's table has a "Region Info"/"RDTSC Runtime
+                # [s]"/"call count" preamble before the header; MPI mode's
+                # per-rank table doesn't, and folds the call count into the
+                # first data row instead ("Region calls,CTR,<v1>,<v2>,...").
+                #
+                preamble = clean(rows[index + 1])
+                if preamble and preamble[0] == "Region Info":
+                    runtime_row = clean(rows[index + 2])
+                    count_row = clean(rows[index + 3])
+                    entry["runtime"] = mean_floats(runtime_row[1:])
+                    entry["call_count"] = mean_floats(count_row[1:])
+                    for event_row in rows[index + 5 : index + 5 + count]:
+                        event_row = clean(event_row)
+                        if len(event_row) < 3:
+                            continue
+                        name = event_row[0]
+                        value = mean_floats(event_row[2:])
+                        if value is not None:
+                            entry["events"][name] = (
+                                entry["events"].get(name, 0.0) + value
+                            )
+                    index = index + 5 + count
+                else:
+                    #
+                    # MPI shape: stage the raw per-rank values instead of
+                    # reducing them here -- the outlier-robust reduction
+                    # (robust_sum(), see there) needs each rank's own
+                    # measured runtime, which only appears later in this
+                    # region's "Group 1 Metric" table. Finalized once the
+                    # whole file has been scanned, below.
+                    #
+                    data_rows = rows[index + 2 : index + 2 + count]
+                    if data_rows:
+                        first = clean(data_rows[0])
+                        if len(first) > 2 and first[0] == "Region calls":
+                            entry["call_count"] = mean_floats(first[2:])
+                        staged = entry.setdefault("_raw_per_rank", {})
+                        for event_row in data_rows[1:]:
+                            event_row = clean(event_row)
+                            if len(event_row) < 3:
+                                continue
+                            name = event_row[0]
+                            values = [to_float(v) for v in event_row[2:]]
+                            if name in staged:
+                                #
+                                # Accumulate element-wise across channels
+                                # sharing the same event name (e.g. 6 MBOX
+                                # channels all named CAS_COUNT_RD).
+                                #
+                                staged[name] = [
+                                    (a or 0.0) + (b or 0.0)
+                                    for a, b in zip(staged[name], values)
+                                ]
+                            else:
+                                staged[name] = values
+                    index = index + 2 + count
+                continue
+
+            if table_kind == "Group 1 Metric":
+                header = clean(rows[index + 1])
+                if not (len(header) > 1 and header[1].startswith("HWThread")):
+                    #
+                    # MPI shape: stash per-rank runtimes for the deferred
+                    # reduction of this region's raw events (see above).
+                    # The serial shape's "Metric,HWThread 0" table has
+                    # nothing this script needs (see module docstring).
+                    #
+                    for metric_row in rows[index + 2 : index + 2 + count]:
+                        metric_row = clean(metric_row)
+                        if metric_row and metric_row[0] == "Runtime (RDTSC) [s]":
+                            entry["_runtimes_per_rank"] = [
+                                to_float(v) for v in metric_row[1:]
+                            ]
+                            break
+                index = index + 2 + count
+                continue
+
+            if table_kind == "Group 1 Metric STAT":
+                header = clean(rows[index + 1])
+                avg_col = header.index("Avg") if "Avg" in header else None
+                for stat_row in rows[index + 2 : index + 2 + count]:
+                    stat_row = clean(stat_row)
+                    if not stat_row:
+                        continue
+                    name = strip_stat_suffix(stat_row[0])
+                    if (
+                        name == "Runtime (RDTSC) [s]"
+                        and avg_col is not None
+                        and avg_col < len(stat_row)
+                    ):
+                        entry["runtime"] = to_float(stat_row[avg_col])
+                index = index + 2 + count
+                continue
+
+            #
+            # "Group 1 Raw STAT" (MPI): not needed -- it's an aggregate
+            # computed by likwid over the same unfiltered per-rank data
+            # that robust_sum() below handles better. Skip.
+            #
+            index = index + 2 + count
+            continue
+
+        index += 1
+
+    #
+    # Now that every table has been seen, reduce each MPI-shape region's
+    # staged per-rank raw values with the outlier-robust sum, using the
+    # per-rank runtimes staged from that same region's "Group 1 Metric"
+    # table. Serial-shape regions never stage anything here, so this is a
+    # no-op for them.
+    #
+    for region, entry in regions.items():
+        staged = entry.pop("_raw_per_rank", None)
+        runtimes = entry.pop("_runtimes_per_rank", None)
+        if not staged:
+            continue
+        for name, values in staged.items():
+            rt = runtimes if runtimes and len(runtimes) == len(values) else [None] * len(
+                values
+            )
+            value, dropped = robust_sum(name, values, rt)
+            if dropped:
+                warnings.append((region, name, dropped, len(values)))
+            entry["events"][name] = entry["events"].get(name, 0.0) + value
+
+    return regions, warnings
+
+
+#
+# Derived quantities: a small formula library, keyed by likwid group name,
+# reproducing the exact formulas from the group definition files
+# (/usr/share/likwid/perfgroups/{skylakeX,zen4,zen4c}/*.txt) and applying
+# them to summed raw event counters instead of trusting likwid's own
+# per-rank/STAT derived metrics (see module docstring for why).
+#
+
+
+def get(events, name, default=0.0):
+    value = events.get(name)
+    return default if value is None else value
+
+
+def formula_mem_precision(events, runtime, names, factors):
+    if not runtime:
+        return {}
+    packed128 = get(events, names[0])
+    scalar = get(events, names[1])
+    packed256 = get(events, names[2])
+    packed512 = get(events, names[3])
+    f128, fscalar, f256, f512 = factors
+
+    flop = packed128 * f128 + scalar * fscalar + packed256 * f256 + packed512 * f512
+    result = {"gflops": flop / 1e9 / runtime}
+
+    #
+    # Note: the group definition files display this formula as
+    # 100*(PMC0+PMC2)/(PMC0+PMC1+PMC2), omitting the 512-bit register
+    # (PMC3/packed512) entirely. That's stale documentation, not what likwid
+    # actually computes -- confirmed by cross-checking against a real
+    # AVX-512-heavy run: only including packed512 in both the packed and
+    # total counts reproduces likwid's own live "Vectorization ratio [%]"
+    # value (97.4435 for a region where the buggy formula gives 38.9).
+    #
+    packed = packed128 + packed256 + packed512
+    vector_den = packed + scalar
+    if vector_den:
+        result["avx_pct"] = 100.0 * packed / vector_den
+
+    cas_rd, cas_wr = get(events, "CAS_COUNT_RD"), get(events, "CAS_COUNT_WR")
+    total_bytes = (cas_rd + cas_wr) * 64.0
+    if total_bytes:
+        result["dram_mib_s"] = total_bytes / 1e6 / runtime * 1e6 / 2**20
+        result["ai"] = flop / total_bytes
+
+    if "PWR_PKG_ENERGY" in events:
+        result["power_w"] = events["PWR_PKG_ENERGY"] / runtime
+    if "PWR_DRAM_ENERGY" in events:
+        result["power_dram_w"] = events["PWR_DRAM_ENERGY"] / runtime
+
+    return result
+
+
+def formula_mem_dp(events, runtime):
+    return formula_mem_precision(
+        events,
+        runtime,
+        (
+            "FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE",
+            "FP_ARITH_INST_RETIRED_SCALAR_DOUBLE",
+            "FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE",
+            "FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE",
+        ),
+        (2.0, 1.0, 4.0, 8.0),
+    )
+
+
+def formula_mem_sp(events, runtime):
+    return formula_mem_precision(
+        events,
+        runtime,
+        (
+            "FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE",
+            "FP_ARITH_INST_RETIRED_SCALAR_SINGLE",
+            "FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE",
+            "FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE",
+        ),
+        (4.0, 1.0, 8.0, 16.0),
+    )
+
+
+def formula_flops(events, runtime):
+    #
+    # AMD Zen4/Zen4c: FLOPS_DP and FLOPS_SP both read this one event (the
+    # group file itself notes Zen doesn't distinguish DP/SP), and neither
+    # group exposes a vectorization ratio.
+    #
+    if not runtime or "RETIRED_SSE_AVX_FLOPS_ALL" not in events:
+        return {}
+    return {"gflops": events["RETIRED_SSE_AVX_FLOPS_ALL"] / 1e9 / runtime}
+
+
+def formula_mem_amd(events, runtime):
+    if not runtime:
+        return {}
+    total_bytes = (get(events, "CAS_CMD_RD") + get(events, "CAS_CMD_WR")) * 64.0
+    if not total_bytes:
+        return {}
+    return {
+        "dram_mib_s": total_bytes / 1e6 / runtime * 1e6 / 2**20,
+        "bytes_total": total_bytes,
+    }
+
+
+BRANCH_EVENT_NAMES = (
+    ("BR_INST_RETIRED_ALL_BRANCHES", "BR_MISP_RETIRED_ALL_BRANCHES"),  # Intel
+    ("RETIRED_BRANCH_INSTR", "RETIRED_MISP_BRANCH_INSTR"),  # AMD Zen4/Zen4c
+)
+
+
+def formula_branch(events, runtime):
+    for inst_name, mispred_name in BRANCH_EVENT_NAMES:
+        instructions = events.get(inst_name)
+        if instructions:
+            return {
+                "branch_mispred_pct": 100.0 * get(events, mispred_name) / instructions
+            }
+    return {}
+
+
+def formula_tma(events, runtime):
+    #
+    # Intel-only (no zen4/zen4c TMA group in this likwid install).
+    #
+    cycles = events.get("CPU_CLK_UNHALTED_CORE")
+    if not cycles:
+        return {}
+    issued = get(events, "UOPS_ISSUED_ANY")
+    retired = get(events, "UOPS_RETIRED_RETIRE_SLOTS")
+    not_delivered = get(events, "IDQ_UOPS_NOT_DELIVERED_CORE")
+    recovery = get(events, "INT_MISC_RECOVERY_CYCLES")
+    slots = 4.0 * cycles
+
+    return {
+        "front_pct": 100.0 * not_delivered / slots,
+        "retiring_pct": 100.0 * retired / slots,
+        "speculation_pct": 100.0 * (issued - retired + 4.0 * recovery) / slots,
+        "back_pct": 100.0 * (1.0 - (not_delivered + issued + 4.0 * recovery) / slots),
+    }
+
+
+def formula_energy(events, runtime):
+    if not runtime:
+        return {}
+    result = {}
+    if "PWR_PKG_ENERGY" in events:
+        result["power_w"] = events["PWR_PKG_ENERGY"] / runtime
+    if "PWR_DRAM_ENERGY" in events:
+        result["power_dram_w"] = events["PWR_DRAM_ENERGY"] / runtime
+    return result
+
+
+FORMULAS = {
+    "MEM_DP": formula_mem_dp,
+    "MEM_SP": formula_mem_sp,
+    "FLOPS_DP": formula_flops,
+    "FLOPS_SP": formula_flops,
+    "MEM": formula_mem_amd,
+    "BRANCH": formula_branch,
+    "TMA": formula_tma,
+    "ENERGY": formula_energy,
+}
+
+
+def derive(regions, group):
+    """Apply the group's formula to every region's raw events, in place."""
+
+    formula = FORMULAS.get(group)
+    for entry in regions.values():
+        entry["derived"] = formula(entry["events"], entry["runtime"]) if formula else {}
+    return regions
+
+
+def build_rows(results, groups_plan):
+    consolidated = groups_plan["consolidated"]
+    frontend_mode = groups_plan["frontend_mode"]
+
+    dp = results.get("dp", {})
+    sp = results.get("sp", {})
+    mem = results.get("mem", {})
+    frontend = results.get("frontend", {})
+    energy = results.get("energy", {})
+
+    regions = set(dp) | set(sp) | set(mem) | set(frontend) | set(energy)
+
+    rows = []
+    for region in sorted(regions):
+        d, s, m, f, e = (
+            dp.get(region, {}),
+            sp.get(region, {}),
+            mem.get(region, {}),
+            frontend.get(region, {}),
+            energy.get(region, {}),
+        )
+
+        dp_gflops = d.get("derived", {}).get("gflops") or 0.0
+        sp_gflops = s.get("derived", {}).get("gflops") or 0.0
+        primary, gflops = (d, dp_gflops) if dp_gflops >= sp_gflops else (s, sp_gflops)
+        derived = primary.get("derived", {})
+
+        count = primary.get("call_count")
+        runtime = primary.get("runtime") or 0.0
+
+        if consolidated:
+            avx_pct = derived.get("avx_pct")
+            ai = derived.get("ai")
+            dram = derived.get("dram_mib_s")
+            power = derived.get("power_w")
+        else:
+            avx_pct = None
+            flop_count = primary.get("events", {}).get("RETIRED_SSE_AVX_FLOPS_ALL")
+            mem_derived = m.get("derived", {})
+            bytes_total = mem_derived.get("bytes_total")
+            ai = flop_count / bytes_total if flop_count and bytes_total else None
+            dram = mem_derived.get("dram_mib_s")
+            power = e.get("derived", {}).get("power_w")
+
+        row = {
+            "region": region,
+            "count": count,
+            "total_ms": runtime * 1000.0,
+            "mean_ms": (runtime * 1000.0 / count) if count else None,
+            "gflops": gflops,
+            "avx_pct": avx_pct,
+            "ai": ai,
+            "dram_mib_s": dram,
+            "power_w": power,
+            "front_pct": None,
+            "back_pct": None,
+            "retiring_pct": None,
+            "speculation_pct": None,
+            "branch_mispred_pct": None,
+        }
+
+        frontend_derived = f.get("derived", {})
+        if frontend_mode == "tma":
+            row["front_pct"] = frontend_derived.get("front_pct")
+            row["back_pct"] = frontend_derived.get("back_pct")
+            row["retiring_pct"] = frontend_derived.get("retiring_pct")
+            row["speculation_pct"] = frontend_derived.get("speculation_pct")
+        elif frontend_mode == "branch":
+            row["branch_mispred_pct"] = frontend_derived.get("branch_mispred_pct")
+
+        rows.append(row)
+
+    return rows
+
+
+def fmt(value, digits=1):
+    return "-" if value is None else round(value, digits)
+
+
+def print_table(rows, groups_plan):
+    frontend_mode = groups_plan["frontend_mode"]
+
+    headers = [
+        "region",
+        "count",
+        "total [ms]",
+        "mean [ms]",
+        "GFLOP/s",
+        "AVX/SIMD [%]",
+        "AI [FLOP/B]",
+        "DRAM [MiB/s]",
+        "Power [W]",
+    ]
+    if frontend_mode == "tma":
+        headers += ["front [%]", "back [%]", "retiring [%]", "spec. [%]"]
+    elif frontend_mode == "branch":
+        headers += ["branch mispred. [%]"]
+
+    table = []
+    for row in rows:
+        entries = [
+            row["region"],
+            fmt(row["count"], 0),
+            fmt(row["total_ms"], 3),
+            fmt(row["mean_ms"], 4),
+            fmt(row["gflops"], 2),
+            fmt(row["avx_pct"], 1),
+            fmt(row["ai"], 4),
+            fmt(row["dram_mib_s"], 1),
+            fmt(row["power_w"], 1),
+        ]
+        if frontend_mode == "tma":
+            entries += [
+                fmt(row["front_pct"], 1),
+                fmt(row["back_pct"], 1),
+                fmt(row["retiring_pct"], 1),
+                fmt(row["speculation_pct"], 1),
+            ]
+        elif frontend_mode == "branch":
+            entries += [fmt(row["branch_mispred_pct"], 2)]
+        table.append(entries)
+
+    print("\nPer region (likwid marker API, averaged over all calls):\n")
+    print(tabulate(table, headers=headers))
+
+
+def write_csv(rows, filename):
+    columns = [
+        "region",
+        "count",
+        "total_ms",
+        "mean_ms",
+        "gflops",
+        "avx_pct",
+        "ai",
+        "dram_mib_s",
+        "power_w",
+        "front_pct",
+        "back_pct",
+        "retiring_pct",
+        "speculation_pct",
+        "branch_mispred_pct",
+    ]
+
+    with open(filename, "w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row[column] for column in columns})
+
+    print("\n[INFO] wrote »%s«" % filename)
+
+
+def report_warnings(group, warnings):
+    """Print one consolidated line per region for the outliers robust_sum()
+    dropped, instead of spamming one line per event."""
+
+    by_region = {}
+    for region, _name, dropped, _total in warnings:
+        by_region[region] = by_region.get(region, 0) + dropped
+
+    for region, dropped in sorted(by_region.items()):
+        print(
+            "[WARNING] %s (%s): discarded %d implausible per-rank counter "
+            "reading(s), likely a likwid/access-daemon glitch under many "
+            "concurrent ranks" % (region, group, dropped)
+        )
+
+
+def main():
+    if args.import_dir is None:
+        available = discover_groups()
+    else:
+        #
+        # Best-effort discovery even in --import mode, so the frontend
+        # table shape matches whatever was actually recorded; fall back to
+        # the Intel-style default if likwid isn't even installed here.
+        #
+        available = discover_groups() or {"MEM_DP", "MEM_SP", "TMA"}
+
+    groups_plan = select_groups(available)
+    runs = planned_runs(groups_plan)
+
+    if not runs:
+        print("[ERROR] no usable likwid performance groups found", file=sys.stderr)
+        sys.exit(1)
+
+    results = {}
+
+    if args.import_dir is not None:
+        if args.dry_run:
+            print("[INFO] nothing to do: --dry-run given together with --import")
+            return
+        for tag, group in runs:
+            csv_file = os.path.join(args.import_dir, output_csv(tag))
+            if not os.path.isfile(csv_file):
+                print("[WARNING] »%s« does not exist, skipping" % csv_file)
+                continue
+            with open(csv_file) as handle:
+                regions, warnings = parse_marker_csv(handle.read())
+            report_warnings(group, warnings)
+            results[tag] = derive(regions, group)
+    else:
+        if not args.dry_run:
+            preflight()
+
+        for tag, group in runs:
+            csv_file = output_csv(tag)
+            command_line = build_command(group, csv_file)
+
+            if args.dry_run:
+                print(" ".join(command_line))
+                continue
+
+            print("[INFO] running %s" % " ".join(command_line))
+            output = run_profiler(command_line)
+
+            if args.np > 1:
+                #
+                # likwid-mpirun ignores -o and prints the report to stdout
+                # instead; save it ourselves under the same filename
+                # convention as the serial path's real CSV file, so --import
+                # works uniformly regardless of which mode produced it.
+                #
+                with open(csv_file, "w") as handle:
+                    handle.write(output)
+                regions, warnings = parse_marker_csv(output)
+            else:
+                if not os.path.isfile(csv_file):
+                    print(
+                        "[ERROR] likwid did not write »%s«: no marker region "
+                        "was recorded. Check that the executable was "
+                        "compiled with -DWITH_LIKWID=ON." % csv_file,
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                with open(csv_file) as handle:
+                    regions, warnings = parse_marker_csv(handle.read())
+
+            if not regions:
+                print(
+                    "[ERROR] »%s« contains no marker region. Check that the "
+                    "executable was compiled with -DWITH_LIKWID=ON." % csv_file,
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            report_warnings(group, warnings)
+            results[tag] = derive(regions, group)
+
+        if args.dry_run:
+            return
+
+    rows = build_rows(results, groups_plan)
+
+    if not rows:
+        print(
+            "[ERROR] no marker region was recorded in any of the csv files",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    print_table(rows, groups_plan)
+
+    if args.csv_file is not None:
+        write_csv(rows, args.csv_file)
+
+
+if __name__ == "__main__":
+    main()
