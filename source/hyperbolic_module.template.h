@@ -426,7 +426,8 @@ namespace ryujin
      * Taking a view<>() might imply implicit memory space transfers. Let's
      * account for them in our computing timers.
      */
-    ComputingTimer::timer("(re)initialize data structures").start();
+    if (have_separate_memory_spaces)
+      ComputingTimer::timer("time step [X] _ - memory space transfers").start();
 
     /*
      * Workaround: A constexpr boolean storing the fact whether we
@@ -509,8 +510,8 @@ namespace ryujin
         old_precomputed.template view<MemorySpace>();
 
     /*
-     * FIXME GPU: std::array::operator[] is not device capable. For the
-     * time being use a Kokkos::Array for wrapping:
+     * FIXME GPU: std::array::operator[] is not device capable.
+     * Use a Kokkos::Array for wrapping for the time being:
      */
 
     using HyperbolicVectorView = std::remove_const_t<decltype(old_U_view)>;
@@ -533,7 +534,8 @@ namespace ryujin
     const auto bounds_view = bounds_.template view<MemorySpace>();
     const auto r_view = r_.template view<MemorySpace>();
 
-    ComputingTimer::timer("(re)initialize data structures").stop();
+    if (have_separate_memory_spaces)
+      ComputingTimer::timer("time step [X] _ - memory space transfers").stop();
 
     /*
      * Create a local copy of cfl_ so that we do not capture "this" in the
