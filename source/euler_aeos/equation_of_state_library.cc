@@ -5,6 +5,7 @@
 
 #include "equation_of_state_library.h"
 
+#include "equation_of_state_bumpy_barotropic_pressure.h"
 #include "equation_of_state_function.h"
 #include "equation_of_state_hayes.h"
 #include "equation_of_state_jones_wilkins_lee.h"
@@ -34,6 +35,7 @@ namespace ryujin
         equation_of_state_list.emplace(std::move(object));
       };
 
+      add(std::make_shared<BumpyBarotropicPressure>(subsection));
       add(std::make_shared<Function>(subsection));
       add(std::make_shared<Hayes>(subsection));
       add(std::make_shared<JonesWilkinsLee>(subsection));
