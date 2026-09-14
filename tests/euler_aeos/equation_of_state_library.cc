@@ -1,3 +1,4 @@
+#include <equation_of_state_bumpy_barotropic_pressure.h>
 #include <equation_of_state_function.h>
 #include <equation_of_state_hayes.h>
 #include <equation_of_state_jones_wilkins_lee.h>
@@ -155,6 +156,45 @@ int main(int argc, char *argv[])
     ParameterAcceptor::initialize(parameters);
   }
   test(noble_abel_stiffened_gas);
+
+  /* bumpy barotropic pressure */
+
+  std::cout << "\nBumpyBarotropicPressure with gamma=1.4, b=0, q=0, pinf=0, "
+               "rho_0=1, c_0=0.1, eps=0.01"
+            << std::endl;
+  BumpyBarotropicPressure bumpy_barotropic_pressure("");
+  {
+    std::stringstream parameters;
+    parameters << "subsection bumpy barotropic pressure\n"
+               << "set gamma = 1.4\n"
+               << "set barotropic reference density = 1.0\n"
+               << "set barotropic sound speed = 0.1\n"
+               << "set barotropic bump width = 0.01\n"
+               << "end\n"
+               << std::endl;
+    ParameterAcceptor::initialize(parameters);
+  }
+  test(bumpy_barotropic_pressure);
+
+  /* For c_0 = 0 the barotropic constituent vanishes identically and we
+   * have to reproduce the NobleAbelStiffenedGas results printed above: */
+
+  std::cout << "\nBumpyBarotropicPressure with c_0=0 and gamma=1.4, b=0.2, "
+               "q=0.00125, pinf=0.005"
+            << std::endl;
+  {
+    std::stringstream parameters;
+    parameters << "subsection bumpy barotropic pressure\n"
+               << "set gamma = 1.4\n"
+               << "set covolume b = 0.2\n"
+               << "set reference specific internal energy = 0.00125\n"
+               << "set reference pressure = 0.005\n"
+               << "set barotropic sound speed = 0.0\n"
+               << "end\n"
+               << std::endl;
+    ParameterAcceptor::initialize(parameters);
+  }
+  test(bumpy_barotropic_pressure);
 
   /* van der Waals */
 
