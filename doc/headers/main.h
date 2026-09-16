@@ -3,7 +3,7 @@
  *
  * This is the main starting page for the technical ryujin class and
  * function documentation. A full usage guide can be found at
- * https://conservation-laws.org
+ * https://conservation-laws.org/ryujin/
  *
  * The program is organized into the following modules:
  *
