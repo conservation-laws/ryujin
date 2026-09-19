@@ -444,7 +444,7 @@ namespace ryujin
         level_matrix_free_ = &matrix_free;
         scalar_vector.resize(matrix_free.min_level(), matrix_free.max_level());
         for (unsigned int level = matrix_free.min_level();
-             level < matrix_free.max_level();
+             level <= matrix_free.max_level();
              ++level)
           matrix_free[level].initialize_dof_vector(scalar_vector[level]);
       }
@@ -727,27 +727,27 @@ namespace ryujin
                  const dealii::MGLevelObject<dealii::MatrixFree<dim, Number>>
                      &matrix_free)
       {
-        dealii::MGTransferMatrixFree<dim, Number>::build(dof_handler);
-        level_matrix_free_ = &matrix_free;
-      }
+        /*
+         * Hand the level partitioners of our MatrixFree objects to the
+         * transfer: copy_to_mg() reinitializes the multigrid level vectors
+         * with these partitioners.
+         */
 
-      template <typename Number2>
-      void copy_to_mg(
-          const dealii::DoFHandler<dim> &dof_handler,
-          dealii::MGLevelObject<
-              dealii::LinearAlgebra::distributed::Vector<Number>> &dst,
-          const dealii::LinearAlgebra::distributed::Vector<Number2> &src) const
-      {
-        if (dst[dst.min_level()].size() == 0)
-          for (unsigned int l = dst.min_level(); l <= dst.max_level(); ++l)
-            (*level_matrix_free_)[l].initialize_dof_vector(dst[l]);
-        dealii::MGTransferMatrixFree<dim, Number>::copy_to_mg(
-            dof_handler, dst, src);
-      }
+        const auto n_levels = dof_handler.get_triangulation().n_global_levels();
+        std::vector<std::shared_ptr<const dealii::Utilities::MPI::Partitioner>>
+            partitioners(n_levels);
 
-    private:
-      const dealii::MGLevelObject<dealii::MatrixFree<dim, Number>>
-          *level_matrix_free_;
+        for (unsigned int level = matrix_free.min_level();
+             level <= matrix_free.max_level();
+             ++level) {
+          dealii::LinearAlgebra::distributed::Vector<Number> vector;
+          matrix_free[level].initialize_dof_vector(vector);
+          partitioners[level] = vector.get_partitioner();
+        }
+
+        dealii::MGTransferMatrixFree<dim, Number>::build(dof_handler,
+                                                         partitioners);
+      }
     };
 
   } // namespace NavierStokes
