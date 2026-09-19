@@ -1,0 +1,11 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »euler poisson barotropic« with dim=2
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+9.83047298217424e-02
+9.83047298198748e-02
+9.83047298251020e-02
+9.83047298228832e-02
+9.83047298284557e-02

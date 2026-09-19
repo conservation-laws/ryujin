@@ -1,0 +1,97 @@
+##
+#
+# A small diocotron instability setup on a disk that exercises the geometric
+# multigrid solver for the electrostatic potential in parallel. The
+# partitioning of the coarser multigrid levels - and with it the ghost layout
+# of the multigrid level vectors - depends on the number of MPI ranks, which
+# is why we run this test with 5 and 8 ranks.
+#
+##
+
+subsection A - TimeLoop
+  set basename                  = test
+
+  set enable compute quantities = true
+  set enable output full        = false
+
+  set final time                = 0.50
+  set timer granularity         = 0.10
+
+  set terminal update interval  = 0
+
+  set debug command             = ../../../../print_mass test-interior-R0000-space_averaged_time_series.dat
+end
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = euler poisson barotropic
+
+  set barotropic equation of state = isothermal
+
+  subsection isothermal
+    set speed of sound = 1e-6
+  end
+
+  set alpha                        = 39.4784176e6
+  set set up magnetic drift limit  = true
+
+  set electrostatic configuration  = constant
+
+  subsection constant
+    set background density   = 0
+    set magnetic field       = -6.28318531e6
+  end
+end
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set mesh refinement       = 3
+  set mesh writeout         = false
+
+  set geometry              = disk
+
+  subsection disk
+    set balanced           = true
+    set radius             = 16
+    set boundary condition = do nothing
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set position      = 0, 0
+
+  subsection function
+    # trigger fifth mode by adding a 10% perturbation:
+    set density expression    = 6 < sqrt(x*x+y*y) && sqrt(x*x+y*y) < 8 ? 1 - 0.1 + 0.1 * sin(5 * atan2(y,x)) : 1e-6
+
+    set velocity x expression = 0
+    set velocity y expression = 0
+  end
+end
+
+subsection G - ParabolicModule
+  set gauss law restart strategy    = full restart
+
+  set multigrid - max iter          = 15
+  set multigrid - chebyshev range   = 8
+  set multigrid - chebyshev max eig = 2
+  set multigrid - chebyshev degree  = 3
+  set multigrid - chebyshev cg iter = 10
+  set multigrid - min level         = 0
+  set tolerance                     = 1e-15
+  set tolerance linfty norm         = false
+end
+
+subsection H - TimeIntegrator
+  set time stepping scheme  = strang erk 33 cn
+
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = cruise control
+end
+
+subsection K - Quantities
+  set interior manifolds = interior : 0. : space_averaged
+end
