@@ -42,6 +42,7 @@ target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 #
 
 set(DEPENDENT_SOURCE_FILES
+  error_evaluation.cc
   hyperbolic_module.cc
   initial_values.cc
   mesh_adaptor.cc
