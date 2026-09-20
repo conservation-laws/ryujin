@@ -24,7 +24,6 @@ subsection A - TimeLoop
   set basename             = linear_transport-time_stepping
 
   set enable compute error = true
-  set error normalize      = true
 
   set enable output full   = false
 
@@ -105,4 +104,8 @@ subsection H - TimeIntegrator
 # set time stepping scheme  = ssprk 33
 
   set cfl recovery strategy = none
+end
+
+subsection L - ErrorEvaluation
+  set error normalize = true
 end

@@ -2,7 +2,6 @@ subsection A - TimeLoop
   set basename                  = validation-becker-l7
 
   set enable compute error      = true
-  set error quantities          = rho, m, E
 
   set final time                = 2.0
   set timer granularity         = 2.0
@@ -68,4 +67,8 @@ subsection H - TimeIntegrator
   set cfl max               = 0.30
   set cfl recovery strategy = none
   set time stepping scheme  = strang ssprk 33 cn
+end
+
+subsection L - ErrorEvaluation
+  set error quantities = rho, m, E
 end

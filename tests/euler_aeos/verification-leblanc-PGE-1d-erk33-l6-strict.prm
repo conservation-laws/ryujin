@@ -2,7 +2,6 @@ subsection A - TimeLoop
   set basename             = leblanc-erk33
 
   set enable compute error = true
-  set error quantities     = rho, m, E
 
   set final time           = 0.66666666666667
   set timer granularity    = 0.66666666666667
@@ -61,4 +60,8 @@ subsection H - TimeIntegrator
   set cfl max               = 0.75
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error quantities = rho, m, E
 end

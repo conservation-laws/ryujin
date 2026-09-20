@@ -18,8 +18,6 @@ subsection A - TimeLoop
   set basename             = isentropic_vortex-erk33
 
   set enable compute error = true
-  set error normalize      = true
-  set error quantities     = rho, m_1, m_2, E
 
   set enable output full   = true
 
@@ -65,4 +63,9 @@ subsection H - TimeIntegrator
   set cfl max               = 0.2
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, m_2, E
 end

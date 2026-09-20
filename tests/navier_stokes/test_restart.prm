@@ -12,7 +12,6 @@ subsection A - TimeLoop
   set timer granularity             = 0.00000000000000000000000000001
 
   set enable compute error          = true
-  set error quantities              = rho, m_1, m_2, E
 
   set terminal update interval      = 0
 end
@@ -73,4 +72,8 @@ subsection H - TimeIntegrator
   set cfl max               = 0.90
   set cfl recovery strategy = bang bang control
   set time stepping scheme  = strang erk 33 cn
+end
+
+subsection L - ErrorEvaluation
+  set error quantities = rho, m_1, m_2, E
 end

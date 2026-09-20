@@ -19,8 +19,6 @@ subsection A - TimeLoop
   set basename             = paraboloid_1d-erk33
 
   set enable compute error = true
-  set error normalize      = true
-  set error quantities     = h
 
   set enable output full   = true
 
@@ -77,4 +75,9 @@ subsection H - TimeIntegrator
   set cfl max               = 0.50
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h
 end

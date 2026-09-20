@@ -18,8 +18,6 @@ subsection A - TimeLoop
   set basename                      = steady_incline_1d-erk33-l9
 
   set enable compute error          = true
-  set error quantities              = h, m
-  set error normalize               = true
 
   set final time                    = 1.0
   set timer granularity             = 1.0
@@ -81,4 +79,9 @@ subsection J - VTUOutput
   set schlieren recompute bounds = true
   set use mpi io                 = true
   set vtu output quantities      = h, m, bathymetry, alpha, eta_m
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h, m
 end

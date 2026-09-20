@@ -2,7 +2,6 @@ subsection A - TimeLoop
   set basename             = zero_pressure-erk33
 
   set enable compute error = true
-  set error quantities     = rho, m
 
   set enforce final time        = true
 
@@ -61,4 +60,8 @@ subsection H - TimeIntegrator
   set cfl max               = 0.10
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error quantities = rho, m
 end

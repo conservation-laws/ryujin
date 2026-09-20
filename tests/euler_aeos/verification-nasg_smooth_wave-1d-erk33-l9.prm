@@ -13,8 +13,6 @@
 subsection A - TimeLoop
   set basename                      = nasg_smooth_wave_1d-erk33.l9
   set enable compute error          = true
-  set error normalize               = true
-  set error quantities              = rho, m, E
 
   set enforce final time            = true
   set final time                    = 0.6
@@ -75,4 +73,9 @@ subsection H - TimeIntegrator
   set cfl min               = 0.50
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m, E
 end
