@@ -1,0 +1,66 @@
+##
+#
+# Exercise the ErrorEvaluation class: compute (non-normalized) L2 and Linf
+# errors of conserved and primitive quantities at every second timer tick
+# and dump the resulting error log.
+#
+##
+
+subsection A - TimeLoop
+  set basename                       = test
+
+  set enable compute error           = true
+  set timer compute error multiplier = 2
+
+  set final time                     = 1.0
+  set timer granularity              = 0.125
+
+  set terminal update interval       = 0
+
+  set debug filename                 = test-error.log
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 5
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+  end
+end
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1
+    set beta        = 5
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.2
+  set cfl max               = 0.2
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = false
+  set error norms      = L2, Linf
+  set error quantities = rho, v_1, p
+end
