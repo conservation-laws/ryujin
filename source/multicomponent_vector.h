@@ -151,6 +151,33 @@ namespace ryujin
       MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
       view() const;
 
+      /**
+       * Return a reference to the underlying deal.II vector residing in
+       * the selected memory space. This accessor is only available for
+       * scalar vectors (n_comp == 1) whose underlying deal.II vector is
+       * compatible with a scalar partitioner and can thus be used with
+       * deal.II functions and methods directly.
+       *
+       * @note The same residency and transfer semantics as for the writable
+       * view() apply.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host>
+      dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+      deal_ii_vector()
+        requires(n_comp == 1);
+
+      /**
+       * Return a const reference to the underlying deal.II vector residing
+       * in the selected memory space, see above.
+       *
+       * @note The same residency and transfer semantics as for the
+       * read-only view() apply.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host>
+      const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+      deal_ii_vector() const
+        requires(n_comp == 1);
+
       /*
        * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
        * transfer_policy(), and set_transfer_policy() methods are inherited
@@ -734,6 +761,36 @@ namespace ryujin
                                       simd_length,
                                       MemorySpace,
                                       false>(*this);
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+    MultiComponentVector<Number, n_comp, simd_length>::deal_ii_vector()
+      requires(n_comp == 1)
+    {
+      this->template prepare_write_access<MemorySpace>();
+
+      if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
+        return host_vector_;
+      else
+        return default_vector_;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+    MultiComponentVector<Number, n_comp, simd_length>::deal_ii_vector() const
+      requires(n_comp == 1)
+    {
+      this->template prepare_read_access<MemorySpace>();
+
+      if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
+        return host_vector_;
+      else
+        return default_vector_;
     }
 
 
