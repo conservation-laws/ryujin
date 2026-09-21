@@ -1,0 +1,8 @@
+Component 2 extracted on HostSpace:
+2 12 22 32 42 52 62 72 82 92 102 112
+Component 1 extracted on HostSpace (scaled by 2):
+2 22 42 62 82 102 122 142 162 182 202 222
+Component 2 extracted on DefaultSpace:
+2 12 22 32 42 52 62 72 82 92 102 112
+Component 1 extracted on DefaultSpace (scaled by 2):
+2 22 42 62 82 102 122 142 162 182 202 222

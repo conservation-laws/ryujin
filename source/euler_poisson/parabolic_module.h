@@ -16,6 +16,7 @@
 #include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/matrix_free/matrix_free.h>
 
@@ -146,7 +147,8 @@ namespace ryujin
 
       using ScalarHostVector = Vectors::ScalarHostVector<Number>;
 
-      using BlockHostVector = Vectors::BlockHostVector<Number>;
+      using BlockHostVector =
+          dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
       using ScalarNumber = typename View::ScalarNumber;
 

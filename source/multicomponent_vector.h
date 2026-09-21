@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "gpu.h"
+#include "loop.h"
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/partitioner.h>
@@ -149,6 +150,33 @@ namespace ryujin
       template <typename MemorySpace = dealii::MemorySpace::Host>
       MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
       view() const;
+
+      /**
+       * Return a reference to the underlying deal.II vector residing in
+       * the selected memory space. This accessor is only available for
+       * scalar vectors (n_comp == 1) whose underlying deal.II vector is
+       * compatible with a scalar partitioner and can thus be used with
+       * deal.II functions and methods directly.
+       *
+       * @note The same residency and transfer semantics as for the writable
+       * view() apply.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host>
+      dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+      deal_ii_vector()
+        requires(n_comp == 1);
+
+      /**
+       * Return a const reference to the underlying deal.II vector residing
+       * in the selected memory space, see above.
+       *
+       * @note The same residency and transfer semantics as for the
+       * read-only view() apply.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host>
+      const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+      deal_ii_vector() const
+        requires(n_comp == 1);
 
       /*
        * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
@@ -322,6 +350,10 @@ namespace ryujin
        * Optionally, a third argument @p functor can be supplied that is
        * applied to each (scalar) value individually before stored in
        * @p scalar_vector.
+       *
+       * @note The operation is performed on the memory space of the view.
+       * Correspondingly, @p functor has to be callable on the selected
+       * memory space.
        *
        * @note This function is used in the VTUOutput module to unpack a
        * single component out of our custom MultiComponentVector in order to
@@ -644,13 +676,13 @@ namespace ryujin
       }
 
       /* Special case of a scalar vector: */
-      if (n_comp == 1)
+      if (n_comp == 1) {
         host_vector_.reinit(scalar_partitioner);
-
-      auto vector_partitioner =
-          create_vector_partitioner(scalar_partitioner, n_comp);
-
-      host_vector_.reinit(vector_partitioner);
+      } else {
+        auto vector_partitioner =
+            create_vector_partitioner(scalar_partitioner, n_comp);
+        host_vector_.reinit(vector_partitioner);
+      }
 
       /*
        * The vector is resident on the host memory space only. Device
@@ -729,6 +761,36 @@ namespace ryujin
                                       simd_length,
                                       MemorySpace,
                                       false>(*this);
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+    MultiComponentVector<Number, n_comp, simd_length>::deal_ii_vector()
+      requires(n_comp == 1)
+    {
+      this->template prepare_write_access<MemorySpace>();
+
+      if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
+        return host_vector_;
+      else
+        return default_vector_;
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename MemorySpace>
+    const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
+    MultiComponentVector<Number, n_comp, simd_length>::deal_ii_vector() const
+      requires(n_comp == 1)
+    {
+      this->template prepare_read_access<MemorySpace>();
+
+      if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
+        return host_vector_;
+      else
+        return default_vector_;
     }
 
 
@@ -961,24 +1023,28 @@ namespace ryujin
                                      unsigned int component,
                                      const Functor &functor) const
     {
-      using HostSpace = dealii::MemorySpace::Host;
-      AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
-                  dealii::ExcNotImplemented());
-
       Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot extract from a vector with zero components."));
       AssertIndexRange(component, n_comp);
 
-      const auto local_size =
-          scalar_vector.get_partitioner()->locally_owned_size();
+      const auto local_size = static_cast<unsigned int>(
+          scalar_vector.get_partitioner()->locally_owned_size());
 
       Assert(n_comp * local_size == n_locally_owned_,
              dealii::ExcMessage("Called with a scalar_vector argument that has "
                                 "incompatible local range."));
 
-      for (unsigned int i = 0; i < local_size; ++i)
-        scalar_vector.local_element(i) = functor(data_[i * n_comp + component]);
+      const auto *data = data_;
+      auto *destination = scalar_vector.begin();
+
+      const auto body = [=](auto /*sentinel*/, unsigned int i) {
+        destination[i] = functor(data[i * n_comp + component]);
+      };
+
+      loop<MemorySpace, Number>(
+          "extract_component", body, 0, /*no vectorization*/ 0, local_size);
+
       scalar_vector.update_ghost_values();
     }
 
