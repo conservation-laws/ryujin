@@ -9,7 +9,6 @@
 #include "loop.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
-#include "selected_components_extractor.h"
 #include "simd.h"
 
 #include <deal.II/base/array_view.h>
@@ -31,10 +30,12 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , hyperbolic_system_(&hyperbolic_system)
-      , parabolic_system_(&parabolic_system)
-      , initial_precomputed_(initial_precomputed)
-      , alpha_(alpha)
+      , selected_components_extractor_(offline_data,
+                                       hyperbolic_system,
+                                       parabolic_system,
+                                       initial_precomputed,
+                                       {"alpha"},
+                                       {alpha})
       , need_mesh_adaptation_(false)
   {
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
@@ -180,10 +181,7 @@ namespace ryujin
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     }
 
-    SelectedComponentsExtractor<Description, dim, Number>::check(
-        parabolic_system_->parabolic_component_names(),
-        {"alpha"},
-        smoothness_selected_quantities_);
+    selected_components_extractor_.prepare(smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
     need_mesh_adaptation_ = false;
@@ -443,15 +441,7 @@ namespace ryujin
      */
 
     auto quantities =
-        SelectedComponentsExtractor<Description, dim, Number>::extract(
-            *offline_data_,
-            *hyperbolic_system_,
-            *parabolic_system_,
-            state_vector,
-            initial_precomputed_,
-            {"alpha"},
-            {alpha_},
-            smoothness_selected_quantities_);
+        selected_components_extractor_.view(state_vector).extract();
 
     for (auto &it : quantities) {
       it.update_ghost_values();

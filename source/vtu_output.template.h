@@ -6,7 +6,6 @@
 #pragma once
 
 #include "computing_timer.h"
-#include "selected_components_extractor.h"
 #include "vtu_output.h"
 
 #include <deal.II/base/function_parser.h>
@@ -33,12 +32,13 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , hyperbolic_system_(&hyperbolic_system)
-      , parabolic_system_(&parabolic_system)
       , postprocessor_(&postprocessor)
-      , initial_precomputed_(initial_precomputed)
-      , alpha_(alpha)
-      , smoothness_indicators_(smoothness_indicators)
+      , selected_components_extractor_(offline_data,
+                                       hyperbolic_system,
+                                       parabolic_system,
+                                       initial_precomputed,
+                                       {"alpha", "smoothness_indicators"},
+                                       {alpha, smoothness_indicators})
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -74,10 +74,7 @@ namespace ryujin
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
 
-    SelectedComponentsExtractor<Description, dim, Number>::check(
-        parabolic_system_->parabolic_component_names(),
-        {"alpha", "smoothness_indicators"},
-        vtu_output_quantities_);
+    selected_components_extractor_.prepare(vtu_output_quantities_);
   }
 
 
@@ -108,15 +105,7 @@ namespace ryujin
      */
 
     auto selected_components =
-        SelectedComponentsExtractor<Description, dim, Number>::extract(
-            *offline_data_,
-            *hyperbolic_system_,
-            *parabolic_system_,
-            state_vector,
-            initial_precomputed_,
-            {"alpha", "smoothness_indicators"},
-            {alpha_, smoothness_indicators_},
-            vtu_output_quantities_);
+        selected_components_extractor_.view(state_vector).extract();
 
     /*
      * Attach data vectors to DataOut object:

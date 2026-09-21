@@ -10,6 +10,7 @@
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
+#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -146,10 +147,9 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
-    const InitialPrecomputedVector &initial_precomputed_;
+    SelectedComponentsExtractor<Description, dim, Number>
+        selected_components_extractor_;
 
     std::string base_name_;
 

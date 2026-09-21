@@ -7,7 +7,6 @@
 
 #include "computing_timer.h"
 #include "error_evaluation.h"
-#include "selected_components_extractor.h"
 
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
@@ -30,9 +29,10 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , hyperbolic_system_(&hyperbolic_system)
-      , parabolic_system_(&parabolic_system)
-      , initial_precomputed_(initial_precomputed)
+      , selected_components_extractor_(offline_data,
+                                       hyperbolic_system,
+                                       parabolic_system,
+                                       initial_precomputed)
       , base_name_("")
   {
     std::copy(std::begin(View::component_names),
@@ -68,8 +68,7 @@ namespace ryujin
 
     base_name_ = name;
 
-    SelectedComponentsExtractor<Description, dim, Number>::check(
-        parabolic_system_->parabolic_component_names(), {}, error_quantities_);
+    selected_components_extractor_.prepare(error_quantities_);
 
     AssertThrow(!error_norms_.empty(),
                 dealii::ExcMessage("No error norms selected."));
@@ -151,25 +150,10 @@ namespace ryujin
                               mpi_ensemble_.ensemble_communicator())));
     };
 
-    using Extractor = SelectedComponentsExtractor<Description, dim, Number>;
-
-    auto analytic_components = Extractor::extract(*offline_data_,
-                                                  *hyperbolic_system_,
-                                                  *parabolic_system_,
-                                                  analytic,
-                                                  initial_precomputed_,
-                                                  {},
-                                                  {},
-                                                  error_quantities_);
-
-    auto error_components = Extractor::extract(*offline_data_,
-                                               *hyperbolic_system_,
-                                               *parabolic_system_,
-                                               state_vector,
-                                               initial_precomputed_,
-                                               {},
-                                               {},
-                                               error_quantities_);
+    auto analytic_components =
+        selected_components_extractor_.view(analytic).extract();
+    auto error_components =
+        selected_components_extractor_.view(state_vector).extract();
 
     std::vector<Number> norms(error_norms_.size(), Number(0.));
 
