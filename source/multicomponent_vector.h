@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "gpu.h"
+#include "loop.h"
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/partitioner.h>
@@ -322,6 +323,10 @@ namespace ryujin
        * Optionally, a third argument @p functor can be supplied that is
        * applied to each (scalar) value individually before stored in
        * @p scalar_vector.
+       *
+       * @note The operation is performed on the memory space of the view.
+       * Correspondingly, @p functor has to be callable on the selected
+       * memory space.
        *
        * @note This function is used in the VTUOutput module to unpack a
        * single component out of our custom MultiComponentVector in order to
@@ -961,24 +966,28 @@ namespace ryujin
                                      unsigned int component,
                                      const Functor &functor) const
     {
-      using HostSpace = dealii::MemorySpace::Host;
-      AssertThrow((std::is_same_v<MemorySpace, HostSpace>),
-                  dealii::ExcNotImplemented());
-
       Assert(n_comp > 0,
              dealii::ExcMessage(
                  "Cannot extract from a vector with zero components."));
       AssertIndexRange(component, n_comp);
 
-      const auto local_size =
-          scalar_vector.get_partitioner()->locally_owned_size();
+      const auto local_size = static_cast<unsigned int>(
+          scalar_vector.get_partitioner()->locally_owned_size());
 
       Assert(n_comp * local_size == n_locally_owned_,
              dealii::ExcMessage("Called with a scalar_vector argument that has "
                                 "incompatible local range."));
 
-      for (unsigned int i = 0; i < local_size; ++i)
-        scalar_vector.local_element(i) = functor(data_[i * n_comp + component]);
+      const auto *data = data_;
+      auto *destination = scalar_vector.begin();
+
+      const auto body = [=](auto /*sentinel*/, unsigned int i) {
+        destination[i] = functor(data[i * n_comp + component]);
+      };
+
+      loop<MemorySpace, Number>(
+          "extract_component", body, 0, /*no vectorization*/ 0, local_size);
+
       scalar_vector.update_ghost_values();
     }
 
