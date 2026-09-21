@@ -126,18 +126,20 @@ namespace ryujin
     } break;
 
     case MeshType::parallel_shared: {
+      // FIXME: enable
+      // parallel::shared::Triangulation<dim>::construct_multigrid_hierarchy
+      // once we support this upstream in deal.II
       const auto settings = static_cast<
           typename dealii::parallel::shared::Triangulation<dim>::Settings>(
-          dealii::parallel::shared::Triangulation<dim>::partition_auto |
-          dealii::parallel::shared::Triangulation<
-              dim>::construct_multigrid_hierarchy);
+          dealii::parallel::shared::Triangulation<dim>::partition_auto);
       /* Beware of the boolean: */
       triangulation_ =
           std::make_unique<dealii::parallel::shared::Triangulation<dim>>(
               mpi_ensemble_.ensemble_communicator(),
               smoothing,
-              /*artificial cells*/ true,
+              /*artificial cells*/ false,
               settings);
+
     } break;
 
     case MeshType::serial: {
