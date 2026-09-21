@@ -11,6 +11,7 @@
 #include "observer_pointer.h"
 #include "offline_data.h"
 #include "postprocessor.h"
+#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -132,14 +133,11 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
     dealii::ObserverPointer<const Postprocessor<Description, dim, Number>>
         postprocessor_;
 
-    const InitialPrecomputedVector &initial_precomputed_;
-    const ScalarVector &alpha_;
-    const ScalarVector &smoothness_indicators_;
+    SelectedComponentsExtractor<Description, dim, Number>
+        selected_components_extractor_;
 
     //@}
   };
