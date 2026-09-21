@@ -50,9 +50,6 @@ namespace ryujin
      * component. All of these vectors have in common that they are
      * associated with a hyperbolic, or parabolic state and precomputed
      * data (derived from the hyperbolic state) for point in time.
-     *
-     * @note The parabolic state is only ever accessed on the host memory
-     * space.
      */
     template <typename Number, unsigned int problem_dim, unsigned int prec_dim>
     using StateVector = std::tuple<

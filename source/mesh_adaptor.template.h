@@ -440,8 +440,8 @@ namespace ryujin
      * Extract selected quantities:
      */
 
-    auto quantities =
-        selected_components_extractor_.view(state_vector).extract();
+    selected_components_extractor_.prepare_extraction(state_vector);
+    auto quantities = selected_components_extractor_.view().extract();
 
     for (auto &it : quantities) {
       it.update_ghost_values();

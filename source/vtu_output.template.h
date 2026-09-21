@@ -104,8 +104,8 @@ namespace ryujin
      * call DataOut::add_data_vector()
      */
 
-    auto selected_components =
-        selected_components_extractor_.view(state_vector).extract();
+    selected_components_extractor_.prepare_extraction(state_vector);
+    auto selected_components = selected_components_extractor_.view().extract();
 
     /*
      * Attach data vectors to DataOut object:

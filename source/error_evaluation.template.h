@@ -150,10 +150,11 @@ namespace ryujin
                               mpi_ensemble_.ensemble_communicator())));
     };
 
-    auto analytic_components =
-        selected_components_extractor_.view(analytic).extract();
-    auto error_components =
-        selected_components_extractor_.view(state_vector).extract();
+    selected_components_extractor_.prepare_extraction(analytic);
+    auto analytic_components = selected_components_extractor_.view().extract();
+
+    selected_components_extractor_.prepare_extraction(state_vector);
+    auto error_components = selected_components_extractor_.view().extract();
 
     std::vector<Number> norms(error_norms_.size(), Number(0.));
 

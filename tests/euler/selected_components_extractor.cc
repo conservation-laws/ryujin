@@ -130,10 +130,11 @@ int main(int argc, char *argv[])
 
   /* Extract on the host and on the default memory space: */
 
-  const auto host_components =
-      extractor.view<HostSpace>(state_vector).extract();
-  const auto device_components =
-      extractor.view<DefaultSpace>(state_vector).extract();
+  extractor.prepare_extraction<HostSpace>(state_vector);
+  const auto host_components = extractor.view<HostSpace>().extract();
+
+  extractor.prepare_extraction<DefaultSpace>(state_vector);
+  const auto device_components = extractor.view<DefaultSpace>().extract();
 
   Vectors::ScalarHostVector<Number> temp;
   temp.reinit(scalar_partitioner);
