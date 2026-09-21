@@ -1,40 +1,34 @@
 ##
 #
-# Euler (optimized polytropic gas EOS) benchmark:
-#
-# The isentropic vortex is an analytic solution of the compressible Euler
-# equations (with polytropic gas equation of state). We compute the vortex
-# on the square [-5, 5]^2 initially centered at (-1,-1) with a strength of
-# beta=5, and moving in diagonal (1,1) direction with mach number 1. At
-# final time t=2 the vortex is located at (1, 1). We report the final,
-# normalized L1, L2, L\infty error norms summed up over all components.
-#
-# This configuration uses an explicit ERK(3, 3, 1) timestepping.
-# Expected results are reported in euler-isentropic_vortex-erk33.baseline
+# Exercise the ErrorEvaluation class: compute (non-normalized) L2 and Linf
+# errors of conserved and primitive quantities at every second timer tick
+# and dump the resulting error log.
 #
 ##
 
 subsection A - TimeLoop
-  set basename             = isentropic_vortex-erk33
+  set basename                       = test
 
-  set enable compute error = true
+  set enable compute error           = true
+  set timer compute error multiplier = 2
 
-  set enable output full   = true
+  set final time                     = 1.0
+  set timer granularity              = 0.125
 
-  set final time           = 2.0
-  set timer granularity    = 2.0
+  set terminal update interval       = 0
+
+  set debug filename                 = test-error.log
 end
 
 subsection B - Equation
   set dimension = 2
   set equation  = euler
-
   set gamma     = 1.4
 end
 
 subsection C - Discretization
   set geometry        = rectangular domain
-  set mesh refinement = 7
+  set mesh refinement = 5
 
   subsection rectangular domain
     set boundary condition bottom = dirichlet
@@ -66,6 +60,7 @@ subsection H - TimeIntegrator
 end
 
 subsection L - ErrorEvaluation
-  set error normalize  = true
-  set error quantities = rho, m_1, m_2, E
+  set error normalize  = false
+  set error norms      = L2, Linf
+  set error quantities = rho, v_1, p
 end

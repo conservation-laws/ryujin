@@ -14,8 +14,6 @@
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/work_stream.h>
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/vector_tools.templates.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -98,6 +96,12 @@ namespace ryujin
                     hyperbolic_system_,
                     parabolic_system_,
                     "/K - Quantities")
+      , error_evaluation_(mpi_ensemble_,
+                          offline_data_,
+                          hyperbolic_system_,
+                          parabolic_system_,
+                          hyperbolic_module_.initial_precomputed(),
+                          "/L - ErrorEvaluation")
       , n_global_dofs_(0)
       , n_devices_(0)
   {
@@ -136,11 +140,14 @@ namespace ryujin
         "\"timer granularity\" and \"timer output levelsets multiplier\"");
 
     enable_compute_error_ = false;
-    add_parameter("enable compute error",
-                  enable_compute_error_,
-                  "Flag to control whether we compute the Linfty Linf_norm of "
-                  "the difference to an analytic solution. Implemented only "
-                  "for certain initial state configurations.");
+    add_parameter(
+        "enable compute error",
+        enable_compute_error_,
+        "Flag to control whether we compute error norms of the difference to "
+        "an analytic solution. Implemented only for certain initial state "
+        "configurations. The frequency how often errors are logged is "
+        "determined by \"timer granularity\" and \"timer compute error "
+        "multiplier\"");
 
     enable_compute_quantities_ = false;
     add_parameter(
@@ -171,27 +178,18 @@ namespace ryujin
                   "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the levelsets pvtu writeout granularity");
 
+    timer_compute_error_multiplier_ = 1;
+    add_parameter("timer compute error multiplier",
+                  timer_compute_error_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
+                  "that determines the writeout granularity for error norms");
+
     timer_compute_quantities_multiplier_ = 1;
     add_parameter(
         "timer compute quantities multiplier",
         timer_compute_quantities_multiplier_,
         "Multiplicative modifier applied to \"timer granularity\" that "
         "determines the writeout granularity for quantities of interest");
-
-    std::copy(std::begin(View::component_names),
-              std::end(View::component_names),
-              std::back_inserter(error_quantities_));
-
-    add_parameter("error quantities",
-                  error_quantities_,
-                  "List of conserved quantities used in the computation of the "
-                  "error norms.");
-
-    error_normalize_ = true;
-    add_parameter("error normalize",
-                  error_normalize_,
-                  "Flag to control whether the error should be normalized by "
-                  "the corresponding norm of the analytic solution.");
 
     resume_ = false;
     add_parameter("resume", resume_, "Resume an interrupted computation");
@@ -274,6 +272,9 @@ namespace ryujin
       logfile_.open(base_name_ + ".log");
 
     print_parameters(logfile_);
+
+    if (enable_compute_error_)
+      error_evaluation_.prepare(base_name_);
 
     /*
      * Prepare data structures:
@@ -364,6 +365,17 @@ namespace ryujin
     constexpr Number relax =
         Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
 
+    /* Create a small lambda for querying whether we write out vtu records: */
+    const auto output_scheduled = [&](const unsigned int cycle) {
+      const bool do_full_output =
+          (cycle % timer_output_full_multiplier_ == 0) && enable_output_full_;
+      const bool do_levelsets =
+          (cycle % timer_output_levelsets_multiplier_ == 0) &&
+          enable_output_levelsets_;
+
+      return do_full_output || do_levelsets;
+    };
+
     unsigned int cycle = 1;
     for (;; ++cycle) {
 
@@ -381,29 +393,30 @@ namespace ryujin
       /* Perform output tasks whenever we reach a timer tick: */
 
       if (t >= relax * timer_cycle * timer_granularity_) {
-        if (enable_compute_error_) {
-          /*
-           * FIXME: We interpolate the analytic solution at every timer
-           * tick. If we happen to actually not output anything then this
-           * is terribly inefficient...
-           */
+        const bool do_compute_error =
+            enable_compute_error_ &&
+            (timer_cycle % timer_compute_error_multiplier_ == 0);
+        const bool do_output_analytic =
+            enable_compute_error_ && output_scheduled(timer_cycle);
 
+        if (do_compute_error || do_output_analytic) {
           StateVector analytic;
-          {
-            ComputingTimer::Scope scope(
-                "time step [X]   - interpolate data vectors");
-            hyperbolic_module_.reinit_state_vector(analytic);
-            parabolic_module_.reinit_state_vector(analytic);
-            std::get<0>(analytic) =
-                initial_values_.get().interpolate_hyperbolic_vector(t);
+          interpolate_analytic_solution(analytic, t);
+
+          if (do_compute_error) {
+            ComputingTimer::Scope scope("time step [X]   - compute error");
+            error_evaluation_.write_out(state_vector, analytic, t);
           }
 
-          time_integrator_.prepare_state_vector(analytic, t);
+          if (do_output_analytic) {
+            /* Apply boundary conditions and precompute values for output: */
+            time_integrator_.prepare_state_vector(analytic, t);
 
-          output(analytic,
-                 base_name_ensemble_ + "-analytic_solution",
-                 t,
-                 timer_cycle);
+            output(analytic,
+                   base_name_ensemble_ + "-analytic_solution",
+                   t,
+                   timer_cycle);
+          }
         }
 
         output(state_vector, base_name_ensemble_ + "-solution", t, timer_cycle);
@@ -513,8 +526,9 @@ namespace ryujin
 
     ComputingTimer::timer("time loop").stop();
 
+    /* Write final timing statistics to screen and logfile: */
+
     if (terminal_update_interval_ != Number(0.)) {
-      /* Write final timing statistics to screen and logfile: */
       print_cycle_statistics(cycle,
                              t,
                              timer_cycle,
@@ -523,14 +537,20 @@ namespace ryujin
                              /*final*/ true);
     }
 
+    /* Compute final error and write out to log file and screen: */
+
     if (enable_compute_error_) {
       /* Output final error: */
-      compute_error(state_vector, t);
+      StateVector analytic;
+      interpolate_analytic_solution(analytic, t);
+      const auto norms = error_evaluation_.compute(state_vector, analytic);
+
+      logfile_ << std::endl << "Computed errors:" << std::endl << std::endl;
+      error_evaluation_.print_summary(logfile_, t, n_global_dofs_, norms);
+      error_evaluation_.print_summary(std::cout, t, n_global_dofs_, norms);
     }
 
-    /*
-     *
-     */
+    /* Print debug file to screen on rank 0: */
 
     if (mpi_ensemble_.world_rank() == 0) {
       if (debug_command_ != "") {
@@ -548,7 +568,7 @@ namespace ryujin
 
   /*
    * ---------------------------------------------------------------------------
-   * Checkpointing, VTK output, and compute error:
+   * Checkpointing and VTK output:
    * ---------------------------------------------------------------------------
    */
 
@@ -709,173 +729,25 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::compute_error(
-      const StateVector &state_vector, const Number t)
+  void TimeLoop<Description, dim, Number>::interpolate_analytic_solution(
+      StateVector &analytic, const Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
+    std::cout << "TimeLoop<dim, Number>::interpolate_analytic_solution()"
+              << std::endl;
 #endif
 
-    /* Ensure that the state vector is resident on the host memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      const auto &[U, precomputed, parabolic] = state_vector;
-      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
-    }
+    ComputingTimer::Scope scope("time step [X]   - interpolate data vectors");
 
-    Vector<Number> difference_per_cell(
-        discretization_.triangulation().n_active_cells());
-
-    Number linf_norm = 0.;
-    Number l1_norm = 0;
-    Number l2_norm = 0;
-
-    const auto analytic_U =
+    hyperbolic_module_.reinit_state_vector(analytic);
+    parabolic_module_.reinit_state_vector(analytic);
+    std::get<0>(analytic) =
         initial_values_.get().interpolate_hyperbolic_vector(t);
-    const auto &U = std::get<0>(state_vector);
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    ScalarHostVector analytic_component;
-    ScalarHostVector error_component;
-    analytic_component.reinit(offline_data_.scalar_partitioner());
-    error_component.reinit(offline_data_.scalar_partitioner());
-
-    /* Loop over all selected components: */
-    for (const auto &entry : error_quantities_) {
-      const auto &names = View::component_names;
-      const auto pos = std::find(std::begin(names), std::end(names), entry);
-      if (pos == std::end(names)) {
-        AssertThrow(
-            false,
-            dealii::ExcMessage("Unknown component name »" + entry + "«"));
-        __builtin_trap();
-      }
-
-      const auto index = std::distance(std::begin(names), pos);
-
-      analytic_U.view().extract_component(analytic_component, index);
-
-      /* Compute norms of analytic solution: */
-
-      Number linf_norm_analytic = 0.;
-      Number l1_norm_analytic = 0.;
-      Number l2_norm_analytic = 0.;
-
-      if (error_normalize_) {
-        linf_norm_analytic = analytic_component.linfty_norm();
-
-        VectorTools::integrate_difference(
-            discretization_.mapping(),
-            offline_data_.dof_handler(),
-            analytic_component,
-            Functions::ZeroFunction<dim, Number>(),
-            difference_per_cell,
-            discretization_.quadrature_high_order(),
-            VectorTools::L1_norm);
-
-        l1_norm_analytic =
-            Utilities::MPI::sum(difference_per_cell.l1_norm(),
-                                mpi_ensemble_.ensemble_communicator());
-
-        VectorTools::integrate_difference(
-            discretization_.mapping(),
-            offline_data_.dof_handler(),
-            analytic_component,
-            Functions::ZeroFunction<dim, Number>(),
-            difference_per_cell,
-            discretization_.quadrature_high_order(),
-            VectorTools::L2_norm);
-
-        l2_norm_analytic = Number(std::sqrt(
-            Utilities::MPI::sum(std::pow(difference_per_cell.l2_norm(), 2),
-                                mpi_ensemble_.ensemble_communicator())));
-      }
-
-      /* Compute norms of error: */
-
-      U.view().extract_component(error_component, index);
-      /* Populate constrained dofs due to periodicity: */
-      offline_data_.affine_constraints().distribute(error_component);
-      error_component.update_ghost_values();
-      error_component -= analytic_component;
-
-      const Number linf_norm_error = error_component.linfty_norm();
-
-      VectorTools::integrate_difference(discretization_.mapping(),
-                                        offline_data_.dof_handler(),
-                                        error_component,
-                                        Functions::ZeroFunction<dim, Number>(),
-                                        difference_per_cell,
-                                        discretization_.quadrature_high_order(),
-                                        VectorTools::L1_norm);
-
-      const Number l1_norm_error = Utilities::MPI::sum(
-          difference_per_cell.l1_norm(), mpi_ensemble_.ensemble_communicator());
-
-      VectorTools::integrate_difference(discretization_.mapping(),
-                                        offline_data_.dof_handler(),
-                                        error_component,
-                                        Functions::ZeroFunction<dim, Number>(),
-                                        difference_per_cell,
-                                        discretization_.quadrature_high_order(),
-                                        VectorTools::L2_norm);
-
-      const Number l2_norm_error = Number(std::sqrt(
-          Utilities::MPI::sum(std::pow(difference_per_cell.l2_norm(), 2),
-                              mpi_ensemble_.ensemble_communicator())));
-
-      if (error_normalize_) {
-        linf_norm += linf_norm_error / linf_norm_analytic;
-        l1_norm += l1_norm_error / l1_norm_analytic;
-        l2_norm += l2_norm_error / l2_norm_analytic;
-      } else {
-        linf_norm += linf_norm_error;
-        l1_norm += l1_norm_error;
-        l2_norm += l2_norm_error;
-      }
-    }
-
-    if (mpi_ensemble_.ensemble_rank() != 0)
-      return;
-
-    /*
-     * Sum up over all participating MPI ranks. Note: we only perform this
-     * operation on "peer" ranks zero:
-     */
-
-    if (mpi_ensemble_.n_ensembles() > 1) {
-      linf_norm = Utilities::MPI::sum(
-          linf_norm, mpi_ensemble_.ensemble_leader_communicator());
-      l1_norm = Utilities::MPI::sum(
-          l1_norm, mpi_ensemble_.ensemble_leader_communicator());
-      l2_norm = Utilities::MPI::sum(
-          l2_norm, mpi_ensemble_.ensemble_leader_communicator());
-    }
-
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    logfile_ << std::endl << "Computed errors:" << std::endl << std::endl;
-    logfile_ << std::setprecision(16);
-
-    std::string description =
-        error_normalize_ ? "Normalized consolidated" : "Consolidated";
-
-    logfile_ << description + " Linf, L1, and L2 errors at final time \n";
-    logfile_ << std::setprecision(16);
-    logfile_ << "#dofs = " << n_global_dofs_ << std::endl;
-    logfile_ << "t     = " << t << std::endl;
-    logfile_ << "Linf  = " << linf_norm << std::endl;
-    logfile_ << "L1    = " << l1_norm << std::endl;
-    logfile_ << "L2    = " << l2_norm << std::endl;
-
-    std::cout << description + " Linf, L1, and L2 errors at final time \n";
-    std::cout << std::setprecision(16);
-    std::cout << "#dofs = " << n_global_dofs_ << std::endl;
-    std::cout << "t     = " << t << std::endl;
-    std::cout << "Linf  = " << linf_norm << std::endl;
-    std::cout << "L1    = " << l1_norm << std::endl;
-    std::cout << "L2    = " << l2_norm << std::endl;
+    /* Populate precomputed values (without applying boundary conditions): */
+    hyperbolic_system_.get().fill_precomputed_values(
+        offline_data_, analytic, /*skip_constrained_dofs*/ false);
+    std::get<1>(analytic).view().update_ghost_values();
   }
 
 
@@ -1226,6 +1098,8 @@ namespace ryujin
       stream << "full ";
     if (enable_output_levelsets_)
       stream << "levelsets ";
+    if (enable_compute_error_)
+      stream << "error ";
     if (enable_compute_quantities_)
       stream << "quantities ";
 

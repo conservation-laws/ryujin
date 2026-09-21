@@ -2,7 +2,6 @@ subsection A - TimeLoop
   set basename             = exactRP_sod-erk33
 
   set enable compute error = true
-  set error quantities     = rho, m, E
 
   set final time           = 0.1
   set timer granularity    = 0.1
@@ -60,4 +59,8 @@ subsection H - TimeIntegrator
   set cfl max               = 0.50
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error quantities = rho, m, E
 end

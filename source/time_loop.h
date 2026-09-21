@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
+#include "error_evaluation.h"
 #include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "mesh_adaptor.h"
@@ -95,10 +96,8 @@ namespace ryujin
 
     unsigned int timer_output_full_multiplier_;
     unsigned int timer_output_levelsets_multiplier_;
+    unsigned int timer_compute_error_multiplier_;
     unsigned int timer_compute_quantities_multiplier_;
-
-    std::vector<std::string> error_quantities_;
-    bool error_normalize_;
 
     bool resume_;
     bool resume_at_time_zero_;
@@ -130,6 +129,7 @@ namespace ryujin
     Postprocessor<Description, dim, Number> postprocessor_;
     VTUOutput<Description, dim, Number> vtu_output_;
     Quantities<Description, dim, Number> quantities_;
+    ErrorEvaluation<Description, dim, Number> error_evaluation_;
 
     dealii::types::global_dof_index n_global_dofs_;
     unsigned int n_devices_;
@@ -178,7 +178,13 @@ namespace ryujin
     void adapt_mesh_and_transfer_state_vector(
         StateVector &state_vector, const Callable &prepare_compute_kernels);
 
-    void compute_error(const StateVector &state_vector, Number t);
+    /**
+     * Interpolate the analytic solution at time @p t into the state vector
+     * @p analytic and populate precomputed values. In contrast to
+     * TimeIntegrator::prepare_state_vector() no boundary conditions are
+     * applied.
+     */
+    void interpolate_analytic_solution(StateVector &analytic, Number t);
 
     void output(const StateVector &state_vector,
                 const std::string &name,

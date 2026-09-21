@@ -2,7 +2,6 @@ subsection A - TimeLoop
   set basename             = verification
 
   set enable compute error = true
-  set error normalize      = true
 
   set final time           = 2.00
   set timer granularity    = 2.00
@@ -70,4 +69,8 @@ subsection H - TimeIntegrator
   set cfl min               = 0.20
   set time stepping scheme  = erk 22
   set cfl recovery strategy = none
+end
+
+subsection L - ErrorEvaluation
+  set error normalize = true
 end

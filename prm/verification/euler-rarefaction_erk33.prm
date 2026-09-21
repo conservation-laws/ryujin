@@ -24,8 +24,6 @@ subsection A - TimeLoop
   set basename             = rarefaction-erk33
 
   set enable compute error = true
-  set error normalize      = true
-  set error quantities     = rho, m, E
 
   set enable output full   = true
 
@@ -87,4 +85,9 @@ subsection J - VTUOutput
   set manifolds      =
   set use mpi io     = true
   set schlieren beta = 10
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m, E
 end

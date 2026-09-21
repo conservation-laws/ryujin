@@ -18,8 +18,6 @@ subsection A - TimeLoop
   set basename             = ritter_dam_break-erk33
 
   set enable compute error = true
-  set error normalize      = true
-  set error quantities     = h
 
   set enable output full   = true
 
@@ -74,4 +72,9 @@ subsection H - TimeIntegrator
   set cfl max               = 0.5
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h
 end

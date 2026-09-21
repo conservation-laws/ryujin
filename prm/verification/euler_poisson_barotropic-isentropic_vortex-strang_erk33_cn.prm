@@ -26,8 +26,6 @@ subsection A - TimeLoop
   set basename             = isentropic_vortex-strang_erk_33_cn
 
   set enable compute error = true
-  set error normalize      = true
-  set error quantities     = rho, m_1, m_2
 
   set enable output full   = true
 
@@ -119,4 +117,9 @@ end
 
 subsection J - VTUOutput
   set vtu output quantities      = rho, m_1, m_2, phi
+end
+
+subsection L - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, m_2
 end
