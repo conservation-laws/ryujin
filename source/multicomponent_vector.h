@@ -649,13 +649,13 @@ namespace ryujin
       }
 
       /* Special case of a scalar vector: */
-      if (n_comp == 1)
+      if (n_comp == 1) {
         host_vector_.reinit(scalar_partitioner);
-
-      auto vector_partitioner =
-          create_vector_partitioner(scalar_partitioner, n_comp);
-
-      host_vector_.reinit(vector_partitioner);
+      } else {
+        auto vector_partitioner =
+            create_vector_partitioner(scalar_partitioner, n_comp);
+        host_vector_.reinit(vector_partitioner);
+      }
 
       /*
        * The vector is resident on the host memory space only. Device
