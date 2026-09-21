@@ -27,10 +27,22 @@ namespace ryujin
     dst_U_view.zero_out_ghost_values();
     dst_U_view.sadd(s, b, src_U_view);
 
+    /*
+     * FIXME: At the moment the parabolic state resides only on the host memory
+     * space. Update the following to view<MemorySpace>() when we have
+     * refactored the parabolic modules.
+     */
+
     auto &dst_V = std::get<2>(dst);
-    auto &src_V = std::get<2>(src);
-    dst_V.zero_out_ghost_values();
-    dst_V.sadd(s, b, src_V);
+    const auto &src_V = std::get<2>(src);
+    AssertDimension(dst_V.size(), src_V.size());
+
+    for (std::size_t k = 0; k < dst_V.size(); ++k) {
+      const auto dst_view = dst_V[k].view();
+      const auto src_view = src_V[k].view();
+      dst_view.zero_out_ghost_values();
+      dst_view.sadd(s, b, src_view);
+    }
   }
 
 

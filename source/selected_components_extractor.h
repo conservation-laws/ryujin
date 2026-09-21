@@ -143,7 +143,7 @@ namespace ryujin
 
       for (const auto &[i, k] : parabolic_indices) {
         const auto &parabolic = std::get<2>(state_vector);
-        extracted_components[i] = parabolic.block(k);
+        extracted_components[i] = parabolic[k].deal_ii_vector();
       }
 
       for (const auto &[i, k] : initial_indices) {

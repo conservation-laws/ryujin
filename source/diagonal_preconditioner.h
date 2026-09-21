@@ -31,7 +31,8 @@ namespace ryujin
     /**
      * @copydoc ryujin::BlockVector
      */
-    using BlockHostVector = typename Vectors::BlockHostVector<Number>;
+    using BlockHostVector =
+        dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
     /**
      * Constructor

@@ -248,12 +248,11 @@ namespace ryujin
 #endif
 
       auto &[U, precomputed, V] = state_vector;
-      V.reinit(1);
+      V.resize(1);
 
-      auto &potential = V.block(0);
       const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
-      potential.reinit(partitioner);
-      potential = 0.;
+      V[0].reinit_with_scalar_partitioner(partitioner);
+      V[0].deal_ii_vector() = 0.;
     }
 
 
@@ -529,7 +528,7 @@ namespace ryujin
 #endif
       const auto U_view = std::get<0>(state_vector).view();
       auto &V = std::get<2>(state_vector);
-      auto &potential = V.block(0);
+      auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -670,7 +669,7 @@ namespace ryujin
 
       const auto U_view = std::get<0>(state_vector).view();
       auto &V = std::get<2>(state_vector);
-      auto &potential = V.block(0);
+      auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -782,11 +781,11 @@ namespace ryujin
       const auto &old_U = std::get<0>(old_state_vector);
       const auto old_U_view = old_U.view();
       const auto &old_V = std::get<2>(old_state_vector);
-      const auto &old_potential = old_V.block(0);
+      const auto &old_potential = old_V[0].deal_ii_vector();
 
       auto &new_U = std::get<0>(new_state_vector);
       auto &new_V = std::get<2>(new_state_vector);
-      auto &new_potential = new_V.block(0);
+      auto &new_potential = new_V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 

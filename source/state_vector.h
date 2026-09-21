@@ -9,7 +9,8 @@
 
 #include "multicomponent_vector.h"
 
-#include <deal.II/lac/la_parallel_block_vector.h>
+#include <tuple>
+#include <vector>
 
 namespace ryujin
 {
@@ -36,16 +37,6 @@ namespace ryujin
 
 
     /**
-     * A block vector representing a multiple components given by a deal.II
-     * data type that is compatible with deal.II functions and methods and
-     * lives in the host memory space.
-     */
-    template <typename Number>
-    using BlockHostVector =
-        dealii::LinearAlgebra::distributed::BlockVector<Number>;
-
-
-    /**
      * A scalar vector representing a single component.
      */
     template <typename Number>
@@ -54,17 +45,20 @@ namespace ryujin
 
     /**
      * A compound state vector formed by a std::tuple consisting of the
-     * hyperbolic state vector @p U, precomputed values, and an "parabolic
-     * state" vector stored as a BlockVector. All of these vectors have in
-     * common that they are associated with a hyperbolic, or parabolic state
-     * and precomputed data (derived from the hyperbolic state) for point in
-     * time.
+     * hyperbolic state vector @p U, precomputed values, and a "parabolic
+     * state" stored as a std::vector of scalar vectors, one per parabolic
+     * component. All of these vectors have in common that they are
+     * associated with a hyperbolic, or parabolic state and precomputed
+     * data (derived from the hyperbolic state) for point in time.
+     *
+     * @note The parabolic state is only ever accessed on the host memory
+     * space.
      */
     template <typename Number, unsigned int problem_dim, unsigned int prec_dim>
     using StateVector = std::tuple<
         MultiComponentVector<Number, problem_dim> /*U*/,
         MultiComponentVector<Number, prec_dim> /*precomputed values*/,
-        BlockHostVector<Number> /*parabolic state vector*/>;
+        std::vector<ScalarVector<Number>> /*parabolic state*/>;
 
 
     /**

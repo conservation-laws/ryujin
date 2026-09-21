@@ -14,6 +14,7 @@
 #include <deal.II/base/vectorization.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/diagonal_matrix.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/matrix_free/matrix_free.h>
@@ -207,7 +208,8 @@ namespace ryujin
     static constexpr unsigned int order_quad = 2;
 
     using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    using BlockHostVector = Vectors::BlockHostVector<Number>;
+    using BlockHostVector =
+        dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
     UpdateOperator() = default;
 
