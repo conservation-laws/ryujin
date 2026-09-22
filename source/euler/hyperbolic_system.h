@@ -133,6 +133,17 @@ namespace ryujin
               &state_vector,
           const bool skip_constrained_dofs = true) const;
 
+      /**
+       * The implementation of the fill_precomputed_values() function.
+       *
+       * @note The struct and its nested tag types are passed as template
+       * arguments to loop(), which instantiates an extended __host__
+       * __device__ lambda. nvcc does not allow a private or protected
+       * class member in that position, so the struct has to be public.
+       */
+      template <typename MemorySpace, int dim, typename ScalarNumber>
+      struct PrecomputedValuesImplementation;
+
     private:
       /**
        * @name Internal fields, methods, and friends
@@ -814,30 +825,67 @@ namespace ryujin
     }
 
 
+    /**
+     * The implementation of HyperbolicSystem::fill_precomputed_values().
+     */
     template <typename MemorySpace, int dim, typename ScalarNumber>
-    inline void HyperbolicSystem::fill_precomputed_values(
-        const OfflineData<dim, ScalarNumber> &offline_data,
-        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
-            &state_vector,
-        const bool skip_constrained_dofs) const
-    {
-      const unsigned int n_internal = offline_data.n_locally_internal();
-      const unsigned int n_owned = offline_data.n_locally_owned();
+    struct HyperbolicSystem::PrecomputedValuesImplementation {
+      /*
+       * Typedefs:
+       */
 
-      const auto sparsity_simd_view =
-          offline_data.sparsity_pattern_simd().template view<MemorySpace>();
+      using StateVector =
+          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector;
+      using HyperbolicVector =
+          typename HyperbolicSystemView<dim, ScalarNumber>::HyperbolicVector;
+      using PrecomputedVector =
+          typename HyperbolicSystemView<dim, ScalarNumber>::PrecomputedVector;
 
-      /* We only read the hyperbolic state vector: */
-      const auto U_view =
-          std::get<0>(std::as_const(state_vector)).template view<MemorySpace>();
-      const auto precomputed_view =
-          std::get<1>(state_vector).template view<MemorySpace>();
+      /* A read-only, resp. writable view of a mirrored object for the
+       * selected memory space: */
+      template <typename T>
+      using ReadView =
+          decltype(std::declval<const T &>().template view<MemorySpace>());
+      template <typename T>
+      using WriteView =
+          decltype(std::declval<T &>().template view<MemorySpace>());
 
-      const auto hyperbolic_system_views =
-          make_select_view<dim, ScalarNumber, MemorySpace>(*this);
+      using SparsityView =
+          decltype(std::declval<const OfflineData<dim, ScalarNumber> &>()
+                       .sparsity_pattern_simd()
+                       .template view<MemorySpace>());
 
-      const auto body = [=](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
+      /* Constructor: Create all views that the compute kernel operates on. */
+
+      PrecomputedValuesImplementation(
+          const HyperbolicSystem &hyperbolic_system,
+          const OfflineData<dim, ScalarNumber> &offline_data,
+          StateVector &state_vector,
+          const bool skip_constrained_dofs)
+          : n_internal(offline_data.n_locally_internal())
+          , n_owned(offline_data.n_locally_owned())
+          , skip_constrained_dofs(skip_constrained_dofs)
+          , sparsity_simd_view(offline_data.sparsity_pattern_simd()
+                                   .template view<MemorySpace>())
+          /* We only read the hyperbolic state vector: */
+          , U_view(std::get<0>(std::as_const(state_vector))
+                       .template view<MemorySpace>())
+          , precomputed_view(
+                std::get<1>(state_vector).template view<MemorySpace>())
+          , hyperbolic_system_views(
+                make_select_view<dim, ScalarNumber, MemorySpace>(
+                    hyperbolic_system))
+      {
+      }
+
+      /**
+       * Compute the precomputed values of the degree of freedom with index
+       * i and write them into the precomputed component of the state vector.
+       */
+      template <typename T>
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE void operator()(T /*sentinel*/,
+                                                        unsigned int i) const
+      {
         using View = HyperbolicSystemView<dim, T, MemorySpace>;
         using precomputed_type = typename View::precomputed_type;
 
@@ -851,10 +899,43 @@ namespace ryujin
         const precomputed_type prec_i{view.specific_entropy(U_i),
                                       view.harten_entropy(U_i)};
         precomputed_view.template write_tensor<T>(prec_i, i);
-      };
+      }
 
-      loop<MemorySpace, ScalarNumber>(
-          "hyperbolic_kernel_01b", body, 0, n_internal, n_owned);
+      /* Populate the precomputed component of the state vector. */
+
+      void fill()
+      {
+        loop<MemorySpace, ScalarNumber>(
+            "hyperbolic_kernel_01b", *this, 0, n_internal, n_owned);
+      }
+
+      /* Index ranges, views, and equation objects: */
+
+      unsigned int n_internal;
+      unsigned int n_owned;
+      bool skip_constrained_dofs;
+
+      SparsityView sparsity_simd_view;
+      ReadView<HyperbolicVector> U_view;
+      WriteView<PrecomputedVector> precomputed_view;
+
+      SelectView<dim, ScalarNumber, MemorySpace, HyperbolicSystem>
+          hyperbolic_system_views;
+    };
+
+
+    template <typename MemorySpace, int dim, typename ScalarNumber>
+    inline void HyperbolicSystem::fill_precomputed_values(
+        const OfflineData<dim, ScalarNumber> &offline_data,
+        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+            &state_vector,
+        const bool skip_constrained_dofs) const
+    {
+      PrecomputedValuesImplementation<MemorySpace, dim, ScalarNumber>
+          implementation(
+              *this, offline_data, state_vector, skip_constrained_dofs);
+
+      implementation.fill();
     }
 
 

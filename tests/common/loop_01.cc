@@ -20,6 +20,29 @@ using DefaultSpace = dealii::MemorySpace::Default;
 constexpr unsigned int n_states = 12;
 constexpr int n_comp = 2;
 
+/*
+ * nvcc does not allow a type local to a function as template argument of a
+ * function that instantiates an extended __host__ __device__ lambda. The
+ * loop body therefore has to be a functor defined at namespace scope.
+ */
+struct Body {
+  template <typename T, typename ReadView, typename WriteView>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+  operator()(T /*sentinel*/,
+             const ReadView &U_view,
+             const WriteView &results_view,
+             unsigned int i) const
+  {
+    const auto U_i = U_view.template read_tensor<T>(i);
+
+    dealii::Tensor<1, n_comp, T> result;
+    result[0] = T(2.) * U_i[0] + U_i[1];
+    result[1] = U_i[0] - T(0.5) * U_i[1];
+
+    results_view.template write_tensor<T>(result, i);
+  }
+};
+
 int main(int argc, char *argv[])
 {
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
@@ -51,27 +74,7 @@ int main(int argc, char *argv[])
     U.view().write_tensor<double>(U_i, i);
   }
 
-  /*
-   * The loop body. Note that the body takes the (memory space dependent)
-   * vector views as additional arguments so that we can use the very same
-   * functor for the host and the device loop.
-   */
-
-  const auto body = KOKKOS_LAMBDA(auto sentinel,
-                                  const auto &U_view,
-                                  const auto &results_view,
-                                  unsigned int i)
-  {
-    using T = decltype(sentinel);
-
-    const auto U_i = U_view.template read_tensor<T>(i);
-
-    dealii::Tensor<1, n_comp, T> result;
-    result[0] = T(2.) * U_i[0] + U_i[1];
-    result[1] = U_i[0] - T(0.5) * U_i[1];
-
-    results_view.template write_tensor<T>(result, i);
-  };
+  const auto body = Body{};
 
   /* Compute results on the host: */
 

@@ -374,6 +374,28 @@ namespace ryujin
     using HyperbolicVector =
         Vectors::MultiComponentVector<Number, problem_dimension>;
 
+  public:
+    /**
+     * The implementation of the step() function. The struct holds all
+     * views that the compute kernels operate on as fields, implements the
+     * compute kernels as host and device callable member functions, and
+     * performs the update step in its own step() member function.
+     *
+     * @note The struct and its nested tag types are passed as template
+     * arguments to loop(), which instantiates an extended __host__
+     * __device__ lambda. nvcc does not allow a private or protected class
+     * member in that position, so the struct has to be public.
+     */
+    template <int stages>
+    struct Implementation;
+
+    /**
+     * The implementation of the apply_boundary_conditions() function.
+     */
+    template <typename MemorySpace>
+    struct BoundaryConditionsImplementation;
+
+  private:
     /**
      * Update all boundary values of the hyperbolic state vector component
      * @p U for the supplied time @p t.
