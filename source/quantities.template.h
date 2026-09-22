@@ -488,9 +488,11 @@ namespace ryujin
         continue;
 
       /*
-       * FIXME: This currently distributes point maps to all MPI ranks.
-       * This is unnecessarily wasteful. Ideally, we should do MPI IO with
-       * only MPI ranks participating who actually have values.
+       * Gather the point maps of all MPI ranks on the root rank, which
+       * then writes out the file.
+       *
+       * FIXME: This serializes the output on a single rank. Ideally, we
+       * should do MPI IO with all ranks participating.
        */
 
       const auto received = Utilities::MPI::gather(
@@ -621,9 +623,11 @@ namespace ryujin
       const bool averaged)
   {
     /*
-     * FIXME: This currently distributes all values to all MPI ranks. This
-     * is unnecessarily wasteful. Ideally, we should do MPI IO with only
-     * MPI ranks participating who actually have values.
+     * Gather the values of all MPI ranks on the root rank, which then
+     * writes out the file.
+     *
+     * FIXME: This serializes the output on a single rank. Ideally, we
+     * should do MPI IO with all ranks participating.
      */
 
     auto received =
