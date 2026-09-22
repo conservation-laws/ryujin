@@ -237,31 +237,64 @@ namespace ryujin
   }
 
 
+  namespace internal
+  {
+    /*
+     * A Kokkos functor wrapping the loop kernel and the reducer for
+     * gpu_reduction_loop().
+     */
+    template <typename Reducer, typename Kernel>
+    struct ReductionFunctor {
+      using value_type = typename Reducer::value_type;
+
+      const Reducer reducer;
+      const Kernel kernel;
+
+      KOKKOS_INLINE_FUNCTION
+      void operator()(const unsigned int i, value_type &local_result) const
+      {
+        reducer.join(local_result, kernel(i));
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      void join(value_type &destination, const value_type &source) const
+      {
+        reducer.join(destination, source);
+      }
+
+      KOKKOS_INLINE_FUNCTION
+      void init(value_type &local_result) const
+      {
+        reducer.init(local_result);
+      }
+    };
+  } // namespace internal
+
+
   /*
    * A thread-parallelized reduction loop running on the CPU. The loop
    * traverses the index range [left, right) and reduces the contributions
-   * of the loop body with the supplied Kokkos @p Reducer (such as
-   * Kokkos::Min, Kokkos::Max, or Kokkos::Sum) into a single value that is
-   * returned.
+   * returned by the loop body with the supplied @p reducer into the result
+   * storage that the reducer references, see reduction_loop().
    *
    * @note In contrast to cpu_simd_loop() the loop is not SIMD vectorized:
    * the loop body is always called with a scalar sentinel type.
    *
    * @note Here, @p body is a functor that must accept a "sentinel" type as
-   * first argument, the current index i, and a reference to a thread-local
-   * accumulator as last arguments. Additional `args` may be specified in
-   * the cpu_reduction_loop() invocation that will be forwarded to the loop
-   * body:
-   * `body(ValueType(), std::forward<Args>(args)..., i, local_result);`
+   * first argument and the current index i as last argument, and that
+   * returns its contribution to the reduction. Additional `args` may be
+   * specified in the cpu_reduction_loop() invocation that will be
+   * forwarded to the loop body:
+   * `body(ValueType(), std::forward<Args>(args)..., i)`
    */
   template <typename Reducer, typename Functor, typename... Args>
-  inline typename Reducer::value_type
-  cpu_reduction_loop(const std::string &region_name [[maybe_unused]],
-                     const Functor &body,
-                     const typename Reducer::value_type initial_value,
-                     const unsigned int left,
-                     const unsigned int right,
-                     Args &&...args)
+  inline void cpu_reduction_loop(const std::string &region_name
+                                 [[maybe_unused]],
+                                 const Functor &body,
+                                 const Reducer &reducer,
+                                 const unsigned int left,
+                                 const unsigned int right,
+                                 Args &&...args)
   {
     Assert(
         left <= right,
@@ -273,22 +306,21 @@ namespace ryujin
 
     using ValueType = typename Reducer::value_type;
 
-    ValueType result = initial_value;
-
 #if defined(WITH_OPENMP)
     /* Variant using OpenMP: */
 
     RYUJIN_PRAGMA(omp parallel default(shared))
     {
       ValueType local_result;
-      Reducer(local_result).init(local_result);
+      reducer.init(local_result);
 
       RYUJIN_PRAGMA(omp for nowait)
       for (unsigned int i = left; i < right; ++i)
-        body(ValueType(), std::forward<Args>(args)..., i, local_result);
+        reducer.join(local_result,
+                     body(ValueType(), std::forward<Args>(args)..., i));
 
       RYUJIN_PRAGMA(omp critical)
-      Reducer(result).join(result, local_result);
+      reducer.join(reducer.reference(), local_result);
     }
 
 #elif defined(WITH_DEAL_II_THREADS)
@@ -301,13 +333,14 @@ namespace ryujin
           right,
           [&](const unsigned int begin, const unsigned int end) {
             ValueType local_result; /* per thread */
-            Reducer(local_result).init(local_result);
+            reducer.init(local_result);
 
             for (unsigned int i = begin; i < end; ++i)
-              body(ValueType(), std::forward<Args>(args)..., i, local_result);
+              reducer.join(local_result,
+                           body(ValueType(), std::forward<Args>(args)..., i));
 
             std::lock_guard<std::mutex> lock(mutex);
-            Reducer(result).join(result, local_result);
+            reducer.join(reducer.reference(), local_result);
           },
           1000);
     }
@@ -316,30 +349,30 @@ namespace ryujin
     /* Execute loop in serial: */
     {
       for (unsigned int i = left; i < right; ++i)
-        body(ValueType(), std::forward<Args>(args)..., i, result);
+        reducer.join(reducer.reference(),
+                     body(ValueType(), std::forward<Args>(args)..., i));
     }
 #endif
 
     if (!region_name.empty()) {
       LIKWID_MARKER_STOP(region_name.c_str());
     }
-
-    return result;
   }
 
 
   /*
    * A reduction loop running on the device (i.e., in the default memory
    * space). The loop traverses the index range [left, right) with a
-   * Kokkos::parallel_reduce using a range policy and the supplied Kokkos
-   * @p Reducer (such as Kokkos::Min, Kokkos::Max, or Kokkos::Sum).
+   * Kokkos::parallel_reduce using a range policy and reduces the
+   * contributions returned by the loop body with the supplied @p reducer
+   * into the result storage that the reducer references, see reduction_loop().
    *
    * @note Here, @p body is a functor that must accept a "sentinel" type as
-   * first argument, the current index i, and a reference to a thread-local
-   * accumulator as last arguments. Additional `args` may be specified in
-   * the gpu_reduction_loop() invocation that will be forwarded to the loop
-   * body:
-   * `body(ValueType(), args..., i, local_result);`
+   * first argument and the current index i as last argument, and that
+   * returns its contribution to the reduction. Additional `args` may be
+   * specified in the gpu_reduction_loop() invocation that will be
+   * forwarded to the loop body:
+   * `body(ValueType(), args..., i)`
    *
    * @note The loop body (and everything it references) has to be callable
    * on the device, see the discussion in gpu_loop().
@@ -349,13 +382,12 @@ namespace ryujin
    * cpu_reduction_loop().
    */
   template <typename Reducer, typename Functor, typename... Args>
-  inline typename Reducer::value_type
-  gpu_reduction_loop(const std::string &region_name,
-                     const Functor &body,
-                     const typename Reducer::value_type initial_value,
-                     const unsigned int left,
-                     const unsigned int right,
-                     Args &&...args)
+  inline void gpu_reduction_loop(const std::string &region_name,
+                                 const Functor &body,
+                                 const Reducer &reducer,
+                                 const unsigned int left,
+                                 const unsigned int right,
+                                 Args &&...args)
   {
     DeviceTimer::Scope scope;
 
@@ -371,27 +403,29 @@ namespace ryujin
 
     const auto exec = ExecutionSpace{};
 
+    const auto kernel = KOKKOS_LAMBDA(const unsigned int i)
+    {
+      return body(ValueType(), args..., i);
+    };
+
+    const auto functor =
+        internal::ReductionFunctor<Reducer, decltype(kernel)>{reducer, kernel};
+
     ValueType result;
+    reducer.init(result);
 
     if (!region_name.empty()) {
       NVTX_MARKER_START(region_name.c_str());
     }
 
     Kokkos::parallel_reduce(
-        region_name,
-        Policy(exec, left, right),
-        KOKKOS_LAMBDA(const unsigned int i, ValueType &local_result) {
-          body(ValueType(), args..., i, local_result);
-        },
-        Reducer(result));
+        region_name, Policy(exec, left, right), functor, result);
 
     if (!region_name.empty()) {
       NVTX_MARKER_STOP(region_name.c_str());
     }
 
-    ValueType combined = initial_value;
-    Reducer(combined).join(combined, result);
-    return combined;
+    reducer.join(reducer.reference(), result);
   }
 
 
@@ -401,35 +435,38 @@ namespace ryujin
    * dispatched to cpu_reduction_loop(), and for dealii::MemorySpace::Default to
    * gpu_reduction_loop().
    *
-   * The operation is selected with a @p Reducer (such as Kokkos::Min,
-   * Kokkos::Max, or Kokkos::Sum) whose value_type also determines the
-   * number type that the loop body accumulates into:
+   * The loop body computes and returns a contribution for every index. The
+   * reduction operation itself is selected with a @p reducer object (such
+   * as Kokkos::Min, Kokkos::Max, or Kokkos::Sum) that folds all
+   * contributions into the result storage it references. The value_type of
+   * the reducer also determines the number type of the loop. The initial
+   * contents of the result storage take part in the reduction:
    * ```
-   * const auto body = [=](auto, unsigned int i, Number &result) {
+   * const auto body = [=](auto, unsigned int i) -> Number {
    *   // ...
-   *   result = std::min(result, local_contribution);
+   *   return local_contribution;
    * };
    *
-   * value = reduction_loop<MemorySpace, Kokkos::Min<Number>>(
-   *     "loop name", body, value, 0, n_owned);
+   * reduction_loop<MemorySpace>(
+   *     "loop name", body, Kokkos::Min<Number>(value), 0, n_owned);
    * ```
    *
    * @note Here, @p body is a functor that must accept a "sentinel" type as
-   * first argument, the current index i, and a reference to a thread-local
-   * accumulator as last argument. Additional `args` may be specified in
-   * the reduction_loop() invocation that will be forwarded to the loop body.
+   * first argument and the current index i as last argument, and that
+   * returns its contribution to the reduction. Additional `args` may be
+   * specified in the reduction_loop() invocation that will be forwarded to
+   * the loop body.
    */
   template <typename MemorySpace,
             typename Reducer,
             typename Functor,
             typename... Args>
-  inline typename Reducer::value_type
-  reduction_loop(const std::string &region_name,
-                 const Functor &body,
-                 const typename Reducer::value_type initial_value,
-                 const unsigned int left,
-                 const unsigned int right,
-                 Args &&...args)
+  inline void reduction_loop(const std::string &region_name,
+                             const Functor &body,
+                             const Reducer &reducer,
+                             const unsigned int left,
+                             const unsigned int right,
+                             Args &&...args)
   {
     using HostSpace = dealii::MemorySpace::Host;
     using DefaultSpace = dealii::MemorySpace::Default;
@@ -438,19 +475,11 @@ namespace ryujin
                   "Unexpected memory space");
 
     if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      return cpu_reduction_loop<Reducer>(region_name,
-                                         body,
-                                         initial_value,
-                                         left,
-                                         right,
-                                         std::forward<Args>(args)...);
+      cpu_reduction_loop(
+          region_name, body, reducer, left, right, std::forward<Args>(args)...);
     } else {
-      return gpu_reduction_loop<Reducer>(region_name,
-                                         body,
-                                         initial_value,
-                                         left,
-                                         right,
-                                         std::forward<Args>(args)...);
+      gpu_reduction_loop(
+          region_name, body, reducer, left, right, std::forward<Args>(args)...);
     }
   }
 } // namespace ryujin
