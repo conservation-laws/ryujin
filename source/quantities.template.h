@@ -164,6 +164,27 @@ namespace ryujin
       return manifold;
     };
 
+    /*
+     * Sort the points of a manifold lexicographically by position (and
+     * normal) so that the output does not depend on the local numbering
+     * of degrees of freedom:
+     */
+
+    const auto sort_points = [](std::vector<ManifoldPoint> &points) {
+      const auto less = [](const auto &left, const auto &right) {
+        for (unsigned int d = 0; d < dim; ++d)
+          if (left[d] != right[d])
+            return left[d] < right[d];
+        return false;
+      };
+      std::sort(
+          points.begin(), points.end(), [&](const auto &a, const auto &b) {
+            const auto &[i_a, n_a, nm_a, m_a, id_a, x_a] = a;
+            const auto &[i_b, n_b, nm_b, m_b, id_b, x_b] = b;
+            return less(x_a, x_b) || (!less(x_b, x_a) && less(n_a, n_b));
+          });
+    };
+
     manifolds_.clear();
 
     /*
@@ -183,7 +204,7 @@ namespace ryujin
 
       std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-      /* We use a map to sort and deduplicate the collected points: */
+      /* We use a map to deduplicate the collected points: */
       std::map<unsigned int, ManifoldPoint> preliminary_map;
 
       for (auto cell : dof_handler.active_cell_iterators()) {
@@ -228,6 +249,7 @@ namespace ryujin
       for (const auto &[index, point] : preliminary_map)
         manifold.points.push_back(point);
 
+      sort_points(manifold.points);
       manifolds_.push_back(std::move(manifold));
     }
 
@@ -257,6 +279,7 @@ namespace ryujin
           manifold.points.push_back(point);
       }
 
+      sort_points(manifold.points);
       manifolds_.push_back(std::move(manifold));
     }
 
@@ -497,7 +520,7 @@ namespace ryujin
           else
             output << x_i << "\t" << m_i << "\n";
         } /*entry*/
-      } /*entries*/
+      }   /*entries*/
 
       output << std::flush;
     }
