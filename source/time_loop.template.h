@@ -95,6 +95,7 @@ namespace ryujin
                     offline_data_,
                     hyperbolic_system_,
                     parabolic_system_,
+                    hyperbolic_module_.initial_precomputed(),
                     "/K - Quantities")
       , error_evaluation_(mpi_ensemble_,
                           offline_data_,

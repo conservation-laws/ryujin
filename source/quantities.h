@@ -10,6 +10,7 @@
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
+#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -19,6 +20,13 @@ namespace ryujin
 {
   /**
    * A postprocessor class for quantities of interest.
+   *
+   * The class accumulates statistics of a user selected list of
+   * (conserved, primitive, precomputed, initial, or parabolic) quantities
+   * on level set defined interior and boundary manifolds. For every
+   * degree of freedom of a manifold the raw moments of all selected
+   * quantities are stored and averaged in time (with a trapezoidal rule),
+   * and averaged in space (weighted by the lumped, or boundary mass).
    *
    * @ingroup TimeLoop
    */
@@ -36,9 +44,13 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using state_type = typename View::state_type;
-
     using StateVector = typename View::StateVector;
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
+
+    /**
+     * The number of raw moments we store for every selected quantity.
+     */
+    static constexpr unsigned int n_moments = 2;
 
     //@}
     /**
@@ -53,6 +65,7 @@ namespace ryujin
                const OfflineData<dim, Number> &offline_data,
                const HyperbolicSystem &hyperbolic_system,
                const ParabolicSystem &parabolic_system,
+               const InitialPrecomputedVector &initial_precomputed,
                const std::string &subsection = "/Quantities");
 
     /**
@@ -107,22 +120,19 @@ namespace ryujin
         typename OfflineData<dim, Number>::BoundaryDescription;
 
     /**
-     * A tuple describing the values we are interested in: the primitive
-     * state and its second moment.
-     */
-    using value_type =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
-
-    /**
      * Temporal statistics we store for each manifold: the values of the
      * previous and the current time step, and the trapezoidal sum over
      * time.
+     *
+     * All values are stored in a flat array with stride() entries per
+     * point: for every point the raw moments are stored consecutively,
+     * with all selected quantities of the first moment first, followed
+     * by all selected quantities of the second moment, and so on.
      */
     struct Statistics {
-      std::vector<value_type> old;
-      std::vector<value_type> current;
-      std::vector<value_type> sum;
+      std::vector<Number> old;
+      std::vector<Number> current;
+      std::vector<Number> sum;
       Number t_old;
       Number t_new;
       Number t_sum;
@@ -139,7 +149,7 @@ namespace ryujin
       bool space_averaged;
       std::vector<ManifoldPoint> points;
       Statistics statistics;
-      std::vector<std::pair<Number, value_type>> time_series;
+      std::vector<std::pair<Number, std::vector<Number>>> time_series;
       std::optional<unsigned int> time_series_cycle;
     };
 
@@ -148,6 +158,8 @@ namespace ryujin
      * @name Run time options
      */
     //@{
+
+    std::vector<std::string> quantities_;
 
     std::vector<std::tuple<std::string, std::string, std::string>>
         interior_manifolds_;
@@ -166,8 +178,8 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
+
+    SelectedComponentsExtractor<Description, dim, Number> extractor_;
 
     /**
      * All interior and boundary manifolds with associated point maps and
@@ -185,21 +197,37 @@ namespace ryujin
      */
     //@{
 
+    /**
+     * The number of values stored per point: the number of moments times
+     * the number of selected quantities.
+     */
+    unsigned int stride() const;
+
     void write_mesh_files(unsigned int cycle);
 
     void clear_statistics();
 
-    value_type internal_accumulate(const StateVector &state_vector,
-                                   Manifold &manifold);
+    /**
+     * Ensure that the state vector is resident on the host and prepare
+     * the extractor for reading from it.
+     */
+    void prepare_extraction(const StateVector &state_vector);
+
+    /**
+     * Read the current values of all points of the manifold into the
+     * current statistics and return the mass weighted spatial average.
+     * The extraction has to be prepared with prepare_extraction().
+     */
+    std::vector<Number> internal_accumulate(Manifold &manifold);
 
     void internal_write_out(const std::string &file_name,
                             const std::string &time_stamp,
-                            const std::vector<value_type> &values,
+                            const std::vector<Number> &values,
                             const Number scale);
 
     void internal_write_out_time_series(
         const std::string &file_name,
-        const std::vector<std::pair<Number, value_type>> &values,
+        const std::vector<std::pair<Number, std::vector<Number>>> &values,
         bool append);
 
     //@}

@@ -14,7 +14,6 @@
 #include <fstream>
 #include <iomanip>
 #include <map>
-#include <numeric>
 #include <sstream>
 
 namespace ryujin
@@ -27,15 +26,28 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
+      const InitialPrecomputedVector &initial_precomputed,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , hyperbolic_system_(&hyperbolic_system)
-      , parabolic_system_(&parabolic_system)
+      , extractor_(offline_data,
+                   hyperbolic_system,
+                   parabolic_system,
+                   initial_precomputed)
       , base_name_("")
       , mesh_files_have_been_written_(false)
   {
+    std::copy(std::begin(View::primitive_component_names),
+              std::end(View::primitive_component_names),
+              std::back_inserter(quantities_));
+
+    add_parameter("quantities",
+                  quantities_,
+                  "List of conserved, primitive, precomputed, initial, or "
+                  "parabolic quantities for which statistics are accumulated "
+                  "on all manifolds.");
+
     add_parameter("interior manifolds",
                   interior_manifolds_,
                   "List of level set functions describing interior manifolds. "
@@ -69,6 +81,8 @@ namespace ryujin
 #endif
 
     base_name_ = name;
+
+    extractor_.prepare(quantities_);
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto sparsity_simd_view =
@@ -208,17 +222,19 @@ namespace ryujin
     mesh_files_have_been_written_ = false;
 
     /* Prepare header string: */
-    const auto &names = View::primitive_component_names;
-    header_ = std::accumulate(
-                  std::begin(names),
-                  std::end(names),
-                  std::string(),
-                  [](const std::string &description, const std::string &name) {
-                    return description.empty()
-                               ? (std::string("primitive state (") + name)
-                               : (description + ", " + name);
-                  }) +
-              ")\t and 2nd moments\n";
+    header_.clear();
+    for (unsigned int k = 0; k < n_moments; ++k)
+      for (const auto &name : quantities_)
+        header_ += (header_.empty() ? "" : "\t") + name +
+                   (k == 0 ? "" : "^" + std::to_string(k + 1));
+    header_ += "\n";
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  unsigned int Quantities<Description, dim, Number>::stride() const
+  {
+    return n_moments * extractor_.n_selected();
   }
 
 
@@ -229,6 +245,8 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
 #endif
+
+    prepare_extraction(state_vector);
 
     for (auto &manifold : manifolds_) {
       /* skip if we don't average in space or time: */
@@ -243,7 +261,7 @@ namespace ryujin
 
       /* accumulate new values */
 
-      const auto spatial_average = internal_accumulate(state_vector, manifold);
+      auto spatial_average = internal_accumulate(manifold);
 
       /* Average in time with trapezoidal rule: */
 
@@ -257,17 +275,13 @@ namespace ryujin
         t_new = t;
         const Number tau = t_new - t_old;
 
-        for (std::size_t i = 0; i < val_sum.size(); ++i) {
-          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
-          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
-          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
-          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
-        }
+        for (std::size_t i = 0; i < val_sum.size(); ++i)
+          val_sum[i] += 0.5 * tau * (val_old[i] + val_new[i]);
         t_sum += tau;
       }
 
       /* Record average in space: */
-      manifold.time_series.push_back({t, spatial_average});
+      manifold.time_series.emplace_back(t, std::move(spatial_average));
     }
   }
 
@@ -287,6 +301,17 @@ namespace ryujin
       write_mesh_files(cycle);
       mesh_files_have_been_written_ = true;
     }
+
+    /*
+     * Manifolds that are only output instantaneously have not been
+     * evaluated in accumulate(). Prepare the extractor if we have to
+     * evaluate any of them:
+     */
+
+    if (std::any_of(manifolds_.begin(), manifolds_.end(), [](const auto &m) {
+          return m.instantaneous && !m.time_averaged && !m.space_averaged;
+        }))
+      prepare_extraction(state_vector);
 
     /*
      * Next write out instantaneous and time_averaged maps, and flush the
@@ -314,7 +339,7 @@ namespace ryujin
         /* We have not computed any updated statistics yet: */
 
         if (!manifold.time_averaged && !manifold.space_averaged)
-          internal_accumulate(state_vector, manifold);
+          internal_accumulate(manifold);
         else
           AssertThrow(t_new == t, dealii::ExcInternalError());
 
@@ -421,12 +446,12 @@ namespace ryujin
   void Quantities<Description, dim, Number>::clear_statistics()
   {
     for (auto &manifold : manifolds_) {
-      const auto n_entries = manifold.points.size();
+      const auto n_entries = manifold.points.size() * stride();
       auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
           manifold.statistics;
-      val_old.assign(n_entries, value_type());
-      val_new.assign(n_entries, value_type());
-      val_sum.assign(n_entries, value_type());
+      val_old.assign(n_entries, Number(0.));
+      val_new.assign(n_entries, Number(0.));
+      val_sum.assign(n_entries, Number(0.));
       t_old = t_new = t_sum = 0.;
       manifold.time_series.clear();
     }
@@ -434,8 +459,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  auto Quantities<Description, dim, Number>::internal_accumulate(
-      const StateVector &state_vector, Manifold &manifold) -> value_type
+  void Quantities<Description, dim, Number>::prepare_extraction(
+      const StateVector &state_vector)
   {
     /* Ensure that the state vector is resident on the host memory space. */
     if constexpr (have_separate_memory_spaces) {
@@ -445,53 +470,58 @@ namespace ryujin
       precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
     }
 
-    const auto U_view = std::get<0>(state_vector).view();
-    const auto view = hyperbolic_system_->template view<dim, Number>();
+    extractor_.prepare_extraction(state_vector);
+  }
 
-    auto &val_new = manifold.statistics.current;
 
-    value_type spatial_average;
+  template <typename Description, int dim, typename Number>
+  std::vector<Number>
+  Quantities<Description, dim, Number>::internal_accumulate(Manifold &manifold)
+  {
+    const auto extractor_view = extractor_.view();
+    const unsigned int n_selected = extractor_view.n_selected();
+    const unsigned int stride = this->stride();
+
+    std::vector<Number> values(n_selected);
+    std::vector<Number> spatial_average(stride, Number(0.));
     Number mass_sum = Number(0.);
 
-    std::transform(manifold.points.begin(),
-                   manifold.points.end(),
-                   val_new.begin(),
-                   [&](const auto &point) -> value_type {
-                     const auto i = std::get<0>(point);
-                     const auto mass_i = std::get<3>(point);
+    auto *current = manifold.statistics.current.data();
 
-                     const auto U_i = U_view.read_tensor(i);
-                     const auto primitive_state = view.to_primitive_state(U_i);
+    for (const auto &point : manifold.points) {
+      const auto i = std::get<0>(point);
+      const auto mass_i = std::get<3>(point);
 
-                     value_type result;
-                     std::get<0>(result) = primitive_state;
-                     /* Compute second moments of the primitive state: */
-                     std::get<1>(result) =
-                         schur_product(primitive_state, primitive_state);
+      extractor_view.extract_element(values.data(), i);
 
-                     mass_sum += mass_i;
-                     std::get<0>(spatial_average) +=
-                         mass_i * std::get<0>(result);
-                     std::get<1>(spatial_average) +=
-                         mass_i * std::get<1>(result);
+      /* Store the raw moments, i.e., powers of the values: */
+      for (unsigned int c = 0; c < n_selected; ++c) {
+        Number power = Number(1.);
+        for (unsigned int k = 0; k < n_moments; ++k) {
+          power *= values[c];
+          current[k * n_selected + c] = power;
+        }
+      }
 
-                     return result;
-                   });
+      for (unsigned int j = 0; j < stride; ++j)
+        spatial_average[j] += mass_i * current[j];
+      mass_sum += mass_i;
+
+      current += stride;
+    }
 
     /* synchronize MPI ranks (MPI Barrier): */
 
     mass_sum =
         Utilities::MPI::sum(mass_sum, mpi_ensemble_.ensemble_communicator());
-
-    std::get<0>(spatial_average) = Utilities::MPI::sum(
-        std::get<0>(spatial_average), mpi_ensemble_.ensemble_communicator());
-    std::get<1>(spatial_average) = Utilities::MPI::sum(
-        std::get<1>(spatial_average), mpi_ensemble_.ensemble_communicator());
+    Utilities::MPI::sum(spatial_average,
+                        mpi_ensemble_.ensemble_communicator(),
+                        spatial_average);
 
     /* take average: */
 
-    std::get<0>(spatial_average) /= mass_sum;
-    std::get<1>(spatial_average) /= mass_sum;
+    for (auto &it : spatial_average)
+      it /= mass_sum;
 
     return spatial_average;
   }
@@ -501,7 +531,7 @@ namespace ryujin
   void Quantities<Description, dim, Number>::internal_write_out(
       const std::string &file_name,
       const std::string &time_stamp,
-      const std::vector<value_type> &values,
+      const std::vector<Number> &values,
       const Number scale)
   {
     /*
@@ -517,6 +547,8 @@ namespace ryujin
             mpi_ensemble_.ensemble_communicator()) != 0)
       return;
 
+    const unsigned int stride = this->stride();
+
     std::ofstream output(file_name);
     output << std::scientific << std::setprecision(14);
     output << time_stamp << "# " << header_;
@@ -524,11 +556,12 @@ namespace ryujin
     unsigned int rank = 0;
     for (const auto &entries : received) {
       output << "# rank " << rank++ << "\n";
-      for (const auto &entry : entries) {
-        const auto &[state, state_square] = entry;
-        output << scale * state << "\t" << scale * state_square << "\n";
-      } /*entry*/
-    }   /*entries*/
+      for (std::size_t j = 0; j < entries.size(); j += stride) {
+        for (unsigned int m = 0; m < stride; ++m)
+          output << (m == 0 ? "" : "\t") << scale * entries[j + m];
+        output << "\n";
+      }
+    }
 
     output << std::flush;
   }
@@ -537,7 +570,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::internal_write_out_time_series(
       const std::string &file_name,
-      const std::vector<std::pair<Number, value_type>> &values,
+      const std::vector<std::pair<Number, std::vector<Number>>> &values,
       bool append)
   {
     if (Utilities::MPI::this_mpi_process(
@@ -554,9 +587,11 @@ namespace ryujin
       output << "# time t\t" << header_;
     }
 
-    for (const auto &[t, value] : values) {
-      const auto &[state, state_square] = value;
-      output << t << "\t" << state << "\t" << state_square << "\n";
+    for (const auto &[t, entry] : values) {
+      output << t;
+      for (const auto &value : entry)
+        output << "\t" << value;
+      output << "\n";
     }
 
     output << std::flush;
