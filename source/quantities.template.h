@@ -10,42 +10,16 @@
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/mpi.templates.h>
-#include <deal.II/base/work_stream.h>
-#include <deal.II/dofs/dof_tools.h>
 
 #include <fstream>
-
-DEAL_II_NAMESPACE_OPEN
-template <int rank, int dim, typename Number>
-bool operator<(const Tensor<rank, dim, Number> &left,
-               const Tensor<rank, dim, Number> &right)
-{
-  return std::lexicographical_compare(
-      left.begin_raw(), left.end_raw(), right.begin_raw(), right.end_raw());
-}
-DEAL_II_NAMESPACE_CLOSE
+#include <iomanip>
+#include <map>
+#include <numeric>
+#include <sstream>
 
 namespace ryujin
 {
   using namespace dealii;
-
-  namespace
-  {
-    template <typename T>
-    const std::string &get_options_from_name(const T &manifolds,
-                                             const std::string &name)
-    {
-      const auto it =
-          std::find_if(manifolds.begin(),
-                       manifolds.end(),
-                       [&, name = std::cref(name)](const auto &element) {
-                         return std::get<0>(element) == name.get();
-                       });
-      Assert(it != manifolds.end(), dealii::ExcInternalError());
-      return std::get<2>(*it);
-    }
-  } // namespace
-
 
   template <typename Description, int dim, typename Number>
   Quantities<Description, dim, Number>::Quantities(
@@ -96,9 +70,6 @@ namespace ryujin
 
     base_name_ = name;
 
-    /* Force to write to a new time series file: */
-    time_series_cycle_.reset();
-
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
@@ -106,130 +77,129 @@ namespace ryujin
         offline_data_->lumped_mass_matrix().view();
 
     /*
-     * Create interior maps and allocate statistics.
-     *
-     * We have to loop over the cells and populate the std::map interior_maps_.
+     * Create a manifold record with the name and parsed options for every
+     * entry of the parameter lists:
      */
 
-    interior_maps_.clear();
-    std::transform(
-        interior_manifolds_.begin(),
-        interior_manifolds_.end(),
-        std::inserter(interior_maps_, interior_maps_.end()),
-        [this, n_owned, &sparsity_simd_view, &lumped_mass_matrix_view](
-            auto it) {
-          const auto &[name, expression, option] = it;
-          FunctionParser<dim> level_set_function(expression);
+    const auto create_manifold = [](const auto &entry, const bool boundary) {
+      const auto &[name, expression, options] = entry;
 
-          std::vector<interior_point> map;
-          std::map<int, interior_point> preliminary_map;
+      Manifold manifold;
+      manifold.name = name;
+      manifold.boundary = boundary;
+      manifold.instantaneous =
+          options.find("instantaneous") != std::string::npos;
+      manifold.time_averaged =
+          options.find("time_averaged") != std::string::npos;
+      manifold.space_averaged =
+          options.find("space_averaged") != std::string::npos;
 
-          const auto &discretization = offline_data_->discretization();
-          const auto &dof_handler = offline_data_->dof_handler();
+      AssertThrow(manifold.instantaneous || manifold.time_averaged ||
+                      manifold.space_averaged,
+                  dealii::ExcMessage(
+                      "Invalid options \"" + options + "\" for manifold \"" +
+                      name +
+                      "\": at least one of instantaneous, time_averaged, or "
+                      "space_averaged has to be selected."));
 
-          const auto support_points =
-              dof_handler.get_fe().get_unit_support_points();
+      return manifold;
+    };
 
-          std::vector<dealii::types::global_dof_index> local_dof_indices;
-
-          /* Loop over cells */
-          for (auto cell : dof_handler.active_cell_iterators()) {
-
-            /* skip if not locally owned */
-            if (!cell->is_locally_owned())
-              continue;
-
-            const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
-            local_dof_indices.resize(dofs_per_cell);
-            cell->get_active_or_mg_dof_indices(local_dof_indices);
-
-            const auto &mapping =
-                discretization.mapping()[cell->active_fe_index()];
-
-            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-
-              Point<dim> position =
-                  mapping.transform_unit_to_real_cell(cell, support_points[j]);
-
-              /*
-               * Insert index, interior mass value and position into
-               * a preliminary map if we satisfy level set condition.
-               */
-
-              if (std::abs(level_set_function.value(position)) > 1.e-12)
-                continue;
-
-              const auto global_index = local_dof_indices[j];
-              const auto index =
-                  offline_data_->scalar_partitioner()->global_to_local(
-                      global_index);
-
-              /* Skip constrained degrees of freedom: */
-              const unsigned int row_length =
-                  sparsity_simd_view.row_length(index);
-              if (row_length == 1)
-                continue;
-
-              if (index >= n_owned)
-                continue;
-
-              const Number interior_mass =
-                  lumped_mass_matrix_view.read_entry(index);
-              // FIXME: change to std::set
-              preliminary_map[index] = {index, interior_mass, position};
-            }
-          }
-
-          /*
-           * Now we populate the std::vector(interior_point) object called map.
-           */
-          // FIXME: use std::copy
-          for (const auto &[index, tuple] : preliminary_map) {
-            map.push_back(tuple);
-          }
-
-          return std::make_pair(name, map);
-        });
+    manifolds_.clear();
 
     /*
-     * Create boundary maps and allocate statistics vector:
-     *
-     * We want to loop over the boundary_map() once and populate the map
-     * object boundary_maps_. We have to create a vector of
-     * boundary_manifolds.size() that holds a std::vector<boundary_point>
-     * for each map entry.
+     * Create interior manifolds: We have to loop over all cells and
+     * collect all degrees of freedom satisfying the level set condition.
      */
 
-    boundary_maps_.clear();
-    std::transform(
-        boundary_manifolds_.begin(),
-        boundary_manifolds_.end(),
-        std::inserter(boundary_maps_, boundary_maps_.end()),
-        [this, n_owned](auto it) {
-          const auto &[name, expression, option] = it;
-          FunctionParser<dim> level_set_function(expression);
+    for (const auto &entry : interior_manifolds_) {
+      auto manifold = create_manifold(entry, /*boundary*/ false);
+      FunctionParser<dim> level_set_function(std::get<1>(entry));
 
-          std::vector<boundary_point> map;
+      const auto &discretization = offline_data_->discretization();
+      const auto &dof_handler = offline_data_->dof_handler();
 
-          for (const auto &entry : offline_data_->boundary_map()) {
-            // [i, normal, normal_mass, boundary_mass, id, position] = entry
-            const auto &i = std::get<0>(entry);
+      const auto support_points =
+          dof_handler.get_fe().get_unit_support_points();
 
-            /* skip nonlocal */
-            if (i >= n_owned)
-              continue;
+      std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-            /* skip constrained */
-            if (offline_data_->affine_constraints().is_constrained(
-                    offline_data_->scalar_partitioner()->local_to_global(i)))
-              continue;
+      /* We use a map to sort and deduplicate the collected points: */
+      std::map<unsigned int, ManifoldPoint> preliminary_map;
 
-            const auto &position = std::get<5>(entry);
-            if (std::abs(level_set_function.value(position)) < 1.e-12)
-              map.push_back(entry);
-          }
-          return std::make_pair(name, map);
-        });
+      for (auto cell : dof_handler.active_cell_iterators()) {
+        if (!cell->is_locally_owned())
+          continue;
+
+        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+        local_dof_indices.resize(dofs_per_cell);
+        cell->get_active_or_mg_dof_indices(local_dof_indices);
+
+        const auto &mapping = discretization.mapping()[cell->active_fe_index()];
+
+        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+          const Point<dim> position =
+              mapping.transform_unit_to_real_cell(cell, support_points[j]);
+
+          if (std::abs(level_set_function.value(position)) > 1.e-12)
+            continue;
+
+          const auto global_index = local_dof_indices[j];
+          const auto index =
+              offline_data_->scalar_partitioner()->global_to_local(
+                  global_index);
+
+          /* Skip constrained degrees of freedom: */
+          if (sparsity_simd_view.row_length(index) == 1)
+            continue;
+
+          if (index >= n_owned)
+            continue;
+
+          const Number mass = lumped_mass_matrix_view.read_entry(index);
+          preliminary_map[index] = {index,
+                                    dealii::Tensor<1, dim, Number>(),
+                                    Number(0.),
+                                    mass,
+                                    dealii::numbers::internal_face_boundary_id,
+                                    position};
+        }
+      }
+
+      for (const auto &[index, point] : preliminary_map)
+        manifold.points.push_back(point);
+
+      manifolds_.push_back(std::move(manifold));
+    }
+
+    /*
+     * Create boundary manifolds: We loop over the boundary map and collect
+     * all degrees of freedom satisfying the level set condition.
+     */
+
+    for (const auto &entry : boundary_manifolds_) {
+      auto manifold = create_manifold(entry, /*boundary*/ true);
+      FunctionParser<dim> level_set_function(std::get<1>(entry));
+
+      for (const auto &point : offline_data_->boundary_map()) {
+        const auto &i = std::get<0>(point);
+
+        /* skip nonlocal */
+        if (i >= n_owned)
+          continue;
+
+        /* skip constrained */
+        if (offline_data_->affine_constraints().is_constrained(
+                offline_data_->scalar_partitioner()->local_to_global(i)))
+          continue;
+
+        const auto &position = std::get<5>(point);
+        if (std::abs(level_set_function.value(position)) < 1.e-12)
+          manifold.points.push_back(point);
+      }
+
+      manifolds_.push_back(std::move(manifold));
+    }
 
     /* Clear statistics: */
     clear_statistics();
@@ -260,66 +230,45 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
 #endif
 
-    const auto accumulate = [&](const auto &point_maps,
-                                const auto &manifolds,
-                                auto &statistics,
-                                auto &time_series) {
-      for (const auto &[name, point_map] : point_maps) {
+    for (auto &manifold : manifolds_) {
+      /* skip if we don't average in space or time: */
+      if (!manifold.time_averaged && !manifold.space_averaged)
+        continue;
 
-        /* Find the correct option string in manifolds */
-        const auto &options = get_options_from_name(manifolds, name);
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          manifold.statistics;
 
-        /* skip if we don't average in space or time: */
-        if (options.find("time_averaged") == std::string::npos &&
-            options.find("space_averaged") == std::string::npos)
-          continue;
+      std::swap(t_old, t_new);
+      std::swap(val_old, val_new);
 
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            statistics[name];
+      /* accumulate new values */
 
-        std::swap(t_old, t_new);
-        std::swap(val_old, val_new);
+      const auto spatial_average = internal_accumulate(state_vector, manifold);
 
-        /* accumulate new values */
+      /* Average in time with trapezoidal rule: */
 
-        const auto spatial_average =
-            internal_accumulate(state_vector, point_map, val_new);
+      if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
+        /* We have not accumulated any statistics yet: */
+        t_old = t - 1.;
+        t_new = t;
 
-        /* Average in time with trapezoidal rule: */
+      } else {
 
-        if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
-          /* We have not accumulated any statistics yet: */
-          t_old = t - 1.;
-          t_new = t;
+        t_new = t;
+        const Number tau = t_new - t_old;
 
-        } else {
-
-          t_new = t;
-          const Number tau = t_new - t_old;
-
-          for (std::size_t i = 0; i < val_sum.size(); ++i) {
-            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
-            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
-            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
-            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
-          }
-          t_sum += tau;
+        for (std::size_t i = 0; i < val_sum.size(); ++i) {
+          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
+          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
+          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
+          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
         }
-
-        /* Record average in space: */
-        time_series[name].push_back({t, spatial_average});
+        t_sum += tau;
       }
-    };
 
-    accumulate(interior_maps_,
-               interior_manifolds_,
-               interior_statistics_,
-               interior_time_series_);
-
-    accumulate(boundary_maps_,
-               boundary_manifolds_,
-               boundary_statistics_,
-               boundary_time_series_);
+      /* Record average in space: */
+      manifold.time_series.push_back({t, spatial_average});
+    }
   }
 
 
@@ -344,99 +293,75 @@ namespace ryujin
      * space_averaged values to the corresponding log files:
      */
 
-    const auto write_out = [&](const auto &point_maps,
-                               const auto &manifolds,
-                               auto &statistics,
-                               auto &time_series) {
-      for (const auto &[name, point_map] : point_maps) {
+    for (auto &manifold : manifolds_) {
+      const auto prefix = base_name_ + "-" + manifold.name + "-R" +
+                          Utilities::to_string(cycle, 4);
 
-        /* Find the correct option string in manifolds */
-        const auto &options = get_options_from_name(manifolds, name);
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          manifold.statistics;
 
-        const auto prefix =
-            base_name_ + "-" + name + "-R" + Utilities::to_string(cycle, 4);
+      /*
+       * Compute and output instantaneous field:
+       */
 
-        /*
-         * Compute and output instantaneous field:
-         */
+      if (manifold.instantaneous) {
+        const std::string file_name = prefix + "-instantaneous.dat";
 
-        if (options.find("instantaneous") != std::string::npos) {
+        std::stringstream time_stamp;
+        time_stamp << std::scientific << std::setprecision(14);
+        time_stamp << "# at t = " << t << std::endl;
 
-          const std::string file_name = prefix + "-instantaneous.dat";
+        /* We have not computed any updated statistics yet: */
 
-          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-              statistics[name];
+        if (!manifold.time_averaged && !manifold.space_averaged)
+          internal_accumulate(state_vector, manifold);
+        else
+          AssertThrow(t_new == t, dealii::ExcInternalError());
 
+        internal_write_out(file_name, time_stamp.str(), val_new, Number(1.));
+      }
+
+      /*
+       * Output time averaged field:
+       */
+
+      if (manifold.time_averaged) {
+        const std::string file_name = prefix + "-time_averaged.dat";
+
+        /* Check whether we have accumulated any statistics yet: */
+        if (t_sum != Number(0.)) {
           std::stringstream time_stamp;
           time_stamp << std::scientific << std::setprecision(14);
-          time_stamp << "# at t = " << t << std::endl;
+          time_stamp << "# averaged from t = " << t_new - t_sum
+                     << " to t = " << t_new << std::endl;
 
-          /* We have not computed any updated statistics yet: */
-
-          if (options.find("time_averaged") == std::string::npos &&
-              options.find("space_averaged") == std::string::npos)
-            internal_accumulate(state_vector, point_map, val_new);
-          else
-            AssertThrow(t_new == t, dealii::ExcInternalError());
-
-          internal_write_out(file_name, time_stamp.str(), val_new, Number(1.));
-        }
-
-        /*
-         * Output time averaged field:
-         */
-
-        if (options.find("time_averaged") != std::string::npos) {
-
-          const std::string file_name = prefix + "-time_averaged.dat";
-
-          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-              statistics[name];
-
-          /* Check whether we have accumulated any statistics yet: */
-          if (t_sum != Number(0.)) {
-            std::stringstream time_stamp;
-            time_stamp << std::scientific << std::setprecision(14);
-            time_stamp << "# averaged from t = " << t_new - t_sum
-                       << " to t = " << t_new << std::endl;
-
-            internal_write_out(
-                file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
-          }
-        }
-
-        /*
-         * Output space averaged field:
-         */
-
-        if (options.find("space_averaged") != std::string::npos) {
-          bool append = true;
-          if (!time_series_cycle_.has_value()) {
-            time_series_cycle_ = cycle;
-            append = false;
-          }
-
-          const auto file_name =
-              base_name_ + "-" + name + "-R" +
-              Utilities::to_string(time_series_cycle_.value(), 4) +
-              "-space_averaged_time_series.dat";
-
-          auto &series = time_series[name];
-          internal_write_out_time_series(file_name, series, /*append*/ append);
-          series.clear();
+          internal_write_out(
+              file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
         }
       }
-    };
 
-    write_out(interior_maps_,
-              interior_manifolds_,
-              interior_statistics_,
-              interior_time_series_);
+      /*
+       * Output space averaged field:
+       */
 
-    write_out(boundary_maps_,
-              boundary_manifolds_,
-              boundary_statistics_,
-              boundary_time_series_);
+      if (manifold.space_averaged) {
+        /* Write to a new time series file after every call to prepare(): */
+        bool append = true;
+        if (!manifold.time_series_cycle.has_value()) {
+          manifold.time_series_cycle = cycle;
+          append = false;
+        }
+
+        const auto file_name =
+            base_name_ + "-" + manifold.name + "-R" +
+            Utilities::to_string(manifold.time_series_cycle.value(), 4) +
+            "-space_averaged_time_series.dat";
+
+        internal_write_out_time_series(
+            file_name, manifold.time_series, /*append*/ append);
+        manifold.time_series.clear();
+      }
+    }
 
     if (clear_temporal_statistics_on_writeout_)
       clear_statistics();
@@ -447,91 +372,47 @@ namespace ryujin
   void
   Quantities<Description, dim, Number>::write_mesh_files(unsigned int cycle)
   {
-    /*
-     * Output interior maps:
-     */
-
-    for (const auto &[name, interior_map] : interior_maps_) {
-      /* Skip outputting the boundary map for spatial averages. */
-      const auto &options = get_options_from_name(interior_manifolds_, name);
-      if (options.find("instantaneous") == std::string::npos &&
-          options.find("time_averaged") == std::string::npos)
+    for (const auto &manifold : manifolds_) {
+      /* Skip outputting the point map for spatial averages. */
+      if (!manifold.instantaneous && !manifold.time_averaged)
         continue;
 
       /*
-       * FIXME: This currently distributes boundary maps to all MPI ranks.
+       * FIXME: This currently distributes point maps to all MPI ranks.
        * This is unnecessarily wasteful. Ideally, we should do MPI IO with
-       * only MPI ranks participating who actually have boundary values.
+       * only MPI ranks participating who actually have values.
        */
 
       const auto received = Utilities::MPI::gather(
-          mpi_ensemble_.ensemble_communicator(), interior_map);
+          mpi_ensemble_.ensemble_communicator(), manifold.points);
 
       if (Utilities::MPI::this_mpi_process(
-              mpi_ensemble_.ensemble_communicator()) == 0) {
+              mpi_ensemble_.ensemble_communicator()) != 0)
+        continue;
 
-        std::ofstream output(base_name_ + "-" + name + "-R" +
-                             Utilities::to_string(cycle, 4) + "-points.dat");
+      std::ofstream output(base_name_ + "-" + manifold.name + "-R" +
+                           Utilities::to_string(cycle, 4) + "-points.dat");
 
-        output << std::scientific << std::setprecision(14);
+      output << std::scientific << std::setprecision(14);
 
+      if (manifold.boundary)
+        output << "#\n# position\tnormal\tnormal mass\tboundary mass\n";
+      else
         output << "#\n# position\tinterior mass\n";
 
-        unsigned int rank = 0;
-        for (const auto &entries : received) {
-          output << "# rank " << rank++ << "\n";
-          for (const auto &entry : entries) {
-            const auto &[index, mass_i, x_i] = entry;
-            output << x_i << "\t" << mass_i << "\n";
-          } /*entry*/
-        }   /*entries*/
+      unsigned int rank = 0;
+      for (const auto &entries : received) {
+        output << "# rank " << rank++ << "\n";
+        for (const auto &entry : entries) {
+          const auto &[index, n_i, nm_i, m_i, id, x_i] = entry;
+          if (manifold.boundary)
+            output << x_i << "\t" << n_i << "\t" << nm_i << "\t" << m_i << "\n";
+          else
+            output << x_i << "\t" << m_i << "\n";
+        } /*entry*/
+      } /*entries*/
 
-        output << std::flush;
-      }
-    }
-
-    /*
-     * Output boundary maps:
-     */
-
-    for (const auto &[name, boundary_map] : boundary_maps_) {
-      /* Skip outputting the boundary map for spatial averages. */
-      const auto &options = get_options_from_name(boundary_manifolds_, name);
-      if (options.find("instantaneous") == std::string::npos &&
-          options.find("time_averaged") == std::string::npos)
-        continue;
-
-      /*
-       * FIXME: This currently distributes boundary maps to all MPI ranks.
-       * This is unnecessarily wasteful. Ideally, we should do MPI IO with
-       * only MPI ranks participating who actually have boundary values.
-       */
-
-      const auto received = Utilities::MPI::gather(
-          mpi_ensemble_.ensemble_communicator(), boundary_map);
-
-      if (Utilities::MPI::this_mpi_process(
-              mpi_ensemble_.ensemble_communicator()) == 0) {
-
-        std::ofstream output(base_name_ + "-" + name + "-R" +
-                             Utilities::to_string(cycle, 4) + "-points.dat");
-
-        output << std::scientific << std::setprecision(14);
-
-        output << "#\n# position\tnormal\tnormal mass\tboundary mass\n";
-
-        unsigned int rank = 0;
-        for (const auto &entries : received) {
-          output << "# rank " << rank++ << "\n";
-          for (const auto &entry : entries) {
-            const auto &[index, n_i, nm_i, bm_i, id, x_i] = entry;
-            output << x_i << "\t" << n_i << "\t" << nm_i << "\t" << bm_i
-                   << "\n";
-          } /*entry*/
-        }   /*entries*/
-
-        output << std::flush;
-      }
+      output << std::flush;
     }
   }
 
@@ -539,36 +420,22 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::clear_statistics()
   {
-    const auto reset = [](const auto &manifold_map, auto &statistics_map) {
-      for (const auto &[name, data_map] : manifold_map) {
-        const auto n_entries = data_map.size();
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            statistics_map[name];
-        val_old.resize(n_entries);
-        val_new.resize(n_entries);
-        val_sum.resize(n_entries);
-        t_old = t_new = t_sum = 0.;
-      }
-    };
-
-    /* Clear statistics and time series: */
-
-    interior_statistics_.clear();
-    reset(interior_maps_, interior_statistics_);
-    interior_time_series_.clear();
-
-    boundary_statistics_.clear();
-    reset(boundary_maps_, boundary_statistics_);
-    boundary_time_series_.clear();
+    for (auto &manifold : manifolds_) {
+      const auto n_entries = manifold.points.size();
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          manifold.statistics;
+      val_old.assign(n_entries, value_type());
+      val_new.assign(n_entries, value_type());
+      val_sum.assign(n_entries, value_type());
+      t_old = t_new = t_sum = 0.;
+      manifold.time_series.clear();
+    }
   }
 
 
   template <typename Description, int dim, typename Number>
-  template <typename point_type, typename value_type>
-  value_type Quantities<Description, dim, Number>::internal_accumulate(
-      const StateVector &state_vector,
-      const std::vector<point_type> &points_vector,
-      std::vector<value_type> &val_new)
+  auto Quantities<Description, dim, Number>::internal_accumulate(
+      const StateVector &state_vector, Manifold &manifold) -> value_type
   {
     /* Ensure that the state vector is resident on the host memory space. */
     if constexpr (have_separate_memory_spaces) {
@@ -579,39 +446,37 @@ namespace ryujin
     }
 
     const auto U_view = std::get<0>(state_vector).view();
+    const auto view = hyperbolic_system_->template view<dim, Number>();
+
+    auto &val_new = manifold.statistics.current;
 
     value_type spatial_average;
     Number mass_sum = Number(0.);
 
-    std::transform(
-        points_vector.begin(),
-        points_vector.end(),
-        val_new.begin(),
-        [&](auto point) -> value_type {
-          const auto i = std::get<0>(point);
-          /*
-           * Small trick to get the correct index for retrieving the
-           * boundary mass.
-           */
-          constexpr auto index =
-              std::is_same_v<point_type, interior_point> ? 1 : 3;
-          const auto mass_i = std::get<index>(point);
+    std::transform(manifold.points.begin(),
+                   manifold.points.end(),
+                   val_new.begin(),
+                   [&](const auto &point) -> value_type {
+                     const auto i = std::get<0>(point);
+                     const auto mass_i = std::get<3>(point);
 
-          const auto U_i = U_view.read_tensor(i);
-          const auto view = hyperbolic_system_->template view<dim, Number>();
-          const auto primitive_state = view.to_primitive_state(U_i);
+                     const auto U_i = U_view.read_tensor(i);
+                     const auto primitive_state = view.to_primitive_state(U_i);
 
-          value_type result;
-          std::get<0>(result) = primitive_state;
-          /* Compute second moments of the primitive state: */
-          std::get<1>(result) = schur_product(primitive_state, primitive_state);
+                     value_type result;
+                     std::get<0>(result) = primitive_state;
+                     /* Compute second moments of the primitive state: */
+                     std::get<1>(result) =
+                         schur_product(primitive_state, primitive_state);
 
-          mass_sum += mass_i;
-          std::get<0>(spatial_average) += mass_i * std::get<0>(result);
-          std::get<1>(spatial_average) += mass_i * std::get<1>(result);
+                     mass_sum += mass_i;
+                     std::get<0>(spatial_average) +=
+                         mass_i * std::get<0>(result);
+                     std::get<1>(spatial_average) +=
+                         mass_i * std::get<1>(result);
 
-          return result;
-        });
+                     return result;
+                   });
 
     /* synchronize MPI ranks (MPI Barrier): */
 
@@ -633,7 +498,6 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  template <typename value_type>
   void Quantities<Description, dim, Number>::internal_write_out(
       const std::string &file_name,
       const std::string &time_stamp,
@@ -641,64 +505,61 @@ namespace ryujin
       const Number scale)
   {
     /*
-     * FIXME: This currently distributes interior maps to all MPI ranks.
-     * This is unnecessarily wasteful. Ideally, we should do MPI IO with
-     * only MPI ranks participating who actually have interior values.
+     * FIXME: This currently distributes all values to all MPI ranks. This
+     * is unnecessarily wasteful. Ideally, we should do MPI IO with only
+     * MPI ranks participating who actually have values.
      */
 
     const auto received =
         Utilities::MPI::gather(mpi_ensemble_.ensemble_communicator(), values);
 
     if (Utilities::MPI::this_mpi_process(
-            mpi_ensemble_.ensemble_communicator()) == 0) {
+            mpi_ensemble_.ensemble_communicator()) != 0)
+      return;
 
-      std::ofstream output(file_name);
-      output << std::scientific << std::setprecision(14);
-      output << time_stamp << "# " << header_;
+    std::ofstream output(file_name);
+    output << std::scientific << std::setprecision(14);
+    output << time_stamp << "# " << header_;
 
-      unsigned int rank = 0;
-      for (const auto &entries : received) {
-        output << "# rank " << rank++ << "\n";
-        for (const auto &entry : entries) {
-          const auto &[state, state_square] = entry;
-          output << scale * state << "\t" << scale * state_square << "\n";
-        } /*entry*/
-      }   /*entries*/
+    unsigned int rank = 0;
+    for (const auto &entries : received) {
+      output << "# rank " << rank++ << "\n";
+      for (const auto &entry : entries) {
+        const auto &[state, state_square] = entry;
+        output << scale * state << "\t" << scale * state_square << "\n";
+      } /*entry*/
+    }   /*entries*/
 
-      output << std::flush;
-    }
+    output << std::flush;
   }
 
 
   template <typename Description, int dim, typename Number>
-  template <typename value_type>
   void Quantities<Description, dim, Number>::internal_write_out_time_series(
       const std::string &file_name,
-      const std::vector<std::tuple<Number, value_type>> &values,
+      const std::vector<std::pair<Number, value_type>> &values,
       bool append)
   {
     if (Utilities::MPI::this_mpi_process(
-            mpi_ensemble_.ensemble_communicator()) == 0) {
-      std::ofstream output;
-      output << std::scientific << std::setprecision(14);
+            mpi_ensemble_.ensemble_communicator()) != 0)
+      return;
 
-      if (append) {
-        output.open(file_name, std::ofstream::out | std::ofstream::app);
-      } else {
-        output.open(file_name, std::ofstream::out | std::ofstream::trunc);
-        output << "# time t\t" << header_;
-      }
+    std::ofstream output;
+    output << std::scientific << std::setprecision(14);
 
-      for (const auto &entry : values) {
-        const auto t = std::get<0>(entry);
-        const auto &[state, state_square] = std::get<1>(entry);
-
-        output << t << "\t" << state << "\t" << state_square << "\n";
-      }
-
-      output << std::flush;
-      output.close();
+    if (append) {
+      output.open(file_name, std::ofstream::out | std::ofstream::app);
+    } else {
+      output.open(file_name, std::ofstream::out | std::ofstream::trunc);
+      output << "# time t\t" << header_;
     }
+
+    for (const auto &[t, value] : values) {
+      const auto &[state, state_square] = value;
+      output << t << "\t" << state << "\t" << state_square << "\n";
+    }
+
+    output << std::flush;
   }
 
 } /* namespace ryujin */

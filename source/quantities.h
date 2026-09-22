@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -12,10 +12,6 @@
 #include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
-#include <deal.II/lac/la_parallel_block_vector.h>
-#include <deal.II/lac/sparse_matrix.templates.h>
-#include <deal.II/lac/vector.h>
 
 #include <optional>
 
@@ -100,68 +96,52 @@ namespace ryujin
     //@{
 
     /**
-     * A tuple describing (local) dof index, boundary normal, normal mass,
-     * boundary mass, boundary id, and position of the boundary degree of
-     * freedom.
-     *
-     * @fixme This type only differs from the one used in OfflineData by
-     * including a DoF index. It might be better to combine both.
+     * A tuple describing (local) dof index, normal, normal mass, mass,
+     * boundary id, and position of a degree of freedom belonging to a
+     * manifold. We use the same description for interior and boundary
+     * manifolds: For an interior degree of freedom the normal and normal
+     * mass are zero, the mass is the lumped mass matrix entry, and the
+     * boundary id is set to dealii::numbers::internal_face_boundary_id.
      */
-    using boundary_point =
-        std::tuple<dealii::types::global_dof_index /*local dof index*/,
-                   dealii::Tensor<1, dim, Number> /*normal*/,
-                   Number /*normal mass*/,
-                   Number /*boundary mass*/,
-                   dealii::types::boundary_id /*id*/,
-                   dealii::Point<dim>> /*position*/;
+    using ManifoldPoint =
+        typename OfflineData<dim, Number>::BoundaryDescription;
 
     /**
-     * A tuple describing boundary values we are interested in: the
-     * primitive state and its second moment, boundary stresses and normal
-     * pressure force.
+     * A tuple describing the values we are interested in: the primitive
+     * state and its second moment.
      */
-    using boundary_value =
+    using value_type =
         std::tuple<state_type /* primitive state */,
                    state_type /* primitive state second moment */>;
 
     /**
-     * Temporal statistics we store for each boundary manifold.
+     * Temporal statistics we store for each manifold: the values of the
+     * previous and the current time step, and the trapezoidal sum over
+     * time.
      */
-    using boundary_statistic =
-        std::tuple<std::vector<boundary_value> /* values old */,
-                   std::vector<boundary_value> /* values new */,
-                   std::vector<boundary_value> /* values sum */,
-                   Number /* t old */,
-                   Number /* t new */,
-                   Number /* t sum */>;
+    struct Statistics {
+      std::vector<value_type> old;
+      std::vector<value_type> current;
+      std::vector<value_type> sum;
+      Number t_old;
+      Number t_new;
+      Number t_sum;
+    };
 
     /**
-     * A tuple describing (local) dof index, mass, and position of an
-     * interior degree of freedom.
+     * All data associated with a single interior or boundary manifold.
      */
-    using interior_point =
-        std::tuple<dealii::types::global_dof_index /*local dof index*/,
-                   Number /*mass*/,
-                   dealii::Point<dim>> /*position*/;
-
-    /**
-     * A tuple describing interior values we are interested in: the
-     * primitive state and its second moment.
-     */
-    using interior_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
-
-    /**
-     * Temporal statistics we store for each interior manifold.
-     */
-    using interior_statistic =
-        std::tuple<std::vector<interior_value> /* values old */,
-                   std::vector<interior_value> /* values new */,
-                   std::vector<interior_value> /* values sum */,
-                   Number /* t old */,
-                   Number /* t new */,
-                   Number /* t sum */>;
+    struct Manifold {
+      std::string name;
+      bool boundary;
+      bool instantaneous;
+      bool time_averaged;
+      bool space_averaged;
+      std::vector<ManifoldPoint> points;
+      Statistics statistics;
+      std::vector<std::pair<Number, value_type>> time_series;
+      std::optional<unsigned int> time_series_cycle;
+    };
 
     //@}
     /**
@@ -190,33 +170,13 @@ namespace ryujin
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
     /**
-     * The boundary map.
+     * All interior and boundary manifolds with associated point maps and
+     * statistics.
      */
-    std::map<std::string, std::vector<boundary_point>> boundary_maps_;
-
-    /**
-     * Associated statistics for the boundary map.
-     */
-    std::map<std::string, boundary_statistic> boundary_statistics_;
-    std::map<std::string, std::vector<std::tuple<Number, boundary_value>>>
-        boundary_time_series_;
-
-    /**
-     * The interior map.
-     */
-    std::map<std::string, std::vector<interior_point>> interior_maps_;
-
-    /**
-     * Associated statistics for the interior map.
-     */
-    std::map<std::string, interior_statistic> interior_statistics_;
-    std::map<std::string, std::vector<std::tuple<Number, interior_value>>>
-        interior_time_series_;
+    std::vector<Manifold> manifolds_;
 
     std::string base_name_;
     std::string header_;
-    bool first_cycle_;
-    std::optional<unsigned int> time_series_cycle_;
     bool mesh_files_have_been_written_;
 
     //@}
@@ -229,21 +189,17 @@ namespace ryujin
 
     void clear_statistics();
 
-    template <typename point_type, typename value_type>
     value_type internal_accumulate(const StateVector &state_vector,
-                                   const std::vector<point_type> &interior_map,
-                                   std::vector<value_type> &new_val);
+                                   Manifold &manifold);
 
-    template <typename value_type>
     void internal_write_out(const std::string &file_name,
                             const std::string &time_stamp,
                             const std::vector<value_type> &values,
                             const Number scale);
 
-    template <typename value_type>
     void internal_write_out_time_series(
         const std::string &file_name,
-        const std::vector<std::tuple<Number, value_type>> &values,
+        const std::vector<std::pair<Number, value_type>> &values,
         bool append);
 
     //@}
