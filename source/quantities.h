@@ -24,9 +24,17 @@ namespace ryujin
    * The class accumulates statistics of a user selected list of
    * (conserved, primitive, precomputed, initial, or parabolic) quantities
    * on level set defined interior and boundary manifolds. For every
-   * degree of freedom of a manifold the raw moments of all selected
-   * quantities are stored and averaged in time (with a trapezoidal rule),
-   * and averaged in space (weighted by the lumped, or boundary mass).
+   * degree of freedom of a manifold the raw moments (up to a selectable
+   * order) of all selected quantities are stored and averaged in time
+   * (with a trapezoidal rule), and averaged in space (weighted by the
+   * lumped, or boundary mass). Raw moments are linear in the samples and
+   * can thus be accumulated exactly. They are converted to the mean and
+   * the central moments (variance, third and fourth central moment) on
+   * output.
+   *
+   * @note The conversion from raw to central moments is subject to
+   * cancellation if the fluctuations of a quantity are small compared to
+   * its mean.
    *
    * @ingroup TimeLoop
    */
@@ -46,11 +54,6 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-
-    /**
-     * The number of raw moments we store for every selected quantity.
-     */
-    static constexpr unsigned int n_moments = 2;
 
     //@}
     /**
@@ -161,6 +164,8 @@ namespace ryujin
 
     std::vector<std::string> quantities_;
 
+    unsigned int n_moments_;
+
     std::vector<std::tuple<std::string, std::string, std::string>>
         interior_manifolds_;
 
@@ -188,7 +193,6 @@ namespace ryujin
     std::vector<Manifold> manifolds_;
 
     std::string base_name_;
-    std::string header_;
     bool mesh_files_have_been_written_;
 
     //@}
@@ -202,6 +206,13 @@ namespace ryujin
      * the number of selected quantities.
      */
     unsigned int stride() const;
+
+    /**
+     * Return a tab separated list of column names: the plain names of
+     * all selected quantities for instantaneous values, or the names of
+     * the mean and all central moments for averaged values.
+     */
+    std::string header(bool averaged) const;
 
     void write_mesh_files(unsigned int cycle);
 
@@ -220,10 +231,16 @@ namespace ryujin
      */
     std::vector<Number> internal_accumulate(Manifold &manifold);
 
+    /**
+     * Write out instantaneous values, or (if @p averaged is set) the mean
+     * and central moments computed from the raw moments scaled by
+     * @p scale.
+     */
     void internal_write_out(const std::string &file_name,
                             const std::string &time_stamp,
                             const std::vector<Number> &values,
-                            const Number scale);
+                            const Number scale,
+                            bool averaged);
 
     void internal_write_out_time_series(
         const std::string &file_name,

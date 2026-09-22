@@ -11,6 +11,7 @@
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/mpi.templates.h>
 
+#include <array>
 #include <fstream>
 #include <iomanip>
 #include <map>
@@ -19,6 +20,37 @@
 namespace ryujin
 {
   using namespace dealii;
+
+  namespace
+  {
+    /**
+     * Convert the raw moments of a single point (stored with n_selected
+     * consecutive values per moment) in place into the mean and the
+     * central moments of order 2, ..., n_moments.
+     */
+    template <typename Number>
+    void to_central_moments(Number *moments,
+                            const unsigned int n_moments,
+                            const unsigned int n_selected)
+    {
+      for (unsigned int c = 0; c < n_selected; ++c) {
+        const auto m = [&](const unsigned int k) -> Number & {
+          return moments[(k - 1) * n_selected + c];
+        };
+        const Number m1 = m(1);
+
+        /* Higher central moments are computed from raw moments first: */
+        if (n_moments >= 4)
+          m(4) +=
+              -4. * m1 * m(3) + 6. * m1 * m1 * m(2) - 3. * m1 * m1 * m1 * m1;
+        if (n_moments >= 3)
+          m(3) += -3. * m1 * m(2) + 2. * m1 * m1 * m1;
+        if (n_moments >= 2)
+          m(2) -= m1 * m1;
+      }
+    }
+  } // namespace
+
 
   template <typename Description, int dim, typename Number>
   Quantities<Description, dim, Number>::Quantities(
@@ -47,6 +79,14 @@ namespace ryujin
                   "List of conserved, primitive, precomputed, initial, or "
                   "parabolic quantities for which statistics are accumulated "
                   "on all manifolds.");
+
+    n_moments_ = 2;
+    add_parameter("number of moments",
+                  n_moments_,
+                  "Number of moments computed for every selected quantity in "
+                  "the time averaged and space averaged statistics: 1 (mean), "
+                  "2 (mean and variance), 3 (additionally the third central "
+                  "moment), 4 (additionally the fourth central moment).");
 
     add_parameter("interior manifolds",
                   interior_manifolds_,
@@ -83,6 +123,11 @@ namespace ryujin
     base_name_ = name;
 
     extractor_.prepare(quantities_);
+
+    AssertThrow(1 <= n_moments_ && n_moments_ <= 4,
+                dealii::ExcMessage("Invalid number of moments: \"" +
+                                   std::to_string(n_moments_) +
+                                   "\" is not in the range 1 to 4."));
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto sparsity_simd_view =
@@ -220,21 +265,29 @@ namespace ryujin
 
     /* Make sure we output new mesh files: */
     mesh_files_have_been_written_ = false;
-
-    /* Prepare header string: */
-    header_.clear();
-    for (unsigned int k = 0; k < n_moments; ++k)
-      for (const auto &name : quantities_)
-        header_ += (header_.empty() ? "" : "\t") + name +
-                   (k == 0 ? "" : "^" + std::to_string(k + 1));
-    header_ += "\n";
   }
 
 
   template <typename Description, int dim, typename Number>
   unsigned int Quantities<Description, dim, Number>::stride() const
   {
-    return n_moments * extractor_.n_selected();
+    return n_moments_ * extractor_.n_selected();
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  std::string
+  Quantities<Description, dim, Number>::header(const bool averaged) const
+  {
+    static const std::array<std::string, 4> labels{
+        "mean", "var", "mu_3", "mu_4"};
+
+    std::string result;
+    for (unsigned int k = 0; k < (averaged ? n_moments_ : 1); ++k)
+      for (const auto &name : quantities_)
+        result += (result.empty() ? "" : "\t") +
+                  (averaged ? labels[k] + "(" + name + ")" : name);
+    return result + "\n";
   }
 
 
@@ -281,6 +334,8 @@ namespace ryujin
       }
 
       /* Record average in space: */
+      to_central_moments(
+          spatial_average.data(), n_moments_, extractor_.n_selected());
       manifold.time_series.emplace_back(t, std::move(spatial_average));
     }
   }
@@ -343,7 +398,11 @@ namespace ryujin
         else
           AssertThrow(t_new == t, dealii::ExcInternalError());
 
-        internal_write_out(file_name, time_stamp.str(), val_new, Number(1.));
+        internal_write_out(file_name,
+                           time_stamp.str(),
+                           val_new,
+                           Number(1.),
+                           /*averaged*/ false);
       }
 
       /*
@@ -360,8 +419,11 @@ namespace ryujin
           time_stamp << "# averaged from t = " << t_new - t_sum
                      << " to t = " << t_new << std::endl;
 
-          internal_write_out(
-              file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
+          internal_write_out(file_name,
+                             time_stamp.str(),
+                             val_sum,
+                             Number(1.) / t_sum,
+                             /*averaged*/ true);
         }
       }
 
@@ -497,7 +559,7 @@ namespace ryujin
       /* Store the raw moments, i.e., powers of the values: */
       for (unsigned int c = 0; c < n_selected; ++c) {
         Number power = Number(1.);
-        for (unsigned int k = 0; k < n_moments; ++k) {
+        for (unsigned int k = 0; k < n_moments_; ++k) {
           power *= values[c];
           current[k * n_selected + c] = power;
         }
@@ -532,7 +594,8 @@ namespace ryujin
       const std::string &file_name,
       const std::string &time_stamp,
       const std::vector<Number> &values,
-      const Number scale)
+      const Number scale,
+      const bool averaged)
   {
     /*
      * FIXME: This currently distributes all values to all MPI ranks. This
@@ -540,25 +603,37 @@ namespace ryujin
      * MPI ranks participating who actually have values.
      */
 
-    const auto received =
+    auto received =
         Utilities::MPI::gather(mpi_ensemble_.ensemble_communicator(), values);
 
     if (Utilities::MPI::this_mpi_process(
             mpi_ensemble_.ensemble_communicator()) != 0)
       return;
 
+    const unsigned int n_selected = extractor_.n_selected();
     const unsigned int stride = this->stride();
+
+    /* For instantaneous values we only output the first moment: */
+    const unsigned int n_columns = averaged ? stride : n_selected;
 
     std::ofstream output(file_name);
     output << std::scientific << std::setprecision(14);
-    output << time_stamp << "# " << header_;
+    output << time_stamp << "# " << header(averaged);
 
     unsigned int rank = 0;
-    for (const auto &entries : received) {
+    for (auto &entries : received) {
       output << "# rank " << rank++ << "\n";
       for (std::size_t j = 0; j < entries.size(); j += stride) {
-        for (unsigned int m = 0; m < stride; ++m)
-          output << (m == 0 ? "" : "\t") << scale * entries[j + m];
+        auto *point = entries.data() + j;
+
+        if (averaged) {
+          for (unsigned int m = 0; m < stride; ++m)
+            point[m] *= scale;
+          to_central_moments(point, n_moments_, n_selected);
+        }
+
+        for (unsigned int m = 0; m < n_columns; ++m)
+          output << (m == 0 ? "" : "\t") << point[m];
         output << "\n";
       }
     }
@@ -584,7 +659,7 @@ namespace ryujin
       output.open(file_name, std::ofstream::out | std::ofstream::app);
     } else {
       output.open(file_name, std::ofstream::out | std::ofstream::trunc);
-      output << "# time t\t" << header_;
+      output << "# time t\t" << header(/*averaged*/ true);
     }
 
     for (const auto &[t, entry] : values) {
