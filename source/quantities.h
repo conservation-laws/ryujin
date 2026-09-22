@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include "gpu.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
@@ -31,6 +32,10 @@ namespace ryujin
    * can thus be accumulated exactly. They are converted to the mean and
    * the central moments (variance, third and fourth central moment) on
    * output.
+   *
+   * All statistics are accumulated on the selected memory space (i.e., on
+   * the device if the state vector resides there) and are only
+   * transferred to the host for writing out.
    *
    * @note The conversion from raw to central moments is subject to
    * cancellation if the fluctuations of a quantity are small compared to
@@ -123,26 +128,13 @@ namespace ryujin
         typename OfflineData<dim, Number>::BoundaryDescription;
 
     /**
-     * Temporal statistics we store for each manifold: the values of the
-     * previous and the current time step, and the trapezoidal sum over
-     * time.
-     *
-     * All values are stored in a flat array with stride() entries per
-     * point: for every point the raw moments are stored consecutively,
-     * with all selected quantities of the first moment first, followed
-     * by all selected quantities of the second moment, and so on.
-     */
-    struct Statistics {
-      std::vector<Number> old;
-      std::vector<Number> current;
-      std::vector<Number> sum;
-      Number t_old;
-      Number t_new;
-      Number t_sum;
-    };
-
-    /**
      * All data associated with a single interior or boundary manifold.
+     *
+     * The raw moments are stored in flat, mirrored arrays with stride()
+     * entries per point: for every point the raw moments are stored
+     * consecutively, with all selected quantities of the first moment
+     * first, followed by all selected quantities of the second moment,
+     * and so on.
      */
     struct Manifold {
       std::string name;
@@ -150,8 +142,35 @@ namespace ryujin
       bool instantaneous;
       bool time_averaged;
       bool space_averaged;
+
+      /**
+       * The point map. It is kept on the host for writing out mesh files.
+       */
       std::vector<ManifoldPoint> points;
-      Statistics statistics;
+
+      /**
+       * The local dof index and mass of every point, and the total mass
+       * summed over all MPI ranks.
+       */
+      Mirrored<unsigned int *> indices{"quantities_indices"};
+      Mirrored<Number *> masses{"quantities_masses"};
+      Number mass_sum;
+
+      /**
+       * Temporal statistics: the raw moments of the previous and the
+       * current time step, and the trapezoidal sum over time.
+       */
+      Mirrored<Number *> old{"quantities_old"};
+      Mirrored<Number *> current{"quantities_current"};
+      Mirrored<Number *> sum{"quantities_sum"};
+      Number t_old;
+      Number t_new;
+      Number t_sum;
+
+      /**
+       * The time series of mass weighted spatial averages: the mean and
+       * central moments of all selected quantities per time step.
+       */
       std::vector<std::pair<Number, std::vector<Number>>> time_series;
       std::optional<unsigned int> time_series_cycle;
     };
@@ -219,15 +238,10 @@ namespace ryujin
     void clear_statistics();
 
     /**
-     * Ensure that the state vector is resident on the host and prepare
-     * the extractor for reading from it.
-     */
-    void prepare_extraction(const StateVector &state_vector);
-
-    /**
      * Read the current values of all points of the manifold into the
-     * current statistics and return the mass weighted spatial average.
-     * The extraction has to be prepared with prepare_extraction().
+     * current statistics and return the mass weighted spatial average of
+     * the raw moments. The extraction has to be prepared on the selected
+     * memory space beforehand.
      */
     std::vector<Number> internal_accumulate(Manifold &manifold);
 
@@ -238,7 +252,7 @@ namespace ryujin
      */
     void internal_write_out(const std::string &file_name,
                             const std::string &time_stamp,
-                            const std::vector<Number> &values,
+                            const Mirrored<Number *> &values,
                             const Number scale,
                             bool averaged);
 

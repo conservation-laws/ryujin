@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "computing_timer.h"
+#include "loop.h"
 #include "quantities.h"
 
 #include <deal.II/base/function_parser.h>
@@ -185,6 +185,33 @@ namespace ryujin
           });
     };
 
+    /*
+     * Sort the points and populate the mirrored index and mass arrays
+     * used in the compute loops:
+     */
+
+    const auto finalize = [&](Manifold &manifold) {
+      sort_points(manifold.points);
+
+      const auto n_points = manifold.points.size();
+      manifold.indices.reinit(n_points, TransferPolicy::implicit_transfers);
+      manifold.masses.reinit(n_points, TransferPolicy::implicit_transfers);
+
+      auto *indices = manifold.indices.view();
+      auto *masses = manifold.masses.view();
+      Number mass_sum = Number(0.);
+      for (std::size_t p = 0; p < n_points; ++p) {
+        indices[p] = std::get<0>(manifold.points[p]);
+        masses[p] = std::get<3>(manifold.points[p]);
+        mass_sum += masses[p];
+      }
+
+      manifold.mass_sum =
+          Utilities::MPI::sum(mass_sum, mpi_ensemble_.ensemble_communicator());
+
+      manifolds_.push_back(std::move(manifold));
+    };
+
     manifolds_.clear();
 
     /*
@@ -249,8 +276,7 @@ namespace ryujin
       for (const auto &[index, point] : preliminary_map)
         manifold.points.push_back(point);
 
-      sort_points(manifold.points);
-      manifolds_.push_back(std::move(manifold));
+      finalize(manifold);
     }
 
     /*
@@ -279,8 +305,7 @@ namespace ryujin
           manifold.points.push_back(point);
       }
 
-      sort_points(manifold.points);
-      manifolds_.push_back(std::move(manifold));
+      finalize(manifold);
     }
 
     /* Clear statistics: */
@@ -322,18 +347,17 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
 #endif
 
-    prepare_extraction(state_vector);
+    using MemorySpace = selected_memory_space_t;
+
+    extractor_.template prepare_extraction<MemorySpace>(state_vector);
 
     for (auto &manifold : manifolds_) {
       /* skip if we don't average in space or time: */
       if (!manifold.time_averaged && !manifold.space_averaged)
         continue;
 
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          manifold.statistics;
-
-      std::swap(t_old, t_new);
-      std::swap(val_old, val_new);
+      std::swap(manifold.t_old, manifold.t_new);
+      std::swap(manifold.old, manifold.current);
 
       /* accumulate new values */
 
@@ -341,19 +365,43 @@ namespace ryujin
 
       /* Average in time with trapezoidal rule: */
 
-      if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
+      if (RYUJIN_UNLIKELY(manifold.t_old == Number(0.) &&
+                          manifold.t_new == Number(0.))) {
         /* We have not accumulated any statistics yet: */
-        t_old = t - 1.;
-        t_new = t;
+        manifold.t_old = t - 1.;
+        manifold.t_new = t;
 
       } else {
 
-        t_new = t;
-        const Number tau = t_new - t_old;
+        manifold.t_new = t;
+        const Number tau = manifold.t_new - manifold.t_old;
+        const Number weight = 0.5 * tau;
 
-        for (std::size_t i = 0; i < val_sum.size(); ++i)
-          val_sum[i] += 0.5 * tau * (val_old[i] + val_new[i]);
-        t_sum += tau;
+        const auto *old =
+            std::as_const(manifold.old).template view<MemorySpace>();
+        const auto *current =
+            std::as_const(manifold.current).template view<MemorySpace>();
+        auto *sum = manifold.sum.template view<MemorySpace>();
+
+        const auto body = [=](auto sentinel, const unsigned int j) {
+          using T = decltype(sentinel);
+          if constexpr (std::is_same_v<T, dealii::VectorizedArray<Number>>) {
+            T s, o, c;
+            s.load(sum + j);
+            o.load(old + j);
+            c.load(current + j);
+            s += weight * (o + c);
+            s.store(sum + j);
+          } else {
+            sum[j] += weight * (old[j] + current[j]);
+          }
+        };
+
+        const auto n_entries = static_cast<unsigned int>(manifold.sum.size());
+        loop<MemorySpace, Number>(
+            "quantities_trapezoidal_rule", body, 0, n_entries, n_entries);
+
+        manifold.t_sum += tau;
       }
 
       /* Record average in space: */
@@ -389,7 +437,8 @@ namespace ryujin
     if (std::any_of(manifolds_.begin(), manifolds_.end(), [](const auto &m) {
           return m.instantaneous && !m.time_averaged && !m.space_averaged;
         }))
-      prepare_extraction(state_vector);
+      extractor_.template prepare_extraction<selected_memory_space_t>(
+          state_vector);
 
     /*
      * Next write out instantaneous and time_averaged maps, and flush the
@@ -399,9 +448,6 @@ namespace ryujin
     for (auto &manifold : manifolds_) {
       const auto prefix = base_name_ + "-" + manifold.name + "-R" +
                           Utilities::to_string(cycle, 4);
-
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          manifold.statistics;
 
       /*
        * Compute and output instantaneous field:
@@ -419,11 +465,11 @@ namespace ryujin
         if (!manifold.time_averaged && !manifold.space_averaged)
           internal_accumulate(manifold);
         else
-          AssertThrow(t_new == t, dealii::ExcInternalError());
+          AssertThrow(manifold.t_new == t, dealii::ExcInternalError());
 
         internal_write_out(file_name,
                            time_stamp.str(),
-                           val_new,
+                           manifold.current,
                            Number(1.),
                            /*averaged*/ false);
       }
@@ -436,16 +482,17 @@ namespace ryujin
         const std::string file_name = prefix + "-time_averaged.dat";
 
         /* Check whether we have accumulated any statistics yet: */
-        if (t_sum != Number(0.)) {
+        if (manifold.t_sum != Number(0.)) {
           std::stringstream time_stamp;
           time_stamp << std::scientific << std::setprecision(14);
-          time_stamp << "# averaged from t = " << t_new - t_sum
-                     << " to t = " << t_new << std::endl;
+          time_stamp << "# averaged from t = "
+                     << manifold.t_new - manifold.t_sum
+                     << " to t = " << manifold.t_new << std::endl;
 
           internal_write_out(file_name,
                              time_stamp.str(),
-                             val_sum,
-                             Number(1.) / t_sum,
+                             manifold.sum,
+                             Number(1.) / manifold.t_sum,
                              /*averaged*/ true);
         }
       }
@@ -532,32 +579,18 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::clear_statistics()
   {
+    using MemorySpace = selected_memory_space_t;
+
     for (auto &manifold : manifolds_) {
+      /* reinit() zero initializes the arrays on the selected memory space: */
       const auto n_entries = manifold.points.size() * stride();
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          manifold.statistics;
-      val_old.assign(n_entries, Number(0.));
-      val_new.assign(n_entries, Number(0.));
-      val_sum.assign(n_entries, Number(0.));
-      t_old = t_new = t_sum = 0.;
+      for (auto *values : {&manifold.old, &manifold.current, &manifold.sum})
+        values->reinit(
+            n_entries, TransferPolicy::implicit_transfers, MemorySpace{});
+
+      manifold.t_old = manifold.t_new = manifold.t_sum = 0.;
       manifold.time_series.clear();
     }
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void Quantities<Description, dim, Number>::prepare_extraction(
-      const StateVector &state_vector)
-  {
-    /* Ensure that the state vector is resident on the host memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      const auto &[U, precomputed, parabolic] = state_vector;
-      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
-      precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
-    }
-
-    extractor_.prepare_extraction(state_vector);
   }
 
 
@@ -565,50 +598,56 @@ namespace ryujin
   std::vector<Number>
   Quantities<Description, dim, Number>::internal_accumulate(Manifold &manifold)
   {
-    const auto extractor_view = extractor_.view();
-    const unsigned int n_selected = extractor_view.n_selected();
+    using MemorySpace = selected_memory_space_t;
+
+    const auto extractor_view = extractor_.template view<MemorySpace>();
+    const unsigned int n_selected = extractor_.n_selected();
+    const unsigned int n_moments = n_moments_;
     const unsigned int stride = this->stride();
+    const auto n_points = static_cast<unsigned int>(manifold.points.size());
 
-    std::vector<Number> values(n_selected);
+    const auto *indices =
+        std::as_const(manifold.indices).template view<MemorySpace>();
+    const auto *masses =
+        std::as_const(manifold.masses).template view<MemorySpace>();
+    auto *current = manifold.current.template view<MemorySpace>();
+
+    /*
+     * Extract the values of all selected quantities of a point directly
+     * into the first moment block, compute all higher raw moments (i.e.,
+     * powers of the values), and return the mass weighted values as
+     * contribution to the spatial sums:
+     */
+
+    const auto body = [=](auto /*sentinel*/, const unsigned int p) {
+      auto *values = current + p * stride;
+      extractor_view.extract_element(values, indices[p]);
+
+      for (unsigned int k = 1; k < n_moments; ++k)
+        for (unsigned int c = 0; c < n_selected; ++c)
+          values[k * n_selected + c] =
+              values[(k - 1) * n_selected + c] * values[c];
+
+      const auto mass = masses[p];
+      return [=](const unsigned int j) { return mass * values[j]; };
+    };
+
     std::vector<Number> spatial_average(stride, Number(0.));
-    Number mass_sum = Number(0.);
+    reduction_loop<MemorySpace>(
+        "quantities_accumulate",
+        body,
+        ArrayReducer<Kokkos::Sum<Number>>(spatial_average),
+        0,
+        n_points);
 
-    auto *current = manifold.statistics.current.data();
+    /* Sum over all MPI ranks and take the average: */
 
-    for (const auto &point : manifold.points) {
-      const auto i = std::get<0>(point);
-      const auto mass_i = std::get<3>(point);
-
-      extractor_view.extract_element(values.data(), i);
-
-      /* Store the raw moments, i.e., powers of the values: */
-      for (unsigned int c = 0; c < n_selected; ++c) {
-        Number power = Number(1.);
-        for (unsigned int k = 0; k < n_moments_; ++k) {
-          power *= values[c];
-          current[k * n_selected + c] = power;
-        }
-      }
-
-      for (unsigned int j = 0; j < stride; ++j)
-        spatial_average[j] += mass_i * current[j];
-      mass_sum += mass_i;
-
-      current += stride;
-    }
-
-    /* synchronize MPI ranks (MPI Barrier): */
-
-    mass_sum =
-        Utilities::MPI::sum(mass_sum, mpi_ensemble_.ensemble_communicator());
     Utilities::MPI::sum(spatial_average,
                         mpi_ensemble_.ensemble_communicator(),
                         spatial_average);
 
-    /* take average: */
-
     for (auto &it : spatial_average)
-      it /= mass_sum;
+      it /= manifold.mass_sum;
 
     return spatial_average;
   }
@@ -618,20 +657,23 @@ namespace ryujin
   void Quantities<Description, dim, Number>::internal_write_out(
       const std::string &file_name,
       const std::string &time_stamp,
-      const std::vector<Number> &values,
+      const Mirrored<Number *> &values,
       const Number scale,
       const bool averaged)
   {
     /*
      * Gather the values of all MPI ranks on the root rank, which then
-     * writes out the file.
+     * writes out the file. The (read only) host view triggers a transfer
+     * from the device if necessary.
      *
      * FIXME: This serializes the output on a single rank. Ideally, we
      * should do MPI IO with all ranks participating.
      */
 
+    const auto *data = values.view();
     auto received =
-        Utilities::MPI::gather(mpi_ensemble_.ensemble_communicator(), values);
+        Utilities::MPI::gather(mpi_ensemble_.ensemble_communicator(),
+                               std::vector<Number>(data, data + values.size()));
 
     if (Utilities::MPI::this_mpi_process(
             mpi_ensemble_.ensemble_communicator()) != 0)
