@@ -727,7 +727,7 @@ namespace ryujin
                                 n_coupling_boundary_pairs);
 
       /* Symmetrize d_ij and compute the maximal time-step size: */
-      const auto body = [=](auto, unsigned int i, Number &result) {
+      const auto body = [=](auto, unsigned int i) -> Number {
 
 #ifdef DEBUG_SYMMETRY_CHECK
         const auto wave_speed_estimator_view =
@@ -737,7 +737,7 @@ namespace ryujin
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd_view.row_length(i);
         if (row_length == 1)
-          return;
+          return std::numeric_limits<Number>::max();
 
         Number d_sum = Number(0.);
 
@@ -789,13 +789,11 @@ namespace ryujin
         dij_matrix_view.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix_view.read_entry(i);
-        const Number local_tau = cfl * mass / (Number(-2.) * d_sum);
-
-        result = std::min(result, local_tau);
+        return cfl * mass / (Number(-2.) * d_sum);
       };
 
-      tau_max = reduction_loop<MemorySpace, Kokkos::Min<Number>>(
-          loop_name() + 'b', body, tau_max, 0, n_owned);
+      reduction_loop<MemorySpace>(
+          loop_name() + 'b', body, Kokkos::Min<Number>(tau_max), 0, n_owned);
     }
 
     {
