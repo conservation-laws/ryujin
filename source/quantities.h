@@ -1,21 +1,19 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <compile_time_options.h>
 
+#include "gpu.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
+#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
-#include <deal.II/lac/la_parallel_block_vector.h>
-#include <deal.II/lac/sparse_matrix.templates.h>
-#include <deal.II/lac/vector.h>
 
 #include <optional>
 
@@ -23,6 +21,25 @@ namespace ryujin
 {
   /**
    * A postprocessor class for quantities of interest.
+   *
+   * The class accumulates statistics of a user selected list of
+   * (conserved, primitive, precomputed, initial, or parabolic) quantities
+   * on level set defined interior and boundary manifolds. For every
+   * degree of freedom of a manifold the raw moments (up to a selectable
+   * order) of all selected quantities are stored and averaged in time
+   * (with a trapezoidal rule), and averaged in space (weighted by the
+   * lumped, or boundary mass). Raw moments are linear in the samples and
+   * can thus be accumulated exactly. They are converted to the mean and
+   * the central moments (variance, third and fourth central moment) on
+   * output.
+   *
+   * All statistics are accumulated on the selected memory space (i.e., on
+   * the device if the state vector resides there) and are only
+   * transferred to the host for writing out.
+   *
+   * @note The conversion from raw to central moments is subject to
+   * cancellation if the fluctuations of a quantity are small compared to
+   * its mean.
    *
    * @ingroup TimeLoop
    */
@@ -40,9 +57,8 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using state_type = typename View::state_type;
-
     using StateVector = typename View::StateVector;
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
     //@}
     /**
@@ -57,6 +73,7 @@ namespace ryujin
                const OfflineData<dim, Number> &offline_data,
                const HyperbolicSystem &hyperbolic_system,
                const ParabolicSystem &parabolic_system,
+               const InitialPrecomputedVector &initial_precomputed,
                const std::string &subsection = "/Quantities");
 
     /**
@@ -100,74 +117,73 @@ namespace ryujin
     //@{
 
     /**
-     * A tuple describing (local) dof index, boundary normal, normal mass,
-     * boundary mass, boundary id, and position of the boundary degree of
-     * freedom.
+     * A tuple describing (local) dof index, normal, normal mass, mass,
+     * boundary id, and position of a degree of freedom belonging to a
+     * manifold. We use the same description for interior and boundary
+     * manifolds: For an interior degree of freedom the normal and normal
+     * mass are zero, the mass is the lumped mass matrix entry, and the
+     * boundary id is set to dealii::numbers::internal_face_boundary_id.
+     */
+    using ManifoldPoint =
+        typename OfflineData<dim, Number>::BoundaryDescription;
+
+    /**
+     * All data associated with a single interior or boundary manifold.
      *
-     * @fixme This type only differs from the one used in OfflineData by
-     * including a DoF index. It might be better to combine both.
+     * The raw moments are stored in flat, mirrored arrays with stride()
+     * entries per point: for every point the raw moments are stored
+     * consecutively, with all selected quantities of the first moment
+     * first, followed by all selected quantities of the second moment,
+     * and so on.
      */
-    using boundary_point =
-        std::tuple<dealii::types::global_dof_index /*local dof index*/,
-                   dealii::Tensor<1, dim, Number> /*normal*/,
-                   Number /*normal mass*/,
-                   Number /*boundary mass*/,
-                   dealii::types::boundary_id /*id*/,
-                   dealii::Point<dim>> /*position*/;
+    struct Manifold {
+      std::string name;
+      bool boundary;
+      bool instantaneous;
+      bool time_averaged;
+      bool space_averaged;
 
-    /**
-     * A tuple describing boundary values we are interested in: the
-     * primitive state and its second moment, boundary stresses and normal
-     * pressure force.
-     */
-    using boundary_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
+      /**
+       * The point map. It is kept on the host for writing out mesh files.
+       */
+      std::vector<ManifoldPoint> points;
 
-    /**
-     * Temporal statistics we store for each boundary manifold.
-     */
-    using boundary_statistic =
-        std::tuple<std::vector<boundary_value> /* values old */,
-                   std::vector<boundary_value> /* values new */,
-                   std::vector<boundary_value> /* values sum */,
-                   Number /* t old */,
-                   Number /* t new */,
-                   Number /* t sum */>;
+      /**
+       * The local dof index and mass of every point, and the total mass
+       * summed over all MPI ranks.
+       */
+      Mirrored<unsigned int *> indices{"quantities_indices"};
+      Mirrored<Number *> masses{"quantities_masses"};
+      Number mass_sum;
 
-    /**
-     * A tuple describing (local) dof index, mass, and position of an
-     * interior degree of freedom.
-     */
-    using interior_point =
-        std::tuple<dealii::types::global_dof_index /*local dof index*/,
-                   Number /*mass*/,
-                   dealii::Point<dim>> /*position*/;
+      /**
+       * Temporal statistics: the raw moments of the previous and the
+       * current time step, and the trapezoidal sum over time.
+       */
+      Mirrored<Number *> old{"quantities_old"};
+      Mirrored<Number *> current{"quantities_current"};
+      Mirrored<Number *> sum{"quantities_sum"};
+      Number t_old;
+      Number t_new;
+      Number t_sum;
 
-    /**
-     * A tuple describing interior values we are interested in: the
-     * primitive state and its second moment.
-     */
-    using interior_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
-
-    /**
-     * Temporal statistics we store for each interior manifold.
-     */
-    using interior_statistic =
-        std::tuple<std::vector<interior_value> /* values old */,
-                   std::vector<interior_value> /* values new */,
-                   std::vector<interior_value> /* values sum */,
-                   Number /* t old */,
-                   Number /* t new */,
-                   Number /* t sum */>;
+      /**
+       * The time series of mass weighted spatial averages: the mean and
+       * central moments of all selected quantities per time step.
+       */
+      std::vector<std::pair<Number, std::vector<Number>>> time_series;
+      std::optional<unsigned int> time_series_cycle;
+    };
 
     //@}
     /**
      * @name Run time options
      */
     //@{
+
+    std::vector<std::string> quantities_;
+
+    unsigned int n_moments_;
 
     std::vector<std::tuple<std::string, std::string, std::string>>
         interior_manifolds_;
@@ -186,37 +202,16 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
+
+    SelectedComponentsExtractor<Description, dim, Number> extractor_;
 
     /**
-     * The boundary map.
+     * All interior and boundary manifolds with associated point maps and
+     * statistics.
      */
-    std::map<std::string, std::vector<boundary_point>> boundary_maps_;
-
-    /**
-     * Associated statistics for the boundary map.
-     */
-    std::map<std::string, boundary_statistic> boundary_statistics_;
-    std::map<std::string, std::vector<std::tuple<Number, boundary_value>>>
-        boundary_time_series_;
-
-    /**
-     * The interior map.
-     */
-    std::map<std::string, std::vector<interior_point>> interior_maps_;
-
-    /**
-     * Associated statistics for the interior map.
-     */
-    std::map<std::string, interior_statistic> interior_statistics_;
-    std::map<std::string, std::vector<std::tuple<Number, interior_value>>>
-        interior_time_series_;
+    std::vector<Manifold> manifolds_;
 
     std::string base_name_;
-    std::string header_;
-    bool first_cycle_;
-    std::optional<unsigned int> time_series_cycle_;
     bool mesh_files_have_been_written_;
 
     //@}
@@ -225,25 +220,45 @@ namespace ryujin
      */
     //@{
 
+    /**
+     * The number of values stored per point: the number of moments times
+     * the number of selected quantities.
+     */
+    unsigned int stride() const;
+
+    /**
+     * Return a tab separated list of column names: the plain names of
+     * all selected quantities for instantaneous values, or the names of
+     * the mean and all central moments for averaged values.
+     */
+    std::string header(bool averaged) const;
+
     void write_mesh_files(unsigned int cycle);
 
     void clear_statistics();
 
-    template <typename point_type, typename value_type>
-    value_type internal_accumulate(const StateVector &state_vector,
-                                   const std::vector<point_type> &interior_map,
-                                   std::vector<value_type> &new_val);
+    /**
+     * Read the current values of all points of the manifold into the
+     * current statistics and return the mass weighted spatial average of
+     * the raw moments. The extraction has to be prepared on the selected
+     * memory space beforehand.
+     */
+    std::vector<Number> internal_accumulate(Manifold &manifold);
 
-    template <typename value_type>
+    /**
+     * Write out instantaneous values, or (if @p averaged is set) the mean
+     * and central moments computed from the raw moments scaled by
+     * @p scale.
+     */
     void internal_write_out(const std::string &file_name,
                             const std::string &time_stamp,
-                            const std::vector<value_type> &values,
-                            const Number scale);
+                            const Mirrored<Number *> &values,
+                            const Number scale,
+                            bool averaged);
 
-    template <typename value_type>
     void internal_write_out_time_series(
         const std::string &file_name,
-        const std::vector<std::tuple<Number, value_type>> &values,
+        const std::vector<std::pair<Number, std::vector<Number>>> &values,
         bool append);
 
     //@}

@@ -66,5 +66,7 @@ subsection I - MeshAdaptor
 end
 
 subsection K - Quantities
+  set quantities         = rho
+  set number of moments  = 1
   set interior manifolds = interior : 0. : space_averaged
 end
