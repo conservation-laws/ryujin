@@ -3,13 +3,16 @@
 
 #include <iomanip>
 #include <iostream>
+#include <vector>
 
 //
 // Test the reduction_loop() driver: We run the same loop bodies - generic,
 // host/device capable lambdas that receive the vector view as forwarded
 // argument and return their contribution - over the host memory space and
-// over the default memory space and compare both results. The initial
-// contents of the result storage take part in the reduction.
+// over the default memory space and compare both results. We test a
+// scalar reduction (Kokkos::Min, Kokkos::Sum) and an array reduction
+// (ArraySum). The initial contents of the result storage take part in the
+// reduction.
 //
 
 using namespace ryujin;
@@ -66,12 +69,24 @@ int main(int argc, char *argv[])
     return U_i[0];
   };
 
+  /* Array reduction: the body returns a callable j -> contribution */
+
+  const auto array_body =
+      KOKKOS_LAMBDA(auto sentinel, const auto &U_view, unsigned int i)
+  {
+    using T = decltype(sentinel);
+    const auto U_i = U_view.template read_tensor<T>(i);
+    return [=](unsigned int j) { return U_i[j]; };
+  };
+
   const auto run = [&](const std::string &name, auto memory_space) {
     using MemorySpace = decltype(memory_space);
 
     /* Initial values that are joined with the result of the loop: */
     double min_result = -1.5;
     double sum_result = 100.;
+    std::vector<double> sums(n_comp, 0.);
+    sums[1] = 1000.;
 
     U.template move_to_memory_space<MemorySpace>();
     const auto U_view = U.template view<MemorySpace>();
@@ -88,10 +103,13 @@ int main(int argc, char *argv[])
                                 0,
                                 n_states,
                                 U_view);
+    reduction_loop<MemorySpace>(
+        "loop_02", array_body, ArraySum<double>(sums), 0, n_states, U_view);
 
     std::cout << name << ":\n";
     std::cout << "  min:  " << min_result << "\n";
     std::cout << "  sum:  " << sum_result << "\n";
+    std::cout << "  sums: " << sums[0] << " " << sums[1] << "\n";
   };
 
   std::cout << "Results for " << n_states << " states:\n";
