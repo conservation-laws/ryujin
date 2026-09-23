@@ -17,7 +17,6 @@
 
 #include <mutex>
 #include <string>
-#include <tuple>
 
 #ifdef WITH_OPENMP
 #include <omp.h>
@@ -173,13 +172,6 @@ namespace ryujin
 
     const auto exec = ExecutionSpace{};
 
-    /*
-     * Note: nvcc does not allow an extended __host__ __device__ lambda to
-     * capture an element of a parameter pack. We thus pack all arguments
-     * into a tuple and unpack them again in the loop body.
-     */
-    const auto packed_args = std::make_tuple(std::forward<Args>(args)...);
-
     if (!region_name.empty()) {
       NVTX_MARKER_START(region_name.c_str());
     }
@@ -188,11 +180,7 @@ namespace ryujin
         region_name,
         Policy(exec, left, right),
         KOKKOS_LAMBDA(const unsigned int i) {
-          std::apply(
-              [&](const auto &...unpacked) {
-                body(ScalarNumber(), unpacked..., i);
-              },
-              packed_args);
+          body(ScalarNumber(), args..., i);
         });
 
     exec.fence();
@@ -385,13 +373,6 @@ namespace ryujin
 
     ValueType result;
 
-    /*
-     * Note: nvcc does not allow an extended __host__ __device__ lambda to
-     * capture an element of a parameter pack. We thus pack all arguments
-     * into a tuple and unpack them again in the loop body.
-     */
-    const auto packed_args = std::make_tuple(std::forward<Args>(args)...);
-
     if (!region_name.empty()) {
       NVTX_MARKER_START(region_name.c_str());
     }
@@ -400,11 +381,7 @@ namespace ryujin
         region_name,
         Policy(exec, left, right),
         KOKKOS_LAMBDA(const unsigned int i, ValueType &local_result) {
-          std::apply(
-              [&](const auto &...unpacked) {
-                body(ValueType(), unpacked..., i, local_result);
-              },
-              packed_args);
+          body(ValueType(), args..., i, local_result);
         },
         Reducer(result));
 
