@@ -15,8 +15,11 @@
 #include <deal.II/base/memory_space.h>
 #include <deal.II/base/parallel.h>
 
+#include <concepts>
 #include <mutex>
 #include <string>
+#include <type_traits>
+#include <vector>
 
 #ifdef WITH_OPENMP
 #include <omp.h>
@@ -24,7 +27,7 @@
 
 namespace ryujin
 {
-  /*
+  /**
    * A thread-parallelized and vectorized loop running on the CPU. The loop
    * traverses the index range [left, internal) SIMD vectorized stepping
    * forward with a stride size equal to the number of packed
@@ -127,7 +130,7 @@ namespace ryujin
   }
 
 
-  /*
+  /**
    * A loop running on the device (i.e., in the default memory space). The
    * loop traverses the index range [left, right) with a suitable Kokkos
    * parallel_for using a range policy.
@@ -191,7 +194,7 @@ namespace ryujin
   }
 
 
-  /*
+  /**
    * A loop running either on the CPU, or on the device depending on the
    * selected memory space: For dealii::MemorySpace::Host the loop is
    * dispatched to cpu_simd_loop(), and for dealii::MemorySpace::Default to
@@ -237,35 +240,146 @@ namespace ryujin
   }
 
 
+  /**
+   * A reducer for reducing an array of values elementwise with a Kokkos
+   * reducer (such as Kokkos::Sum, Kokkos::Min, or Kokkos::Max) that can
+   * be used with reduction_loop(). The reducer takes a result object as
+   * argument in which it folds in contributions of the loop body:
+   * ```
+   * std::vector<Number> sums(n_values, Number(0.));
+   * reduction_loop<MemorySpace>(
+   *     "name", body, ArrayReducer<Kokkos::Sum<Number>>(sums), 0, n);
+   * ```
+   *
+   * The loop body itself has to return a callable object `j -> Number`
+   * returning the j-th partial result that will be folded back into the
+   * result.
+   */
+  template <typename ElementReducer>
+  struct ArrayReducer {
+    using scalar_type = typename ElementReducer::value_type;
+    using value_type = scalar_type[];
+
+    const unsigned int value_count;
+
+    ArrayReducer(scalar_type *data, const unsigned int n)
+        : value_count(n)
+        , data_(data)
+        , element_reducer_(typename ElementReducer::result_view_type())
+    {
+    }
+
+    explicit ArrayReducer(std::vector<scalar_type> &values)
+        : ArrayReducer(values.data(), static_cast<unsigned int>(values.size()))
+    {
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    void init(scalar_type *values) const
+    {
+      for (unsigned int k = 0; k < value_count; ++k)
+        element_reducer_.init(values[k]);
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    void join(scalar_type *destination, const scalar_type *source) const
+    {
+      for (unsigned int k = 0; k < value_count; ++k)
+        element_reducer_.join(destination[k], source[k]);
+    }
+
+    template <typename Contribution>
+      requires std::invocable<const Contribution &, unsigned int>
+    KOKKOS_INLINE_FUNCTION void join(scalar_type *destination,
+                                     const Contribution &contribution) const
+    {
+      for (unsigned int k = 0; k < value_count; ++k)
+        element_reducer_.join(destination[k], contribution(k));
+    }
+
+    scalar_type *reference() const
+    {
+      return data_;
+    }
+
+  private:
+    scalar_type *const data_;
+
+    /*
+     * The element reducer is only used for its join() and init()
+     * operations; it is constructed with an empty result view.
+     */
+    const ElementReducer element_reducer_;
+  };
+
+
   namespace internal
   {
-    /*
-     * A Kokkos functor wrapping the loop kernel and the reducer for
-     * gpu_reduction_loop().
+    /**
+     * A local storage container for a reducer with either a scalar Number
+     * or an array Number[] value_type. The Kokkos convention for the
+     * latter is to also provide a `value_count` member annotating the size
+     * of the array. We use this for setting up a type trait is_array.
      */
-    template <typename Reducer, typename Kernel>
-    struct ReductionFunctor {
-      using value_type = typename Reducer::value_type;
+    template <typename Reducer>
+    struct LocalResult {
+      static constexpr bool is_array =
+          std::is_array_v<typename Reducer::value_type>;
+      using scalar_type = std::remove_extent_t<typename Reducer::value_type>;
 
-      const Reducer reducer;
-      const Kernel kernel;
+      std::conditional_t<is_array, std::vector<scalar_type>, scalar_type>
+          storage;
 
-      KOKKOS_INLINE_FUNCTION
-      void operator()(const unsigned int i, value_type &local_result) const
+      /* Initialize our storage element: */
+      LocalResult(const Reducer &reducer)
       {
-        reducer.join(local_result, kernel(i));
+        if constexpr (is_array)
+          storage.resize(reducer.value_count);
+        reducer.init(get());
+      }
+
+      /* Return the stored data: */
+      std::conditional_t<is_array, scalar_type *, scalar_type &> get()
+      {
+        if constexpr (is_array)
+          return storage.data();
+        else
+          return storage;
+      }
+
+      /* Construct a view for our storage element: */
+      auto view()
+      {
+        using Unmanaged = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
+        if constexpr (is_array)
+          return Kokkos::View<scalar_type *, Kokkos::HostSpace, Unmanaged>(
+              storage.data(), storage.size());
+        else
+          return Kokkos::View<scalar_type, Kokkos::HostSpace, Unmanaged>(
+              &storage);
+      }
+    };
+
+
+    /**
+     * A Kokkos functor for gpu_reduction_loop() that combines the reducer
+     * with the loop body. We simply augment the reducer itself with an
+     * operator() calling the loop body.
+     */
+    template <typename Reducer, typename Body>
+    struct ReductionFunctor : Reducer {
+      const Body body;
+
+      ReductionFunctor(const Reducer &reducer, const Body &body)
+          : Reducer(reducer)
+          , body(body)
+      {
       }
 
       KOKKOS_INLINE_FUNCTION
-      void join(value_type &destination, const value_type &source) const
+      void operator()(const unsigned int i, auto &&local_result) const
       {
-        reducer.join(destination, source);
-      }
-
-      KOKKOS_INLINE_FUNCTION
-      void init(value_type &local_result) const
-      {
-        reducer.init(local_result);
+        Reducer::join(local_result, body(i));
       }
     };
   } // namespace internal
@@ -285,7 +399,7 @@ namespace ryujin
    * returns its contribution to the reduction. Additional `args` may be
    * specified in the cpu_reduction_loop() invocation that will be
    * forwarded to the loop body:
-   * `body(ValueType(), std::forward<Args>(args)..., i)`
+   * `body(Number(), std::forward<Args>(args)..., i)`
    */
   template <typename Reducer, typename Functor, typename... Args>
   inline void cpu_reduction_loop(const std::string &region_name
@@ -304,23 +418,22 @@ namespace ryujin
       LIKWID_MARKER_START(region_name.c_str());
     }
 
-    using ValueType = typename Reducer::value_type;
+    using scalar_type = std::remove_extent_t<typename Reducer::value_type>;
 
 #if defined(WITH_OPENMP)
     /* Variant using OpenMP: */
 
     RYUJIN_PRAGMA(omp parallel default(shared))
     {
-      ValueType local_result;
-      reducer.init(local_result);
+      internal::LocalResult<Reducer> local_result(reducer);
 
       RYUJIN_PRAGMA(omp for nowait)
       for (unsigned int i = left; i < right; ++i)
-        reducer.join(local_result,
-                     body(ValueType(), std::forward<Args>(args)..., i));
+        reducer.join(local_result.get(),
+                     body(scalar_type(), std::forward<Args>(args)..., i));
 
       RYUJIN_PRAGMA(omp critical)
-      reducer.join(reducer.reference(), local_result);
+      reducer.join(reducer.reference(), local_result.get());
     }
 
 #elif defined(WITH_DEAL_II_THREADS)
@@ -332,15 +445,15 @@ namespace ryujin
           left,
           right,
           [&](const unsigned int begin, const unsigned int end) {
-            ValueType local_result; /* per thread */
-            reducer.init(local_result);
+            /* per thread */
+            internal::LocalResult<Reducer> local_result(reducer);
 
             for (unsigned int i = begin; i < end; ++i)
-              reducer.join(local_result,
-                           body(ValueType(), std::forward<Args>(args)..., i));
+              reducer.join(local_result.get(),
+                           body(scalar_type(), std::forward<Args>(args)..., i));
 
             std::lock_guard<std::mutex> lock(mutex);
-            reducer.join(reducer.reference(), local_result);
+            reducer.join(reducer.reference(), local_result.get());
           },
           1000);
     }
@@ -350,7 +463,7 @@ namespace ryujin
     {
       for (unsigned int i = left; i < right; ++i)
         reducer.join(reducer.reference(),
-                     body(ValueType(), std::forward<Args>(args)..., i));
+                     body(scalar_type(), std::forward<Args>(args)..., i));
     }
 #endif
 
@@ -372,14 +485,13 @@ namespace ryujin
    * returns its contribution to the reduction. Additional `args` may be
    * specified in the gpu_reduction_loop() invocation that will be
    * forwarded to the loop body:
-   * `body(ValueType(), args..., i)`
+   * `body(Number(), args..., i)`
    *
    * @note The loop body (and everything it references) has to be callable
    * on the device, see the discussion in gpu_loop().
    *
-   * @note Kokkos::parallel_reduce() fences the execution space before
-   * returning. The function thus has the same (synchronous) semantics as
-   * cpu_reduction_loop().
+   * @note The function fences the execution space before returning. It
+   * thus has the same (synchronous) semantics as cpu_reduction_loop().
    */
   template <typename Reducer, typename Functor, typename... Args>
   inline void gpu_reduction_loop(const std::string &region_name,
@@ -395,7 +507,8 @@ namespace ryujin
         left <= right,
         dealii::ExcMessage("Invalid index range: it must hold left <= right"));
 
-    using ValueType = typename Reducer::value_type;
+    using scalar_type = std::remove_extent_t<typename Reducer::value_type>;
+
     using MemorySpace = dealii::MemorySpace::Default;
     using ExecutionSpace = typename MemorySpace::kokkos_space::execution_space;
     using Policy =
@@ -405,27 +518,28 @@ namespace ryujin
 
     const auto kernel = KOKKOS_LAMBDA(const unsigned int i)
     {
-      return body(ValueType(), args..., i);
+      return body(scalar_type(), args..., i);
     };
 
     const auto functor =
-        internal::ReductionFunctor<Reducer, decltype(kernel)>{reducer, kernel};
+        internal::ReductionFunctor<Reducer, decltype(kernel)>(reducer, kernel);
 
-    ValueType result;
-    reducer.init(result);
+    internal::LocalResult<Reducer> result(reducer);
 
     if (!region_name.empty()) {
       NVTX_MARKER_START(region_name.c_str());
     }
 
     Kokkos::parallel_reduce(
-        region_name, Policy(exec, left, right), functor, result);
+        region_name, Policy(exec, left, right), functor, result.view());
+
+    exec.fence();
 
     if (!region_name.empty()) {
       NVTX_MARKER_STOP(region_name.c_str());
     }
 
-    reducer.join(reducer.reference(), result);
+    reducer.join(reducer.reference(), result.get());
   }
 
 
@@ -449,6 +563,20 @@ namespace ryujin
    *
    * reduction_loop<MemorySpace>(
    *     "loop name", body, Kokkos::Min<Number>(value), 0, n_owned);
+   * ```
+   * For reducing an array of values elementwise use the ArrayReducer, in
+   * which case the loop body returns a callable `j -> Number` that the
+   * reducer evaluates for all j < `value_count`:
+   * ```
+   * const auto body = [=](auto, unsigned int i) {
+   *   // ...
+   *   return [=](unsigned int j) { return local_contribution[j]; };
+   * };
+   *
+   * std::vector<Number> sums(n_values, Number(0.));
+   * reduction_loop<MemorySpace>(
+   *     "loop name", body, ArrayReducer<Kokkos::Sum<Number>>(sums), 0,
+   * n_owned);
    * ```
    *
    * @note Here, @p body is a functor that must accept a "sentinel" type as
