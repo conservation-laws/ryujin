@@ -241,65 +241,75 @@ namespace ryujin
 
 
   /**
-   * A reducer for summing up an array of values that can be used with
-   * reduction_loop(). The reducer takes a result object as argument in
-   * which it folds in contributions of the loop body:
+   * A reducer for reducing an array of values elementwise with a Kokkos
+   * reducer (such as Kokkos::Sum, Kokkos::Min, or Kokkos::Max) that can
+   * be used with reduction_loop(). The reducer takes a result object as
+   * argument in which it folds in contributions of the loop body:
    * ```
    * std::vector<Number> sums(n_values, Number(0.));
-   * reduction_loop<MemorySpace>("name", body, ArraySum<Number>(sums), 0, n);
+   * reduction_loop<MemorySpace>(
+   *     "name", body, ArrayReducer<Kokkos::Sum<Number>>(sums), 0, n);
    * ```
    *
    * The loop body itself has to return a callable object `j -> Number`
    * returning the j-th partial result that will be folded back into the
    * result.
    */
-  template <typename Number>
-  struct ArraySum {
-    using value_type = Number[];
+  template <typename ElementReducer>
+  struct ArrayReducer {
+    using scalar_type = typename ElementReducer::value_type;
+    using value_type = scalar_type[];
 
     const unsigned int value_count;
 
-    ArraySum(Number *data, const unsigned int n)
+    ArrayReducer(scalar_type *data, const unsigned int n)
         : value_count(n)
         , data_(data)
+        , element_reducer_(typename ElementReducer::result_view_type())
     {
     }
 
-    explicit ArraySum(std::vector<Number> &values)
-        : ArraySum(values.data(), static_cast<unsigned int>(values.size()))
+    explicit ArrayReducer(std::vector<scalar_type> &values)
+        : ArrayReducer(values.data(), static_cast<unsigned int>(values.size()))
     {
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    void init(Number *values) const
-    {
-      for (unsigned int k = 0; k < value_count; ++k)
-        values[k] = Number(0.);
     }
 
     KOKKOS_INLINE_FUNCTION
-    void join(Number *destination, const Number *source) const
+    void init(scalar_type *values) const
     {
       for (unsigned int k = 0; k < value_count; ++k)
-        destination[k] += source[k];
+        element_reducer_.init(values[k]);
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    void join(scalar_type *destination, const scalar_type *source) const
+    {
+      for (unsigned int k = 0; k < value_count; ++k)
+        element_reducer_.join(destination[k], source[k]);
     }
 
     template <typename Contribution>
       requires std::invocable<const Contribution &, unsigned int>
-    KOKKOS_INLINE_FUNCTION void join(Number *destination,
+    KOKKOS_INLINE_FUNCTION void join(scalar_type *destination,
                                      const Contribution &contribution) const
     {
       for (unsigned int k = 0; k < value_count; ++k)
-        destination[k] += contribution(k);
+        element_reducer_.join(destination[k], contribution(k));
     }
 
-    Number *reference() const
+    scalar_type *reference() const
     {
       return data_;
     }
 
   private:
-    Number *const data_;
+    scalar_type *const data_;
+
+    /*
+     * The element reducer is only used for its join() and init()
+     * operations; it is constructed with an empty result view.
+     */
+    const ElementReducer element_reducer_;
   };
 
 
@@ -554,9 +564,9 @@ namespace ryujin
    * reduction_loop<MemorySpace>(
    *     "loop name", body, Kokkos::Min<Number>(value), 0, n_owned);
    * ```
-   * For summing up an array of values use the ArraySum reducer, in which
-   * case the loop body returns a callable `j -> Number` that the reducer
-   * evaluates for all j < `value_count`:
+   * For reducing an array of values elementwise use the ArrayReducer, in
+   * which case the loop body returns a callable `j -> Number` that the
+   * reducer evaluates for all j < `value_count`:
    * ```
    * const auto body = [=](auto, unsigned int i) {
    *   // ...
@@ -565,7 +575,8 @@ namespace ryujin
    *
    * std::vector<Number> sums(n_values, Number(0.));
    * reduction_loop<MemorySpace>(
-   *     "loop name", body, ArraySum<Number>(sums), 0, n_owned);
+   *     "loop name", body, ArrayReducer<Kokkos::Sum<Number>>(sums), 0,
+   * n_owned);
    * ```
    *
    * @note Here, @p body is a functor that must accept a "sentinel" type as
