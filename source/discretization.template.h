@@ -87,6 +87,12 @@ namespace ryujin
     std::cout << "Discretization<dim>::prepare()" << std::endl;
 #endif
 
+    AssertThrow(
+        mesh_type_ != MeshType::parallel_fullydistributed || refinement_ == 0,
+        ExcMessage("The fully distributed mesh type does not support global "
+                   "refinement. The geometry must create a properly refined "
+                   "mesh."));
+
     /* Select geometry: */
 
     {
