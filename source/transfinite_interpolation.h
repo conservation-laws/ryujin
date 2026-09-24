@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception or LGPL-2.1-or-later
 // Copyright (C) 2007 - 2022 by Martin Kronbichler
 // Copyright (C) 2008 - 2022 by David Wells
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -11,6 +11,7 @@
 
 #include <deal.II/base/config.h>
 #include <deal.II/grid/manifold.h>
+#include <deal.II/grid/reference_cell.h>
 #include <deal.II/grid/tria.h>
 
 namespace ryujin
@@ -18,65 +19,58 @@ namespace ryujin
   using namespace dealii; // FIXME: namespace pollution
 
   /**
-   * This is a copy of the TransfiniteInterpolationManifold shipped with
-   * deal.II. In contrast to the deal.II version it copies the coarse grid
-   * and all relevant Manifold information. That way it can be initialized
-   * with one Triangulation and be used with another Triangulation.
+   * A transfinite interpolation patch bound to a single coarse cell.
+   *
+   * In contrast to the TransfiniteInterpolationManifold shipped with
+   * deal.II, this class copies all relevant geometry and manifold
+   * information from a given (coarse) cell and only implements the push
+   * forward: transform() maps a point of the undeformed (straight-sided)
+   * coarse cell to the curved geometry.
+   *
+   * It is meant to be used with a MappingQCache on a triangulation that is
+   * refined without any manifolds attached, see
+   * Geometry::transformation().
    *
    * @ingroup Mesh
    */
   template <int dim, int spacedim = dim>
-  class TransfiniteInterpolationManifold : public Manifold<dim, spacedim>
+  class TransfiniteInterpolationPatch : public Manifold<dim, spacedim>
   {
   public:
-    TransfiniteInterpolationManifold();
-
-    ~TransfiniteInterpolationManifold() override = default;
+    TransfiniteInterpolationPatch(
+        const typename Triangulation<dim, spacedim>::cell_iterator &cell,
+        const Manifold<dim, spacedim> &chart_manifold = FlatManifold<dim>());
 
     std::unique_ptr<Manifold<dim, spacedim>> clone() const override;
 
-    void initialize(
-        const Triangulation<dim, spacedim> &triangulation,
-        const Manifold<dim, spacedim> &chart_manifold = FlatManifold<dim>());
+    /* Forward map of a point of the undeformed (straight-sided) coarse cell: */
+    Point<spacedim> transform(const Point<spacedim> &point) const;
 
+    /* Only defined for surrounding points that are vertices of the cell: */
     Point<spacedim>
     get_new_point(const ArrayView<const Point<spacedim>> &surrounding_points,
                   const ArrayView<const double> &weights) const override;
 
-    void
-    get_new_points(const ArrayView<const Point<spacedim>> &surrounding_points,
-                   const Table<2, double> &weights,
-                   ArrayView<Point<spacedim>> new_points) const override;
-
   private:
-    std::array<unsigned int, 20> get_possible_cells_around_points(
-        const ArrayView<const Point<spacedim>> &surrounding_points) const;
+    Point<spacedim> push_forward(const Point<dim> &chart_point) const;
 
-    typename Triangulation<dim, spacedim>::cell_iterator compute_chart_points(
-        const ArrayView<const Point<spacedim>> &surrounding_points,
-        ArrayView<Point<dim>> chart_points) const;
+    /* We only support hypercubes, create a constexpr copy for sizing arrays: */
+    static constexpr ReferenceCell<dim> reference_cell =
+        ReferenceCells::get_hypercube<dim>();
 
-    Point<dim>
-    pull_back(const typename Triangulation<dim, spacedim>::cell_iterator &cell,
-              const Point<spacedim> &p,
-              const Point<dim> &initial_guess) const;
+    std::array<Point<spacedim>, reference_cell.n_vertices()> vertices;
 
-    Point<spacedim> push_forward(
-        const typename Triangulation<dim, spacedim>::cell_iterator &cell,
-        const Point<dim> &chart_point) const;
+    /* Shared immutable copies so that copying the patch stays cheap: */
+    std::array<std::shared_ptr<const Manifold<dim, spacedim>>,
+               reference_cell.n_lines()>
+        line_manifolds;
 
-    DerivativeForm<1, dim, spacedim> push_forward_gradient(
-        const typename Triangulation<dim, spacedim>::cell_iterator &cell,
-        const Point<dim> &chart_point,
-        const Point<spacedim> &pushed_forward_chart_point) const;
+    /* Only used for dim == 3: */
+    std::array<std::shared_ptr<const Manifold<dim, spacedim>>,
+               reference_cell.n_faces()>
+        face_manifolds;
 
-    Triangulation<dim, spacedim> triangulation;
-
-    int level_coarse;
-
-    std::vector<bool> coarse_cell_is_flat;
-
-    std::unique_ptr<Manifold<dim, spacedim>> chart_manifold;
+    std::shared_ptr<const Manifold<dim, spacedim>> chart_manifold;
   };
 
 } // namespace ryujin

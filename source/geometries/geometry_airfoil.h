@@ -168,21 +168,6 @@ namespace ryujin
       {
       }
 
-      /* FIXME: find out why weights are not normalized. */
-      Point<dim>
-      get_new_point(const ArrayView<const Point<dim>> &surrounding_points,
-                    const ArrayView<const double> &weights) const override
-      {
-        if (weights[0] > 1.0)
-          return surrounding_points[0];
-
-        if (weights[1] > 1.0)
-          return surrounding_points[1];
-
-        return dealii::ChartManifold<dim>::get_new_point(surrounding_points,
-                                                         weights);
-      }
-
       dealii::Point<dim>
       pull_back(const dealii::Point<dim> &space_point) const final
       {
@@ -233,65 +218,6 @@ namespace ryujin
       const dealii::Tensor<1, dim> direction;
       const double grading;
       const double epsilon;
-    };
-
-
-    /**
-     * @todo Documentation
-     *
-     * @ingroup Mesh
-     */
-    template <int dim>
-    class ExtrudedManifold : public dealii::Manifold<dim>
-    {
-    public:
-      ExtrudedManifold(const dealii::Manifold<dim - 1> &manifold)
-          : manifold(manifold.clone())
-      {
-      }
-
-      std::unique_ptr<Manifold<dim>> clone() const override
-      {
-        return std::make_unique<ExtrudedManifold<dim>>(*manifold);
-      }
-
-      Point<dim>
-      get_new_point(const ArrayView<const Point<dim>> &surrounding_points,
-                    const ArrayView<const double> &weights) const override
-      {
-        Assert(surrounding_points.size() == weights.size(),
-               dealii::ExcInternalError());
-
-        boost::container::small_vector<dealii::Point<dim - 1>, 100>
-            surrounding_points_projected;
-        std::transform(surrounding_points.begin(),
-                       surrounding_points.end(),
-                       surrounding_points_projected.begin(),
-                       [](const dealii::Point<dim> &source) {
-                         dealii::Point<dim - 1> result;
-                         for (unsigned int d = 0; d < dim - 1; ++d)
-                           result[d] = source[d];
-                         return result;
-                       });
-
-        const auto projected = manifold->get_new_point(
-            ArrayView<const Point<dim - 1>>{surrounding_points_projected.data(),
-                                            weights.size()},
-            weights);
-
-        dealii::Point<dim> result;
-
-        for (unsigned int d = 0; d < dim - 1; ++d)
-          result[d] = projected[d];
-
-        for (unsigned int i = 0; i < weights.size(); ++i)
-          result[dim - 1] += weights[i] * surrounding_points[i][dim - 1];
-
-        return result;
-      }
-
-    private:
-      std::unique_ptr<const dealii::Manifold<dim - 1>> manifold;
     };
 
   } // namespace Manifolds
@@ -1134,18 +1060,19 @@ namespace ryujin
         Assert(sharp_trailing_edge || (coarse_triangulation.n_cells() == 7),
                dealii::ExcInternalError());
 
-        std::vector<std::unique_ptr<dealii::Manifold<2, 2>>> manifolds;
-        manifolds.resize(sharp_trailing_edge ? 6 : 7);
+        patches_.clear();
+        patches_.resize(sharp_trailing_edge ? 6 : 7);
 
-        /* FIXME: Remove workaround - mark cells as off limit: */
-        // WORKAROUND
-        const auto first_cell = coarse_triangulation.begin_active();
-        std::next(first_cell, 4)->set_material_id(42);
-        std::next(first_cell, sharp_trailing_edge ? 5 : 6)->set_material_id(42);
-        // end WORKAROUND
+        /*
+         * Graded patches for the cells surrounding the airfoil (bottom
+         * center, bottom front, top front, top center) and, for a blunt
+         * trailing edge, the center trailing cell. These patches capture
+         * the airfoil and spherical boundary manifolds attached above.
+         */
 
         for (auto i : {0, 1, 2, 3, 5}) {
-          const auto index = 10 + i;
+          if (i == 5 && sharp_trailing_edge)
+            continue;
 
           dealii::Point<2> center;
           dealii::Tensor<1, 2> direction;
@@ -1153,7 +1080,6 @@ namespace ryujin
             /* cells: bottom center, bottom front, top front, top center */
             direction[1] = 1.;
           } else {
-            Assert(i == 5, dealii::ExcInternalError());
             /* cell: center trailing (blunt) */
             center[0] = 1.;
             direction[0] = -1.;
@@ -1165,28 +1091,11 @@ namespace ryujin
               grading_,
               i == 5 ? grading_epsilon_trailing_ : grading_epsilon_};
 
-          auto transfinite =
-              std::make_unique<TransfiniteInterpolationManifold<2>>();
-          transfinite->initialize(coarse_triangulation, grading);
-
-          coarse_triangulation.set_manifold(index, *transfinite);
-          manifolds[i] = std::move(transfinite);
+          patches_[i] = std::make_shared<TransfiniteInterpolationPatch<2>>(
+              std::next(coarse_triangulation.begin_active(), i), grading);
+          coarse_triangulation.set_manifold(10 + i, *patches_[i]);
         }
 
-        /* Remove erroneous manifold: */
-        if (sharp_trailing_edge)
-          coarse_triangulation.reset_manifold(5);
-
-        /*
-         * Remove unneeded manifolds now. Our custom
-         * TransfiniteInterpolationManifolds did copy all necessary
-         * geometry information from the coarse grid already. The boundary
-         * manifolds are thus not needed any more.
-         */
-
-        coarse_triangulation.reset_manifold(1);
-        coarse_triangulation.reset_manifold(2);
-        coarse_triangulation.reset_manifold(3);
 
         /* We can set the final sequence of manifold ids: */
         for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
@@ -1200,33 +1109,47 @@ namespace ryujin
         }
 
         /*
-         * Attach separate transfinite interpolation manifolds (without a
-         * grading) to the top and bottom trailing cells:
+         * Attach separate transfinite interpolation patches (without a
+         * grading) to the top and bottom trailing cells. Their lines shared
+         * with the graded cells carry the manifold ids set above, so the
+         * patches capture the neighboring graded patches:
          */
 
-        /* FIXME: Remove workaround - mark cells as off limit: */
-        // WORKAROUND
-        for (auto cell : coarse_triangulation.active_cell_iterators())
-          cell->set_material_id(42);
-        // const auto first_cell = coarse_triangulation.begin_active();
-        std::next(first_cell, 4)->set_material_id(0);
-        std::next(first_cell, sharp_trailing_edge ? 5 : 6)->set_material_id(0);
-        // end WORKAROUND
-
         for (auto i : {4, sharp_trailing_edge ? 5 : 6}) {
-          const auto index = 10 + i;
-          auto transfinite =
-              std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
-          transfinite->initialize(coarse_triangulation);
-          coarse_triangulation.set_manifold(index, *transfinite);
-          manifolds[i] = std::move(transfinite);
+          patches_[i] = std::make_shared<TransfiniteInterpolationPatch<2>>(
+              std::next(coarse_triangulation.begin_active(), i));
+          coarse_triangulation.set_manifold(10 + i, *patches_[i]);
         }
 
         /*
-         * For good measure, also set material ids. We will need those
-         * in a minute to reconstruct material ids...
+         * The patches now carry all geometry information. Detach all
+         * manifolds so that the triangulation is refined undeformed: the
+         * actual geometry is realized by a mapping that applies the 2D patch
+         * of the coarse cell to the (x, y) coordinates and keeps the z
+         * coordinate as is:
          */
 
+        coarse_triangulation.reset_all_manifolds();
+
+        this->transformation_ =
+            [&patches = patches_](
+                const typename dealii::Triangulation<dim>::cell_iterator &cell,
+                const dealii::Point<dim> &point) {
+              const auto point_2d = dealii::Point<2>(point[0], point[1]);
+              /* We distinguish which patch to use with the material id: */
+              const auto index = cell->material_id() - 10;
+              const auto transformed_2d = patches[index]->transform(point_2d);
+
+              auto result = point;
+              result[0] = transformed_2d[0];
+              result[1] = transformed_2d[1];
+              return result;
+            };
+
+        /*
+         * FIXME We use a material id to identify the correct coarse cell,
+         * and thus the patch, in the transformation:
+         */
         for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
           const auto &cell = std::next(coarse_triangulation.begin_active(), i);
           const auto index = 10 + i;
@@ -1264,8 +1187,8 @@ namespace ryujin
           }
 
         /*
-         * Step 5: Flatten triangulation, create distributed coarse
-         * triangulation, and reattach manifolds
+         * Step 5: Flatten triangulation and create distributed coarse
+         * triangulation
          *
          * Runtime parameters: width_, subdivisions_z_ (for dim == 3)
          */
@@ -1299,38 +1222,8 @@ namespace ryujin
         }
 
         /*
-         * Somewhere during flattening the triangulation, extruding and
-         * copying, all manifold ids got lost. Reconstruct manifold IDs
-         * from the material ids we set earlier:
+         * Set boundary ids.
          */
-
-        for (auto &cell : triangulation.active_cell_iterators()) {
-          const auto id = cell->material_id();
-          cell->set_all_manifold_ids(id);
-        }
-
-        /*
-         * Reattach manifolds:
-         */
-        if constexpr (dim == 1) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
-
-        } else if constexpr (dim == 2) {
-          unsigned int index = 10;
-          for (const auto &manifold : manifolds)
-            triangulation.set_manifold(index++, *manifold);
-
-        } else {
-          static_assert(dim == 3);
-
-          unsigned int index = 10;
-          for (const auto &manifold : manifolds)
-            triangulation.set_manifold(
-                index++, Manifolds::ExtrudedManifold<3>(*manifold));
-        }
-
-        /* Set boundary ids: */
 
         for (auto cell : triangulation.active_cell_iterators()) {
           for (auto f : cell->face_indices()) {
@@ -1346,10 +1239,11 @@ namespace ryujin
             const auto &indices =
                 dealii::GeometryInfo<dim - 1>::vertex_indices();
             for (const auto v : indices) {
-              const auto vert = face->vertex(v);
-              const auto radius_sqr = vert[0] * vert[0] + vert[1] * vert[1];
+              /* Map vertex to the actual geometry: */
+              const auto vertex = this->transformation_(cell, face->vertex(v));
+              const auto radius_sqr = vertex.norm_square();
               if (radius_sqr >= outer_radius * outer_radius - 1.0e-10 ||
-                  vert[0] > airfoil_center_[0] + 1.001 * back_length)
+                  vertex[0] > airfoil_center_[0] + 1.001 * back_length)
                 airfoil = false;
               else
                 spherical_boundary = false;
@@ -1407,6 +1301,14 @@ namespace ryujin
       }
 
     private:
+      /*
+       * The transfinite interpolation patches of the coarse cells. They are
+       * created in the (const) create_coarse_triangulation() method:
+       */
+      mutable std::vector<
+          std::shared_ptr<const TransfiniteInterpolationPatch<2>>>
+          patches_;
+
       dealii::Point<2> airfoil_center_;
       double airfoil_length_;
       std::string airfoil_type_;
