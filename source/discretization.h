@@ -16,6 +16,7 @@
 #include <deal.II/distributed/fully_distributed_tria.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
+#include <deal.II/fe/mapping_q_cache.h>
 #include <deal.II/hp/fe_collection.h>
 #include <deal.II/hp/mapping_collection.h>
 #include <deal.II/hp/q_collection.h>
@@ -275,6 +276,14 @@ namespace ryujin
      */
     void prepare(const std::string &base_name);
 
+    /**
+     * Recompute the cached mapping after the triangulation has changed.
+     *
+     * This function only sets up and reinitializes a MappingQCache object
+     * if the selected geometry provides a Geometry::transformation().
+     */
+    void update_mapping();
+
     //@}
     /**
      * @name Information and statistics
@@ -481,6 +490,7 @@ namespace ryujin
     std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
 
     Collection collection_;
+    std::shared_ptr<dealii::MappingQCache<dim>> mapping_cache_;
 
     std::set<std::shared_ptr<Geometry<dim>>> geometry_list_;
     std::shared_ptr<Geometry<dim>> selected_geometry_;

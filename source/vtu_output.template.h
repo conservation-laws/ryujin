@@ -159,7 +159,8 @@ namespace ryujin
     /* Perform output: */
 
     if (output_full) {
-      data_out->build_patches(mapping, patch_order);
+      data_out->build_patches(
+          mapping, patch_order, DataOut<dim>::curved_inner_cells);
 
       if (use_mpi_io_) {
         /* MPI-based synchronous IO */
@@ -206,7 +207,8 @@ namespace ryujin
         return false;
       });
 
-      data_out->build_patches(mapping, patch_order);
+      data_out->build_patches(
+          mapping, patch_order, DataOut<dim>::curved_inner_cells);
 
       if (use_mpi_io_) {
         /* MPI-based synchronous IO */
