@@ -13,6 +13,7 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/tria.h>
 
+#include <functional>
 #include <string>
 
 namespace ryujin
@@ -107,9 +108,33 @@ namespace ryujin
     }
 
     /**
+     * Return the (optional) forward transformation that maps points of the
+     * undeformed triangulation created by create_coarse_triangulation()
+     * (and its refinements) to the actual geometry.
+     *
+     * If the function is nonempty the Discretization class refines the
+     * triangulation without manifolds and realizes the geometry with a
+     * MappingQCache whose support points are computed with this
+     * transformation. If the function object is empty then a standard
+     * MappinQ is used instead.
+     */
+    ACCESSOR_READ_ONLY(transformation)
+
+    /**
      * Return the name of the geometry as (const reference) std::string
      */
     ACCESSOR_READ_ONLY(name)
+
+  protected:
+    /**
+     * The transformation function object which should be set in
+     * create_coarse_triangulation() of derived classes that need
+     * MappingQCache to be set up.
+     */
+    mutable std::function<dealii::Point<dim>(
+        const typename dealii::Triangulation<dim>::cell_iterator &,
+        const dealii::Point<dim> &)>
+        transformation_;
 
   private:
     const std::string name_;

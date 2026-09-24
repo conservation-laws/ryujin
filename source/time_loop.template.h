@@ -289,6 +289,7 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       print_info("preparing compute kernels");
 
+      discretization_.update_mapping();
       offline_data_.prepare(problem_dimension, n_precomputed_values);
 
       hyperbolic_module_.prepare();

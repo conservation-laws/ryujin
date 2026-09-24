@@ -224,9 +224,23 @@ namespace ryujin
       collection_.finite_element_dg =
           std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
 
-      collection_.mapping =
-          std::make_unique<dealii::hp::MappingCollection<dim>>(
-              MappingQ<dim>(mapping_degree));
+      /*
+       * If the geometry describes the mesh via a forward transformation of
+       * the undeformed triangulation we use a MappingQCache that is filled
+       * in update_mapping(). The cache is stored by pointer (and not
+       * cloned) so that the collection always refers to the current cache:
+       */
+      if (selected_geometry_->transformation()) {
+        mapping_cache_ = std::make_shared<MappingQCache<dim>>(mapping_degree);
+        auto mapping = std::make_unique<hp::MappingCollection<dim>>();
+        hp::Collection<Mapping<dim>> &base = *mapping;
+        base.push_back(mapping_cache_);
+        collection_.mapping = std::move(mapping);
+      } else {
+        collection_.mapping =
+            std::make_unique<dealii::hp::MappingCollection<dim>>(
+                MappingQ<dim>(mapping_degree));
+      }
 
       collection_.quadrature = std::make_unique<hp::QCollection<dim>>(
           QGauss<dim>(quadrature_degree));
@@ -311,6 +325,20 @@ namespace ryujin
     default:
       __builtin_trap();
     }
+  }
+
+
+  template <int dim>
+  void Discretization<dim>::update_mapping()
+  {
+    if (!mapping_cache_)
+      return;
+
+    mapping_cache_->initialize(MappingQ<dim>(mapping_cache_->get_degree()),
+                               *triangulation_,
+                               selected_geometry_->transformation(),
+                               /*function_describes_relative_displacement*/
+                               false);
   }
 
 } /* namespace ryujin */
