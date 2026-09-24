@@ -87,6 +87,12 @@ namespace ryujin
     std::cout << "Discretization<dim>::prepare()" << std::endl;
 #endif
 
+    AssertThrow(
+        mesh_type_ != MeshType::parallel_fullydistributed || refinement_ == 0,
+        ExcMessage("The fully distributed mesh type does not support global "
+                   "refinement. The geometry must create a properly refined "
+                   "mesh."));
+
     /* Select geometry: */
 
     {
@@ -111,10 +117,19 @@ namespace ryujin
 
     switch (mesh_type_) {
     case MeshType::parallel_fullydistributed: {
-      triangulation_ = std::make_unique<
+      const auto settings = dealii::TriangulationDescription::Settings::
+          construct_multigrid_hierarchy;
+      auto triangulation = std::make_unique<
           dealii::parallel::fullydistributed::Triangulation<dim>>(
           mpi_ensemble_.ensemble_communicator());
-      triangulation_->set_mesh_smoothing(smoothing);
+      triangulation->set_mesh_smoothing(smoothing);
+      triangulation->set_partitioner(
+          [](dealii::Triangulation<dim> &tria,
+             const unsigned int n_partitions) {
+            GridTools::partition_triangulation_zorder(n_partitions, tria);
+          },
+          settings);
+      triangulation_ = std::move(triangulation);
     } break;
 
     case MeshType::parallel_distributed: {
