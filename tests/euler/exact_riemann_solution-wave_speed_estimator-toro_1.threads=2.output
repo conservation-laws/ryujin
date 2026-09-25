@@ -1,0 +1,5 @@
+lambda_left_minus (exact)  = -4.3321595661992285e-01
+lambda_right_plus (exact)  = 2.1532343675648988e+00
+lambda_max        (exact)  = 2.1532343675648988e+00
+lambda_max        (approx) = 2.1728117856479452e+00
+ratio approx / exact        = 1.0090920980911087e+00
