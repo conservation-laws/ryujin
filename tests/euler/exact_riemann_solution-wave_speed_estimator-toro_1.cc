@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2026 Ryujin Authors [Jerett Cherry: jerett-cc]
+// Copyright (C) 2026 Ryujin contributors
 //
 
 //
