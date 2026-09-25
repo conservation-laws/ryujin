@@ -23,6 +23,7 @@
 
 #include <memory>
 #include <set>
+#include <vector>
 
 namespace ryujin
 {
@@ -253,8 +254,9 @@ namespace ryujin
       std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature;
       std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d;
       std::unique_ptr<const dealii::hp::QCollection<1>> nodal_quadrature_1d;
-      std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature;
-      std::unique_ptr<const dealii::hp::QCollection<dim - 1>>
+      std::unique_ptr<const std::vector<dealii::hp::QCollection<dim - 1>>>
+          face_quadrature;
+      std::unique_ptr<const std::vector<dealii::hp::QCollection<dim - 1>>>
           face_nodal_quadrature;
     };
 
@@ -448,17 +450,20 @@ namespace ryujin
     ACCESSOR_CONTAINER_READ_ONLY(collection_, nodal_quadrature_1d)
 
     /**
-     * Return a read-only const reference to the face quadrature rule.
+     * Return a read-only const reference to the face quadrature rules.
      *
-     * @note The accessor returns an QCollection object.
+     * @note The accessor returns a vector of QCollection objects, one per
+     * finite element of the collection, that holds one quadrature per face
+     * of the reference cell (or a single quadrature used on all faces).
      */
     ACCESSOR_CONTAINER_READ_ONLY(collection_, face_quadrature)
 
     /**
-     * Return a read-only const reference to the nodal face quadrature rule
+     * Return a read-only const reference to the nodal face quadrature rules
      * (Gauß Lobatto).
      *
-     * @note The accessor returns an QCollection object.
+     * @note The accessor returns a vector of QCollection objects, see
+     * face_quadrature().
      */
     ACCESSOR_CONTAINER_READ_ONLY(collection_, face_nodal_quadrature)
 
