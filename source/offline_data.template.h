@@ -198,8 +198,15 @@ namespace ryujin
 
           const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
           affine_constraints.reinit(locally_owned, locally_relevant);
-          DoFTools::make_hanging_node_constraints(dof_handler,
-                                                  affine_constraints);
+
+          /*
+           * Skip distributing hanging node constraints when none are needed.
+           * This works around some non-implemented features in the library
+           * for hp constraints (current as of deal.II version 9.8).
+           */
+          if (discretization_->triangulation().has_hanging_nodes())
+            DoFTools::make_hanging_node_constraints(dof_handler,
+                                                    affine_constraints);
 
           /*
            * Enforce periodic boundary conditions. We assume that the mesh is in
