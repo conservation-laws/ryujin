@@ -207,11 +207,13 @@ namespace ryujin
            * If the bound is not satisfied, we need to find the root of a
            * quadratic function:
            *
-           * psi(t)   = (h_U + t h_P)^2 v2_max
+           * psi(t)   = r (h_U + t h_P)^2 v2_max
            *            - (|q_U|^2 + 2(q_U * q_P) t + |q_P|^2 t^2)
            *
-           * d_psi(t) = 2 (h_U + t * h_P) * h_P v2_max
-           *            - 2 (q_U * q_P) - |q_P|^2 t
+           * d_psi(t) = 2 r (h_U + t * h_P) * h_P v2_max
+           *            - 2 (q_U * q_P) - 2 |q_P|^2 t
+           *
+           * where r = relax_small.
            *
            * We can compute the root of this function efficiently by using our
            * standard quadratic_newton_step() function that will use the points
@@ -225,12 +227,12 @@ namespace ryujin
           const auto &q_U = view_.momentum(U);
           const auto &q_P = view_.momentum(P);
 
-          const auto dpsi_l =
-              (h_U + t_l * h_P) * h_P * v2_max -
-              ScalarNumber(2.) * ((q_U * q_P) - q_P * q_P * t_l);
-          const auto dpsi_r =
-              (h_U + t_r * h_P) * h_P * v2_max -
-              ScalarNumber(2.) * ((q_U * q_P) - q_P * q_P * t_r);
+          const auto dpsi_l = ScalarNumber(2.) *
+                              (relax_small * (h_U + t_l * h_P) * h_P * v2_max -
+                               ((q_U * q_P) + q_P * q_P * t_l));
+          const auto dpsi_r = ScalarNumber(2.) *
+                              (relax_small * (h_U + t_r * h_P) * h_P * v2_max -
+                               ((q_U * q_P) + q_P * q_P * t_r));
 
           quadratic_newton_step(
               t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));

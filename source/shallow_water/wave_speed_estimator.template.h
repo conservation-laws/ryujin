@@ -227,7 +227,7 @@ namespace ryujin
 
       h_star =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_value_max, Number(0.), h_star_middle, h_star_right);
+              phi_value_max, Number(0.), h_star_middle, h_star);
 
       return h_star;
     }
