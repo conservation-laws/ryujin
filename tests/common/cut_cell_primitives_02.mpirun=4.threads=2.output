@@ -1,0 +1,67 @@
+
+== flat at level 3 ==
+  cells: Quad 60
+  boundary faces: id 1: 5 id 2: 5 id 4: 12 id 7: 12
+  min measure: 1
+
+== flat at level 3.5 ==
+  cells: Quad 60
+  boundary faces: id 1: 5 id 2: 5 id 4: 12 id 7: 12
+  min measure: 0.5
+
+== slope 0.25 ==
+  cells: Quad 66 Tri 3
+  boundary faces: id 1: 7 id 2: 4 id 4: 12 id 7: 12
+  min measure: 0.25
+    2.000 2.000 2.000 1.500 3.000 1.750
+    6.000 3.000 6.000 2.500 7.000 2.750
+    10.000 4.000 10.000 3.500 11.000 3.750
+
+== cliff at x = 0.15 of height 0.5 ==
+  cells: Quad 72
+  boundary faces: id 1: 6 id 2: 6 id 4: 12 id 7: 12
+  min measure: 0.5
+
+== cliff at x = 0.15 of height 1 ==
+  cells: Quad 60 Tri 1
+  boundary faces: id 1: 6 id 2: 5 id 4: 12 id 7: 12
+  min measure: 0.5
+    0.000 3.000 0.000 2.000 1.000 3.000
+
+== cliff at x = 0.15 of height 1.5 ==
+  cells: Quad 60 Tri 1
+  boundary faces: id 1: 6 id 2: 5 id 4: 12 id 7: 12
+  min measure: 0.5
+    0.000 3.000 0.000 2.000 1.000 3.500
+
+== cliff at x = 5 of height 0.5 ==
+  cells: Quad 72
+  boundary faces: id 1: 6 id 2: 6 id 4: 12 id 7: 12
+  min measure: 0.4624
+
+== cliff at x = 5 of height 1 ==
+  cells: Quad 65
+  boundary faces: id 1: 6 id 2: 5 id 4: 12 id 7: 13
+  min measure: 0.9249
+
+== cliff at x = 5 of height 1.5 ==
+  cells: Quad 65
+  boundary faces: id 1: 6 id 2: 5 id 4: 12 id 7: 13
+  min measure: 0.5
+
+== cliff at x = 5.5 of height 0.5 ==
+  cells: Quad 72
+  boundary faces: id 1: 6 id 2: 6 id 4: 12 id 7: 12
+  min measure: 0.5
+
+== cliff at x = 5.5 of height 1 ==
+  cells: Quad 65 Tri 1
+  boundary faces: id 1: 6 id 2: 5 id 4: 12 id 7: 12
+  min measure: 0.3249
+    5.000 3.000 5.350 2.000 5.650 3.000
+
+== cliff at x = 5.5 of height 1.5 ==
+  cells: Quad 65 Tri 1
+  boundary faces: id 1: 6 id 2: 5 id 4: 12 id 7: 12
+  min measure: 0.5
+    5.000 3.000 5.000 2.000 6.000 3.500
