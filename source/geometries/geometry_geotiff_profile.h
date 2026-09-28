@@ -1,305 +1,220 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2022 - 2026 by the ryujin authors
+// Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <compile_time_options.h>
 
-#include "geometry_common_includes.h"
+#include "cut_cell_primitives.h"
+#include "geometry_rectangular_domain.h"
 #include "geotiff_reader.h"
+
+#include <deal.II/base/quadrature_lib.h>
+#include <deal.II/distributed/fully_distributed_tria.h>
+#include <deal.II/distributed/tria.h>
+#include <deal.II/fe/fe_dgq.h>
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_simplex_p.h>
+#include <deal.II/fe/fe_tools.h>
+#include <deal.II/fe/mapping_fe.h>
+#include <deal.II/fe/mapping_q.h>
 
 namespace ryujin
 {
   namespace Geometries
   {
     /**
-     * A ChartManifold that warps the y-direction (in 2D) or z-direction
-     * (in 3D) with a given function callable. The callable lambda must
-     * take a dealii::Point<dim> as argument and return a double that is
-     * used for the shift. The computation of the shift must only depend on
-     * the x-coordinate (in 2D) or the x and y coordinates (in 3D).
+     * A modified rectangular domain, where the bottom boundary is
+     * described by an elevation profile read from a GeoTIFF file. By
+     * convention, the negative y-direction points to the bottom boundary.
+     *
+     * The rectangular mesh is aligned with the profile (see MeshAlignment)
+     * and the cells above the profile form the new mesh, where cut cells
+     * are replaced by triangles (see CutCellDecomposition).
+     *
+     * @note Only implemented in 2D.
      *
      * @ingroup Mesh
      */
-    template <int dim, typename Callable>
-    class ProfileManifold : public dealii::ChartManifold<dim>
-    {
-    public:
-      ProfileManifold(const Callable &callable)
-          : callable_(callable)
-      {
-      }
-
-      dealii::Point<dim>
-      pull_back(const dealii::Point<dim> &space_point) const final
-      {
-        auto chart_point = space_point;
-
-        if constexpr (dim >= 2) {
-          /* transform y-direction (2D) or z-direction (3D): */
-          chart_point[dim - 1] -= callable_(space_point);
-        }
-
-        return chart_point;
-      }
-
-      dealii::Point<dim>
-      push_forward(const dealii::Point<dim> &chart_point) const final
-      {
-        auto space_point = chart_point;
-
-        if constexpr (dim >= 2) {
-          /* transform y-direction (2D) or z-direction (3D): */
-          space_point[dim - 1] += callable_(space_point);
-        }
-
-        return space_point;
-      }
-
-      std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final
-      {
-        return std::make_unique<ProfileManifold<dim, Callable>>(callable_);
-      }
-
-    private:
-      const Callable callable_;
-    };
-
-
-    template <int dim, typename Callable>
-    ProfileManifold<dim, Callable>
-    make_profile_manifold(const Callable &callable)
-    {
-      return {callable};
-    }
-
-
-    /**
-     * @ingroup Mesh
-     */
     template <int dim>
-    class GeoTIFFProfile : public Geometry<dim>
+    class GeoTIFFProfile : public RectangularDomain<dim>
     {
     public:
       GeoTIFFProfile(const std::string &subsection)
-          : Geometry<dim>("geotiff profile", subsection)
-          , geotiff_reader_(subsection + "/geotiff profile")
+          : RectangularDomain<dim>("geotiff profile", subsection)
+          , geotiff_reader_(subsection + "/geotiff profile/geotiff")
+          , mesh_alignment_(subsection + "/geotiff profile/mesh alignment")
       {
-        this->add_parameter("position bottom left",
-                            point_left_,
-                            "Position of bottom left corner");
-
-        for (unsigned int d = 0; d < dim; ++d)
-          point_right_[d] = 20.0;
+        reference_y_coordinate_ = 0.;
         this->add_parameter(
-            "position top right", point_right_, "Position of top right corner");
+            "reference y coordinate",
+            reference_y_coordinate_,
+            "GeoTIFF: select the value for y-coordinate in 2D. That is, the "
+            "1D profile for the lower boundary is queried from the 2D "
+            "geotiff image at coordinates (x, y=constant)");
 
-        subdivisions_x_ = 1;
-        subdivisions_y_ = 1;
-        subdivisions_z_ = 1;
-        boundary_back_ = Boundary::dirichlet;
-        boundary_bottom_ = Boundary::dirichlet;
-        boundary_front_ = Boundary::dirichlet;
-        boundary_left_ = Boundary::dirichlet;
-        boundary_right_ = Boundary::dirichlet;
-        boundary_top_ = Boundary::dirichlet;
-
-        this->add_parameter("subdivisions x",
-                            subdivisions_x_,
-                            "number of subdivisions in x direction");
-        this->add_parameter(
-            "boundary condition left",
-            boundary_left_,
-            "Type of boundary condition enforced on the left side of the "
-            "domain (faces with normal in negative x direction)");
-        this->add_parameter(
-            "boundary condition right",
-            boundary_right_,
-            "Type of boundary condition enforced on the right side of the "
-            "domain (faces with normal in positive x direction)");
-
-        if constexpr (dim >= 2) {
-          this->add_parameter("subdivisions y",
-                              subdivisions_y_,
-                              "number of subdivisions in y direction");
-          this->add_parameter(
-              "boundary condition bottom",
-              boundary_bottom_,
-              "Type of boundary condition enforced on the bottom side of the "
-              "domain (faces with normal in negative y direction)");
-          this->add_parameter(
-              "boundary condition top",
-              boundary_top_,
-              "Type of boundary condition enforced on the top side of the "
-              "domain (faces with normal in positive y direction)");
-        }
-
-        if constexpr (dim == 2) {
-          reference_y_coordinate_ = 0.;
-          this->add_parameter(
-              "reference y coordinate",
-              reference_y_coordinate_,
-              "GeoTIFF: select the value for y-coordinate in 2D. That is, the "
-              "1D profile for the lower boundary is queried from the 2D "
-              "geotiff image at coordinates (x, y=constant)");
-        }
-
-        if constexpr (dim == 3) {
-          this->add_parameter("subdivisions z",
-                              subdivisions_z_,
-                              "number of subdivisions in z direction");
-          this->add_parameter(
-              "boundary condition back",
-              boundary_back_,
-              "Type of boundary condition enforced on the back side of the "
-              "domain (faces with normal in negative z direction)");
-          this->add_parameter(
-              "boundary condition front",
-              boundary_front_,
-              "Type of boundary condition enforced on the front side of the "
-              "domain (faces with normal in positive z direction)");
-        }
+        refinement_ = 0;
+        this->add_parameter("refinement",
+                            refinement_,
+                            "number of global refinement steps applied to the "
+                            "coarse mesh before aligning it with the elevation "
+                            "profile");
       }
 
 
       void create_coarse_triangulation(
           dealii::Triangulation<dim> &triangulation) const final
       {
-        /* create mesh: */
+        AssertThrow(
+            dim == 2,
+            dealii::ExcMessage(
+                "The geotiff profile ng geometry is only implemented in 2D."));
 
-        dealii::Triangulation<dim, dim> tria1;
-        tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+        /*
+         * The mesh is refined and aligned on a temporary triangulation (a
+         * parallel::distributed one for a fully distributed triangulation)
+         * from which the cut cell decomposition creates the triangulation:
+         */
+        using Base = dealii::parallel::TriangulationBase<dim>;
+        using FD = dealii::parallel::fullydistributed::Triangulation<dim>;
+        const auto distributed = dynamic_cast<const Base *>(&triangulation);
+        const auto fully_distributed = dynamic_cast<const FD *>(&triangulation);
+        AssertThrow(
+            fully_distributed != nullptr || distributed == nullptr,
+            dealii::ExcMessage("The geotiff profile ng geometry only supports "
+                               "serial and fully distributed triangulations."));
 
-        if constexpr (dim == 1) {
-          dealii::GridGenerator::subdivided_hyper_rectangle<dim, dim>(
-              tria1, {subdivisions_x_}, point_left_, point_right_);
-        } else if constexpr (dim == 2) {
-          dealii::GridGenerator::subdivided_hyper_rectangle(
-              tria1,
-              {subdivisions_x_, subdivisions_y_},
-              point_left_,
-              point_right_);
-        } else if constexpr (dim == 3) {
-          dealii::GridGenerator::subdivided_hyper_rectangle(
-              tria1,
-              {subdivisions_x_, subdivisions_y_, subdivisions_z_},
-              point_left_,
-              point_right_);
+        if constexpr (dim == 2) {
+          std::unique_ptr<dealii::Triangulation<dim>> temporary;
+          if (fully_distributed != nullptr)
+            temporary =
+                std::make_unique<FD>(triangulation.get_mpi_communicator());
+          else
+            temporary = std::make_unique<dealii::Triangulation<dim>>();
+
+          RectangularDomain<dim>::create_coarse_triangulation(*temporary);
+          temporary->refine_global(refinement_);
+
+          /*
+           * The 1D profile is extracted from the geotiff image along the
+           * line y = reference_y_coordinate_:
+           */
+
+          const auto height = [&](const dealii::Point<dim> &vertex) {
+            return geotiff_reader_.compute_height(
+                dealii::Point<2>(vertex[0], reference_y_coordinate_));
+          };
+
+          mesh_alignment_.align_with_elevation_profile(*temporary, height);
+
+          cut_cell_decomposition_.create_triangulation(
+              triangulation, *temporary, height, this->boundary_bottom_);
+
+        } else {
+
+          __builtin_trap();
+        }
+      }
+
+
+      void update_dof_handler(dealii::DoFHandler<dim> &dof_handler) const final
+      {
+        /* Select the simplex finite element (index 1) on all triangles: */
+        for (const auto &cell : dof_handler.active_cell_iterators())
+          if (cell->is_locally_owned() && cell->reference_cell().is_simplex())
+            cell->set_active_fe_index(1);
+      }
+
+
+      Geometry<dim>::HP_Collection
+      populate_hp_collections(const unsigned int fe_degree,
+                              typename ryujin::Discretization<dim>::Collection
+                                  &collection) const final
+      {
+        using namespace dealii;
+
+        /*
+         * Every collection has the cG Qk / dG Qk finite element for
+         * quadrilaterals at index 0 and the cG Pk / dG Pk finite element
+         * for the triangles created by the cut cell decomposition at index
+         * 1:
+         */
+
+        if constexpr (dim == 2) {
+          const auto mapping_degree = fe_degree;
+          const auto quadrature_degree = fe_degree + 1;
+
+          const auto make = [](auto collection,
+                               const auto &quadrilateral,
+                               const auto &triangle) {
+            collection.push_back(quadrilateral);
+            collection.push_back(triangle);
+            return std::make_unique<decltype(collection)>(
+                std::move(collection));
+          };
+
+          collection.finite_element_cg = make(hp::FECollection<dim>(),
+                                              FE_Q<dim>(fe_degree),
+                                              FE_SimplexP<dim>(fe_degree));
+          collection.finite_element_dg = make(hp::FECollection<dim>(),
+                                              FE_DGQ<dim>(fe_degree),
+                                              FE_SimplexDGP<dim>(fe_degree));
+
+          collection.mapping =
+              make(hp::MappingCollection<dim>(),
+                   MappingQ<dim>(mapping_degree),
+                   MappingFE<dim>(FE_SimplexP<dim>(mapping_degree)));
+
+          collection.quadrature = make(hp::QCollection<dim>(),
+                                       QGauss<dim>(quadrature_degree),
+                                       QGaussSimplex<dim>(quadrature_degree));
+          collection.quadrature_high_order =
+              make(hp::QCollection<dim>(),
+                   QGauss<dim>(quadrature_degree + 1),
+                   QGaussSimplex<dim>(quadrature_degree + 1));
+          collection.nodal_quadrature =
+              make(hp::QCollection<dim>(),
+                   QGaussLobatto<dim>(quadrature_degree),
+                   FETools::compute_nodal_quadrature(
+                       FE_SimplexP<dim>(quadrature_degree)));
+
+          collection.quadrature_1d = make(hp::QCollection<1>(),
+                                          QGauss<1>(quadrature_degree),
+                                          QGaussSimplex<1>(quadrature_degree));
+          collection.nodal_quadrature_1d =
+              make(hp::QCollection<1>(),
+                   QGaussLobatto<1>(quadrature_degree),
+                   QGaussLobatto<1>(quadrature_degree));
+
+          /* One face quadrature collection per finite element: */
+          using QCF = hp::QCollection<dim - 1>;
+          collection.face_quadrature =
+              make(std::vector<QCF>(),
+                   QCF(QGauss<dim - 1>(quadrature_degree)),
+                   QCF(QGaussSimplex<dim - 1>(quadrature_degree)));
+          collection.face_nodal_quadrature =
+              make(std::vector<QCF>(),
+                   QCF(QGaussLobatto<dim - 1>(quadrature_degree)),
+                   QCF(QGaussLobatto<dim - 1>(quadrature_degree)));
+
+        } else {
+
+          __builtin_trap();
         }
 
-        triangulation.copy_triangulation(tria1);
-        triangulation.reset_all_manifolds();
-        /* manifold id 0 for transfinite interpolation manifold */
-        triangulation.set_all_manifold_ids(0);
-
-        /* set boundary and manifold ids: */
-
-        for (auto cell : triangulation.active_cell_iterators()) {
-          for (auto f : cell->face_indices()) {
-            auto face = cell->face(f);
-            if (!face->at_boundary())
-              continue;
-            const auto position = face->center();
-
-            if (position[0] < point_left_[0] + 1.e-8) {
-              face->set_boundary_id(boundary_left_);
-              face->set_manifold_id(dealii::numbers::flat_manifold_id);
-            }
-
-            if (position[0] > point_right_[0] - 1.e-8) {
-              face->set_boundary_id(boundary_right_);
-              face->set_manifold_id(dealii::numbers::flat_manifold_id);
-            }
-
-
-            if constexpr (dim == 2) {
-              if (position[1] < point_left_[1] + 1.e-8) {
-                face->set_boundary_id(boundary_bottom_);
-                /* manifold id 1 for ProfileManifold: */
-                face->set_manifold_id(1);
-              }
-              if (position[1] > point_right_[1] - 1.e-8) {
-                face->set_boundary_id(boundary_top_);
-                face->set_manifold_id(dealii::numbers::flat_manifold_id);
-              }
-            }
-
-            if constexpr (dim == 3) {
-              if (position[1] < point_left_[1] + 1.e-8) {
-                face->set_boundary_id(boundary_bottom_);
-                face->set_manifold_id(dealii::numbers::flat_manifold_id);
-              }
-
-              if (position[1] > point_right_[1] - 1.e-8) {
-                face->set_boundary_id(boundary_top_);
-                face->set_manifold_id(dealii::numbers::flat_manifold_id);
-              }
-
-              /*
-               * The lower boundary at z = point_left_[2] is the profile
-               * manifold ant the upper boundary boundary at z =
-               * point_right_[2] is flat:
-               */
-
-              if (position[2] < point_left_[2] + 1.e-8) {
-                face->set_boundary_id(boundary_back_);
-                /* manifold id 1 for ProfileManifold: */
-                face->set_manifold_id(1);
-              }
-
-              if (position[2] > point_right_[2] - 1.e-8) {
-                face->set_boundary_id(boundary_front_);
-                face->set_manifold_id(dealii::numbers::flat_manifold_id);
-              }
-            }
-          } /*for*/
-        }   /*for*/
-
-        const auto profile =
-            make_profile_manifold<dim>([&](dealii::Point<dim> point) {
-              /*
-               *
-               */
-              if constexpr (dim == 1) {
-                return 0.;
-              } else if constexpr (dim == 2) {
-                /*
-                 * Set the second coordinate to a constant when querying
-                 * height information in 2D.
-                 */
-                point[1] = reference_y_coordinate_;
-                return geotiff_reader_.compute_height(point);
-              } else if constexpr (dim == 3) {
-                return geotiff_reader_.compute_height(point);
-              }
-            });
-        triangulation.set_manifold(1, profile);
-
-        dealii::TransfiniteInterpolationManifold<dim> transfinite_interpolation;
-        transfinite_interpolation.initialize(triangulation);
-        triangulation.set_manifold(0, transfinite_interpolation);
+        return Geometry<dim>::HP_Collection::populated_by_geometry;
       }
 
     private:
       GeoTIFFReader geotiff_reader_;
-
-      dealii::Point<dim> point_left_;
-      dealii::Point<dim> point_right_;
+      MeshAlignment<dim> mesh_alignment_;
+      CutCellDecomposition<dim> cut_cell_decomposition_;
 
       double reference_y_coordinate_;
-
-      unsigned int subdivisions_x_;
-      unsigned int subdivisions_y_;
-      unsigned int subdivisions_z_;
-
-      Boundary boundary_back_;
-      Boundary boundary_bottom_;
-      Boundary boundary_front_;
-      Boundary boundary_left_;
-      Boundary boundary_right_;
-      Boundary boundary_top_;
+      unsigned int refinement_;
     };
+
   } /* namespace Geometries */
 } /* namespace ryujin */
