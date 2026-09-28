@@ -286,7 +286,7 @@ namespace ryujin
       }
 
 
-    private:
+    protected:
       dealii::Point<dim> point_left_;
       dealii::Point<dim> point_right_;
 
