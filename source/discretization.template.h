@@ -268,11 +268,11 @@ namespace ryujin
           std::make_unique<hp::QCollection<1>>(QGauss<1>(quadrature_degree));
       collection_.nodal_quadrature_1d = std::make_unique<hp::QCollection<1>>(
           QGaussLobatto<1>(quadrature_degree));
-      collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
-          QGauss<dim - 1>(quadrature_degree));
-      collection_.face_nodal_quadrature =
-          std::make_unique<hp::QCollection<dim - 1>>(
-              QGaussLobatto<dim - 1>(quadrature_degree));
+      using QCF = hp::QCollection<dim - 1>;
+      collection_.face_quadrature = std::make_unique<std::vector<QCF>>(
+          1, QCF(QGauss<dim - 1>(quadrature_degree)));
+      collection_.face_nodal_quadrature = std::make_unique<std::vector<QCF>>(
+          1, QCF(QGaussLobatto<dim - 1>(quadrature_degree)));
     } break;
 
     case Geometry<dim>::HP_Collection::standard_simplices: {
@@ -312,7 +312,6 @@ namespace ryujin
       AssertThrow(false,
                   dealii::ExcMessage("Discretization: Simplex support requires "
                                      "deal.II version 9.7.0 or newer"));
-
 #endif
       collection_.quadrature_1d = std::make_unique<hp::QCollection<1>>(
           QGaussSimplex<1>(quadrature_degree));
@@ -320,18 +319,18 @@ namespace ryujin
       collection_.nodal_quadrature_1d = std::make_unique<hp::QCollection<1>>(
           QGaussLobatto<1>(quadrature_degree));
 #endif
-      collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
-          QGaussSimplex<dim - 1>(quadrature_degree));
+      using QCF = hp::QCollection<dim - 1>;
+      collection_.face_quadrature = std::make_unique<std::vector<QCF>>(
+          1, QCF(QGaussSimplex<dim - 1>(quadrature_degree)));
       if constexpr (dim == 1) {
-        collection_.face_nodal_quadrature =
-            std::make_unique<hp::QCollection<dim - 1>>(
-                QGaussLobatto<dim - 1>(quadrature_degree));
+        collection_.face_nodal_quadrature = std::make_unique<std::vector<QCF>>(
+            1, QCF(QGaussLobatto<dim - 1>(quadrature_degree)));
       } else {
 #if DEAL_II_VERSION_GTE(9, 7, 0)
+        const auto quadrature = FETools::compute_nodal_quadrature(
+            FE_SimplexP<dim - 1>(quadrature_degree));
         collection_.face_nodal_quadrature =
-            std::make_unique<hp::QCollection<dim - 1>>(
-                FETools::compute_nodal_quadrature(
-                    FE_SimplexP<dim - 1>(quadrature_degree)));
+            std::make_unique<std::vector<QCF>>(1, QCF(quadrature));
 #endif
       }
 
