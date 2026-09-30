@@ -29,8 +29,8 @@ using state_type = typename HostSystemView::state_type;
 
 
 /*
- * Runtime parameters. These do not depend on a state and are thus computed
- * separately:
+ * Runtime parameters of the Riemann solver. These do not depend on a state
+ * and are thus computed separately:
  */
 
 constexpr const char *constant_names[]{"newton_tolerance",
@@ -85,6 +85,7 @@ int main(int argc, char *argv[])
 
   Euler::HyperbolicSystem hyperbolic_system;
   Euler::WaveSpeedEstimator<double> wave_speed_estimator(hyperbolic_system);
+  Euler::PGRiemannSolver<double> riemann_solver("/RiemannSolver");
 
   /*
    * Exercise the parse_parameters_call_back() update path and enable the
@@ -94,6 +95,9 @@ int main(int argc, char *argv[])
   std::stringstream parameters;
   parameters << "subsection WaveSpeedEstimator\n"
              << "set newton max iterations = 2\n"
+             << "end\n"
+             << "subsection RiemannSolver\n"
+             << "set newton max iterations = 2\n"
              << "end" << std::endl;
   dealii::ParameterAcceptor::initialize(parameters);
 
@@ -102,6 +106,11 @@ int main(int argc, char *argv[])
   const auto host_view = wave_speed_estimator.view<dim, double, HostSpace>();
   const auto device_view =
       wave_speed_estimator.view<dim, double, DefaultSpace>();
+
+  const auto host_riemann_solver_view =
+      riemann_solver.view<double, HostSpace>();
+  const auto device_riemann_solver_view =
+      riemann_solver.view<double, DefaultSpace>();
 
   /* Set up locally owned and relevant index sets. */
 
@@ -166,7 +175,7 @@ int main(int argc, char *argv[])
 
   /* Compute all quantities on the host: */
 
-  const auto host_constants = compute_constants(host_view);
+  const auto host_constants = compute_constants(host_riemann_solver_view);
 
   std::array<dealii::Tensor<1, n_results, double>, n_states> host_results;
   {
@@ -199,7 +208,8 @@ int main(int argc, char *argv[])
       "test_constants",
       Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 1),
       KOKKOS_LAMBDA(std::size_t i) {
-        constants_view.write_tensor(compute_constants(device_view), i);
+        constants_view.write_tensor(
+            compute_constants(device_riemann_solver_view), i);
       });
 
   Kokkos::parallel_for(
