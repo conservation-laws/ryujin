@@ -195,7 +195,9 @@ namespace ryujin
       //@{
 
       /**
-       * FIXME
+       * The function c(gamma) as defined in (A.3) of
+       * @cite ClaytonGuermondPopov-2022, with a simplified cut-off for
+       * gamma > 3.
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -203,7 +205,9 @@ namespace ryujin
 
 
       /**
-       * FIXME
+       * The factor alpha = 2 a (1 - b rho) / (gamma - 1) used in the
+       * two-rarefaction and shock-shock bounds of
+       * @cite ClaytonGuermondPopov-2022.
        *
        * Cost: 0x pow, 1x division, 0x sqrt
        */
@@ -214,14 +218,22 @@ namespace ryujin
 
 #ifndef DOXYGEN
       /*
-       * FIXME
+       * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
+       * Noble-Abel stiffened gas equation of state, see
+       * @cite ClaytonGuermondPopov-2022.
+       *
+       * Cost: 1x pow, 6x division, 1x sqrt
        */
       DEAL_II_HOST_DEVICE Number f(const primitive_type &riemann_data,
                                    const Number p_star) const;
 
 
       /*
-       * FIXME
+       * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
+       * Noble-Abel stiffened gas equation of state, see
+       * @cite ClaytonGuermondPopov-2022.
+       *
+       * Cost: 2x pow, 12x division, 2x sqrt
        */
       DEAL_II_HOST_DEVICE Number phi(const primitive_type &riemann_data_i,
                                      const primitive_type &riemann_data_j,
@@ -241,7 +253,7 @@ namespace ryujin
        * the implementation of the "f" function and eliminates all
        * unnecessary branches in "f".
        *
-       * Cost: 0x pow, 2x division, 2x sqrt
+       * Cost: 0x pow, 4x division, 2x sqrt
        */
       DEAL_II_HOST_DEVICE Number
       phi_of_p_max(const primitive_type &riemann_data_i,
@@ -249,31 +261,31 @@ namespace ryujin
 
 
       /**
-       * See @cite GuermondPopov2016 page 912, (3.7)
+       * See @cite GuermondPopov2016b, page 912, (3.7)
        *
-       * Cost: 0x pow, 1x division, 1x sqrt
+       * Cost: 0x pow, 2x division, 1x sqrt
        */
       DEAL_II_HOST_DEVICE Number lambda1_minus(
           const primitive_type &riemann_data, const Number p_star) const;
 
 
       /**
-       * See @cite GuermondPopov2016 page 912, (3.8)
+       * See @cite GuermondPopov2016b, page 912, (3.8)
        *
-       * Cost: 0x pow, 1x division, 1x sqrt
+       * Cost: 0x pow, 2x division, 1x sqrt
        */
       DEAL_II_HOST_DEVICE Number lambda3_plus(
           const primitive_type &primitive_state, const Number p_star) const;
 
 
       /**
-       * See @cite GuermondPopov2016 page 912, (3.9)
+       * See @cite GuermondPopov2016b, page 912, (3.9)
        *
        * For two given primitive states <code>riemann_data_i</code> and
        * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
        * for lambda.
        *
-       * Cost: 0x pow, 2x division, 2x sqrt (inclusive)
+       * Cost: 0x pow, 4x division, 2x sqrt (inclusive)
        */
       DEAL_II_HOST_DEVICE Number
       compute_lambda(const primitive_type &riemann_data_i,
@@ -298,7 +310,7 @@ namespace ryujin
        * shock-shock case as described in §5.5, Eqn. (5.10) and (5.12) in
        * @cite ClaytonGuermondPopov-2022
        *
-       * Cost: 2x pow, 9x division, 3x sqrt
+       * Cost: 2x pow, 11x division, 5x sqrt (inclusive)
        */
       DEAL_II_HOST_DEVICE Number
       p_star_SS_full(const primitive_type &riemann_data_i,
