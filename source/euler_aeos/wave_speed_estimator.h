@@ -410,8 +410,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto pinf = view_.eos_interpolation_pinfty();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -428,7 +426,7 @@ namespace ryujin
       std::cout << "a_right: " << a_j << std::endl;
 #endif
 
-      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
       if (!view_.compute_strict_bounds()) {
@@ -630,12 +628,12 @@ namespace ryujin
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
-      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number p_max = std::max(p_i, p_j);
 
       const Number radicand_inverse_i =
           safe_division(ScalarNumber(0.5) * rho_i,
                         Number(1.) - covolume_b * rho_i) *
-          ((gamma_i + Number(1.)) * p_max +
+          ((gamma_i + Number(1.)) * (p_max + pinf) +
            (gamma_i - Number(1.)) * (p_i + pinf));
 
       const Number value_i =
@@ -644,7 +642,7 @@ namespace ryujin
       const Number radicand_inverse_j =
           safe_division(ScalarNumber(0.5) * rho_j,
                         Number(1.) - covolume_b * rho_j) *
-          ((gamma_j + Number(1.)) * p_max +
+          ((gamma_j + Number(1.)) * (p_max + pinf) +
            (gamma_j - Number(1.)) * (p_j + pinf));
 
       const Number value_j =
