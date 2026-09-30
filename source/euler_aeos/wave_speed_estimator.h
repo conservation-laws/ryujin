@@ -423,14 +423,14 @@ namespace ryujin
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
         const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-        const Number p_debug =
+        const Number p_strict =
             ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                 phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-        std::cout << "   p^*_debug  = " << p_debug << "\n";
-        std::cout << "   phi(p_*_d) = "
-                  << phi(riemann_data_i, riemann_data_j, p_debug) << "\n";
-        std::cout << "-> lambda_deb = "
-                  << compute_lambda(riemann_data_i, riemann_data_j, p_debug)
+        std::cout << "   p^*_strict = " << p_strict << "\n";
+        std::cout << "   phi(p_*_s) = "
+                  << phi(riemann_data_i, riemann_data_j, p_strict) << "\n";
+        std::cout << "-> lambda_str = "
+                  << compute_lambda(riemann_data_i, riemann_data_j, p_strict)
                   << std::endl;
 #endif
 
@@ -451,7 +451,7 @@ namespace ryujin
         std::cout << "   phi(p_*_t) = "
                   << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
         std::cout << "-> lambda_max = "
-                  << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
+                  << compute_lambda(riemann_data_i, riemann_data_j, p_2)
                   << std::endl;
 #endif
 
@@ -775,10 +775,6 @@ namespace ryujin
                                        first_exponent_inverse) -
           pinf;
 
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "RS p_1_tilde  = " << p_1_tilde << "\n";
-#endif
-
       /*
        * Compute (5.7) second formula for \tilde p_2^\ast and (5.8) first
        * formula for \tilde p_1^\ast at the same time:
@@ -799,11 +795,12 @@ namespace ryujin
                                        second_exponent_inverse) -
           pinf;
 
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "RS p_2_tilde  = " << p_2_tilde << "\n";
-#endif
+      const Number p_star = std::min(p_1_tilde, p_2_tilde);
 
-      return std::min(p_1_tilde, p_2_tilde);
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "p_star_RS_full = " << p_star << std::endl;
+#endif
+      return p_star;
     }
 
 
@@ -850,13 +847,14 @@ namespace ryujin
                                      exponent_inverse) -
           pinf;
 
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "SS p_1_tilde  = " << p_1_tilde << "\n";
-#endif
-
       const auto p_2_tilde = p_star_failsafe(riemann_data_i, riemann_data_j);
 
-      return std::min(p_1_tilde, p_2_tilde);
+      const Number p_star = std::min(p_1_tilde, p_2_tilde);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "p_star_SS_full = " << p_star << std::endl;
+#endif
+      return p_star;
     }
 
 
@@ -909,7 +907,7 @@ namespace ryujin
       const Number p_2_tilde = base * base - pinf;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "SS p_2_tilde  = " << p_2_tilde << "\n";
+      std::cout << "p_star_failsafe = " << p_2_tilde << std::endl;
 #endif
       return p_2_tilde;
     }
@@ -995,9 +993,8 @@ namespace ryujin
       const Number p_tilde = p_max * ryujin::pow(temp, exponent_inverse) - pinf;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "IN p_*_tilde  = " << p_tilde << "\n";
+      std::cout << "p_star_interpolated = " << p_tilde << std::endl;
 #endif
-
       return p_tilde;
     }
 
