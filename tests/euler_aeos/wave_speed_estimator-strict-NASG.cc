@@ -6,7 +6,6 @@
 #define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <simd.h>
 #include <wave_speed_estimator.h>
-#include <wave_speed_estimator.template.h>
 
 /*
  * Test the NASG interpolation for the EulerAEOS::RiemmanSolver. Do this by
