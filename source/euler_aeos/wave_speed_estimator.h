@@ -229,6 +229,17 @@ namespace ryujin
 
 
       /*
+       * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
+       * Noble-Abel stiffened gas equation of state, see
+       * @cite ClaytonGuermondPopov-2022.
+       *
+       * Cost: 1x pow, 6x division, 1x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number df(const primitive_type &riemann_data,
+                                    const Number &p_star) const;
+
+
+      /*
        * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
        * Noble-Abel stiffened gas equation of state, see
        * @cite ClaytonGuermondPopov-2022.
@@ -238,6 +249,18 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number phi(const primitive_type &riemann_data_i,
                                      const primitive_type &riemann_data_j,
                                      const Number p_in) const;
+
+
+      /*
+       * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
+       * Noble-Abel stiffened gas equation of state, see
+       * @cite ClaytonGuermondPopov-2022.
+       *
+       * Cost: 2x pow, 12x division, 2x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number dphi(const primitive_type &riemann_data_i,
+                                      const primitive_type &riemann_data_j,
+                                      const Number &p) const;
 #endif
 
 
@@ -604,6 +627,50 @@ namespace ryujin
 
     template <int dim, typename Number, typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::df(
+        const primitive_type &riemann_data, const Number &p_star) const
+    {
+      const auto covolume_b = view_.eos_covolume_constant();
+      const auto pinf = view_.eos_interpolation_pinfty();
+
+      const auto &[rho, u, p, gamma, a] = riemann_data;
+
+      const Number one_minus_b_rho = Number(1.) - covolume_b * rho;
+
+      const Number radicand_inverse =
+          safe_division(ScalarNumber(0.5) * rho, one_minus_b_rho) *
+          ((gamma + Number(1.)) * (p_star + pinf) +
+           (gamma - Number(1.)) * (p + pinf));
+      const Number denominator =
+          p_star + pinf +
+          (gamma - Number(1.)) / (gamma + Number(1.)) * (p + pinf);
+
+      /* true_value is shock case */
+      const Number true_value =
+          (denominator - ScalarNumber(0.5) * (p_star - p)) /
+          (denominator * std::sqrt(radicand_inverse));
+
+      const auto exponent = ScalarNumber(-0.5) * (gamma + Number(1.)) / gamma;
+
+      const Number ratio = safe_division(p_star + pinf, p + pinf);
+
+      /*
+       * false_value is rarefaction case. Note that the factor (gamma - 1)
+       * of the derivative of the exponent cancels with the denominator of
+       * alpha, so we do not have to divide by (gamma - 1):
+       */
+      const auto false_value =
+          safe_division(a * one_minus_b_rho * ryujin::pow(ratio, exponent),
+                        gamma * (p + pinf));
+
+      return ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     WaveSpeedEstimatorView<dim, Number, MemorySpace>::phi(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
@@ -613,6 +680,17 @@ namespace ryujin
       const Number &u_j = riemann_data_j[1];
 
       return f(riemann_data_i, p_in) + f(riemann_data_j, p_in) + u_j - u_i;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::dphi(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &p) const
+    {
+      return df(riemann_data_i, p) + df(riemann_data_j, p);
     }
 
 
