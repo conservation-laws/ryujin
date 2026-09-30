@@ -47,6 +47,15 @@ namespace ryujin
       //@{
 
       /**
+       * A structure holding all runtime parameters of the wave speed
+       * estimator.
+       */
+      struct Parameters {
+        double newton_tolerance;
+        unsigned int newton_max_iterations;
+      };
+
+      /**
        * Alias for the view on the wave speed estimator for a given
        * dimension @p dim, choice of number type @p Number, and memory
        * space @p MemorySpace.
@@ -68,8 +77,42 @@ namespace ryujin
       WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
+          , parameters_("euler_aeos_wave_speed_estimator_parameters",
+                        TransferPolicy::implicit_transfers_host_resident)
           , hyperbolic_system_(&hyperbolic_system)
       {
+        /*
+         * Note: We bind the parameters directly to the storage held by the
+         * Mirrored object. The corresponding memory is allocated once in
+         * the constructor and never reallocated, and the
+         * implicit_transfers_host_resident policy guarantees that the host
+         * storage is never deallocated: the addresses thus remain valid
+         * for the lifetime of this object.
+         */
+        auto &parameters = *parameters_.view();
+
+        if constexpr (std::is_same<ScalarNumber, double>::value)
+          parameters.newton_tolerance = 1.e-10;
+        else
+          parameters.newton_tolerance = 1.e-4;
+        add_parameter("newton tolerance",
+                      parameters.newton_tolerance,
+                      "Tolerance for the quadratic newton stopping criterion");
+
+        parameters.newton_max_iterations = 0;
+        add_parameter("newton max iterations",
+                      parameters.newton_max_iterations,
+                      "Maximal number of quadratic newton iterations performed "
+                      "during limiting");
+
+        /*
+         * A parameter file read writes directly through the addresses
+         * bound above and bypasses the view() mechanism. Request a
+         * writable view on the host memory space to invalidate the (now
+         * stale) mirror of the parameters in the default memory space:
+         */
+        ParameterAcceptor::parse_parameters_call_back.connect(
+            [this] { parameters_.view(); });
       }
 
       /**
@@ -91,6 +134,14 @@ namespace ryujin
     private:
       //@}
       /**
+       * @name Run time options
+       */
+      //@{
+
+      Mirrored<Parameters> parameters_;
+
+      //@}
+      /**
        * @name Internal data
        */
       //@{
@@ -98,6 +149,9 @@ namespace ryujin
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
       //@}
+
+      template <int, typename, typename>
+      friend class WaveSpeedEstimatorView;
     };
 
 
@@ -159,9 +213,28 @@ namespace ryujin
        */
       WaveSpeedEstimatorView(
           const View &view,
-          const WaveSpeedEstimator<ScalarNumber> & /*wave_speed_estimator*/)
+          const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
           : view_(view)
+          , parameters_(
+                wave_speed_estimator.parameters_.template view<MemorySpace>())
       {
+      }
+
+      /**
+       * Return the tolerance for the quadratic Newton stopping criterion.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber newton_tolerance() const
+      {
+        return ScalarNumber(parameters_->newton_tolerance);
+      }
+
+      /**
+       * Return the maximal number of quadratic Newton iterations.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+      newton_max_iterations() const
+      {
+        return parameters_->newton_max_iterations;
       }
 
       /**
@@ -229,6 +302,17 @@ namespace ryujin
 
 
       /*
+       * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
+       * Noble-Abel stiffened gas equation of state, see
+       * @cite ClaytonGuermondPopov-2022.
+       *
+       * Cost: 1x pow, 6x division, 1x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number df(const primitive_type &riemann_data,
+                                    const Number &p_star) const;
+
+
+      /*
        * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
        * Noble-Abel stiffened gas equation of state, see
        * @cite ClaytonGuermondPopov-2022.
@@ -238,6 +322,18 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number phi(const primitive_type &riemann_data_i,
                                      const primitive_type &riemann_data_j,
                                      const Number p_in) const;
+
+
+      /*
+       * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
+       * Noble-Abel stiffened gas equation of state, see
+       * @cite ClaytonGuermondPopov-2022.
+       *
+       * Cost: 2x pow, 12x division, 2x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number dphi(const primitive_type &riemann_data_i,
+                                      const primitive_type &riemann_data_j,
+                                      const Number &p) const;
 #endif
 
 
@@ -276,6 +372,23 @@ namespace ryujin
        */
       DEAL_II_HOST_DEVICE Number lambda3_plus(
           const primitive_type &primitive_state, const Number p_star) const;
+
+
+      /**
+       * For two given primitive states <code>riemann_data_i</code> and
+       * <code>riemann_data_j</code>, and two guesses p_1 <= p* <= p_2,
+       * compute the gap in lambda between both guesses.
+       *
+       * See @cite GuermondPopov2016b, page 914, (4.4a), (4.4b), (4.5), and
+       * (4.6)
+       *
+       * Cost: 0x pow, 8x division, 4x sqrt
+       */
+      DEAL_II_HOST_DEVICE std::array<Number, 2>
+      compute_gap(const primitive_type &riemann_data_i,
+                  const primitive_type &riemann_data_j,
+                  const Number p_1,
+                  const Number p_2) const;
 
 
       /**
@@ -362,6 +475,7 @@ namespace ryujin
       //@{
 
       const View view_;
+      const WaveSpeedEstimator<ScalarNumber>::Parameters *const parameters_;
 
       //@}
     };
@@ -400,6 +514,12 @@ namespace ryujin
      *
      *    If p_2 > p_min then a more pessimistic bound is computed.
      *
+     *  - The (optional) quadratic Newton iteration requires a valid bracket
+     *    p_1 <= p_star <= p_2, i.e., phi(p_1) <= 0 <= phi(p_2). Both, the
+     *    strict bound and the (cheaper) interpolated bound, are upper
+     *    bounds of p_star; p_1 is set to p_min or p_max depending on the
+     *    sign of phi(p_max).
+     *
      *  - FIXME: Simplification in p_star_RS
      */
 
@@ -410,8 +530,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto pinf = view_.eos_interpolation_pinfty();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -428,8 +546,10 @@ namespace ryujin
       std::cout << "a_right: " << a_j << std::endl;
 #endif
 
-      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
+
+      Number p_2;
 
       if (!view_.compute_strict_bounds()) {
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
@@ -451,42 +571,115 @@ namespace ryujin
         const Number p_star_backup =
             p_star_failsafe(riemann_data_i, riemann_data_j);
 
-        const Number p_2 =
-            ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                phi_p_max,
-                Number(0.),
-                std::min(p_star_tilde, p_star_backup),
-                std::min(p_max, p_star_tilde));
+        p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+            phi_p_max,
+            Number(0.),
+            std::min(p_star_tilde, p_star_backup),
+            std::min(p_max, p_star_tilde));
 
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "   p^*_tilde  = " << p_2 << "\n";
-        std::cout << "   phi(p_*_t) = "
-                  << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
-        std::cout << "-> lambda_max = "
-                  << compute_lambda(riemann_data_i, riemann_data_j, p_2)
-                  << std::endl;
-#endif
+      } else {
 
-        return compute_lambda(riemann_data_i, riemann_data_j, p_2);
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+
+        p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+            phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
       }
-
-      const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-      const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-
-      const Number p_2 =
-          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "   p^*_tilde  = " << p_2 << "\n";
       std::cout << "   phi(p_*_t) = "
-                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
-      std::cout << "-> lambda_max = "
-                << compute_lambda(riemann_data_i, riemann_data_j, p_2)
-                << std::endl;
+                << phi(riemann_data_i, riemann_data_j, p_2) << std::endl;
 #endif
 
-      return compute_lambda(riemann_data_i, riemann_data_j, p_2);
+      /*
+       * If we do no Newton iteration, cut it short:
+       */
+
+      if (newton_max_iterations() == 0) {
+        const auto lambda_max =
+            compute_lambda(riemann_data_i, riemann_data_j, p_2);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        std::cout << "-> lambda_max = " << lambda_max << std::endl;
+#endif
+        return lambda_max;
+      }
+
+      /*
+       * Compute p_1 and ensure that p_1 < p_2. If we hit a case with two
+       * expansions we might indeed have that p_star_tilde < p_1. Set p_1 =
+       * p_2 in this case.
+       */
+
+      const Number p_min = std::min(p_i, p_j);
+
+      Number p_1 =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max, Number(0.), p_max, p_min);
+
+      p_1 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, p_2);
+
+      /*
+       * Step 2: Perform quadratic Newton iteration.
+       *
+       * See @cite GuermondPopov2016b, p. 915f (4.8) and (4.9)
+       */
+
+      auto [gap, lambda_max] =
+          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << std::fixed << std::setprecision(16);
+      std::cout << "p_1: (start) " << p_1 << std::endl;
+      std::cout << "p_2: (start) " << p_2 << std::endl;
+      std::cout << "gap: (start) " << gap << std::endl;
+      std::cout << "l_m: (start) " << lambda_max << std::endl;
+#endif
+
+      for (unsigned int i = 0; i < newton_max_iterations(); ++i) {
+
+        /* We accept our current guess if we reach the tolerance... */
+        const Number tolerance(newton_tolerance());
+        if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+          std::cout << "converged after " << i << " iterations." << std::endl;
+#endif
+          break;
+        }
+
+        // FIXME: Fuse these computations:
+        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+        const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+        const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
+
+        quadratic_newton_step(p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
+
+        /* Update  lambda_max and gap: */
+        auto [gap_new, lambda_max_new] =
+            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+        gap = gap_new;
+        lambda_max = lambda_max_new;
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
+        std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
+        std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
+        std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
+        std::cout << "p_1: (  " << i << "  ) " << p_1 << std::endl;
+        std::cout << "p_2: (  " << i << "  ) " << p_2 << std::endl;
+        std::cout << "gap:         " << gap << std::endl;
+        std::cout << "l_m:         " << lambda_max << std::endl;
+#endif
+      }
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "-> lambda_max = " << lambda_max << std::endl;
+#endif
+
+      return lambda_max;
     }
 
 
@@ -606,6 +799,50 @@ namespace ryujin
 
     template <int dim, typename Number, typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::df(
+        const primitive_type &riemann_data, const Number &p_star) const
+    {
+      const auto covolume_b = view_.eos_covolume_constant();
+      const auto pinf = view_.eos_interpolation_pinfty();
+
+      const auto &[rho, u, p, gamma, a] = riemann_data;
+
+      const Number one_minus_b_rho = Number(1.) - covolume_b * rho;
+
+      const Number radicand_inverse =
+          safe_division(ScalarNumber(0.5) * rho, one_minus_b_rho) *
+          ((gamma + Number(1.)) * (p_star + pinf) +
+           (gamma - Number(1.)) * (p + pinf));
+      const Number denominator =
+          p_star + pinf +
+          (gamma - Number(1.)) / (gamma + Number(1.)) * (p + pinf);
+
+      /* true_value is shock case */
+      const Number true_value =
+          (denominator - ScalarNumber(0.5) * (p_star - p)) /
+          (denominator * std::sqrt(radicand_inverse));
+
+      const auto exponent = ScalarNumber(-0.5) * (gamma + Number(1.)) / gamma;
+
+      const Number ratio = safe_division(p_star + pinf, p + pinf);
+
+      /*
+       * false_value is rarefaction case. Note that the factor (gamma - 1)
+       * of the derivative of the exponent cancels with the denominator of
+       * alpha, so we do not have to divide by (gamma - 1):
+       */
+      const auto false_value =
+          safe_division(a * one_minus_b_rho * ryujin::pow(ratio, exponent),
+                        gamma * (p + pinf));
+
+      return ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     WaveSpeedEstimatorView<dim, Number, MemorySpace>::phi(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
@@ -615,6 +852,17 @@ namespace ryujin
       const Number &u_j = riemann_data_j[1];
 
       return f(riemann_data_i, p_in) + f(riemann_data_j, p_in) + u_j - u_i;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::dphi(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &p) const
+    {
+      return df(riemann_data_i, p) + df(riemann_data_j, p);
     }
 
 
@@ -630,12 +878,12 @@ namespace ryujin
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
-      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number p_max = std::max(p_i, p_j);
 
       const Number radicand_inverse_i =
           safe_division(ScalarNumber(0.5) * rho_i,
                         Number(1.) - covolume_b * rho_i) *
-          ((gamma_i + Number(1.)) * p_max +
+          ((gamma_i + Number(1.)) * (p_max + pinf) +
            (gamma_i - Number(1.)) * (p_i + pinf));
 
       const Number value_i =
@@ -644,7 +892,7 @@ namespace ryujin
       const Number radicand_inverse_j =
           safe_division(ScalarNumber(0.5) * rho_j,
                         Number(1.) - covolume_b * rho_j) *
-          ((gamma_j + Number(1.)) * p_max +
+          ((gamma_j + Number(1.)) * (p_max + pinf) +
            (gamma_j - Number(1.)) * (p_j + pinf));
 
       const Number value_j =
@@ -687,6 +935,30 @@ namespace ryujin
       const Number tmp = safe_division(positive_part(p_star - p), p + pinf);
 
       return u + a * std::sqrt(Number(1.) + factor * tmp);
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE std::array<Number, 2>
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute_gap(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number p_1,
+        const Number p_2) const
+    {
+      const Number nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
+      const Number nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
+
+      const Number nu_31 = lambda3_plus(riemann_data_j, p_1);
+      const Number nu_32 = lambda3_plus(riemann_data_j, p_2);
+
+      const Number lambda_max =
+          std::max(positive_part(nu_32), negative_part(nu_11));
+
+      const Number gap =
+          std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
+
+      return {{gap, lambda_max}};
     }
 
 
