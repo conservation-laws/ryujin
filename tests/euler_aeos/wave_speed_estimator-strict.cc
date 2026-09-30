@@ -7,6 +7,10 @@
 #include <simd.h>
 #include <wave_speed_estimator.h>
 
+#ifndef NEWTON_ITERATIONS
+#define NEWTON_ITERATIONS "0"
+#endif
+
 using namespace ryujin::EulerAEOS;
 using namespace ryujin;
 using namespace dealii;
@@ -26,6 +30,9 @@ int main(int argc, char *argv[])
   std::stringstream parameters;
   parameters << "subsection HyperbolicSystem\n"
              << "set compute strict bounds = true\n"
+             << "end\n"
+             << "subsection WaveSpeedEstimator\n"
+             << "set newton max iterations = " NEWTON_ITERATIONS "\n"
              << "end" << std::endl;
   ParameterAcceptor::initialize(parameters);
 
@@ -40,10 +47,11 @@ int main(int argc, char *argv[])
     result[1] = u;
     result[2] = p;
     result[3] = gamma;
-    const double interpolation_b =
-        hyperbolic_system.view<dim, double>().eos_covolume_constant();
+    const auto view = hyperbolic_system.view<dim, double>();
+    const double interpolation_b = view.eos_covolume_constant();
+    const double pinf = view.eos_interpolation_pinfty();
     const double x = 1. - interpolation_b * rho;
-    result[4] = std::sqrt(gamma * p / (rho * x));
+    result[4] = std::sqrt(gamma * (p + pinf) / (rho * x));
     return result;
   };
 
@@ -75,6 +83,28 @@ int main(int argc, char *argv[])
                << std::endl;
     ParameterAcceptor::initialize(parameters);
   };
+
+  const auto set_nasg =
+      [&](const double covolume, const double pinf, const double q) {
+        /*
+         * Select the Noble-Abel stiffened gas equation of state with a
+         * covolume, a reference pressure pinf and a reference specific
+         * internal energy q.
+         */
+        std::stringstream parameters;
+        parameters << "subsection HyperbolicSystem\n"
+                   << "set equation of state = noble abel stiffened gas\n"
+                   << "subsection noble abel stiffened gas\n"
+                   << "set covolume b = " << std::to_string(covolume) << "\n"
+                   << "set reference pressure = " << std::to_string(pinf)
+                   << "\n"
+                   << "set reference specific internal energy = "
+                   << std::to_string(q) << "\n"
+                   << "end\n"
+                   << "end\n"
+                   << std::endl;
+        ParameterAcceptor::initialize(parameters);
+      };
 
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
@@ -159,6 +189,26 @@ int main(int argc, char *argv[])
   test({1., 0., 2. / 30., 2.96}, {1.e-3, 0., 2. / 3. * 1.e-10, 2.99});
 
   test({1., 0., 2. / 30., 40.0}, {1.e-3, 0., 2. / 3. * 1.e-10, 1.001});
+
+  /*
+   * Noble-Abel stiffened gas with covolume, pinf, q and different gamma
+   * values for both states:
+   */
+
+  set_nasg(0.003, 0.5, 0.1);
+
+  /* Shock-shock */
+  test({1.5, 100., 22., 2.0041781532448066}, {7., 0., 12., 5.7237635705670113});
+  /* Shock-expansion */
+  test({1.5, 0., 22., 2.0041781532448066}, {7., 0., 12., 5.7237635705670113});
+  /* Sod-like */
+  test({1., 0., 1., 1.4}, {0.125, 0., 0.1, 3.0});
+  /* Leblanc-like */
+  test({1., 0., 2. / 30., 2.99}, {1.e-3, 0., 2. / 3. * 1.e-10, 1.4});
+  /* Negative pressure p > -pinf */
+  test({1., 0., -0.3, 1.6}, {2., 0., 1., 4.0});
+  /* Two rarefactions */
+  test({1., -2., 0.4, 1.2}, {0.5, 2., 0.1, 2.5});
 
   return 0;
 }
