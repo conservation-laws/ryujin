@@ -273,7 +273,7 @@ namespace ryujin
       /**
        * See @cite GuermondPopov2016b, page 912, (3.4).
        *
-       * Cost: 1x pow, 1x division, 2x sqrt
+       * Cost: 1x pow, 3x division, 1x sqrt
        */
       DEAL_II_HOST_DEVICE Number f(const primitive_type &riemann_data,
                                    const Number p_star) const;
@@ -931,9 +931,9 @@ namespace ryujin
      * Failsafe approximation to p_star computed for two primitive
      * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
      *
-     * See [1], page 914, (4.3)
+     * See @cite ClaytonGuermondPopov-2022, (5.11)
      *
-     * Cost: 2x pow, 2x division, 0x sqrt
+     * Cost: 0x pow, 3x division, 3x sqrt
      */
     template <int dim, typename Number, typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
