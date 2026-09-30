@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "hyperbolic_system.h"
-
 #include <gpu.h>
 #include <newton.h>
 #include <simd.h>
@@ -376,7 +374,7 @@ namespace ryujin
       safe_division(const Number &numerator, const Number &denominator) const
       {
         if constexpr (options.safe_division)
-          return EulerAEOS::safe_division(numerator, denominator);
+          return ryujin::safe_division(numerator, denominator);
         else
           return numerator / denominator;
       }

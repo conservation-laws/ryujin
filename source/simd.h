@@ -165,6 +165,27 @@ namespace ryujin
 
 
   /**
+   * For various divisions we have a mathematical guarantee that the
+   * numerator and denominator are nonnegative and the limit (of zero
+   * numerator and denominator) must converge to zero. The following
+   * function takes care of rounding issues when computing such quotients
+   * by (a) avoiding division by zero and (b) ensuring non-negativity of
+   * the result.
+   *
+   * @ingroup SIMD
+   */
+  template <typename Number>
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+  safe_division(const Number &numerator, const Number &denominator)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+    constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
+
+    return std::max(numerator, Number(0.)) / std::max(denominator, Number(min));
+  }
+
+
+  /**
    * A wrapper around dealii::compare_and_apply_mask() for scalar number
    * types that is annotated with DEAL_II_HOST_DEVICE so that it can be
    * used in device code.
