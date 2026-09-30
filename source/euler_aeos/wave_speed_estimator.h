@@ -238,7 +238,8 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      return riemann_solver_view_.compute(riemann_data_i, riemann_data_j);
+      /* Only return lambda_max: */
+      return riemann_solver_view_.compute(riemann_data_i, riemann_data_j)[0];
     }
 
 

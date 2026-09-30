@@ -245,8 +245,14 @@ namespace ryujin
        * For two given 1D primitive states riemann_data_i and
        * riemann_data_j, compute an estimate for an upper bound of the
        * maximum wavespeed lambda.
+       *
+       * The function returns the array {lambda_max, p_star}, where
+       * lambda_max is the upper bound of the maximal wavespeed and p_star
+       * is the corresponding upper bound estimate of the pressure in the
+       * star region. (In case of two expansion waves p_star is only
+       * guaranteed to be less than or equal to p_min.)
        */
-      DEAL_II_HOST_DEVICE Number
+      DEAL_II_HOST_DEVICE std::array<Number, 2>
       compute(const primitive_type &riemann_data_i,
               const primitive_type &riemann_data_j) const;
 
@@ -511,7 +517,7 @@ namespace ryujin
      */
 
     template <typename Number, typename MemorySpace>
-    DEAL_II_HOST_DEVICE Number
+    DEAL_II_HOST_DEVICE std::array<Number, 2>
     NASGRiemannSolverView<Number, MemorySpace>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
@@ -590,7 +596,7 @@ namespace ryujin
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "-> lambda_max = " << lambda_max << std::endl;
 #endif
-        return lambda_max;
+        return {{lambda_max, p_2}};
       }
 
       /*
@@ -666,7 +672,7 @@ namespace ryujin
       std::cout << "-> lambda_max = " << lambda_max << std::endl;
 #endif
 
-      return lambda_max;
+      return {{lambda_max, p_2}};
     }
 
 
