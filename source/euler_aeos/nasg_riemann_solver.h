@@ -23,7 +23,34 @@ namespace ryujin
 {
   namespace EulerAEOS
   {
-    template <typename Number, typename MemorySpace = dealii::MemorySpace::Host>
+    /**
+     * Compile time options for the NASGRiemannSolver.
+     */
+    struct NASGRiemannSolverOptions {
+      /**
+       * Take the interpolatory covolume b into account.
+       * If set to false, b = 0 is assumed.
+       */
+      bool covolume = true;
+
+      /**
+       * Take the interpolatory reference pressure pinf into account.
+       * If set to false, pinf = 0 is assumed.
+       */
+      bool pinf = true;
+
+      /**
+       * Guard divisions against negative numerators and vanishing
+       * denominators (vacuum states). If set to false, plain divisions are
+       * used instead.
+       */
+      bool safe_division = true;
+    };
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options = NASGRiemannSolverOptions{},
+              typename MemorySpace = dealii::MemorySpace::Host>
     class NASGRiemannSolverView;
 
 
@@ -37,7 +64,8 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename ScalarNumber = double>
+    template <typename ScalarNumber = double,
+              NASGRiemannSolverOptions options = NASGRiemannSolverOptions{}>
     class NASGRiemannSolver : public dealii::ParameterAcceptor
     {
     public:
@@ -125,7 +153,7 @@ namespace ryujin
                 typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return NASGRiemannSolverView<Number, MemorySpace>{*this};
+        return NASGRiemannSolverView<Number, options, MemorySpace>{*this};
       }
 
     private:
@@ -137,7 +165,7 @@ namespace ryujin
 
       Mirrored<Parameters> parameters_;
 
-      template <typename, typename>
+      template <typename, NASGRiemannSolverOptions, typename>
       friend class NASGRiemannSolverView;
 
       //@}
@@ -155,7 +183,9 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     class NASGRiemannSolverView
     {
     public:
@@ -171,7 +201,8 @@ namespace ryujin
 
       using ScalarNumber = typename get_value_type<Number>::type;
 
-      using Parameters = typename NASGRiemannSolver<ScalarNumber>::Parameters;
+      using Parameters =
+          typename NASGRiemannSolver<ScalarNumber, options>::Parameters;
 
       /**
        * Number of components in a primitive state, we store \f$[\rho, v,
@@ -195,7 +226,7 @@ namespace ryujin
        * Constructor taking a NASGRiemannSolver object as argument.
        */
       NASGRiemannSolverView(
-          const NASGRiemannSolver<ScalarNumber> &riemann_solver)
+          const NASGRiemannSolver<ScalarNumber, options> &riemann_solver)
           : parameters_(riemann_solver.parameters_.template view<MemorySpace>())
       {
       }
@@ -263,6 +294,53 @@ namespace ryujin
       //@{
 
       /**
+       * Return the covolume \f$1 - b rho\f$
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+      one_minus_b_rho(const Number &rho) const
+      {
+        if constexpr (options.covolume)
+          return Number(1.) - covolume_b() * rho;
+        else
+          return Number(1.);
+      }
+
+      /**
+       * Return the shifted pressure \f$p + pinf\f$
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number shift(const Number &p) const
+      {
+        if constexpr (options.pinf)
+          return p + pinf();
+        else
+          return p;
+      }
+
+      /**
+       * Return the "unshifted" pressure \f$p - pinf\f$
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number unshift(const Number &p) const
+      {
+        if constexpr (options.pinf)
+          return p - pinf();
+        else
+          return p;
+      }
+
+      /**
+       * If options.safe_devision is enabled, return a safe division of
+       * numerator / denominator.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+      safe_division(const Number &numerator, const Number &denominator) const
+      {
+        if constexpr (options.safe_division)
+          return EulerAEOS::safe_division(numerator, denominator);
+        else
+          return numerator / denominator;
+      }
+
+      /**
        * The function c(gamma) as defined in (A.3) of
        * @cite ClaytonGuermondPopov-2022, with a simplified cut-off for
        * gamma > 3.
@@ -270,7 +348,6 @@ namespace ryujin
        * Cost: 0x pow, 1x division, 1x sqrt
        */
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number c(const Number &gamma_Z) const;
-
 
       /**
        * The factor alpha = 2 a (1 - b rho) / (gamma - 1) used in the
@@ -397,6 +474,7 @@ namespace ryujin
       p_star_interpolated(const primitive_type &riemann_data_i,
                           const primitive_type &riemann_data_j) const;
 
+
       /**
        * See @cite GuermondPopov2016b, page 912, (3.7)
        *
@@ -467,8 +545,8 @@ namespace ryujin
      */
 
 
-    template <typename ScalarNumber>
-    inline void NASGRiemannSolver<ScalarNumber>::set_equation_of_state(
+    template <typename ScalarNumber, NASGRiemannSolverOptions options>
+    inline void NASGRiemannSolver<ScalarNumber, options>::set_equation_of_state(
         const double covolume_b,
         const double pinf,
         const bool compute_expensive_bounds)
@@ -516,9 +594,11 @@ namespace ryujin
      *  - FIXME: Simplification in p_star_RS
      */
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE std::array<Number, 2>
-    NASGRiemannSolverView<Number, MemorySpace>::compute(
+    NASGRiemannSolverView<Number, options, MemorySpace>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -676,9 +756,12 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::c(const Number &gamma) const
+    NASGRiemannSolverView<Number, options, MemorySpace>::c(
+        const Number &gamma) const
     {
       /*
        * We implement the continuous and monotonic function c(gamma) as
@@ -710,16 +793,14 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::alpha(const Number &rho,
-                                                      const Number &gamma,
-                                                      const Number &a) const
+    NASGRiemannSolverView<Number, options, MemorySpace>::alpha(
+        const Number &rho, const Number &gamma, const Number &a) const
     {
-      const auto covolume_b = this->covolume_b();
-
-      const Number numerator =
-          ScalarNumber(2.) * a * (Number(1.) - covolume_b * rho);
+      const Number numerator = ScalarNumber(2.) * a * one_minus_b_rho(rho);
 
       const Number denominator = gamma - Number(1.);
 
@@ -727,34 +808,33 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::f(
+    NASGRiemannSolverView<Number, options, MemorySpace>::f(
         const primitive_type &riemann_data, const Number p_star) const
     {
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
 
-      const auto covolume_b = this->covolume_b();
-      const auto pinf = this->pinf();
-
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
-      const Number one_minus_b_rho = Number(1.) - covolume_b * rho;
+      const Number one_minus_b_rho = this->one_minus_b_rho(rho);
       const Number gamma_minus_one = gamma - Number(1.);
 
       const Number Az =
           ScalarNumber(2.) * one_minus_b_rho / (rho * (gamma + Number(1.)));
 
-      const Number Bz = gamma_minus_one / (gamma + Number(1.)) * (p + pinf);
+      const Number Bz = gamma_minus_one / (gamma + Number(1.)) * shift(p);
 
-      const Number radicand = safe_division(Az, p_star + pinf + Bz);
+      const Number radicand = safe_division(Az, shift(p_star) + Bz);
 
       /* true_value is shock case */
       const Number true_value = (p_star - p) * std::sqrt(radicand);
 
       const auto exponent = ScalarNumber(0.5) * gamma_minus_one / gamma;
 
-      const Number ratio = safe_division(p_star + pinf, p + pinf);
+      const Number ratio = safe_division(shift(p_star), shift(p));
       const Number factor = ryujin::pow(ratio, exponent) - Number(1.);
 
       /* false_value is rarefaction case */
@@ -767,25 +847,24 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::df(
+    NASGRiemannSolverView<Number, options, MemorySpace>::df(
         const primitive_type &riemann_data, const Number &p_star) const
     {
-      const auto covolume_b = this->covolume_b();
-      const auto pinf = this->pinf();
-
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
-      const Number one_minus_b_rho = Number(1.) - covolume_b * rho;
+      const Number one_minus_b_rho = this->one_minus_b_rho(rho);
 
       const Number radicand_inverse =
           safe_division(ScalarNumber(0.5) * rho, one_minus_b_rho) *
-          ((gamma + Number(1.)) * (p_star + pinf) +
-           (gamma - Number(1.)) * (p + pinf));
+          ((gamma + Number(1.)) * shift(p_star) +
+           (gamma - Number(1.)) * shift(p));
       const Number denominator =
-          p_star + pinf +
-          (gamma - Number(1.)) / (gamma + Number(1.)) * (p + pinf);
+          shift(p_star) +
+          ((gamma - Number(1.)) / (gamma + Number(1.)) * shift(p));
 
       /* true_value is shock case */
       const Number true_value =
@@ -794,16 +873,15 @@ namespace ryujin
 
       const auto exponent = ScalarNumber(-0.5) * (gamma + Number(1.)) / gamma;
 
-      const Number ratio = safe_division(p_star + pinf, p + pinf);
+      const Number ratio = safe_division(shift(p_star), shift(p));
 
       /*
        * false_value is rarefaction case. Note that the factor (gamma - 1)
        * of the derivative of the exponent cancels with the denominator of
        * alpha, so we do not have to divide by (gamma - 1):
        */
-      const auto false_value =
-          safe_division(a * one_minus_b_rho * ryujin::pow(ratio, exponent),
-                        gamma * (p + pinf));
+      const auto false_value = safe_division(
+          a * one_minus_b_rho * ryujin::pow(ratio, exponent), gamma * shift(p));
 
       return ryujin::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
@@ -811,9 +889,11 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::phi(
+    NASGRiemannSolverView<Number, options, MemorySpace>::phi(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number p_in) const
@@ -825,9 +905,11 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::dphi(
+    NASGRiemannSolverView<Number, options, MemorySpace>::dphi(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number &p) const
@@ -836,34 +918,31 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::phi_of_p_max(
+    NASGRiemannSolverView<Number, options, MemorySpace>::phi_of_p_max(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto covolume_b = this->covolume_b();
-      const auto pinf = this->pinf();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
       const Number p_max = std::max(p_i, p_j);
 
       const Number radicand_inverse_i =
-          safe_division(ScalarNumber(0.5) * rho_i,
-                        Number(1.) - covolume_b * rho_i) *
-          ((gamma_i + Number(1.)) * (p_max + pinf) +
-           (gamma_i - Number(1.)) * (p_i + pinf));
+          safe_division(ScalarNumber(0.5) * rho_i, one_minus_b_rho(rho_i)) *
+          ((gamma_i + Number(1.)) * shift(p_max) +
+           (gamma_i - Number(1.)) * shift(p_i));
 
       const Number value_i =
           safe_division(p_max - p_i, std::sqrt(radicand_inverse_i));
 
       const Number radicand_inverse_j =
-          safe_division(ScalarNumber(0.5) * rho_j,
-                        Number(1.) - covolume_b * rho_j) *
-          ((gamma_j + Number(1.)) * (p_max + pinf) +
-           (gamma_j - Number(1.)) * (p_j + pinf));
+          safe_division(ScalarNumber(0.5) * rho_j, one_minus_b_rho(rho_j)) *
+          ((gamma_j + Number(1.)) * shift(p_max) +
+           (gamma_j - Number(1.)) * shift(p_j));
 
       const Number value_j =
           safe_division(p_max - p_j, std::sqrt(radicand_inverse_j));
@@ -872,14 +951,14 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::p_star_RS_full(
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_RS_full(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto pinf = this->pinf();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
       const auto alpha_i = alpha(rho_i, gamma_i, a_i);
@@ -915,7 +994,7 @@ namespace ryujin
 
       const Number numerator =
           ryujin::compare_and_apply_mask<dealii::SIMDComparison::equal>(
-              p_max + pinf,
+              shift(p_max),
               Number(0.),
               Number(0.),
               positive_part(alpha_hat_min + alpha_max - (u_j - u_i)));
@@ -924,7 +1003,7 @@ namespace ryujin
        * The admissible set is p_min >= pinf. But numerically let's avoid
        * division by zero and ensure positivity:
        */
-      const Number p_ratio = safe_division(p_min + pinf, p_max + pinf);
+      const Number p_ratio = safe_division(shift(p_min), shift(p_max));
 
       /*
        * Here, we use a trick: The r-factor only shows up in the formula
@@ -950,10 +1029,9 @@ namespace ryujin
           alpha_hat_min * ryujin::pow(p_ratio, r_exponent - first_exponent) +
           alpha_max;
 
-      const Number p_1_tilde =
-          (p_max + pinf) * ryujin::pow(safe_division(numerator, first_denom),
-                                       first_exponent_inverse) -
-          pinf;
+      const Number p_1_tilde = unshift(
+          shift(p_max) * ryujin::pow(safe_division(numerator, first_denom),
+                                     first_exponent_inverse));
 
       /*
        * Compute (5.7) second formula for \tilde p_2^\ast and (5.8) first
@@ -970,10 +1048,9 @@ namespace ryujin
           alpha_hat_min * ryujin::pow(p_ratio, -second_exponent) +
           alpha_max * ryujin::pow(p_ratio, r_exponent);
 
-      const Number p_2_tilde =
-          (p_max + pinf) * ryujin::pow(safe_division(numerator, second_denom),
-                                       second_exponent_inverse) -
-          pinf;
+      const Number p_2_tilde = unshift(
+          shift(p_max) * ryujin::pow(safe_division(numerator, second_denom),
+                                     second_exponent_inverse));
 
       const Number p_star = std::min(p_1_tilde, p_2_tilde);
 
@@ -984,14 +1061,14 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::p_star_SS_full(
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_SS_full(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto pinf = this->pinf();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -1012,20 +1089,19 @@ namespace ryujin
 
       const Number numerator =
           ryujin::compare_and_apply_mask<dealii::SIMDComparison::equal>(
-              p_j + pinf,
+              shift(p_j),
               Number(0.),
               Number(0.),
               positive_part(alpha_hat_i + alpha_hat_j - (u_j - u_i)));
 
       const Number denominator =
           alpha_hat_i *
-              ryujin::pow(safe_division(p_i + pinf, p_j + pinf), -exponent) +
+              ryujin::pow(safe_division(shift(p_i), shift(p_j)), -exponent) +
           alpha_hat_j;
 
-      const Number p_1_tilde =
-          (p_j + pinf) * ryujin::pow(safe_division(numerator, denominator),
-                                     exponent_inverse) -
-          pinf;
+      const Number p_1_tilde = unshift(
+          shift(p_j) *
+          ryujin::pow(safe_division(numerator, denominator), exponent_inverse));
 
       const auto p_2_tilde = p_star_failsafe(riemann_data_i, riemann_data_j);
 
@@ -1038,15 +1114,14 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::p_star_failsafe(
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_failsafe(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto covolume_b = this->covolume_b();
-      const auto pinf = this->pinf();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -1056,19 +1131,19 @@ namespace ryujin
        * Cost: 0x pow, 3x division, 3x sqrt
        */
 
-      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number p_max = shift(std::max(p_i, p_j));
 
-      const Number radicand_i = safe_division(
-          ScalarNumber(2.) * (Number(1.) - covolume_b * rho_i) * p_max,
-          rho_i * ((gamma_i + Number(1.)) * p_max +
-                   (gamma_i - Number(1.)) * (p_i + pinf)));
+      const Number radicand_i =
+          safe_division(ScalarNumber(2.) * one_minus_b_rho(rho_i) * p_max,
+                        rho_i * ((gamma_i + Number(1.)) * p_max +
+                                 (gamma_i - Number(1.)) * shift(p_i)));
 
       const Number x_i = std::sqrt(radicand_i);
 
-      const Number radicand_j = safe_division(
-          ScalarNumber(2.) * (Number(1.) - covolume_b * rho_j) * p_max,
-          rho_j * ((gamma_j + Number(1.)) * p_max +
-                   (gamma_j - Number(1.)) * (p_j + pinf)));
+      const Number radicand_j =
+          safe_division(ScalarNumber(2.) * one_minus_b_rho(rho_j) * p_max,
+                        rho_j * ((gamma_j + Number(1.)) * p_max +
+                                 (gamma_j - Number(1.)) * shift(p_j)));
 
       const Number x_j = std::sqrt(radicand_j);
 
@@ -1077,14 +1152,14 @@ namespace ryujin
           ryujin::compare_and_apply_mask<dealii::SIMDComparison::equal>(
               a, Number(0.), Number(0.), u_j - u_i);
 
-      const Number c = -(p_i + pinf) * x_i - (p_j + pinf) * x_j;
+      const Number c = -shift(p_i) * x_i - shift(p_j) * x_j;
 
       const Number base = safe_division(
           std::abs(-b +
                    std::sqrt(positive_part(b * b - ScalarNumber(4.) * a * c))),
           std::abs(ScalarNumber(2.) * a));
 
-      const Number p_2_tilde = base * base - pinf;
+      const Number p_2_tilde = unshift(base * base);
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "p_star_failsafe = " << p_2_tilde << std::endl;
@@ -1093,14 +1168,14 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::p_star_interpolated(
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_interpolated(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto pinf = this->pinf();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
       const auto alpha_i = alpha(rho_i, gamma_i, a_i);
@@ -1114,8 +1189,8 @@ namespace ryujin
        * necessarily the minimum/maximum of *_i vs *_j.
        */
 
-      const Number p_min = std::min(p_i, p_j) + pinf;
-      const Number p_max = std::max(p_i, p_j) + pinf;
+      const Number p_min = shift(std::min(p_i, p_j));
+      const Number p_max = shift(std::max(p_i, p_j));
 
       const Number gamma_min =
           ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
@@ -1170,7 +1245,8 @@ namespace ryujin
 
       const auto temp = safe_division(numerator, denominator);
 
-      const Number p_tilde = p_max * ryujin::pow(temp, exponent_inverse) - pinf;
+      const Number p_tilde =
+          unshift(p_max * ryujin::pow(temp, exponent_inverse));
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "p_star_interpolated = " << p_tilde << std::endl;
@@ -1179,45 +1255,49 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::lambda1_minus(
+    NASGRiemannSolverView<Number, options, MemorySpace>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      const auto pinf = this->pinf();
-
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
       const auto factor =
           ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
 
-      const Number tmp = safe_division(positive_part(p_star - p), p + pinf);
+      const Number p_inverse = safe_division(Number(1.), shift(p));
+      const Number tmp = positive_part(p_star - p) * p_inverse;
 
       return u - a * std::sqrt(Number(1.) + factor * tmp);
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::lambda3_plus(
+    NASGRiemannSolverView<Number, options, MemorySpace>::lambda3_plus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      const auto pinf = this->pinf();
-
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
       const auto factor =
           ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
 
-      const Number tmp = safe_division(positive_part(p_star - p), p + pinf);
+      const Number p_inverse = safe_division(Number(1.), shift(p));
+      const Number tmp = positive_part(p_star - p) * p_inverse;
 
       return u + a * std::sqrt(Number(1.) + factor * tmp);
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE std::array<Number, 2>
-    NASGRiemannSolverView<Number, MemorySpace>::compute_gap(
+    NASGRiemannSolverView<Number, options, MemorySpace>::compute_gap(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number p_1,
@@ -1239,9 +1319,11 @@ namespace ryujin
     }
 
 
-    template <typename Number, typename MemorySpace>
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, MemorySpace>::compute_lambda_max(
+    NASGRiemannSolverView<Number, options, MemorySpace>::compute_lambda_max(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j,
         const Number p_star) const

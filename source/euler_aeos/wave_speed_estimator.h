@@ -132,7 +132,10 @@ namespace ryujin
        * The view on the Riemann solver used for computing the wavespeed
        * estimate.
        */
-      using RiemannSolverView = NASGRiemannSolverView<Number, MemorySpace>;
+      using RiemannSolverView =
+          NASGRiemannSolverView<Number,
+                                NASGRiemannSolverOptions{},
+                                MemorySpace>;
 
       /**
        * Number of components in a primitive state, we store \f$[\rho, v,
