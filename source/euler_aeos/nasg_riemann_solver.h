@@ -45,6 +45,14 @@ namespace ryujin
        * used instead.
        */
       bool safe_division = true;
+
+      /**
+       * Take the ratio of specific heats gamma from the Riemann data of
+       * each state. If set to false, a single gamma is assumed that is
+       * passed to the constructor, and all gamma dependent constants are
+       * precomputed.
+       */
+      bool variable_gamma = true;
     };
 
 
@@ -91,6 +99,24 @@ namespace ryujin
         unsigned int newton_max_iterations;
 
         //@}
+        /**
+         * @name Cached inverses
+         *
+         * If options.variable_gamma is set to false, we maintain a
+         * collection of commonly used expressions with gamma that would
+         * otherwise need to be recomputed many times putting unnecessary
+         * pressure on the div/sqrt ALU unit.
+         */
+        //@{
+
+        ScalarNumber gamma;
+        ScalarNumber lambda_factor;
+        ScalarNumber rarefaction_exponent;
+        ScalarNumber rarefaction_exponent_inverse;
+        ScalarNumber half_gamma_minus_one;
+        ScalarNumber c_of_gamma;
+
+        //@}
       };
 
       //@}
@@ -128,10 +154,25 @@ namespace ryujin
         parameters.pinf = ScalarNumber(0.);
         parameters.compute_expensive_bounds = false;
 
+        parameters.gamma = ScalarNumber(0.);
+        parameters.lambda_factor = ScalarNumber(0.);
+        parameters.rarefaction_exponent = ScalarNumber(0.);
+        parameters.rarefaction_exponent_inverse = ScalarNumber(0.);
+        parameters.half_gamma_minus_one = ScalarNumber(0.);
+        parameters.c_of_gamma = ScalarNumber(0.);
+
         /* invalidates view on default memory space */
         ParameterAcceptor::parse_parameters_call_back.connect(
             [this] { parameters_.view(); });
       }
+
+      /**
+       * Set the (single) ratio of specific heats @p gamma and precompute
+       * all gamma dependent constants. Only available if
+       * options.variable_gamma is set to false.
+       */
+      void set_gamma(const double gamma)
+        requires(!options.variable_gamma);
 
       /**
        * Set the interpolatory covolume @p covolume_b, the interpolatory
@@ -347,7 +388,92 @@ namespace ryujin
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
-      DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number c(const Number &gamma_Z) const;
+      template <typename T>
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE static T c(const T &gamma_Z);
+
+      /**
+       * Return gamma for the given state.
+       *
+       * @note If options.variable_gamma is set to false, then this
+       * function return the single (scalar) gamma set via set_gamma().
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+      gamma_of(const primitive_type &riemann_data) const
+      {
+        if constexpr (options.variable_gamma)
+          return riemann_data[3];
+        else
+          return parameters_->gamma;
+      }
+
+
+      /**
+       * Return (gamma + 1) / (2 gamma) for the given state.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+      lambda_factor(const primitive_type &riemann_data) const
+      {
+        if constexpr (options.variable_gamma) {
+          const auto &gamma = riemann_data[3];
+          return ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
+        } else
+          return parameters_->lambda_factor;
+      }
+
+      /**
+       * Return (gamma - 1) / (2 gamma) for the given state.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+      rarefaction_exponent(const primitive_type &riemann_data) const
+      {
+        if constexpr (options.variable_gamma) {
+          const auto &gamma = riemann_data[3];
+          return ScalarNumber(0.5) * (gamma - Number(1.)) / gamma;
+        } else
+          return parameters_->rarefaction_exponent;
+      }
+
+
+      /**
+       * Return 2 gamma / (gamma - 1) for the given state.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+      rarefaction_exponent_inverse(const primitive_type &riemann_data) const
+      {
+        if constexpr (options.variable_gamma) {
+          const auto &gamma = riemann_data[3];
+          return ScalarNumber(2.) * gamma / (gamma - Number(1.));
+        } else
+          return parameters_->rarefaction_exponent_inverse;
+      }
+
+
+      /**
+       * Return (gamma - 1) / 2 for the given state.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+      half_gamma_minus_one(const primitive_type &riemann_data) const
+      {
+        if constexpr (options.variable_gamma) {
+          const auto &gamma = riemann_data[3];
+          return ScalarNumber(0.5) * (gamma - Number(1.));
+        } else
+          return parameters_->half_gamma_minus_one;
+      }
+
+
+      /**
+       * Return c(gamma) for the given state.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+      c_of_gamma(const primitive_type &riemann_data) const
+      {
+        if constexpr (options.variable_gamma)
+          return c(riemann_data[3]);
+        else
+          return parameters_->c_of_gamma;
+      }
+
 
       /**
        * The factor alpha = 2 a (1 - b rho) / (gamma - 1) used in the
@@ -475,6 +601,27 @@ namespace ryujin
                           const primitive_type &riemann_data_j) const;
 
 
+      /*
+       * Compute an upper bound on p_star for the case of a single gamma
+       * (gamma_i == gamma_j). In this case the expansion-shock bound
+       * (5.7)/(5.8) and the shock-shock bound (5.10) of
+       * @cite ClaytonGuermondPopov-2022 reduce to
+       *
+       *   p_max * (N / D)^{1/e},  e = (gamma - 1) / (2 gamma),
+       *   N = alpha_hat_min + X - (u_j - u_i),
+       *   D = alpha_hat_min (p_min / p_max)^{-e} + X,
+       *
+       * with X = alpha_hat_max for phi(p_max) < 0 (5.10), and X = alpha_max
+       * otherwise (5.7)/(5.8).
+       *
+       * Cost: 2x pow, 2x division, 0x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_single_gamma(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j,
+                          const Number &phi_p_max) const;
+
+
       /**
        * See @cite GuermondPopov2016b, page 912, (3.7)
        *
@@ -535,6 +682,9 @@ namespace ryujin
       const Parameters *parameters_;
 
       //@}
+
+      template <typename, NASGRiemannSolverOptions>
+      friend class NASGRiemannSolver;
     };
 
 
@@ -543,6 +693,25 @@ namespace ryujin
      * Inline definitions
      * -------------------------------------------------------------------------
      */
+
+
+    template <typename ScalarNumber, NASGRiemannSolverOptions options>
+    inline void
+    NASGRiemannSolver<ScalarNumber, options>::set_gamma(const double gamma)
+      requires(!options.variable_gamma)
+    {
+      auto &parameters = *parameters_.view();
+
+      parameters.gamma = ScalarNumber(gamma);
+      parameters.lambda_factor = ScalarNumber(0.5 * (gamma + 1.) / gamma);
+      parameters.rarefaction_exponent =
+          ScalarNumber(0.5 * (gamma - 1.) / gamma);
+      parameters.rarefaction_exponent_inverse =
+          ScalarNumber(2. * gamma / (gamma - 1.));
+      parameters.half_gamma_minus_one = ScalarNumber(0.5 * (gamma - 1.));
+      parameters.c_of_gamma = ScalarNumber(
+          NASGRiemannSolverView<ScalarNumber, options>::c(ScalarNumber(gamma)));
+    }
 
 
     template <typename ScalarNumber, NASGRiemannSolverOptions options>
@@ -623,7 +792,24 @@ namespace ryujin
 
       Number p_2;
 
-      if (!compute_expensive_bounds()) {
+      if constexpr (!options.variable_gamma) {
+        /*
+         * For a single gamma the expensive bounds (5.7), (5.8), and (5.10)
+         * reduce to a single formula of the same cost as the interpolated
+         * bound:
+         */
+        const Number p_star_tilde =
+            p_star_single_gamma(riemann_data_i, riemann_data_j, phi_p_max);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
+
+        p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+            phi_p_max,
+            Number(0.),
+            std::min(p_star_tilde, p_star_backup),
+            std::min(p_max, p_star_tilde));
+
+      } else if (!compute_expensive_bounds()) {
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
         const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
@@ -759,9 +945,9 @@ namespace ryujin
     template <typename Number,
               NASGRiemannSolverOptions options,
               typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::c(
-        const Number &gamma) const
+    template <typename T>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE T
+    NASGRiemannSolverView<Number, options, MemorySpace>::c(const T &gamma)
     {
       /*
        * We implement the continuous and monotonic function c(gamma) as
@@ -779,15 +965,14 @@ namespace ryujin
       constexpr ScalarNumber slope =
           ScalarNumber(-0.34976871477801828189920753948709);
 
-      const Number first_radicand = (ScalarNumber(3.) * gamma + Number(11.)) /
-                                    (ScalarNumber(6.) * gamma + Number(6.));
+      const T first_radicand = (ScalarNumber(3.) * gamma + T(11.)) /
+                               (ScalarNumber(6.) * gamma + T(6.));
 
-      const Number second_radicand =
-          Number(5. / 6.) + slope * (gamma - Number(3.));
+      const T second_radicand = T(5. / 6.) + slope * (gamma - T(3.));
 
-      Number radicand = std::min(first_radicand, second_radicand);
-      radicand = std::min(Number(1.), radicand);
-      radicand = std::max(Number(1. / 2.), radicand);
+      T radicand = std::min(first_radicand, second_radicand);
+      radicand = std::min(T(1.), radicand);
+      radicand = std::max(T(1. / 2.), radicand);
 
       return std::sqrt(radicand);
     }
@@ -817,7 +1002,8 @@ namespace ryujin
     {
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
 
-      const auto &[rho, u, p, gamma, a] = riemann_data;
+      const auto &[rho, u, p, gamma_Z, a] = riemann_data;
+      const auto gamma = gamma_of(riemann_data);
 
       const Number one_minus_b_rho = this->one_minus_b_rho(rho);
       const Number gamma_minus_one = gamma - Number(1.);
@@ -832,7 +1018,7 @@ namespace ryujin
       /* true_value is shock case */
       const Number true_value = (p_star - p) * std::sqrt(radicand);
 
-      const auto exponent = ScalarNumber(0.5) * gamma_minus_one / gamma;
+      const auto exponent = rarefaction_exponent(riemann_data);
 
       const Number ratio = safe_division(shift(p_star), shift(p));
       const Number factor = ryujin::pow(ratio, exponent) - Number(1.);
@@ -854,7 +1040,8 @@ namespace ryujin
     NASGRiemannSolverView<Number, options, MemorySpace>::df(
         const primitive_type &riemann_data, const Number &p_star) const
     {
-      const auto &[rho, u, p, gamma, a] = riemann_data;
+      const auto &[rho, u, p, gamma_Z, a] = riemann_data;
+      const auto gamma = gamma_of(riemann_data);
 
       const Number one_minus_b_rho = this->one_minus_b_rho(rho);
 
@@ -871,7 +1058,7 @@ namespace ryujin
           (denominator - ScalarNumber(0.5) * (p_star - p)) /
           (denominator * std::sqrt(radicand_inverse));
 
-      const auto exponent = ScalarNumber(-0.5) * (gamma + Number(1.)) / gamma;
+      const auto exponent = -lambda_factor(riemann_data);
 
       const Number ratio = safe_division(shift(p_star), shift(p));
 
@@ -880,8 +1067,9 @@ namespace ryujin
        * of the derivative of the exponent cancels with the denominator of
        * alpha, so we do not have to divide by (gamma - 1):
        */
-      const auto false_value = safe_division(
-          a * one_minus_b_rho * ryujin::pow(ratio, exponent), gamma * shift(p));
+      const auto false_value =
+          safe_division(a * one_minus_b_rho * ryujin::pow(ratio, exponent),
+                        Number(gamma * shift(p)));
 
       return ryujin::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
@@ -926,8 +1114,10 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+      const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
+      const auto gamma_i = gamma_of(riemann_data_i);
+      const auto gamma_j = gamma_of(riemann_data_j);
 
       const Number p_max = std::max(p_i, p_j);
 
@@ -1122,8 +1312,10 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+      const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
+      const auto gamma_i = gamma_of(riemann_data_i);
+      const auto gamma_j = gamma_of(riemann_data_j);
 
       /*
        * Compute (5.11) formula for \tilde p_2^\ast:
@@ -1259,13 +1451,78 @@ namespace ryujin
               NASGRiemannSolverOptions options,
               typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_single_gamma(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &phi_p_max) const
+    {
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+
+      /* We have gamma_i == gamma_j: */
+      const auto c_gamma = c_of_gamma(riemann_data_i);
+
+      /*
+       * alpha_Z = 2 a_Z (1 - b rho_Z) / (gamma - 1). We drop the common
+       * factor 2 / (gamma - 1) and rescale (u_j - u_i) accordingly:
+       */
+      const Number alpha_i = a_i * one_minus_b_rho(rho_i);
+      const Number alpha_j = a_j * one_minus_b_rho(rho_j);
+
+      const Number p_min = shift(std::min(p_i, p_j));
+      const Number p_max = shift(std::max(p_i, p_j));
+
+      const Number alpha_min =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_max = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_hat_min = c_gamma * alpha_min;
+
+      /*
+       * The shock-shock bound (5.10) uses alpha_hat_max, the
+       * expansion-shock bound (5.7)/(5.8) uses alpha_max:
+       */
+      const Number alpha_select =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max, Number(0.), c_gamma * alpha_max, alpha_max);
+
+      const auto exponent = rarefaction_exponent(riemann_data_i);
+      const auto exponent_inverse =
+          rarefaction_exponent_inverse(riemann_data_i);
+
+      const Number numerator =
+          positive_part(alpha_hat_min + alpha_select -
+                        half_gamma_minus_one(riemann_data_i) * (u_j - u_i));
+
+      const Number denominator =
+          alpha_hat_min * ryujin::pow(safe_division(p_min, p_max), -exponent) +
+          alpha_select;
+
+      const Number p_tilde =
+          unshift(p_max * ryujin::pow(safe_division(numerator, denominator),
+                                      exponent_inverse));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "p_star_single_gamma = " << p_tilde << std::endl;
+#endif
+      return p_tilde;
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     NASGRiemannSolverView<Number, options, MemorySpace>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
-      const auto factor =
-          ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
+      const auto factor = lambda_factor(riemann_data);
 
       const Number p_inverse = safe_division(Number(1.), shift(p));
       const Number tmp = positive_part(p_star - p) * p_inverse;
@@ -1283,8 +1540,7 @@ namespace ryujin
     {
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
-      const auto factor =
-          ScalarNumber(0.5) * (gamma + ScalarNumber(1.)) / gamma;
+      const auto factor = lambda_factor(riemann_data);
 
       const Number p_inverse = safe_division(Number(1.), shift(p));
       const Number tmp = positive_part(p_star - p) * p_inverse;
