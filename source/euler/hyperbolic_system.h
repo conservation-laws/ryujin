@@ -149,10 +149,10 @@ namespace ryujin
 
       Mirrored<Parameters> parameters_;
 
-      //@}
-
       template <int, typename, typename>
       friend class HyperbolicSystemView;
+
+      //@}
     }; /* HyperbolicSystem */
 
 
