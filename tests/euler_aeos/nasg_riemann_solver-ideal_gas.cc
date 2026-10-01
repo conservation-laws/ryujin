@@ -73,17 +73,16 @@ int main(int argc, char *argv[])
       const auto vsolver = riemann_solver->view<VA>();
       const unsigned int iterations = solver.newton_max_iterations();
 
-      const auto [lambda_max, p_star] = solver.compute(rd_i, rd_j);
-      const auto [vlambda_max, vp_star] = vsolver.compute(vrd_i, vrd_j);
+      const auto lambda_max = solver.compute(rd_i, rd_j);
+      const auto vlambda_max = vsolver.compute(vrd_i, vrd_j);
 
       bool simd_matches = true;
       for (unsigned int l = 0; l < VA::size(); ++l)
         simd_matches &=
-            std::abs(vlambda_max[l] - lambda_max) <= 1.e-14 * lambda_max &&
-            std::abs(vp_star[l] - p_star) <= 1.e-14 * std::abs(p_star);
+            std::abs(vlambda_max[l] - lambda_max) <= 1.e-14 * lambda_max;
 
       std::cout << "iterations " << iterations
-                << ": lambda_max = " << lambda_max << ", p_star = " << p_star
+                << ": lambda_max = " << lambda_max
                 << (simd_matches ? "" : " (SIMD MISMATCH)") << std::endl;
     }
     std::cout << std::endl;
