@@ -255,6 +255,32 @@ namespace ryujin
        */
       using primitive_type = std::array<Number, riemann_data_size>;
 
+      /**
+       * The wave structure of the 1D Riemann problem: the star state and
+       * the characteristic speeds
+       * \f[
+       *   \lambda_1^- \le \lambda_1^+ \le \lambda_2 = u^\ast \le
+       *   \lambda_3^- \le \lambda_3^+.
+       * \f]
+       * For a shock the head and tail speed of the wave coincide.
+       *
+       * @note If a vacuum is formed in the star region, then p_star =
+       * -pinf, both star densities are zero, and u_star is set to the
+       * mean of the two vacuum front speeds lambda1_plus and
+       * lambda3_minus.
+       */
+      struct RiemannSolution {
+        Number p_star;
+        Number u_star;
+        Number rho_star_left;
+        Number rho_star_right;
+
+        Number lambda1_minus; /* head of the 1-wave */
+        Number lambda1_plus;  /* tail of the 1-wave */
+        Number lambda3_minus; /* tail of the 3-wave */
+        Number lambda3_plus;  /* head of the 3-wave */
+      };
+
       //@}
       /**
        * @name Constructor and methods for computing wavespeed estimates
@@ -319,6 +345,45 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number
       compute(const primitive_type &riemann_data_i,
               const primitive_type &riemann_data_j) const;
+
+      //@}
+      /**
+       * @name Methods for computing the full Riemann solution
+       */
+      //@{
+
+      /**
+       * For two given 1D primitive states riemann_data_i and
+       * riemann_data_j, and a given star pressure p_star, compute the
+       * resulting wave structure: the star velocity, the star densities
+       * left and right of the contact, and all wave speeds.
+       *
+       * The star pressure can be exact (see solve()), or an approximation,
+       * for example the upper bound p_star_upper_bound(). In the latter
+       * case lambda1_minus and lambda3_plus are guaranteed bounds on the
+       * extreme wave speeds and u_star is the mean of the velocities
+       * obtained from the left and right wave curves.
+       *
+       * See @cite Toro2009, §4.2 - §4.4, generalized to the Noble-Abel
+       * stiffened gas equation of state.
+       *
+       * Cost: 4x pow, 22x division, 6x sqrt (inclusive)
+       */
+      DEAL_II_HOST_DEVICE RiemannSolution
+      riemann_solution(const primitive_type &riemann_data_i,
+                       const primitive_type &riemann_data_j,
+                       const Number p_star) const;
+
+      /**
+       * For two given 1D primitive states riemann_data_i and
+       * riemann_data_j, compute the exact star pressure (up to machine
+       * precision, or until @p max_iterations quadratic Newton steps have
+       * been performed) and return the resulting wave structure.
+       */
+      DEAL_II_HOST_DEVICE RiemannSolution
+      solve(const primitive_type &riemann_data_i,
+            const primitive_type &riemann_data_j,
+            const unsigned int max_iterations = 100) const;
 
       //@}
       /**
@@ -600,6 +665,19 @@ namespace ryujin
 
 
       /*
+       * Compute a lower bound on p_star for the case of two rarefaction
+       * waves (phi(p_min) > 0). The bound is exact for a single gamma, see
+       * @cite Toro2009, (4.46), and it is strictly larger than -pinf
+       * unless a vacuum is formed.
+       *
+       * Cost: 2x pow, 4x division, 0x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_two_rarefaction(const primitive_type &riemann_data_i,
+                             const primitive_type &riemann_data_j) const;
+
+
+      /*
        * Compute an upper bound on p_star. (In case of two expansion waves
        * the bound is only guaranteed to be less than or equal to p_min.)
        */
@@ -638,6 +716,31 @@ namespace ryujin
        */
       DEAL_II_HOST_DEVICE Number lambda3_plus(
           const primitive_type &primitive_state, const Number p_star) const;
+
+
+      /**
+       * The speed of sound
+       * \f$a = \sqrt{\gamma (p + p_\infty) / (\rho (1 - b \rho))}\f$
+       * of the Noble-Abel stiffened gas equation of state. Returns zero
+       * for vacuum.
+       *
+       * Cost: 0x pow, 1x division, 1x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number speed_of_sound(const Number &rho,
+                                                const Number &p,
+                                                const Number &gamma) const;
+
+
+      /**
+       * Return the density of the star state adjacent to the given state
+       * for a given star pressure p_star, see @cite Toro2009, (4.50) and
+       * (4.53), generalized to the Noble-Abel stiffened gas equation of
+       * state.
+       *
+       * Cost: 1x pow, 4x division, 0x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number rho_star(const primitive_type &riemann_data,
+                                          const Number &p_star) const;
 
 
       /**
@@ -1477,6 +1580,73 @@ namespace ryujin
               NASGRiemannSolverOptions options,
               typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_two_rarefaction(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      /*
+       * With e_m = (gamma_m - 1) / (2 gamma_m), where gamma_m is the minimum
+       * of gamma_i and gamma_j, we have (P / P_Z)^{e_Z} <= (P / P_Z)^{e_m}
+       * for P <= P_Z. Thus, in the two rarefaction case phi is bounded from
+       * above by a function whose root is
+       *
+       *   P_min (N / D)^{1/e_m},
+       *   N = alpha_min + alpha_max - (u_j - u_i),
+       *   D = alpha_min + alpha_max (P_min / P_max)^{e_m}.
+       */
+
+      const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
+      const auto gamma_i = gamma_of(riemann_data_i);
+      const auto gamma_j = gamma_of(riemann_data_j);
+
+      const Number alpha_i = alpha(rho_i, Number(gamma_i), a_i);
+      const Number alpha_j = alpha(rho_j, Number(gamma_j), a_j);
+
+      const Number p_min = shift(std::min(p_i, p_j));
+      const Number p_max = shift(std::max(p_i, p_j));
+
+      const Number alpha_min =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_max = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, alpha_i, alpha_j);
+
+      Number exponent;
+      Number exponent_inverse;
+      if constexpr (options.variable_gamma) {
+        const Number gamma_m = std::min(gamma_i, gamma_j);
+        exponent = (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
+        exponent_inverse = Number(1.) / exponent;
+      } else {
+        exponent = rarefaction_exponent(riemann_data_i);
+        exponent_inverse = rarefaction_exponent_inverse(riemann_data_i);
+      }
+
+      const Number numerator =
+          positive_part(alpha_min + alpha_max - (u_j - u_i));
+
+      const Number denominator =
+          alpha_min +
+          alpha_max * ryujin::pow(safe_division(p_min, p_max), exponent);
+
+      const Number p_tilde =
+          unshift(p_min * ryujin::pow(safe_division(numerator, denominator),
+                                      exponent_inverse));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "p_star_two_rarefaction = " << p_tilde << std::endl;
+#endif
+      return p_tilde;
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     NASGRiemannSolverView<Number, options, MemorySpace>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
@@ -1655,6 +1825,230 @@ namespace ryujin
 
       ryujin::quadratic_newton_step(
           p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::speed_of_sound(
+        const Number &rho, const Number &p, const Number &gamma) const
+    {
+      return std::sqrt(
+          safe_division(gamma * shift(p), rho * one_minus_b_rho(rho)));
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::rho_star(
+        const primitive_type &riemann_data, const Number &p_star) const
+    {
+      /*
+       * For p_star >= p the state is connected by a shock and we use the
+       * Rankine-Hugoniot condition
+       *
+       *   w^\ast = w (mu P^\ast + P) / (P^\ast + mu P),
+       *
+       * otherwise the state is connected by a rarefaction wave and we use
+       * the isentrope P w^gamma = const. Here, w = 1 / rho - b,
+       * P = p + pinf, and mu = (gamma - 1) / (gamma + 1).
+       */
+
+      const auto &[rho, u, p, gamma_Z, a] = riemann_data;
+      const auto gamma = gamma_of(riemann_data);
+
+      const Number one_minus_b_rho = this->one_minus_b_rho(rho);
+      const Number b_rho = Number(1.) - one_minus_b_rho;
+
+      const Number P = shift(p);
+      const Number P_star = shift(p_star);
+
+      /*
+       * Shock case: Multiply w^\ast = w (mu P^\ast + P) / (P^\ast + mu P)
+       * by (gamma + 1) and solve for rho^\ast = 1 / (b + w^\ast):
+       */
+
+      const Number gamma_minus_one_P_star = (gamma - Number(1.)) * P_star;
+      const Number gamma_minus_one_P = (gamma - Number(1.)) * P;
+      const Number gamma_plus_one_P_star = (gamma + Number(1.)) * P_star;
+      const Number gamma_plus_one_P = (gamma + Number(1.)) * P;
+
+      const Number shock_numerator = gamma_plus_one_P_star + gamma_minus_one_P;
+      const Number shock_denominator =
+          one_minus_b_rho * (gamma_minus_one_P_star + gamma_plus_one_P) +
+          b_rho * shock_numerator;
+
+      const Number true_value =
+          rho * safe_division(shock_numerator, shock_denominator);
+
+      /*
+       * Rarefaction case: w^\ast = w r^{-1} with r = (P^\ast / P)^{1/gamma}.
+       * We avoid the division by r so that the vacuum case P^\ast = 0
+       * results in rho^\ast = 0:
+       */
+
+      const Number r = ryujin::pow(safe_division(P_star, P),
+                                   Number(ScalarNumber(1.) / gamma));
+
+      const Number false_value =
+          rho * safe_division(r, one_minus_b_rho + b_rho * r);
+
+      return ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE auto
+    NASGRiemannSolverView<Number, options, MemorySpace>::riemann_solution(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number p_star) const -> RiemannSolution
+    {
+      const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
+      const auto gamm_i = gamma_of(riemann_data_i);
+      const auto gamm_j = gamma_of(riemann_data_j);
+
+      /*
+       * The velocity of the star state obtained from the left and right
+       * wave curves, see @cite Toro2009, (4.9). Both values coincide for
+       * the exact p_star, but differ in case of vacuum (or an approximate
+       * p_star). In case of vacuum they are the velocities of the vacuum
+       * fronts.
+       */
+
+      const Number u_star_left = u_i - f(riemann_data_i, p_star);
+      const Number u_star_right = u_j + f(riemann_data_j, p_star);
+      const Number u_star = ScalarNumber(0.5) * (u_star_left + u_star_right);
+
+      const Number rho_star_left = rho_star(riemann_data_i, p_star);
+      const Number rho_star_right = rho_star(riemann_data_j, p_star);
+
+      const Number lambda1_minus = this->lambda1_minus(riemann_data_i, p_star);
+      const Number lambda3_plus = this->lambda3_plus(riemann_data_j, p_star);
+
+      /*
+       * For a shock the tail speed coincides with the shock speed, for a
+       * rarefaction wave it is u^\ast -+ a^\ast, see @cite Toro2009, §4.4:
+       */
+
+      constexpr auto GTE = dealii::SIMDComparison::greater_than_or_equal;
+      Number lambda1_plus =
+          u_star_left - speed_of_sound(rho_star_left, p_star, Number(gamm_i));
+      lambda1_plus = ryujin::compare_and_apply_mask<GTE>(
+          p_star, p_i, lambda1_minus, lambda1_plus);
+
+      Number lambda3_minus =
+          u_star_right + speed_of_sound(rho_star_right, p_star, Number(gamm_j));
+      lambda3_minus = ryujin::compare_and_apply_mask<GTE>(
+          p_star, p_j, lambda3_plus, lambda3_minus);
+
+      return RiemannSolution{
+          .p_star = p_star,
+          .u_star = u_star,
+          .rho_star_left = rho_star_left,
+          .rho_star_right = rho_star_right,
+          .lambda1_minus = lambda1_minus,
+          .lambda1_plus = lambda1_plus,
+          .lambda3_minus = lambda3_minus,
+          .lambda3_plus = lambda3_plus,
+      };
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE auto
+    NASGRiemannSolverView<Number, options, MemorySpace>::solve(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const unsigned int max_iterations) const -> RiemannSolution
+    {
+      /*
+       * First, we compute a bracket p_1 <= p_star <= p_2 with phi(p_1) <= 0
+       * <= phi(p_2). Recall that phi is monotonically increasing.
+       */
+
+      const Number &p_i = riemann_data_i[2];
+      const Number &p_j = riemann_data_j[2];
+
+      const Number p_min = std::min(p_i, p_j);
+      const Number p_max = std::max(p_i, p_j);
+      const Number p_vacuum = unshift(Number(0.));
+
+      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
+      const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
+      const Number phi_p_vacuum = phi(riemann_data_i, riemann_data_j, p_vacuum);
+
+      /*
+       * Case phi(p_min) <= 0 <= phi(p_max) (rarefaction-shock): The bracket
+       * is [p_min, p_max].
+       *
+       * Case phi(p_min) > 0 (rarefaction-rarefaction): The bracket is
+       * [p_star_two_rarefaction(), p_min]. Note that we must not start the
+       * iteration at -pinf: dphi is unbounded at -pinf (vacuum), which
+       * results in NaNs in the quadratic Newton step.
+       */
+
+      const Number p_lower = std::max(
+          p_vacuum, p_star_two_rarefaction(riemann_data_i, riemann_data_j));
+
+      Number p_1 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(
+          phi_p_min, Number(0.), p_min, p_lower);
+      Number p_2 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(
+          phi_p_min, Number(0.), p_max, p_min);
+
+      /*
+       * Case phi(p_max) < 0 (shock-shock): The bracket is
+       * [p_max, p_star_upper_bound()].
+       */
+
+      const Number p_upper = std::max(
+          p_max, p_star_upper_bound(riemann_data_i, riemann_data_j, phi_p_max));
+
+      p_1 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          phi_p_max, Number(0.), p_max, p_1);
+      p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          phi_p_max, Number(0.), p_upper, p_2);
+
+      /*
+       * Case phi(-pinf) >= 0: A vacuum is formed and p_star = -pinf.
+       */
+
+      p_1 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          phi_p_vacuum, Number(0.), p_vacuum, p_1);
+      p_2 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          phi_p_vacuum, Number(0.), p_vacuum, p_2);
+
+      /*
+       * Now, we perform quadratic Newton steps until the bracket has shrunk
+       * to machine precision:
+       */
+
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
+      for (unsigned int i = 0; i < max_iterations; ++i) {
+        const Number tolerance = ScalarNumber(16. * eps) * shift(p_2);
+        if (std::max(Number(0.), p_2 - p_1 - tolerance) == Number(0.))
+          break;
+
+        newton_step(riemann_data_i, riemann_data_j, p_1, p_2);
+      }
+
+      return riemann_solution(riemann_data_i, riemann_data_j, p_2);
     }
 
   } // namespace EulerAEOS
