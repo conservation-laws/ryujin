@@ -1,5 +1,6 @@
 // force distinct symbols in test
 #define Euler EulerTest
+#define EulerAEOS EulerAEOSTest
 
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
@@ -47,11 +48,12 @@ int main(int argc, char *argv[])
     const Number u = state[1];
     const Number p = state[2];
 
-    std::array<Number, 4> result;
+    std::array<Number, 5> result;
     result[0] = rho;
     result[1] = u;
     result[2] = p;
-    result[3] = std::sqrt(gamma * p / rho);
+    result[3] = gamma;
+    result[4] = std::sqrt(gamma * p / rho);
     return result;
   };
 

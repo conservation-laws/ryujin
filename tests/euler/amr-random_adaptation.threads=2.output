@@ -12,7 +12,7 @@
 [INFO] preparing compute kernels
 Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 800
-t     = 2.008229115565869
-Linf  = 0.5947862142865539
-L1    = 0.04457784279433662
-L2    = 0.08776597575422618
+t     = 2.008228865764486
+Linf  = 0.5947846113583297
+L1    = 0.0445778467124202
+L2    = 0.08776596629453069
