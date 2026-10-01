@@ -313,16 +313,10 @@ namespace ryujin
 
       /**
        * For two given 1D primitive states riemann_data_i and
-       * riemann_data_j, compute an estimate for an upper bound of the
-       * maximum wavespeed lambda.
-       *
-       * The function returns the array {lambda_max, p_star}, where
-       * lambda_max is the upper bound of the maximal wavespeed and p_star
-       * is the corresponding upper bound estimate of the pressure in the
-       * star region. (In case of two expansion waves p_star is only
-       * guaranteed to be less than or equal to p_min.)
+       * riemann_data_j, compute an upper bound of the maximum wavespeed
+       * lambda.
        */
-      DEAL_II_HOST_DEVICE std::array<Number, 2>
+      DEAL_II_HOST_DEVICE Number
       compute(const primitive_type &riemann_data_i,
               const primitive_type &riemann_data_j) const;
 
@@ -620,6 +614,33 @@ namespace ryujin
                           const Number &phi_p_max) const;
 
 
+      /*
+       * Compute an upper bound on p_star. Depending on the compile time
+       * options and on compute_expensive_bounds(), this is the single
+       * gamma bound, the interpolated bound, or the expensive bounds, each
+       * combined with the failsafe bound or p_max. (In case of two
+       * expansion waves the bound is only guaranteed to be less than or
+       * equal to p_min.)
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_upper_bound(const primitive_type &riemann_data_i,
+                         const primitive_type &riemann_data_j,
+                         const Number &phi_p_max) const;
+
+
+      /*
+       * Perform one quadratic Newton step on the bracket p_1 <= p_star <=
+       * p_2 of the root of phi, see @cite GuermondPopov2016b, p. 915f
+       * (4.8) and (4.9).
+       *
+       * Cost: 8x pow, 51x division, 10x sqrt (inclusive)
+       */
+      DEAL_II_HOST_DEVICE void newton_step(const primitive_type &riemann_data_i,
+                                           const primitive_type &riemann_data_j,
+                                           Number &p_1,
+                                           Number &p_2) const;
+
+
       /**
        * See @cite GuermondPopov2016b, page 912, (3.7)
        *
@@ -764,7 +785,7 @@ namespace ryujin
     template <typename Number,
               NASGRiemannSolverOptions options,
               typename MemorySpace>
-    DEAL_II_HOST_DEVICE std::array<Number, 2>
+    DEAL_II_HOST_DEVICE Number
     NASGRiemannSolverView<Number, options, MemorySpace>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
@@ -785,63 +806,9 @@ namespace ryujin
       std::cout << "a_right: " << a_j << std::endl;
 #endif
 
-      const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
-
-      Number p_2;
-
-      if constexpr (!options.variable_gamma) {
-        /*
-         * For a single gamma the expensive bounds (5.7), (5.8), and (5.10)
-         * reduce to a single formula of the same cost as the interpolated
-         * bound:
-         */
-        const Number p_star_tilde =
-            p_star_single_gamma(riemann_data_i, riemann_data_j, phi_p_max);
-        const Number p_star_backup =
-            p_star_failsafe(riemann_data_i, riemann_data_j);
-
-        p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max,
-            Number(0.),
-            std::min(p_star_tilde, p_star_backup),
-            std::min(p_max, p_star_tilde));
-
-      } else if (!compute_expensive_bounds()) {
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-        const Number p_strict =
-            ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-        std::cout << "   p^*_strict = " << p_strict << "\n";
-        std::cout << "   phi(p_*_s) = "
-                  << phi(riemann_data_i, riemann_data_j, p_strict) << "\n";
-        std::cout << "-> lambda_str = "
-                  << compute_lambda_max(
-                         riemann_data_i, riemann_data_j, p_strict)
-                  << std::endl;
-#endif
-
-        const Number p_star_tilde =
-            p_star_interpolated(riemann_data_i, riemann_data_j);
-        const Number p_star_backup =
-            p_star_failsafe(riemann_data_i, riemann_data_j);
-
-        p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max,
-            Number(0.),
-            std::min(p_star_tilde, p_star_backup),
-            std::min(p_max, p_star_tilde));
-
-      } else {
-
-        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-
-        p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-      }
+      Number p_2 =
+          p_star_upper_bound(riemann_data_i, riemann_data_j, phi_p_max);
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "   p^*_tilde  = " << p_2 << "\n";
@@ -860,7 +827,7 @@ namespace ryujin
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
         std::cout << "-> lambda_max = " << lambda_max << std::endl;
 #endif
-        return {{lambda_max, p_2}};
+        return lambda_max;
       }
 
       /*
@@ -870,6 +837,7 @@ namespace ryujin
        */
 
       const Number p_min = std::min(p_i, p_j);
+      const Number p_max = std::max(p_i, p_j);
 
       Number p_1 =
           ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
@@ -906,13 +874,7 @@ namespace ryujin
           break;
         }
 
-        // FIXME: Fuse these computations:
-        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
-        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
-        const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
-        const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
-
-        quadratic_newton_step(p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
+        newton_step(riemann_data_i, riemann_data_j, p_1, p_2);
 
         /* Update  lambda_max and gap: */
         auto [gap_new, lambda_max_new] =
@@ -921,10 +883,6 @@ namespace ryujin
         lambda_max = lambda_max_new;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
-        std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
-        std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
-        std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
         std::cout << "p_1: (  " << i << "  ) " << p_1 << std::endl;
         std::cout << "p_2: (  " << i << "  ) " << p_2 << std::endl;
         std::cout << "gap:         " << gap << std::endl;
@@ -936,7 +894,7 @@ namespace ryujin
       std::cout << "-> lambda_max = " << lambda_max << std::endl;
 #endif
 
-      return {{lambda_max, p_2}};
+      return lambda_max;
     }
 
 
@@ -1586,6 +1544,106 @@ namespace ryujin
       const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
 
       return std::max(positive_part(nu_32), negative_part(nu_11));
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_upper_bound(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &phi_p_max) const
+    {
+      const Number &p_i = riemann_data_i[2];
+      const Number &p_j = riemann_data_j[2];
+
+      const Number p_max = std::max(p_i, p_j);
+
+      if constexpr (!options.variable_gamma) {
+        /*
+         * For a single gamma the expensive bounds (5.7), (5.8), and (5.10)
+         * reduce to a single formula of the same cost as the interpolated
+         * bound:
+         */
+        const Number p_star_tilde =
+            p_star_single_gamma(riemann_data_i, riemann_data_j, phi_p_max);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
+
+        return ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::less_than>(
+            phi_p_max,
+            Number(0.),
+            std::min(p_star_tilde, p_star_backup),
+            std::min(p_max, p_star_tilde));
+
+      } else if (!compute_expensive_bounds()) {
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+        const Number p_strict =
+            ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+        std::cout << "   p^*_strict = " << p_strict << "\n";
+        std::cout << "   phi(p_*_s) = "
+                  << phi(riemann_data_i, riemann_data_j, p_strict) << "\n";
+        std::cout << "-> lambda_str = "
+                  << compute_lambda_max(
+                         riemann_data_i, riemann_data_j, p_strict)
+                  << std::endl;
+#endif
+
+        const Number p_star_tilde =
+            p_star_interpolated(riemann_data_i, riemann_data_j);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
+
+        return ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::less_than>(
+            phi_p_max,
+            Number(0.),
+            std::min(p_star_tilde, p_star_backup),
+            std::min(p_max, p_star_tilde));
+
+      } else {
+
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+
+        return ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::less_than>(
+            phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+      }
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    NASGRiemannSolverView<Number, options, MemorySpace>::newton_step(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        Number &p_1,
+        Number &p_2) const
+    {
+      // FIXME: Fuse these computations:
+      const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+      const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+      const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+      const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
+      std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
+      std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
+      std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
+#endif
+
+      ryujin::quadratic_newton_step(
+          p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
     }
 
   } // namespace EulerAEOS
