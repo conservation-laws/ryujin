@@ -62,7 +62,7 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<ScalarNumber>;
 
-    constexpr unsigned int stride_size = get_stride_size<VA>;
+    constexpr unsigned int stride_size = VA::size();
     const unsigned int regular =
         left + (internal - left) / stride_size * stride_size;
 

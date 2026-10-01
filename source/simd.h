@@ -75,21 +75,6 @@ namespace ryujin
   //@}
 
 
-  /**
-   * Return the stride size:
-   *
-   * @ingroup SIMD
-   */
-  //@{
-  template <typename T>
-  constexpr unsigned int get_stride_size = 1;
-
-  template <typename T, std::size_t width>
-  constexpr unsigned int get_stride_size<dealii::VectorizedArray<T, width>> =
-      width;
-  //@}
-
-
 #ifndef DOXYGEN
   namespace
   {

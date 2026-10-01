@@ -474,7 +474,7 @@ namespace ryujin
 
     const auto body = [&](auto sentinel, unsigned int i) {
       using T = decltype(sentinel);
-      unsigned int stride_size = get_stride_size<T>;
+      const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
 
       /* Skip constrained degrees of freedom: */
       const unsigned int row_length = sparsity_simd_view.row_length(i);
@@ -567,7 +567,7 @@ namespace ryujin
 
     const auto body_widen = [&](auto sentinel, unsigned int i) {
       using T = decltype(sentinel);
-      unsigned int stride_size = get_stride_size<T>;
+      const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
 
       /* Skip constrained degrees of freedom: */
       const unsigned int row_length = sparsity_simd_view.row_length(i);

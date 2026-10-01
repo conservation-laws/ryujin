@@ -982,7 +982,7 @@ namespace ryujin
 
         const auto view = this->view<dim, T>();
 
-        constexpr unsigned int stride_size = get_stride_size<T>;
+        const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
         const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += stride_size) {
