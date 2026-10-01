@@ -86,7 +86,9 @@ void test(const Solver &riemann_solver,
       simd_matches &= std::abs(vvalues[k][l] - values[k]) <=
                       1.e-14 * std::max(1., std::abs(values[k]));
 
-  const auto &[p_star,
+  const auto &[riemann_data_left,
+               riemann_data_right,
+               p_star,
                u_star,
                rho_star_left,
                rho_star_right,

@@ -256,8 +256,8 @@ namespace ryujin
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
-       * The wave structure of the 1D Riemann problem: the star state and
-       * the characteristic speeds
+       * The self-similar solution of the 1D Riemann problem: the left and
+       * right states, the star state, and the characteristic speeds
        * \f[
        *   \lambda_1^- \le \lambda_1^+ \le \lambda_2 = u^\ast \le
        *   \lambda_3^- \le \lambda_3^+.
@@ -270,6 +270,9 @@ namespace ryujin
        * lambda3_minus.
        */
       struct RiemannSolution {
+        primitive_type riemann_data_left;
+        primitive_type riemann_data_right;
+
         Number p_star;
         Number u_star;
         Number rho_star_left;
@@ -1041,6 +1044,8 @@ namespace ryujin
           p_star, p_j, lambda3_plus, lambda3_minus);
 
       return RiemannSolution{
+          .riemann_data_left = riemann_data_i,
+          .riemann_data_right = riemann_data_j,
           .p_star = p_star,
           .u_star = u_star,
           .rho_star_left = rho_star_left,
