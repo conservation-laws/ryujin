@@ -432,7 +432,7 @@ namespace ryujin
       }
 
       /**
-       * If options.safe_devision is enabled, return a safe division of
+       * If options.safe_division is enabled, return a safe division of
        * numerator / denominator.
        */
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
@@ -579,7 +579,7 @@ namespace ryujin
        */
       //@{
 
-      /*
+      /**
        * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
        * Noble-Abel stiffened gas equation of state, see
        * @cite ClaytonGuermondPopov-2022.
@@ -589,7 +589,9 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number f(const primitive_type &riemann_data,
                                    const Number p_star) const;
 
-      /*
+      /**
+       * The derivative of f() with respect to p_star.
+       *
        * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
        * Noble-Abel stiffened gas equation of state, see
        * @cite ClaytonGuermondPopov-2022.
@@ -599,7 +601,7 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number df(const primitive_type &riemann_data,
                                     const Number &p_star) const;
 
-      /*
+      /**
        * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
        * Noble-Abel stiffened gas equation of state, see
        * @cite ClaytonGuermondPopov-2022.
@@ -610,7 +612,9 @@ namespace ryujin
                                      const primitive_type &riemann_data_j,
                                      const Number p_in) const;
 
-      /*
+      /**
+       * The derivative of phi() with respect to p.
+       *
        * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
        * Noble-Abel stiffened gas equation of state, see
        * @cite ClaytonGuermondPopov-2022.
@@ -645,7 +649,7 @@ namespace ryujin
        * Cost: 0x pow, 2x division, 1x sqrt
        */
       DEAL_II_HOST_DEVICE Number lambda3_plus(
-          const primitive_type &primitive_state, const Number p_star) const;
+          const primitive_type &riemann_data, const Number p_star) const;
 
       //@}
       /**
@@ -653,7 +657,7 @@ namespace ryujin
        */
       //@{
 
-      /*
+      /**
        * Compute an upper bound on p_star. (In case of two expansion waves
        * the bound is only guaranteed to be less than or equal to p_min.)
        */
@@ -662,7 +666,7 @@ namespace ryujin
                          const primitive_type &riemann_data_j,
                          const Number &phi_p_max) const;
 
-      /*
+      /**
        * Compute an upper bound on p_star for the case of a single gamma
        * (gamma_i == gamma_j) that combines the expansion-shock bound
        * (5.7)/(5.8) and the shock-shock bound (5.10) of
@@ -675,7 +679,7 @@ namespace ryujin
                           const primitive_type &riemann_data_j,
                           const Number &phi_p_max) const;
 
-      /*
+      /**
        * Compute a simultaneous upper bound on (5.7) second formula for
        * \tilde p_2^\ast (5.8) first formula for \tilde p_1^\ast (5.11)
        * formula for \tilde p_2^\ast in @cite ClaytonGuermondPopov-2022
@@ -710,8 +714,8 @@ namespace ryujin
       p_star_SS_full(const primitive_type &riemann_data_i,
                      const primitive_type &riemann_data_j) const;
 
-      /*
-       * Compute only the failsafe the failsafe bound for \f$\tilde
+      /**
+       * Compute only the failsafe bound for \f$\tilde
        * p_2^\ast\f$ (5.11) in @cite ClaytonGuermondPopov-2022
        *
        * Cost: 0x pow, 3x division, 3x sqrt
@@ -720,7 +724,7 @@ namespace ryujin
       p_star_failsafe(const primitive_type &riemann_data_i,
                       const primitive_type &riemann_data_j) const;
 
-      /*
+      /**
        * Compute a lower bound on p_star for the case of two rarefaction
        * waves (phi(p_min) > 0). The bound is exact for a single gamma, see
        * @cite Toro2009, (4.46), and it is strictly larger than -pinf
@@ -738,7 +742,7 @@ namespace ryujin
        */
       //@{
 
-      /*
+      /**
        * Perform one quadratic Newton step on the bracket p_1 <= p_star <=
        * p_2 of the root of phi, see @cite GuermondPopov2016b, p. 915f
        * (4.8) and (4.9).
@@ -837,41 +841,6 @@ namespace ryujin
     }
 
 
-    /*
-     * The NASGRiemannSolver is a guaranteed maximal wavespeed (GMS)
-     * estimate for the extended Riemann problem outlined in
-     * @cite ClaytonGuermondPopov-2022. For extenstions on handling negative
-     * pressures, we follow @cite clayton2023robust (see §4.6).
-     *
-     * In contrast to the algorithm outlined in above reference the
-     * algorithm takes a couple of shortcuts to significantly decrease the
-     * computational footprint. These simplifications still guarantee that
-     * we have an upper bound on the maximal wavespeed - but the number
-     * bound might be larger. In particular:
-     *
-     *  - We do not check and treat the case phi(p_min) > 0. This
-     *    corresponds to two expansion waves, see §5.2 in the reference. In
-     *    this case we have
-     *
-     *      0 < p_star < p_min <= p_max.
-     *
-     *    And due to the fact that p_star < p_min the wavespeeds reduce to
-     *    a left wavespeed v_L - a_L and right wavespeed v_R + a_R. This
-     *    implies that it is sufficient to set p_2 to ANY value provided
-     *    that p_2 <= p_min hold true in order to compute the correct
-     *    wavespeed.
-     *
-     *    If p_2 > p_min then a more pessimistic bound is computed.
-     *
-     *  - The (optional) quadratic Newton iteration requires a valid bracket
-     *    p_1 <= p_star <= p_2, i.e., phi(p_1) <= 0 <= phi(p_2). Both, the
-     *    expensive bound and the (cheaper) interpolated bound, are upper
-     *    bounds of p_star; p_1 is set to p_min or p_max depending on the
-     *    sign of phi(p_max).
-     *
-     *  - FIXME: Simplification in p_star_RS
-     */
-
     template <typename Number,
               NASGRiemannSolverOptions options,
               typename MemorySpace>
@@ -880,6 +849,41 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
+      /*
+       * The NASGRiemannSolver is a guaranteed maximal wavespeed (GMS)
+       * estimate for the extended Riemann problem outlined in
+       * @cite ClaytonGuermondPopov-2022. For extensions on handling negative
+       * pressures, we follow @cite clayton2023robust (see §4.6).
+       *
+       * In contrast to the algorithm outlined in above reference the
+       * algorithm takes a couple of shortcuts to significantly decrease the
+       * computational footprint. These simplifications still guarantee that
+       * we have an upper bound on the maximal wavespeed - but the number
+       * bound might be larger. In particular:
+       *
+       *  - We do not check and treat the case phi(p_min) > 0. This
+       *    corresponds to two expansion waves, see §5.2 in the reference. In
+       *    this case we have
+       *
+       *      0 < p_star < p_min <= p_max.
+       *
+       *    And due to the fact that p_star < p_min the wavespeeds reduce to
+       *    a left wavespeed v_L - a_L and right wavespeed v_R + a_R. This
+       *    implies that it is sufficient to set p_2 to ANY value provided
+       *    that p_2 <= p_min hold true in order to compute the correct
+       *    wavespeed.
+       *
+       *    If p_2 > p_min then a more pessimistic bound is computed.
+       *
+       *  - The (optional) quadratic Newton iteration requires a valid bracket
+       *    p_1 <= p_star <= p_2, i.e., phi(p_1) <= 0 <= phi(p_2). Both, the
+       *    expensive bound and the (cheaper) interpolated bound, are upper
+       *    bounds of p_star; p_1 is set to p_min or p_max depending on the
+       *    sign of phi(p_max).
+       *
+       *  - FIXME: Simplification in p_star_RS
+       */
+
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
