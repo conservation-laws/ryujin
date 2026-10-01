@@ -394,6 +394,33 @@ namespace ryujin
             const primitive_type &riemann_data_j,
             const unsigned int max_iterations = 100) const;
 
+      /**
+       * For a given Riemann solution (see solve() and riemann_solution())
+       * return the self-similar solution \f$[\rho, u, p, \gamma, a]\f$ at
+       * \f$\xi = x / t\f$.
+       *
+       * Inside a rarefaction fan the pressure is computed with (up to
+       * @p max_iterations) Newton steps, see rarefaction_fan_pressure().
+       */
+      DEAL_II_HOST_DEVICE primitive_type
+      sample(const RiemannSolution &solution,
+             const Number &xi,
+             const unsigned int max_iterations = 100) const;
+
+      /**
+       * Return the pressure inside the rarefaction fan emanating from the
+       * given state at \f$\xi = x / t\f$. Here, @p sign is -1 for the
+       * 1-wave and +1 for the 3-wave.
+       *
+       * See @cite Toro2009, (4.56) and (4.63), generalized to the
+       * Noble-Abel stiffened gas equation of state.
+       */
+      DEAL_II_HOST_DEVICE Number
+      rarefaction_fan_pressure(const primitive_type &riemann_data,
+                               const Number &xi,
+                               const ScalarNumber sign,
+                               const unsigned int max_iterations) const;
+
       //@}
       /**
        * @name Equation of state
@@ -1143,6 +1170,176 @@ namespace ryujin
       }
 
       return riemann_solution(riemann_data_i, riemann_data_j, p_2);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE auto
+    NASGRiemannSolverView<Number, options, MemorySpace>::sample(
+        const RiemannSolution &solution,
+        const Number &xi,
+        const unsigned int max_iterations) const -> primitive_type
+    {
+      const auto &riemann_data_left = solution.riemann_data_left;
+      const auto &riemann_data_right = solution.riemann_data_right;
+
+      /*
+       * The states inside the left and right rarefaction fans. We clip xi
+       * to the fan so that the (masked out) values outside of the fan stay
+       * well defined. For a shock the fan is empty:
+       */
+
+      const Number xi_left =
+          std::max(solution.lambda1_minus, std::min(xi, solution.lambda1_plus));
+      const Number p_fan_left = rarefaction_fan_pressure(
+          riemann_data_left, xi_left, ScalarNumber(-1.), max_iterations);
+      const Number rho_fan_left = rho_star(riemann_data_left, p_fan_left);
+      const Number u_fan_left =
+          riemann_data_left[1] - f(riemann_data_left, p_fan_left);
+
+      const Number xi_right =
+          std::max(solution.lambda3_minus, std::min(xi, solution.lambda3_plus));
+      const Number p_fan_right = rarefaction_fan_pressure(
+          riemann_data_right, xi_right, ScalarNumber(1.), max_iterations);
+      const Number rho_fan_right = rho_star(riemann_data_right, p_fan_right);
+      const Number u_fan_right =
+          riemann_data_right[1] + f(riemann_data_right, p_fan_right);
+
+      /*
+       * Select the region from right to left, every region overrides the
+       * previous one. In case of vacuum the star states carry rho = 0 and
+       * p = -pinf, so no special treatment is necessary:
+       */
+
+      primitive_type result = riemann_data_right;
+
+      const auto select = [&](const Number &threshold,
+                              const Number &rho,
+                              const Number &u,
+                              const Number &p,
+                              const Number &gamma) {
+        constexpr auto LT = dealii::SIMDComparison::less_than;
+        result[0] =
+            ryujin::compare_and_apply_mask<LT>(xi, threshold, rho, result[0]);
+        result[1] =
+            ryujin::compare_and_apply_mask<LT>(xi, threshold, u, result[1]);
+        result[2] =
+            ryujin::compare_and_apply_mask<LT>(xi, threshold, p, result[2]);
+        result[3] =
+            ryujin::compare_and_apply_mask<LT>(xi, threshold, gamma, result[3]);
+      };
+
+      select(solution.lambda3_plus,
+             rho_fan_right,
+             u_fan_right,
+             p_fan_right,
+             riemann_data_right[3]);
+      select(solution.lambda3_minus,
+             solution.rho_star_right,
+             solution.u_star,
+             solution.p_star,
+             riemann_data_right[3]);
+      select(solution.u_star,
+             solution.rho_star_left,
+             solution.u_star,
+             solution.p_star,
+             riemann_data_left[3]);
+      select(solution.lambda1_plus,
+             rho_fan_left,
+             u_fan_left,
+             p_fan_left,
+             riemann_data_left[3]);
+      select(solution.lambda1_minus,
+             riemann_data_left[0],
+             riemann_data_left[1],
+             riemann_data_left[2],
+             riemann_data_left[3]);
+
+      Number gamma;
+      if constexpr (options.variable_gamma)
+        gamma = result[3];
+      else
+        gamma = Number(gamma_of(riemann_data_left));
+
+      result[4] = speed_of_sound(result[0], result[2], gamma);
+
+      return result;
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::
+        rarefaction_fan_pressure(const primitive_type &riemann_data,
+                                 const Number &xi,
+                                 const ScalarNumber sign,
+                                 const unsigned int max_iterations) const
+    {
+      /*
+       * Inside the fan we have xi = u + sign a, the generalized Riemann
+       * invariant u - sign 2 a (1 - b rho) / (gamma - 1) = const, and the
+       * isentrope P (1 / rho - b)^gamma = const, with P = p + pinf. We
+       * introduce
+       *
+       *   r = (P / P_Z)^e,   e = (gamma - 1) / (2 gamma),
+       *
+       * and note that a (1 - b rho) = a_Z (1 - b rho_Z) r. Combining all
+       * three conditions results in the scalar equation
+       *
+       *   g(r) = alpha_Z + d - (a_Z (1 - b rho_Z) + alpha_Z) r
+       *          - a_Z b rho_Z r^k = 0,
+       *
+       * with alpha_Z = 2 a_Z (1 - b rho_Z) / (gamma - 1), d = sign (xi -
+       * u_Z), and k = (gamma + 1) / (gamma - 1). The function g is
+       * decreasing and concave. Thus, a Newton iteration started at the
+       * root r_0 of the linear part (which is the exact solution for b = 0,
+       * see @cite Toro2009, (4.56)) converges monotonically from the right.
+       */
+
+      const auto &[rho_Z, u_Z, p_Z, gamma_Z, a_Z] = riemann_data;
+      const Number gamma = gamma_of(riemann_data);
+
+      const Number alpha_Z = alpha(rho_Z, gamma, a_Z);
+      const Number a_tilde_Z = a_Z * one_minus_b_rho(rho_Z);
+
+      const Number constant = alpha_Z + sign * (xi - u_Z);
+      const Number linear = a_tilde_Z + alpha_Z;
+
+      Number r = std::max(Number(0.), safe_division(constant, linear));
+
+      if constexpr (options.covolume) {
+        const Number nonlinear = a_Z - a_tilde_Z; /* a_Z b rho_Z */
+        const Number k_minus_one =
+            safe_division(Number(2.), gamma - Number(1.));
+        const Number k = k_minus_one + Number(1.);
+
+        constexpr ScalarNumber eps =
+            std::numeric_limits<ScalarNumber>::epsilon();
+        const Number tolerance(ScalarNumber(16.) * eps);
+
+        for (unsigned int i = 0; i < max_iterations; ++i) {
+          const Number r_power = ryujin::pow(r, k_minus_one);
+
+          /* We approach the root from the right, thus -g(r) >= 0: */
+          const Number minus_g =
+              linear * r + nonlinear * r * r_power - constant;
+          const Number minus_dg = linear + k * nonlinear * r_power;
+          const Number delta = safe_division(minus_g, minus_dg);
+
+          r = std::max(Number(0.), r - delta);
+          if (std::max(Number(0.), delta - tolerance) == Number(0.))
+            break;
+        }
+      }
+
+      const Number P_Z = shift(p_Z);
+      return unshift(
+          P_Z *
+          ryujin::pow(r, Number(rarefaction_exponent_inverse(riemann_data))));
     }
 
 
