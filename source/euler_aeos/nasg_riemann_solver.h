@@ -526,16 +526,8 @@ namespace ryujin
 
 
       /**
-       * See @cite ClaytonGuermondPopov-2022
-       *
-       * The approximate Riemann solver is based on a function phi(p) that is
-       * montone increasing in p, concave down and whose (weak) third
-       * derivative is non-negative and locally bounded. Because we
-       * actually do not perform any iteration for computing our wavespeed
-       * estimate we can get away by only implementing a specialized
-       * variant of the phi function that computes phi(p_max). It inlines
-       * the implementation of the "f" function and eliminates all
-       * unnecessary branches in "f".
+       * A specialized variant of phi() that computes phi(p_max), see
+       * @cite ClaytonGuermondPopov-2022
        *
        * Cost: 0x pow, 4x division, 2x sqrt
        */
@@ -595,16 +587,9 @@ namespace ryujin
 
       /*
        * Compute an upper bound on p_star for the case of a single gamma
-       * (gamma_i == gamma_j). In this case the expansion-shock bound
+       * (gamma_i == gamma_j) that combines the expansion-shock bound
        * (5.7)/(5.8) and the shock-shock bound (5.10) of
-       * @cite ClaytonGuermondPopov-2022 reduce to
-       *
-       *   p_max * (N / D)^{1/e},  e = (gamma - 1) / (2 gamma),
-       *   N = alpha_hat_min + X - (u_j - u_i),
-       *   D = alpha_hat_min (p_min / p_max)^{-e} + X,
-       *
-       * with X = alpha_hat_max for phi(p_max) < 0 (5.10), and X = alpha_max
-       * otherwise (5.7)/(5.8).
+       * @cite ClaytonGuermondPopov-2022.
        *
        * Cost: 2x pow, 2x division, 0x sqrt
        */
@@ -615,12 +600,8 @@ namespace ryujin
 
 
       /*
-       * Compute an upper bound on p_star. Depending on the compile time
-       * options and on compute_expensive_bounds(), this is the single
-       * gamma bound, the interpolated bound, or the expensive bounds, each
-       * combined with the failsafe bound or p_max. (In case of two
-       * expansion waves the bound is only guaranteed to be less than or
-       * equal to p_min.)
+       * Compute an upper bound on p_star. (In case of two expansion waves
+       * the bound is only guaranteed to be less than or equal to p_min.)
        */
       DEAL_II_HOST_DEVICE Number
       p_star_upper_bound(const primitive_type &riemann_data_i,
@@ -1070,6 +1051,16 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
+      /*
+       * The approximate Riemann solver is based on a function phi(p) that is
+       * montone increasing in p, concave down and whose (weak) third
+       * derivative is non-negative and locally bounded. Because we actually
+       * do not perform any iteration for computing our wavespeed estimate we
+       * can get away by only implementing a specialized variant of the phi
+       * function that computes phi(p_max). It inlines the implementation of
+       * the "f" function and eliminates all unnecessary branches in "f".
+       */
+
       const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
       const auto gamma_i = gamma_of(riemann_data_i);
@@ -1412,6 +1403,19 @@ namespace ryujin
         const primitive_type &riemann_data_j,
         const Number &phi_p_max) const
     {
+      /*
+       * For a single gamma the expansion-shock bound (5.7)/(5.8) and the
+       * shock-shock bound (5.10) of @cite ClaytonGuermondPopov-2022 reduce
+       * to
+       *
+       *   p_max * (N / D)^{1/e},  e = (gamma - 1) / (2 gamma),
+       *   N = alpha_hat_min + X - (u_j - u_i),
+       *   D = alpha_hat_min (p_min / p_max)^{-e} + X,
+       *
+       * with X = alpha_hat_max for phi(p_max) < 0 (5.10), and X = alpha_max
+       * otherwise (5.7)/(5.8).
+       */
+
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -1556,6 +1560,13 @@ namespace ryujin
         const primitive_type &riemann_data_j,
         const Number &phi_p_max) const
     {
+      /*
+       * Depending on the compile time options and on
+       * compute_expensive_bounds() we use the single gamma bound, the
+       * interpolated bound, or the expensive bounds, each combined with
+       * the failsafe bound or p_max.
+       */
+
       const Number &p_i = riemann_data_i[2];
       const Number &p_j = riemann_data_j[2];
 
