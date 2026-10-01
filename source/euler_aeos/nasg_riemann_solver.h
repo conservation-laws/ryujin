@@ -283,7 +283,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Constructor and methods for computing wavespeed estimates
+       * @name Constructor and parameters
        */
       //@{
 
@@ -337,6 +337,12 @@ namespace ryujin
         return parameters_->compute_expensive_bounds;
       }
 
+      //@}
+      /**
+       * @name Methods for computing wavespeed estimates
+       */
+      //@{
+
       /**
        * For two given 1D primitive states riemann_data_i and
        * riemann_data_j, compute an upper bound of the maximum wavespeed
@@ -387,7 +393,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Low level primitives for the Riemann solver
+       * @name Equation of state
        */
       //@{
 
@@ -439,6 +445,35 @@ namespace ryujin
       }
 
       /**
+       * The speed of sound
+       * \f$a = \sqrt{\gamma (p + p_\infty) / (\rho (1 - b \rho))}\f$
+       * of the Noble-Abel stiffened gas equation of state. Returns zero
+       * for vacuum.
+       *
+       * Cost: 0x pow, 1x division, 1x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number speed_of_sound(const Number &rho,
+                                                const Number &p,
+                                                const Number &gamma) const;
+
+      /**
+       * Return the density of the star state adjacent to the given state
+       * for a given star pressure p_star, see @cite Toro2009, (4.50) and
+       * (4.53), generalized to the Noble-Abel stiffened gas equation of
+       * state.
+       *
+       * Cost: 1x pow, 4x division, 0x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number rho_star(const primitive_type &riemann_data,
+                                          const Number &p_star) const;
+
+      //@}
+      /**
+       * @name Gamma dependent constants
+       */
+      //@{
+
+      /**
        * The function c(gamma) as defined in (A.3) of
        * @cite ClaytonGuermondPopov-2022, with a simplified cut-off for
        * gamma > 3.
@@ -462,7 +497,6 @@ namespace ryujin
         else
           return parameters_->gamma;
       }
-
 
       /**
        * Return (gamma + 1) / (2 gamma) for the given state.
@@ -490,7 +524,6 @@ namespace ryujin
           return parameters_->rarefaction_exponent;
       }
 
-
       /**
        * Return 2 gamma / (gamma - 1) for the given state.
        */
@@ -503,7 +536,6 @@ namespace ryujin
         } else
           return parameters_->rarefaction_exponent_inverse;
       }
-
 
       /**
        * Return (gamma - 1) / 2 for the given state.
@@ -518,7 +550,6 @@ namespace ryujin
           return parameters_->half_gamma_minus_one;
       }
 
-
       /**
        * Return c(gamma) for the given state.
        */
@@ -531,7 +562,6 @@ namespace ryujin
           return parameters_->c_of_gamma;
       }
 
-
       /**
        * The factor alpha = 2 a (1 - b rho) / (gamma - 1) used in the
        * two-rarefaction and shock-shock bounds of
@@ -543,6 +573,11 @@ namespace ryujin
                                        const Number &gamma,
                                        const Number &a) const;
 
+      //@}
+      /**
+       * @name Wave curves
+       */
+      //@{
 
       /*
        * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
@@ -554,7 +589,6 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number f(const primitive_type &riemann_data,
                                    const Number p_star) const;
 
-
       /*
        * See @cite GuermondPopov2016b, page 912, (3.4), generalized to the
        * Noble-Abel stiffened gas equation of state, see
@@ -564,7 +598,6 @@ namespace ryujin
        */
       DEAL_II_HOST_DEVICE Number df(const primitive_type &riemann_data,
                                     const Number &p_star) const;
-
 
       /*
        * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
@@ -577,7 +610,6 @@ namespace ryujin
                                      const primitive_type &riemann_data_j,
                                      const Number p_in) const;
 
-
       /*
        * See @cite GuermondPopov2016b, page 912, (3.3), generalized to the
        * Noble-Abel stiffened gas equation of state, see
@@ -589,7 +621,6 @@ namespace ryujin
                                       const primitive_type &riemann_data_j,
                                       const Number &p) const;
 
-
       /**
        * A specialized variant of phi() that computes phi(p_max), see
        * @cite ClaytonGuermondPopov-2022
@@ -600,55 +631,36 @@ namespace ryujin
       phi_of_p_max(const primitive_type &riemann_data_i,
                    const primitive_type &riemann_data_j) const;
 
+      /**
+       * See @cite GuermondPopov2016b, page 912, (3.7)
+       *
+       * Cost: 0x pow, 2x division, 1x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number lambda1_minus(
+          const primitive_type &riemann_data, const Number p_star) const;
 
       /**
-       * Compute the best available, but expensive, upper bound on the
-       * expansion-shock case as described in §5.4, Eqn. (5.7) and (5.8) in
-       * @cite ClaytonGuermondPopov-2022
+       * See @cite GuermondPopov2016b, page 912, (3.8)
        *
-       * Cost: 5x pow, 11x division, 1x sqrt
+       * Cost: 0x pow, 2x division, 1x sqrt
        */
-      DEAL_II_HOST_DEVICE Number
-      p_star_RS_full(const primitive_type &riemann_data_i,
-                     const primitive_type &riemann_data_j) const;
+      DEAL_II_HOST_DEVICE Number lambda3_plus(
+          const primitive_type &primitive_state, const Number p_star) const;
 
-
+      //@}
       /**
-       * Compute the best available, but expensive, upper bound on the
-       * shock-shock case as described in §5.5, Eqn. (5.10) and (5.12) in
-       * @cite ClaytonGuermondPopov-2022
-       *
-       * Cost: 2x pow, 11x division, 5x sqrt (inclusive)
+       * @name Bounds on p_star
        */
-      DEAL_II_HOST_DEVICE Number
-      p_star_SS_full(const primitive_type &riemann_data_i,
-                     const primitive_type &riemann_data_j) const;
-
+      //@{
 
       /*
-       * Compute only the failsafe the failsafe bound for \f$\tilde
-       * p_2^\ast\f$ (5.11) in @cite ClaytonGuermondPopov-2022
-       *
-       * Cost: 0x pow, 3x division, 3x sqrt
+       * Compute an upper bound on p_star. (In case of two expansion waves
+       * the bound is only guaranteed to be less than or equal to p_min.)
        */
       DEAL_II_HOST_DEVICE Number
-      p_star_failsafe(const primitive_type &riemann_data_i,
-                      const primitive_type &riemann_data_j) const;
-
-
-      /*
-       * Compute a simultaneous upper bound on (5.7) second formula for
-       * \tilde p_2^\ast (5.8) first formula for \tilde p_1^\ast (5.11)
-       * formula for \tilde p_2^\ast in @cite ClaytonGuermondPopov-2022
-       *
-       * Cost: 3x pow, 9x division, 2x sqrt
-       *
-       * @todo improve documentation
-       */
-      DEAL_II_HOST_DEVICE Number
-      p_star_interpolated(const primitive_type &riemann_data_i,
-                          const primitive_type &riemann_data_j) const;
-
+      p_star_upper_bound(const primitive_type &riemann_data_i,
+                         const primitive_type &riemann_data_j,
+                         const Number &phi_p_max) const;
 
       /*
        * Compute an upper bound on p_star for the case of a single gamma
@@ -663,6 +675,50 @@ namespace ryujin
                           const primitive_type &riemann_data_j,
                           const Number &phi_p_max) const;
 
+      /*
+       * Compute a simultaneous upper bound on (5.7) second formula for
+       * \tilde p_2^\ast (5.8) first formula for \tilde p_1^\ast (5.11)
+       * formula for \tilde p_2^\ast in @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 3x pow, 9x division, 2x sqrt
+       *
+       * @todo improve documentation
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_interpolated(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j) const;
+
+      /**
+       * Compute the best available, but expensive, upper bound on the
+       * expansion-shock case as described in §5.4, Eqn. (5.7) and (5.8) in
+       * @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 5x pow, 11x division, 1x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_RS_full(const primitive_type &riemann_data_i,
+                     const primitive_type &riemann_data_j) const;
+
+      /**
+       * Compute the best available, but expensive, upper bound on the
+       * shock-shock case as described in §5.5, Eqn. (5.10) and (5.12) in
+       * @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 2x pow, 11x division, 5x sqrt (inclusive)
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_SS_full(const primitive_type &riemann_data_i,
+                     const primitive_type &riemann_data_j) const;
+
+      /*
+       * Compute only the failsafe the failsafe bound for \f$\tilde
+       * p_2^\ast\f$ (5.11) in @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 0x pow, 3x division, 3x sqrt
+       */
+      DEAL_II_HOST_DEVICE Number
+      p_star_failsafe(const primitive_type &riemann_data_i,
+                      const primitive_type &riemann_data_j) const;
 
       /*
        * Compute a lower bound on p_star for the case of two rarefaction
@@ -676,16 +732,11 @@ namespace ryujin
       p_star_two_rarefaction(const primitive_type &riemann_data_i,
                              const primitive_type &riemann_data_j) const;
 
-
-      /*
-       * Compute an upper bound on p_star. (In case of two expansion waves
-       * the bound is only guaranteed to be less than or equal to p_min.)
+      //@}
+      /**
+       * @name Quadratic Newton iteration
        */
-      DEAL_II_HOST_DEVICE Number
-      p_star_upper_bound(const primitive_type &riemann_data_i,
-                         const primitive_type &riemann_data_j,
-                         const Number &phi_p_max) const;
-
+      //@{
 
       /*
        * Perform one quadratic Newton step on the bracket p_1 <= p_star <=
@@ -698,50 +749,6 @@ namespace ryujin
                                            const primitive_type &riemann_data_j,
                                            Number &p_1,
                                            Number &p_2) const;
-
-
-      /**
-       * See @cite GuermondPopov2016b, page 912, (3.7)
-       *
-       * Cost: 0x pow, 2x division, 1x sqrt
-       */
-      DEAL_II_HOST_DEVICE Number lambda1_minus(
-          const primitive_type &riemann_data, const Number p_star) const;
-
-
-      /**
-       * See @cite GuermondPopov2016b, page 912, (3.8)
-       *
-       * Cost: 0x pow, 2x division, 1x sqrt
-       */
-      DEAL_II_HOST_DEVICE Number lambda3_plus(
-          const primitive_type &primitive_state, const Number p_star) const;
-
-
-      /**
-       * The speed of sound
-       * \f$a = \sqrt{\gamma (p + p_\infty) / (\rho (1 - b \rho))}\f$
-       * of the Noble-Abel stiffened gas equation of state. Returns zero
-       * for vacuum.
-       *
-       * Cost: 0x pow, 1x division, 1x sqrt
-       */
-      DEAL_II_HOST_DEVICE Number speed_of_sound(const Number &rho,
-                                                const Number &p,
-                                                const Number &gamma) const;
-
-
-      /**
-       * Return the density of the star state adjacent to the given state
-       * for a given star pressure p_star, see @cite Toro2009, (4.50) and
-       * (4.53), generalized to the Noble-Abel stiffened gas equation of
-       * state.
-       *
-       * Cost: 1x pow, 4x division, 0x sqrt
-       */
-      DEAL_II_HOST_DEVICE Number rho_star(const primitive_type &riemann_data,
-                                          const Number &p_star) const;
-
 
       /**
        * For two given primitive states <code>riemann_data_i</code> and
@@ -758,7 +765,6 @@ namespace ryujin
                   const primitive_type &riemann_data_j,
                   const Number p_1,
                   const Number p_2) const;
-
 
       /**
        * See @cite GuermondPopov2016b, page 912, (3.9)
@@ -985,6 +991,230 @@ namespace ryujin
     template <typename Number,
               NASGRiemannSolverOptions options,
               typename MemorySpace>
+    DEAL_II_HOST_DEVICE auto
+    NASGRiemannSolverView<Number, options, MemorySpace>::riemann_solution(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number p_star) const -> RiemannSolution
+    {
+      const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
+      const auto gamm_i = gamma_of(riemann_data_i);
+      const auto gamm_j = gamma_of(riemann_data_j);
+
+      /*
+       * The velocity of the star state obtained from the left and right
+       * wave curves, see @cite Toro2009, (4.9). Both values coincide for
+       * the exact p_star, but differ in case of vacuum (or an approximate
+       * p_star). In case of vacuum they are the velocities of the vacuum
+       * fronts.
+       */
+
+      const Number u_star_left = u_i - f(riemann_data_i, p_star);
+      const Number u_star_right = u_j + f(riemann_data_j, p_star);
+      const Number u_star = ScalarNumber(0.5) * (u_star_left + u_star_right);
+
+      const Number rho_star_left = rho_star(riemann_data_i, p_star);
+      const Number rho_star_right = rho_star(riemann_data_j, p_star);
+
+      const Number lambda1_minus = this->lambda1_minus(riemann_data_i, p_star);
+      const Number lambda3_plus = this->lambda3_plus(riemann_data_j, p_star);
+
+      /*
+       * For a shock the tail speed coincides with the shock speed, for a
+       * rarefaction wave it is u^\ast -+ a^\ast, see @cite Toro2009, §4.4:
+       */
+
+      constexpr auto GTE = dealii::SIMDComparison::greater_than_or_equal;
+      Number lambda1_plus =
+          u_star_left - speed_of_sound(rho_star_left, p_star, Number(gamm_i));
+      lambda1_plus = ryujin::compare_and_apply_mask<GTE>(
+          p_star, p_i, lambda1_minus, lambda1_plus);
+
+      Number lambda3_minus =
+          u_star_right + speed_of_sound(rho_star_right, p_star, Number(gamm_j));
+      lambda3_minus = ryujin::compare_and_apply_mask<GTE>(
+          p_star, p_j, lambda3_plus, lambda3_minus);
+
+      return RiemannSolution{
+          .p_star = p_star,
+          .u_star = u_star,
+          .rho_star_left = rho_star_left,
+          .rho_star_right = rho_star_right,
+          .lambda1_minus = lambda1_minus,
+          .lambda1_plus = lambda1_plus,
+          .lambda3_minus = lambda3_minus,
+          .lambda3_plus = lambda3_plus,
+      };
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE auto
+    NASGRiemannSolverView<Number, options, MemorySpace>::solve(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const unsigned int max_iterations) const -> RiemannSolution
+    {
+      /*
+       * First, we compute a bracket p_1 <= p_star <= p_2 with phi(p_1) <= 0
+       * <= phi(p_2). Recall that phi is monotonically increasing.
+       */
+
+      const Number &p_i = riemann_data_i[2];
+      const Number &p_j = riemann_data_j[2];
+
+      const Number p_min = std::min(p_i, p_j);
+      const Number p_max = std::max(p_i, p_j);
+      const Number p_vacuum = unshift(Number(0.));
+
+      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
+      const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
+      const Number phi_p_vacuum = phi(riemann_data_i, riemann_data_j, p_vacuum);
+
+      /*
+       * Case phi(p_min) <= 0 <= phi(p_max) (rarefaction-shock): The bracket
+       * is [p_min, p_max].
+       *
+       * Case phi(p_min) > 0 (rarefaction-rarefaction): The bracket is
+       * [p_star_two_rarefaction(), p_min]. Note that we must not start the
+       * iteration at -pinf: dphi is unbounded at -pinf (vacuum), which
+       * results in NaNs in the quadratic Newton step.
+       */
+
+      const Number p_lower = std::max(
+          p_vacuum, p_star_two_rarefaction(riemann_data_i, riemann_data_j));
+
+      Number p_1 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(
+          phi_p_min, Number(0.), p_min, p_lower);
+      Number p_2 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(
+          phi_p_min, Number(0.), p_max, p_min);
+
+      /*
+       * Case phi(p_max) < 0 (shock-shock): The bracket is
+       * [p_max, p_star_upper_bound()].
+       */
+
+      const Number p_upper = std::max(
+          p_max, p_star_upper_bound(riemann_data_i, riemann_data_j, phi_p_max));
+
+      p_1 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          phi_p_max, Number(0.), p_max, p_1);
+      p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          phi_p_max, Number(0.), p_upper, p_2);
+
+      /*
+       * Case phi(-pinf) >= 0: A vacuum is formed and p_star = -pinf.
+       */
+
+      p_1 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          phi_p_vacuum, Number(0.), p_vacuum, p_1);
+      p_2 = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          phi_p_vacuum, Number(0.), p_vacuum, p_2);
+
+      /*
+       * Now, we perform quadratic Newton steps until the bracket has shrunk
+       * to machine precision:
+       */
+
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
+      for (unsigned int i = 0; i < max_iterations; ++i) {
+        const Number tolerance = ScalarNumber(16. * eps) * shift(p_2);
+        if (std::max(Number(0.), p_2 - p_1 - tolerance) == Number(0.))
+          break;
+
+        newton_step(riemann_data_i, riemann_data_j, p_1, p_2);
+      }
+
+      return riemann_solution(riemann_data_i, riemann_data_j, p_2);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::speed_of_sound(
+        const Number &rho, const Number &p, const Number &gamma) const
+    {
+      return std::sqrt(
+          safe_division(gamma * shift(p), rho * one_minus_b_rho(rho)));
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::rho_star(
+        const primitive_type &riemann_data, const Number &p_star) const
+    {
+      /*
+       * For p_star >= p the state is connected by a shock and we use the
+       * Rankine-Hugoniot condition
+       *
+       *   w^\ast = w (mu P^\ast + P) / (P^\ast + mu P),
+       *
+       * otherwise the state is connected by a rarefaction wave and we use
+       * the isentrope P w^gamma = const. Here, w = 1 / rho - b,
+       * P = p + pinf, and mu = (gamma - 1) / (gamma + 1).
+       */
+
+      const auto &[rho, u, p, gamma_Z, a] = riemann_data;
+      const auto gamma = gamma_of(riemann_data);
+
+      const Number one_minus_b_rho = this->one_minus_b_rho(rho);
+      const Number b_rho = Number(1.) - one_minus_b_rho;
+
+      const Number P = shift(p);
+      const Number P_star = shift(p_star);
+
+      /*
+       * Shock case: Multiply w^\ast = w (mu P^\ast + P) / (P^\ast + mu P)
+       * by (gamma + 1) and solve for rho^\ast = 1 / (b + w^\ast):
+       */
+
+      const Number gamma_minus_one_P_star = (gamma - Number(1.)) * P_star;
+      const Number gamma_minus_one_P = (gamma - Number(1.)) * P;
+      const Number gamma_plus_one_P_star = (gamma + Number(1.)) * P_star;
+      const Number gamma_plus_one_P = (gamma + Number(1.)) * P;
+
+      const Number shock_numerator = gamma_plus_one_P_star + gamma_minus_one_P;
+      const Number shock_denominator =
+          one_minus_b_rho * (gamma_minus_one_P_star + gamma_plus_one_P) +
+          b_rho * shock_numerator;
+
+      const Number true_value =
+          rho * safe_division(shock_numerator, shock_denominator);
+
+      /*
+       * Rarefaction case: w^\ast = w r^{-1} with r = (P^\ast / P)^{1/gamma}.
+       * We avoid the division by r so that the vacuum case P^\ast = 0
+       * results in rho^\ast = 0:
+       */
+
+      const Number r = ryujin::pow(safe_division(P_star, P),
+                                   Number(ScalarNumber(1.) / gamma));
+
+      const Number false_value =
+          rho * safe_division(r, one_minus_b_rho + b_rho * r);
+
+      return ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
     template <typename T>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE T
     NASGRiemannSolverView<Number, options, MemorySpace>::c(const T &gamma)
@@ -1188,6 +1418,287 @@ namespace ryujin
           safe_division(p_max - p_j, std::sqrt(radicand_inverse_j));
 
       return value_i + value_j + u_j - u_i;
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::lambda1_minus(
+        const primitive_type &riemann_data, const Number p_star) const
+    {
+      const auto &[rho, u, p, gamma, a] = riemann_data;
+
+      const auto factor = lambda_factor(riemann_data);
+
+      const Number p_inverse = safe_division(Number(1.), shift(p));
+      const Number tmp = positive_part(p_star - p) * p_inverse;
+
+      return u - a * std::sqrt(Number(1.) + factor * tmp);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::lambda3_plus(
+        const primitive_type &riemann_data, const Number p_star) const
+    {
+      const auto &[rho, u, p, gamma, a] = riemann_data;
+
+      const auto factor = lambda_factor(riemann_data);
+
+      const Number p_inverse = safe_division(Number(1.), shift(p));
+      const Number tmp = positive_part(p_star - p) * p_inverse;
+
+      return u + a * std::sqrt(Number(1.) + factor * tmp);
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_upper_bound(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &phi_p_max) const
+    {
+      /*
+       * Depending on the compile time options and on
+       * compute_expensive_bounds() we use the single gamma bound, the
+       * interpolated bound, or the expensive bounds, each combined with
+       * the failsafe bound or p_max.
+       */
+
+      const Number &p_i = riemann_data_i[2];
+      const Number &p_j = riemann_data_j[2];
+
+      const Number p_max = std::max(p_i, p_j);
+
+      if constexpr (!options.variable_gamma) {
+        /*
+         * For a single gamma the expensive bounds (5.7), (5.8), and (5.10)
+         * reduce to a single formula of the same cost as the interpolated
+         * bound:
+         */
+        const Number p_star_tilde =
+            p_star_single_gamma(riemann_data_i, riemann_data_j, phi_p_max);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
+
+        return ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::less_than>(
+            phi_p_max,
+            Number(0.),
+            std::min(p_star_tilde, p_star_backup),
+            std::min(p_max, p_star_tilde));
+
+      } else if (!compute_expensive_bounds()) {
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+        const Number p_strict =
+            ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+        std::cout << "   p^*_strict = " << p_strict << "\n";
+        std::cout << "   phi(p_*_s) = "
+                  << phi(riemann_data_i, riemann_data_j, p_strict) << "\n";
+        std::cout << "-> lambda_str = "
+                  << compute_lambda_max(
+                         riemann_data_i, riemann_data_j, p_strict)
+                  << std::endl;
+#endif
+
+        const Number p_star_tilde =
+            p_star_interpolated(riemann_data_i, riemann_data_j);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
+
+        return ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::less_than>(
+            phi_p_max,
+            Number(0.),
+            std::min(p_star_tilde, p_star_backup),
+            std::min(p_max, p_star_tilde));
+
+      } else {
+
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+
+        return ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::less_than>(
+            phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+      }
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_single_gamma(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        const Number &phi_p_max) const
+    {
+      /*
+       * For a single gamma the expansion-shock bound (5.7)/(5.8) and the
+       * shock-shock bound (5.10) of @cite ClaytonGuermondPopov-2022 reduce
+       * to
+       *
+       *   p_max * (N / D)^{1/e},  e = (gamma - 1) / (2 gamma),
+       *   N = alpha_hat_min + X - (u_j - u_i),
+       *   D = alpha_hat_min (p_min / p_max)^{-e} + X,
+       *
+       * with X = alpha_hat_max for phi(p_max) < 0 (5.10), and X = alpha_max
+       * otherwise (5.7)/(5.8).
+       */
+
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+
+      /* We have gamma_i == gamma_j: */
+      const auto c_gamma = c_of_gamma(riemann_data_i);
+
+      /*
+       * alpha_Z = 2 a_Z (1 - b rho_Z) / (gamma - 1). We drop the common
+       * factor 2 / (gamma - 1) and rescale (u_j - u_i) accordingly:
+       */
+      const Number alpha_i = a_i * one_minus_b_rho(rho_i);
+      const Number alpha_j = a_j * one_minus_b_rho(rho_j);
+
+      const Number p_min = shift(std::min(p_i, p_j));
+      const Number p_max = shift(std::max(p_i, p_j));
+
+      const Number alpha_min =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_max = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_hat_min = c_gamma * alpha_min;
+
+      /*
+       * The shock-shock bound (5.10) uses alpha_hat_max, the
+       * expansion-shock bound (5.7)/(5.8) uses alpha_max:
+       */
+      const Number alpha_select =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max, Number(0.), c_gamma * alpha_max, alpha_max);
+
+      const auto exponent = rarefaction_exponent(riemann_data_i);
+      const auto exponent_inverse =
+          rarefaction_exponent_inverse(riemann_data_i);
+
+      const Number numerator =
+          positive_part(alpha_hat_min + alpha_select -
+                        half_gamma_minus_one(riemann_data_i) * (u_j - u_i));
+
+      const Number denominator =
+          alpha_hat_min * ryujin::pow(safe_division(p_min, p_max), -exponent) +
+          alpha_select;
+
+      const Number p_tilde =
+          unshift(p_max * ryujin::pow(safe_division(numerator, denominator),
+                                      exponent_inverse));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "p_star_single_gamma = " << p_tilde << std::endl;
+#endif
+      return p_tilde;
+    }
+
+
+    template <typename Number,
+              NASGRiemannSolverOptions options,
+              typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_interpolated(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+      const auto alpha_i = alpha(rho_i, gamma_i, a_i);
+      const auto alpha_j = alpha(rho_j, gamma_j, a_j);
+
+      /*
+       * First get p_min, p_max.
+       *
+       * Then, we get gamma_min/max, and alpha_min/max. Note that the
+       * *_min/max values are associated with p_min/max and are not
+       * necessarily the minimum/maximum of *_i vs *_j.
+       */
+
+      const Number p_min = shift(std::min(p_i, p_j));
+      const Number p_max = shift(std::max(p_i, p_j));
+
+      const Number gamma_min =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, gamma_i, gamma_j);
+
+      const Number alpha_min =
+          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_hat_min = c(gamma_min) * alpha_min;
+
+      const Number gamma_max = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, gamma_i, gamma_j);
+
+      const Number alpha_max = ryujin::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_hat_max = c(gamma_max) * alpha_max;
+
+      const Number gamma_m = std::min(gamma_i, gamma_j);
+      const Number gamma_M = std::max(gamma_i, gamma_j);
+
+      const Number p_ratio = safe_division(p_min, p_max);
+
+      /*
+       * Here, we use a trick: The r-factor only shows up in the formula
+       * for the case \gamma_min = \gamma_m, otherwise the r-factor
+       * vanishes. We can accomplish this by using the following modified
+       * exponent (where we substitute gamma_m by gamma_min):
+       */
+      const Number r_exponent =
+          (gamma_M - gamma_min) / (ScalarNumber(2.) * gamma_min * gamma_M);
+
+      /*
+       * Compute a simultaneous upper bound on
+       *   (5.7) second formula for \tilde p_2^\ast
+       *   (5.8) first formula for \tilde p_1^\ast
+       *   (5.11) formula for \tilde p_2^\ast
+       */
+
+      const Number exponent =
+          (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
+      const Number exponent_inverse = Number(1.) / exponent;
+
+      const Number numerator =
+          positive_part(alpha_hat_min + /*SIC!*/ alpha_max - (u_j - u_i));
+
+      Number denominator = alpha_hat_min * ryujin::pow(p_ratio, -exponent) +
+                           alpha_hat_max * ryujin::pow(p_ratio, r_exponent);
+
+      const auto temp = safe_division(numerator, denominator);
+
+      const Number p_tilde =
+          unshift(p_max * ryujin::pow(temp, exponent_inverse));
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "p_star_interpolated = " << p_tilde << std::endl;
+#endif
+      return p_tilde;
     }
 
 
@@ -1414,172 +1925,6 @@ namespace ryujin
               NASGRiemannSolverOptions options,
               typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_interpolated(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j) const
-    {
-      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
-      const auto alpha_i = alpha(rho_i, gamma_i, a_i);
-      const auto alpha_j = alpha(rho_j, gamma_j, a_j);
-
-      /*
-       * First get p_min, p_max.
-       *
-       * Then, we get gamma_min/max, and alpha_min/max. Note that the
-       * *_min/max values are associated with p_min/max and are not
-       * necessarily the minimum/maximum of *_i vs *_j.
-       */
-
-      const Number p_min = shift(std::min(p_i, p_j));
-      const Number p_max = shift(std::max(p_i, p_j));
-
-      const Number gamma_min =
-          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              p_i, p_j, gamma_i, gamma_j);
-
-      const Number alpha_min =
-          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              p_i, p_j, alpha_i, alpha_j);
-
-      const Number alpha_hat_min = c(gamma_min) * alpha_min;
-
-      const Number gamma_max = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_i, p_j, gamma_i, gamma_j);
-
-      const Number alpha_max = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_i, p_j, alpha_i, alpha_j);
-
-      const Number alpha_hat_max = c(gamma_max) * alpha_max;
-
-      const Number gamma_m = std::min(gamma_i, gamma_j);
-      const Number gamma_M = std::max(gamma_i, gamma_j);
-
-      const Number p_ratio = safe_division(p_min, p_max);
-
-      /*
-       * Here, we use a trick: The r-factor only shows up in the formula
-       * for the case \gamma_min = \gamma_m, otherwise the r-factor
-       * vanishes. We can accomplish this by using the following modified
-       * exponent (where we substitute gamma_m by gamma_min):
-       */
-      const Number r_exponent =
-          (gamma_M - gamma_min) / (ScalarNumber(2.) * gamma_min * gamma_M);
-
-      /*
-       * Compute a simultaneous upper bound on
-       *   (5.7) second formula for \tilde p_2^\ast
-       *   (5.8) first formula for \tilde p_1^\ast
-       *   (5.11) formula for \tilde p_2^\ast
-       */
-
-      const Number exponent =
-          (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
-      const Number exponent_inverse = Number(1.) / exponent;
-
-      const Number numerator =
-          positive_part(alpha_hat_min + /*SIC!*/ alpha_max - (u_j - u_i));
-
-      Number denominator = alpha_hat_min * ryujin::pow(p_ratio, -exponent) +
-                           alpha_hat_max * ryujin::pow(p_ratio, r_exponent);
-
-      const auto temp = safe_division(numerator, denominator);
-
-      const Number p_tilde =
-          unshift(p_max * ryujin::pow(temp, exponent_inverse));
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "p_star_interpolated = " << p_tilde << std::endl;
-#endif
-      return p_tilde;
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_single_gamma(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j,
-        const Number &phi_p_max) const
-    {
-      /*
-       * For a single gamma the expansion-shock bound (5.7)/(5.8) and the
-       * shock-shock bound (5.10) of @cite ClaytonGuermondPopov-2022 reduce
-       * to
-       *
-       *   p_max * (N / D)^{1/e},  e = (gamma - 1) / (2 gamma),
-       *   N = alpha_hat_min + X - (u_j - u_i),
-       *   D = alpha_hat_min (p_min / p_max)^{-e} + X,
-       *
-       * with X = alpha_hat_max for phi(p_max) < 0 (5.10), and X = alpha_max
-       * otherwise (5.7)/(5.8).
-       */
-
-      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
-
-      /* We have gamma_i == gamma_j: */
-      const auto c_gamma = c_of_gamma(riemann_data_i);
-
-      /*
-       * alpha_Z = 2 a_Z (1 - b rho_Z) / (gamma - 1). We drop the common
-       * factor 2 / (gamma - 1) and rescale (u_j - u_i) accordingly:
-       */
-      const Number alpha_i = a_i * one_minus_b_rho(rho_i);
-      const Number alpha_j = a_j * one_minus_b_rho(rho_j);
-
-      const Number p_min = shift(std::min(p_i, p_j));
-      const Number p_max = shift(std::max(p_i, p_j));
-
-      const Number alpha_min =
-          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              p_i, p_j, alpha_i, alpha_j);
-
-      const Number alpha_max = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_i, p_j, alpha_i, alpha_j);
-
-      const Number alpha_hat_min = c_gamma * alpha_min;
-
-      /*
-       * The shock-shock bound (5.10) uses alpha_hat_max, the
-       * expansion-shock bound (5.7)/(5.8) uses alpha_max:
-       */
-      const Number alpha_select =
-          ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max, Number(0.), c_gamma * alpha_max, alpha_max);
-
-      const auto exponent = rarefaction_exponent(riemann_data_i);
-      const auto exponent_inverse =
-          rarefaction_exponent_inverse(riemann_data_i);
-
-      const Number numerator =
-          positive_part(alpha_hat_min + alpha_select -
-                        half_gamma_minus_one(riemann_data_i) * (u_j - u_i));
-
-      const Number denominator =
-          alpha_hat_min * ryujin::pow(safe_division(p_min, p_max), -exponent) +
-          alpha_select;
-
-      const Number p_tilde =
-          unshift(p_max * ryujin::pow(safe_division(numerator, denominator),
-                                      exponent_inverse));
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "p_star_single_gamma = " << p_tilde << std::endl;
-#endif
-      return p_tilde;
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     NASGRiemannSolverView<Number, options, MemorySpace>::p_star_two_rarefaction(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
@@ -1646,36 +1991,28 @@ namespace ryujin
     template <typename Number,
               NASGRiemannSolverOptions options,
               typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::lambda1_minus(
-        const primitive_type &riemann_data, const Number p_star) const
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    NASGRiemannSolverView<Number, options, MemorySpace>::newton_step(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j,
+        Number &p_1,
+        Number &p_2) const
     {
-      const auto &[rho, u, p, gamma, a] = riemann_data;
+      // FIXME: Fuse these computations:
+      const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+      const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+      const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+      const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
-      const auto factor = lambda_factor(riemann_data);
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+      std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
+      std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
+      std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
+      std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
+#endif
 
-      const Number p_inverse = safe_division(Number(1.), shift(p));
-      const Number tmp = positive_part(p_star - p) * p_inverse;
-
-      return u - a * std::sqrt(Number(1.) + factor * tmp);
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::lambda3_plus(
-        const primitive_type &riemann_data, const Number p_star) const
-    {
-      const auto &[rho, u, p, gamma, a] = riemann_data;
-
-      const auto factor = lambda_factor(riemann_data);
-
-      const Number p_inverse = safe_division(Number(1.), shift(p));
-      const Number tmp = positive_part(p_star - p) * p_inverse;
-
-      return u + a * std::sqrt(Number(1.) + factor * tmp);
+      ryujin::quadratic_newton_step(
+          p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
     }
 
 
@@ -1718,337 +2055,6 @@ namespace ryujin
       const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
 
       return std::max(positive_part(nu_32), negative_part(nu_11));
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::p_star_upper_bound(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j,
-        const Number &phi_p_max) const
-    {
-      /*
-       * Depending on the compile time options and on
-       * compute_expensive_bounds() we use the single gamma bound, the
-       * interpolated bound, or the expensive bounds, each combined with
-       * the failsafe bound or p_max.
-       */
-
-      const Number &p_i = riemann_data_i[2];
-      const Number &p_j = riemann_data_j[2];
-
-      const Number p_max = std::max(p_i, p_j);
-
-      if constexpr (!options.variable_gamma) {
-        /*
-         * For a single gamma the expensive bounds (5.7), (5.8), and (5.10)
-         * reduce to a single formula of the same cost as the interpolated
-         * bound:
-         */
-        const Number p_star_tilde =
-            p_star_single_gamma(riemann_data_i, riemann_data_j, phi_p_max);
-        const Number p_star_backup =
-            p_star_failsafe(riemann_data_i, riemann_data_j);
-
-        return ryujin::compare_and_apply_mask<
-            dealii::SIMDComparison::less_than>(
-            phi_p_max,
-            Number(0.),
-            std::min(p_star_tilde, p_star_backup),
-            std::min(p_max, p_star_tilde));
-
-      } else if (!compute_expensive_bounds()) {
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-        const Number p_strict =
-            ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-        std::cout << "   p^*_strict = " << p_strict << "\n";
-        std::cout << "   phi(p_*_s) = "
-                  << phi(riemann_data_i, riemann_data_j, p_strict) << "\n";
-        std::cout << "-> lambda_str = "
-                  << compute_lambda_max(
-                         riemann_data_i, riemann_data_j, p_strict)
-                  << std::endl;
-#endif
-
-        const Number p_star_tilde =
-            p_star_interpolated(riemann_data_i, riemann_data_j);
-        const Number p_star_backup =
-            p_star_failsafe(riemann_data_i, riemann_data_j);
-
-        return ryujin::compare_and_apply_mask<
-            dealii::SIMDComparison::less_than>(
-            phi_p_max,
-            Number(0.),
-            std::min(p_star_tilde, p_star_backup),
-            std::min(p_max, p_star_tilde));
-
-      } else {
-
-        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
-        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
-
-        return ryujin::compare_and_apply_mask<
-            dealii::SIMDComparison::less_than>(
-            phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
-      }
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-    NASGRiemannSolverView<Number, options, MemorySpace>::newton_step(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j,
-        Number &p_1,
-        Number &p_2) const
-    {
-      // FIXME: Fuse these computations:
-      const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
-      const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
-      const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
-      const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-      std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
-      std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
-      std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
-      std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
-#endif
-
-      ryujin::quadratic_newton_step(
-          p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::speed_of_sound(
-        const Number &rho, const Number &p, const Number &gamma) const
-    {
-      return std::sqrt(
-          safe_division(gamma * shift(p), rho * one_minus_b_rho(rho)));
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
-    NASGRiemannSolverView<Number, options, MemorySpace>::rho_star(
-        const primitive_type &riemann_data, const Number &p_star) const
-    {
-      /*
-       * For p_star >= p the state is connected by a shock and we use the
-       * Rankine-Hugoniot condition
-       *
-       *   w^\ast = w (mu P^\ast + P) / (P^\ast + mu P),
-       *
-       * otherwise the state is connected by a rarefaction wave and we use
-       * the isentrope P w^gamma = const. Here, w = 1 / rho - b,
-       * P = p + pinf, and mu = (gamma - 1) / (gamma + 1).
-       */
-
-      const auto &[rho, u, p, gamma_Z, a] = riemann_data;
-      const auto gamma = gamma_of(riemann_data);
-
-      const Number one_minus_b_rho = this->one_minus_b_rho(rho);
-      const Number b_rho = Number(1.) - one_minus_b_rho;
-
-      const Number P = shift(p);
-      const Number P_star = shift(p_star);
-
-      /*
-       * Shock case: Multiply w^\ast = w (mu P^\ast + P) / (P^\ast + mu P)
-       * by (gamma + 1) and solve for rho^\ast = 1 / (b + w^\ast):
-       */
-
-      const Number gamma_minus_one_P_star = (gamma - Number(1.)) * P_star;
-      const Number gamma_minus_one_P = (gamma - Number(1.)) * P;
-      const Number gamma_plus_one_P_star = (gamma + Number(1.)) * P_star;
-      const Number gamma_plus_one_P = (gamma + Number(1.)) * P;
-
-      const Number shock_numerator = gamma_plus_one_P_star + gamma_minus_one_P;
-      const Number shock_denominator =
-          one_minus_b_rho * (gamma_minus_one_P_star + gamma_plus_one_P) +
-          b_rho * shock_numerator;
-
-      const Number true_value =
-          rho * safe_division(shock_numerator, shock_denominator);
-
-      /*
-       * Rarefaction case: w^\ast = w r^{-1} with r = (P^\ast / P)^{1/gamma}.
-       * We avoid the division by r so that the vacuum case P^\ast = 0
-       * results in rho^\ast = 0:
-       */
-
-      const Number r = ryujin::pow(safe_division(P_star, P),
-                                   Number(ScalarNumber(1.) / gamma));
-
-      const Number false_value =
-          rho * safe_division(r, one_minus_b_rho + b_rho * r);
-
-      return ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_star, p, true_value, false_value);
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE auto
-    NASGRiemannSolverView<Number, options, MemorySpace>::riemann_solution(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j,
-        const Number p_star) const -> RiemannSolution
-    {
-      const auto &[rho_i, u_i, p_i, gamma_Z_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, gamma_Z_j, a_j] = riemann_data_j;
-      const auto gamm_i = gamma_of(riemann_data_i);
-      const auto gamm_j = gamma_of(riemann_data_j);
-
-      /*
-       * The velocity of the star state obtained from the left and right
-       * wave curves, see @cite Toro2009, (4.9). Both values coincide for
-       * the exact p_star, but differ in case of vacuum (or an approximate
-       * p_star). In case of vacuum they are the velocities of the vacuum
-       * fronts.
-       */
-
-      const Number u_star_left = u_i - f(riemann_data_i, p_star);
-      const Number u_star_right = u_j + f(riemann_data_j, p_star);
-      const Number u_star = ScalarNumber(0.5) * (u_star_left + u_star_right);
-
-      const Number rho_star_left = rho_star(riemann_data_i, p_star);
-      const Number rho_star_right = rho_star(riemann_data_j, p_star);
-
-      const Number lambda1_minus = this->lambda1_minus(riemann_data_i, p_star);
-      const Number lambda3_plus = this->lambda3_plus(riemann_data_j, p_star);
-
-      /*
-       * For a shock the tail speed coincides with the shock speed, for a
-       * rarefaction wave it is u^\ast -+ a^\ast, see @cite Toro2009, §4.4:
-       */
-
-      constexpr auto GTE = dealii::SIMDComparison::greater_than_or_equal;
-      Number lambda1_plus =
-          u_star_left - speed_of_sound(rho_star_left, p_star, Number(gamm_i));
-      lambda1_plus = ryujin::compare_and_apply_mask<GTE>(
-          p_star, p_i, lambda1_minus, lambda1_plus);
-
-      Number lambda3_minus =
-          u_star_right + speed_of_sound(rho_star_right, p_star, Number(gamm_j));
-      lambda3_minus = ryujin::compare_and_apply_mask<GTE>(
-          p_star, p_j, lambda3_plus, lambda3_minus);
-
-      return RiemannSolution{
-          .p_star = p_star,
-          .u_star = u_star,
-          .rho_star_left = rho_star_left,
-          .rho_star_right = rho_star_right,
-          .lambda1_minus = lambda1_minus,
-          .lambda1_plus = lambda1_plus,
-          .lambda3_minus = lambda3_minus,
-          .lambda3_plus = lambda3_plus,
-      };
-    }
-
-
-    template <typename Number,
-              NASGRiemannSolverOptions options,
-              typename MemorySpace>
-    DEAL_II_HOST_DEVICE auto
-    NASGRiemannSolverView<Number, options, MemorySpace>::solve(
-        const primitive_type &riemann_data_i,
-        const primitive_type &riemann_data_j,
-        const unsigned int max_iterations) const -> RiemannSolution
-    {
-      /*
-       * First, we compute a bracket p_1 <= p_star <= p_2 with phi(p_1) <= 0
-       * <= phi(p_2). Recall that phi is monotonically increasing.
-       */
-
-      const Number &p_i = riemann_data_i[2];
-      const Number &p_j = riemann_data_j[2];
-
-      const Number p_min = std::min(p_i, p_j);
-      const Number p_max = std::max(p_i, p_j);
-      const Number p_vacuum = unshift(Number(0.));
-
-      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
-      const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
-      const Number phi_p_vacuum = phi(riemann_data_i, riemann_data_j, p_vacuum);
-
-      /*
-       * Case phi(p_min) <= 0 <= phi(p_max) (rarefaction-shock): The bracket
-       * is [p_min, p_max].
-       *
-       * Case phi(p_min) > 0 (rarefaction-rarefaction): The bracket is
-       * [p_star_two_rarefaction(), p_min]. Note that we must not start the
-       * iteration at -pinf: dphi is unbounded at -pinf (vacuum), which
-       * results in NaNs in the quadratic Newton step.
-       */
-
-      const Number p_lower = std::max(
-          p_vacuum, p_star_two_rarefaction(riemann_data_i, riemann_data_j));
-
-      Number p_1 = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::less_than_or_equal>(
-          phi_p_min, Number(0.), p_min, p_lower);
-      Number p_2 = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::less_than_or_equal>(
-          phi_p_min, Number(0.), p_max, p_min);
-
-      /*
-       * Case phi(p_max) < 0 (shock-shock): The bracket is
-       * [p_max, p_star_upper_bound()].
-       */
-
-      const Number p_upper = std::max(
-          p_max, p_star_upper_bound(riemann_data_i, riemann_data_j, phi_p_max));
-
-      p_1 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          phi_p_max, Number(0.), p_max, p_1);
-      p_2 = ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          phi_p_max, Number(0.), p_upper, p_2);
-
-      /*
-       * Case phi(-pinf) >= 0: A vacuum is formed and p_star = -pinf.
-       */
-
-      p_1 = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          phi_p_vacuum, Number(0.), p_vacuum, p_1);
-      p_2 = ryujin::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          phi_p_vacuum, Number(0.), p_vacuum, p_2);
-
-      /*
-       * Now, we perform quadratic Newton steps until the bracket has shrunk
-       * to machine precision:
-       */
-
-      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-
-      for (unsigned int i = 0; i < max_iterations; ++i) {
-        const Number tolerance = ScalarNumber(16. * eps) * shift(p_2);
-        if (std::max(Number(0.), p_2 - p_1 - tolerance) == Number(0.))
-          break;
-
-        newton_step(riemann_data_i, riemann_data_j, p_1, p_2);
-      }
-
-      return riemann_solution(riemann_data_i, riemann_data_j, p_2);
     }
 
   } // namespace EulerAEOS
