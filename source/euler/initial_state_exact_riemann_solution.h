@@ -82,10 +82,7 @@ namespace ryujin
             gamma_ = view.gamma();
           }
 
-          const Number p_L = primitive_left_[2];
-          const Number p_R = primitive_right_[2];
-
-          p_star_ = compute_pstar(p_L, p_R, primitive_left_, primitive_right_);
+          p_star_ = compute_pstar(primitive_left_, primitive_right_);
 
           const Number u_L = primitive_left_[1];
           u_star_ = u_L - fZofP(p_star_, primitive_left_);
@@ -284,7 +281,7 @@ namespace ryujin
         Number left_brach = 2. * c_Z / (gamma_ - 1.) * exp;
         exp -= 1.;
 
-        left_brach *= std::pow(p_in / p_Z, exp - 1.) / p_Z;
+        left_brach *= std::pow(p_in / p_Z, exp) / p_Z;
 
         Number right_branch = std::pow(A_Z / (p_in + B_Z), 1.5);
         right_branch *= (2. * B_Z + p_in + p_Z) / (2. * A_Z);
@@ -425,31 +422,157 @@ namespace ryujin
 
 
       /**
-       * Compute pstar using the quadratic_newton_step()
+       * The two-rarefaction approximation \f$\tilde p^\ast\f$ to
+       * \f$p^\ast\f$, i.e., the (closed-form) root of the two-rarefaction
+       * branch \f$\phi_R\f$ of \f$\phi\f$.
+       *
+       * See @cite GuermondPopov2016b, page 914, (4.3) (with covolume
+       * \f$b=0\f$); this is also equation (4.103) in Toro, Chapter 4.7.2.
+       *
+       * By @cite GuermondPopov2016b, Lemma 4.3 we have \f$p^\ast <
+       * \tilde p^\ast\f$ for the physical range \f$1 < \gamma \le 5/3\f$,
+       * which is what makes \f$\tilde p^\ast\f$ usable as an upper bound
+       * for the bracketing interval in Algorithm 1.
        */
-      double compute_pstar(double p_1,
-                           double p_2,
-                           dealii::Tensor<1, 3, Number> data_1,
-                           dealii::Tensor<1, 3, Number> data_2)
+      double p_tilde_star(const dealii::Tensor<1, 3, Number> &data_left,
+                          const dealii::Tensor<1, 3, Number> &data_right) const
+      {
+        const Number rho_L = data_left[0];
+        const Number u_L = data_left[1];
+        const Number p_L = data_left[2];
+
+        const Number rho_R = data_right[0];
+        const Number u_R = data_right[1];
+        const Number p_R = data_right[2];
+
+        const Number c_L = std::sqrt(gamma_ * p_L / rho_L);
+        const Number c_R = std::sqrt(gamma_ * p_R / rho_R);
+
+        const Number exp = 0.5 * (gamma_ - 1.) / gamma_;
+
+        const Number numerator = c_L + c_R - 0.5 * (gamma_ - 1.) * (u_R - u_L);
+        const Number denominator =
+            c_L * std::pow(p_L, -exp) + c_R * std::pow(p_R, -exp);
+
+        return std::pow(numerator / denominator, 1. / exp);
+      }
+
+
+      /**
+       * Compute the intermediate ("star") pressure \f$p^\ast\f$, i.e., the
+       * unique root of \f$\phi\f$, see @cite GuermondPopov2016b, page 912,
+       * (3.3).
+       *
+       * The bracketing interval \f$[p_1, p_2]\f$ with \f$p_1 \le p^\ast \le
+       * p_2\f$ is initialized following @cite GuermondPopov2016b,
+       * Algorithm 1 ("Initialization"); the root is then computed by
+       * bisection down to machine precision. (The paper continues with the
+       * quadratic Newton iteration of its Algorithm 2, which converges much
+       * faster. We do not need the speed here: this happens exactly once
+       * during initialization, and unlike RiemannSolver we want the root
+       * itself and not merely a bound on \f$\lambda_{\max}\f$.)
+       *
+       * @note The two states must be passed in left/right order and must
+       * never be transposed. The concavity of \f$\phi\f$, which is what
+       * justifies the bracketing and the Newton step of Algorithm 1 (see
+       * @cite GuermondPopov2016b, Theorem 4.1), does require the two
+       * pressures to be ordered, but ordering them as *scalars* (line 1 of
+       * Algorithm 1, \f$p_{\min}\f$ and \f$p_{\max}\f$ below) is enough:
+       * the sum \f$f(p,L) + f(p,R)\f$ is symmetric, so a left/right
+       * transposition of the two states leaves \f$\phi\f$ concave but
+       * shifts it by the constant \f$-2(u_R - u_L)\f$, which moves the root
+       * whenever \f$u_L \neq u_R\f$.
+       */
+      double compute_pstar(const dealii::Tensor<1, 3, Number> &data_left,
+                           const dealii::Tensor<1, 3, Number> &data_right)
       {
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
 
-        // Ensure that p_1 <= p_2
+        /* Algorithm 1, line 1: */
 
-        if (p_1 > p_2) {
-          std::swap(p_1, p_2);
-          std::swap(data_1, data_2);
+        const double p_min = std::min(data_left[2], data_right[2]);
+        const double p_max = std::max(data_left[2], data_right[2]);
+
+        /*
+         * The non-vacuum condition, see @cite GuermondPopov2016b, page 912,
+         * (3.6): phi(0) < 0 is equivalent to
+         *
+         *   u_R - u_L < 2 c_L / (gamma - 1) + 2 c_R / (gamma - 1).
+         *
+         * If it is violated the Riemann solution contains a vacuum region
+         * and there is no star state to compute.
+         */
+
+        AssertThrow(
+            phi(Number(0.), data_left, data_right) < 0.,
+            dealii::ExcMessage(
+                "Euler::ExactRiemannSolution: the prescribed left and right "
+                "states violate the non-vacuum condition; the exact Riemann "
+                "solution contains a vacuum region and has no star state."));
+
+        const double phi_p_min = phi(p_min, data_left, data_right);
+        const double phi_p_max = phi(p_max, data_left, data_right);
+
+        const double p_tilde = p_tilde_star(data_left, data_right);
+
+        double p_1, p_2;
+
+        if (phi_p_max < 0.) {
+
+          /*
+           * Algorithm 1, lines 8-9: two shocks, p_max < p^* < \tilde p^*.
+           */
+
+          p_1 = p_max;
+          p_2 = p_tilde;
+
+        } else if (phi_p_min <= 0.) {
+
+          /*
+           * Algorithm 1, lines 10-11: one shock and one rarefaction,
+           * p_min <= p^* <= min(p_max, \tilde p^*). This branch also covers
+           * the special case phi(p_max) == 0 of Algorithm 1, lines 5-6.
+           */
+
+          p_1 = p_min;
+          p_2 = std::min(p_max, p_tilde);
+
+        } else {
+
+          /*
+           * Two rarefactions, 0 < p^* < p_min.
+           *
+           * Algorithm 1, lines 2-3 short-circuit this case by setting
+           * p^* = 0, which is legitimate when all one needs is the bound
+           * (3.7)-(3.8) on lambda_max, but not here: we want the actual
+           * solution. We therefore bracket with [0, p_min] instead, which
+           * is a valid bracket because phi(0) < 0 (non-vacuum condition
+           * above) and phi(p_min) > 0.
+           */
+
+          p_1 = 0.;
+          p_2 = p_min;
         }
 
-#ifdef DEBUG
-        {
-          const double phi_1 = phi(p_1, data_1, data_2);
-          const double phi_2 = phi(p_2, data_1, data_2);
-          Assert(phi_1 * phi_2 <= 0.,
-                 dealii::ExcMessage(
-                     "Euler::ExactRiemannSolver: failed to compute p_star."));
+        /*
+         * Safeguard: the bound p^* < \tilde p^* of Lemma 4.3 rests on
+         * Theorem 4.1, which by @cite GuermondPopov2016b, Remark 4.2 is
+         * false outside the physical range gamma \in (1, 5/3]. For
+         * gamma > 5/3 the upper bracket may therefore fall short of p^*;
+         * widen it until phi changes sign.
+         */
+
+        for (unsigned int i = 0; phi(p_2, data_left, data_right) < 0.; ++i) {
+          p_2 *= 2.;
+          AssertThrow(i < 200,
+                      dealii::ExcMessage("Euler::ExactRiemannSolution: failed "
+                                         "to bracket p_star."));
         }
-#endif
+
+        Assert(phi(p_1, data_left, data_right) <= 0. &&
+                   phi(p_2, data_left, data_right) >= 0.,
+               dealii::ExcMessage(
+                   "Euler::ExactRiemannSolver: failed to compute p_star."));
 
         //
         // We simply compute the root of phi with a bisection method down
@@ -458,7 +581,10 @@ namespace ryujin
         //
 
 #ifdef DEBUG_SOLUTION
-        std::cout << "Computing p_star with a bisection method." << std::endl;
+        std::cout << "Computing p_star with a bisection method.\n"
+                  << "p_tilde_star: " << p_tilde << "\n"
+                  << "initial bracket: [" << p_1 << ", " << p_2 << "]"
+                  << std::endl;
 #endif
 
         unsigned int iter = 0;
@@ -469,10 +595,9 @@ namespace ryujin
             break;
           }
 
-          const double phi_2 = phi(p_2, data_1, data_2);
-
 #ifdef DEBUG_SOLUTION
-          const double phi_1 = phi(p_1, data_1, data_2);
+          const double phi_1 = phi(p_1, data_left, data_right);
+          const double phi_2 = phi(p_2, data_left, data_right);
 
           std::cout << "\niter: " << iter << "\n";
           std::cout << "p_1: " << p_1 << "\n";
@@ -481,24 +606,31 @@ namespace ryujin
           std::cout << "phi_2: " << phi_2 << "\n";
 #endif
 
-          const auto p_m = 0.5 * (p_2 + p_1);
-          const double phi_m = phi(p_m, data_1, data_2);
+          /*
+           * phi is strictly monotone increasing and we maintain the
+           * invariant phi(p_1) <= 0 <= phi(p_2), so we can simply test the
+           * sign of phi at the midpoint.
+           */
 
-          if (phi_m * phi_2 >= 0.) {
+          const auto p_m = 0.5 * (p_2 + p_1);
+
+          if (phi(p_m, data_left, data_right) >= 0.) {
             p_2 = p_m;
           } else {
             p_1 = p_m;
           }
         }
 
+        const double p_star = 0.5 * (p_1 + p_2);
+
 #ifdef DEBUG_SOLUTION
-        const double phi_2 = phi(p_2, data_1, data_2);
         std::cout << "After " << iter << " iterations:"
-                  << "\np_star =      " << p_2 << "\nphi(p_star) = " << phi_2
+                  << "\np_star =      " << p_star
+                  << "\nphi(p_star) = " << phi(p_star, data_left, data_right)
                   << "\n|p_2 - p_1| = " << std::abs(p_2 - p_1) << std::endl;
 #endif
 
-        return p_2;
+        return p_star;
       }
 
       //@}
