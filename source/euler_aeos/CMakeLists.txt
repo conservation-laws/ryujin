@@ -7,7 +7,6 @@ add_library(obj_euler_aeos OBJECT
   equation_dispatch.cc
   equation_of_state_library.cc
   initial_state_library.cc
-  limiter.cc
   )
 set_target_properties(obj_euler_aeos PROPERTIES LINKER_LANGUAGE CXX)
 deal_ii_setup_target(obj_euler_aeos)
