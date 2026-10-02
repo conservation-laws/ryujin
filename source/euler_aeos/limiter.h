@@ -169,10 +169,10 @@ namespace ryujin
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
 
-      //@}
-
       template <int, typename, typename>
       friend class LimiterView;
+
+      //@}
     };
 
 
