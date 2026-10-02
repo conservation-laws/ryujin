@@ -124,8 +124,15 @@ namespace ryujin
        * @note The method does not update the ghost range of the state
        * vector. The precomputed part has to be synchronized by explicitly
        * calling the update ghost values function.
+       *
+       * @note The pressure is computed with the selected equation of state
+       * on the host memory space. If @p MemorySpace is the default (device)
+       * memory space the state vector is thus temporarily transferred to
+       * the host memory space.
        */
-      template <int dim, typename ScalarNumber>
+      template <typename MemorySpace = dealii::MemorySpace::Host,
+                int dim,
+                typename ScalarNumber>
       void fill_precomputed_values(
           const OfflineData<dim, ScalarNumber> &offline_data,
           typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
@@ -1032,87 +1039,140 @@ namespace ryujin
     }
 
 
-    template <int dim, typename ScalarNumber>
+    template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
         typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
             &state_vector,
         const bool skip_constrained_dofs) const
     {
+      using HostSpace = dealii::MemorySpace::Host;
+
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
-      const auto sparsity_simd_view =
-          offline_data.sparsity_pattern_simd().view();
-      using VA = dealii::VectorizedArray<ScalarNumber>;
 
-      const auto U_view = std::get<0>(state_vector).view();
-      const auto precomputed_view = std::get<1>(state_vector).view();
+      auto &U = std::get<0>(state_vector);
+      auto &precomputed = std::get<1>(state_vector);
 
-      /* Compute values over the diagonal: */
+      /*
+       * Compute the pressure (and an initial surrogate gamma_min) over the
+       * diagonal. This requires calling into the selected equation of
+       * state, which is only possible on the host memory space. Thus,
+       * temporarily transfer the state vector and the precomputed values
+       * to the host memory space:
+       */
 
-      const auto body = [&](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
-        using View = HyperbolicSystemView<dim, T>;
-        using precomputed_type = typename View::precomputed_type;
+      constexpr bool transfer =
+          have_separate_memory_spaces &&
+          !std::is_same_v<MemorySpace, dealii::MemorySpace::Host>;
 
-        const unsigned int row_length = sparsity_simd_view.row_length(i);
-        if (skip_constrained_dofs && row_length == 1)
-          return;
+      [[maybe_unused]] const bool host_resident =
+          U.template is_resident<HostSpace>();
 
-        const auto U_i = U_view.template read_tensor<T>(i);
-        const auto view = this->view<dim, T>();
-        const auto rho_i = view.density(U_i);
-        const auto e_i = view.internal_energy(U_i) / rho_i;
+      if constexpr (transfer) {
+        U.template copy_to_memory_space<HostSpace>();
+        precomputed.template move_to_memory_space<HostSpace>();
+      }
 
-        /* Calls into the selected equation of state: */
-        const auto p_i = view.eos_pressure(rho_i, e_i);
+      {
+        const auto sparsity_simd_view =
+            offline_data.sparsity_pattern_simd().template view<HostSpace>();
 
-        const auto gamma_i = view.surrogate_gamma(U_i, p_i);
-        using PT = precomputed_type;
-        const PT prec_i{p_i, gamma_i, T(0.), T(0.)};
-        precomputed_view.template write_tensor<T>(prec_i, i);
-      };
+        /* We only read the hyperbolic state vector: */
+        const auto U_view = std::as_const(U).template view<HostSpace>();
+        const auto precomputed_view = precomputed.template view<HostSpace>();
 
-      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
-      precomputed_view.update_ghost_values();
+        const auto hyperbolic_system_views =
+            make_select_view<dim, ScalarNumber, HostSpace>(*this);
 
-      /* Compute gamma_min over the stencil: */
+        const auto body = [=](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
+          using View = HyperbolicSystemView<dim, T, HostSpace>;
+          using precomputed_type = typename View::precomputed_type;
 
-      const auto body_stencil = [&](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
-        using View = HyperbolicSystemView<dim, T>;
-        using PT = typename View::precomputed_type;
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
+          if (skip_constrained_dofs && row_length == 1)
+            return;
 
-        const unsigned int row_length = sparsity_simd_view.row_length(i);
-        if (skip_constrained_dofs && row_length == 1)
-          return;
+          const auto view = hyperbolic_system_views.template view<T>();
 
-        const auto U_i = U_view.template read_tensor<T>(i);
-        auto prec_i = precomputed_view.template read_tensor<T, PT>(i);
-        /* Previous loop: gamma_min_i == gamma_i, s_i == 0, eta_i == 0 */
-        auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+          const auto U_i = U_view.template read_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+          const auto e_i = view.internal_energy(U_i) / rho_i;
 
-        const auto view = this->view<dim, T>();
+          /* Calls into the selected equation of state: */
+          const auto p_i = view.eos_pressure(rho_i, e_i);
 
-        const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
-        const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
-        for (unsigned int col_idx = 1; col_idx < row_length;
-             ++col_idx, js += stride_size) {
+          const auto gamma_i = view.surrogate_gamma(U_i, p_i);
+          const precomputed_type prec_i{p_i, gamma_i, T(0.), T(0.)};
+          precomputed_view.template write_tensor<T>(prec_i, i);
+        };
 
-          const auto U_j = U_view.template read_tensor<T>(js);
-          const auto prec_j = precomputed_view.template read_tensor<T, PT>(js);
-          const auto p_j = std::get<0>(prec_j);
-          const auto gamma_j = view.surrogate_gamma(U_j, p_j);
-          gamma_min_i = std::min(gamma_min_i, gamma_j);
-        }
+        loop<HostSpace, ScalarNumber>(
+            "hyperbolic_kernel_01b", body, 0, n_internal, n_owned);
+      }
 
-        s_i = view.surrogate_specific_entropy(U_i, gamma_min_i);
-        eta_i = view.surrogate_harten_entropy(U_i, gamma_min_i);
-        precomputed_view.template write_tensor<T>(prec_i, i);
-      };
+      if constexpr (transfer) {
+        /* Drop the (now stale) host mirror unless it was resident before: */
+        if (!host_resident)
+          U.template move_to_memory_space<MemorySpace>();
+        precomputed.template move_to_memory_space<MemorySpace>();
+      }
 
-      cpu_simd_loop<ScalarNumber>(
-          "time_step_1", body_stencil, 0, n_internal, n_owned);
+      precomputed.template view<MemorySpace>().update_ghost_values();
+
+      /*
+       * Compute gamma_min over the stencil:
+       */
+
+      {
+        const auto sparsity_simd_view =
+            offline_data.sparsity_pattern_simd().template view<MemorySpace>();
+
+        /* We only read the hyperbolic state vector: */
+        const auto U_view = std::as_const(U).template view<MemorySpace>();
+        const auto precomputed_view = precomputed.template view<MemorySpace>();
+
+        const auto hyperbolic_system_views =
+            make_select_view<dim, ScalarNumber, MemorySpace>(*this);
+
+        const auto body = [=](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
+          using View = HyperbolicSystemView<dim, T, MemorySpace>;
+          using PT = typename View::precomputed_type;
+
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
+          if (skip_constrained_dofs && row_length == 1)
+            return;
+
+          const auto view = hyperbolic_system_views.template view<T>();
+
+          const auto U_i = U_view.template read_tensor<T>(i);
+          auto prec_i = precomputed_view.template read_tensor<T, PT>(i);
+          /* Previous loop: gamma_min_i == gamma_i, s_i == 0, eta_i == 0 */
+          auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+
+          const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
+          const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
+          for (unsigned int col_idx = 1; col_idx < row_length;
+               ++col_idx, js += stride_size) {
+
+            const auto U_j = U_view.template read_tensor<T>(js);
+            const auto prec_j =
+                precomputed_view.template read_tensor<T, PT>(js);
+            const auto p_j = std::get<0>(prec_j);
+            const auto gamma_j = view.surrogate_gamma(U_j, p_j);
+            gamma_min_i = std::min(gamma_min_i, gamma_j);
+          }
+
+          s_i = view.surrogate_specific_entropy(U_i, gamma_min_i);
+          eta_i = view.surrogate_harten_entropy(U_i, gamma_min_i);
+          precomputed_view.template write_tensor<T>(prec_i, i);
+        };
+
+        loop<MemorySpace, ScalarNumber>(
+            "hyperbolic_kernel_01c", body, 0, n_internal, n_owned);
+      }
     }
 
 
