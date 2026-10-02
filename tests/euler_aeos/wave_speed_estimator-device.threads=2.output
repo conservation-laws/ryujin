@@ -1,0 +1,28 @@
+
+compute strict bounds = true
+
+Runtime parameters:
+
+newton_tolerance (host):   1.0000000000e-10
+newton_tolerance (device): 1.0000000000e-10
+newton_max_iterations (host):   2.0000000000e+00
+newton_max_iterations (device): 2.0000000000e+00
+
+lambda_max for 8 states:
+
+lambda_max (host):   1.3800933168e+00 1.5769282198e+00 1.7716712855e+00 1.9650969451e+00 2.1578026648e+00 1.3219820006e+00 1.5159820673e+00 1.7079930862e+00
+lambda_max (device): 1.3800933168e+00 1.5769282198e+00 1.7716712855e+00 1.9650969451e+00 2.1578026648e+00 1.3219820006e+00 1.5159820673e+00 1.7079930862e+00
+
+compute strict bounds = false
+
+Runtime parameters:
+
+newton_tolerance (host):   1.0000000000e-10
+newton_tolerance (device): 1.0000000000e-10
+newton_max_iterations (host):   2.0000000000e+00
+newton_max_iterations (device): 2.0000000000e+00
+
+lambda_max for 8 states:
+
+lambda_max (host):   1.3800933168e+00 1.5769282198e+00 1.7716712855e+00 1.9650969451e+00 2.1578026648e+00 1.3219820028e+00 1.5159820675e+00 1.7079930862e+00
+lambda_max (device): 1.3800933168e+00 1.5769282198e+00 1.7716712855e+00 1.9650969451e+00 2.1578026648e+00 1.3219820028e+00 1.5159820675e+00 1.7079930862e+00
