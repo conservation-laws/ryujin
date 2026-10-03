@@ -157,12 +157,9 @@ compute_quantities(const View &limiter_view,
   for (unsigned int d = 0; d < n_bounds; ++d)
     result[k++] = accumulated_bounds[d];
 
-  /*
-   * Limit against the tight combined projection bounds so that the water
-   * depth limiter and the limiter on the square velocity actually engage:
-   */
+  /* Limit against bounds so that the quadratic Newton iterates: */
   const state_type P = 8. * (U_j_1 - U_i) + 4. * (U_j_2 - U_i);
-  const auto [t_l, success] = limiter.limit(combined_bounds, U_i, P);
+  const auto [t_l, success] = limiter.limit(relaxed_bounds, U_i, P);
   result[k++] = t_l;
   result[k++] = success ? 1. : 0.;
 
