@@ -6,7 +6,6 @@
 add_library(obj_shallow_water OBJECT
   equation_dispatch.cc
   initial_state_library.cc
-  limiter.cc
   wave_speed_estimator.cc
   )
 set_target_properties(obj_shallow_water PROPERTIES LINKER_LANGUAGE CXX)
