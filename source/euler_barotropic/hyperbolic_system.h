@@ -102,8 +102,15 @@ namespace ryujin
        * @note The method does not update the ghost range of the state
        * vector. The precomputed part has to be synchronized by explicitly
        * calling the update ghost values function.
+       *
+       * @note The precomputed values are computed with the selected
+       * barotropic equation of state on the host memory space. If @p
+       * MemorySpace is the default (device) memory space the state vector
+       * is thus temporarily transferred to the host memory space.
        */
-      template <int dim, typename ScalarNumber>
+      template <typename MemorySpace = dealii::MemorySpace::Host,
+                int dim,
+                typename ScalarNumber>
       void fill_precomputed_values(
           const OfflineData<dim, ScalarNumber> &offline_data,
           typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
@@ -794,44 +801,85 @@ namespace ryujin
     }
 
 
-    template <int dim, typename ScalarNumber>
+    template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
         typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
             &state_vector,
         const bool skip_constrained_dofs) const
     {
+      using HostSpace = dealii::MemorySpace::Host;
+
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
-      const auto sparsity_simd_view =
-          offline_data.sparsity_pattern_simd().view();
-      using VA = dealii::VectorizedArray<ScalarNumber>;
 
-      const auto U_view = std::get<0>(state_vector).view();
-      const auto precomputed_view = std::get<1>(state_vector).view();
+      auto &U = std::get<0>(state_vector);
+      auto &precomputed = std::get<1>(state_vector);
 
-      const auto body = [&](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
-        using View = HyperbolicSystemView<dim, T>;
-        using precomputed_type = typename View::precomputed_type;
+      /*
+       * Compute the specific internal energy, pressure, and speed of sound.
+       * This requires calling into the selected equation of state, which
+       * is only possible on the host memory space. Thus, temporarily
+       * transfer the state vector and the precomputed values to the host
+       * memory space:
+       */
 
-        const unsigned int row_length = sparsity_simd_view.row_length(i);
-        if (skip_constrained_dofs && row_length == 1)
-          return;
+      constexpr bool transfer =
+          have_separate_memory_spaces &&
+          !std::is_same_v<MemorySpace, dealii::MemorySpace::Host>;
 
-        const auto U_i = U_view.template read_tensor<T>(i);
-        const auto view = this->view<dim, T>();
-        const auto rho_i = view.density(U_i);
+      [[maybe_unused]] const bool host_resident =
+          U.template is_resident<HostSpace>();
 
-        const auto e_i = view.beos_specific_internal_energy(rho_i);
-        const auto p_i = view.beos_pressure(rho_i);
-        const auto a_i = view.beos_speed_of_sound(rho_i);
+      if constexpr (transfer) {
+        U.template copy_to_memory_space<HostSpace>();
+        precomputed.template move_to_memory_space<HostSpace>();
+      }
 
-        const precomputed_type prec_i{e_i, p_i, a_i};
-        precomputed_view.template write_tensor<T>(prec_i, i);
-      };
+      {
+        const auto sparsity_simd_view =
+            offline_data.sparsity_pattern_simd().template view<HostSpace>();
 
-      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
+        /* We only read the hyperbolic state vector: */
+        const auto U_view = std::as_const(U).template view<HostSpace>();
+        const auto precomputed_view = precomputed.template view<HostSpace>();
+
+        const auto hyperbolic_system_views =
+            make_select_view<dim, ScalarNumber, HostSpace>(*this);
+
+        const auto body = [=](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
+          using View = HyperbolicSystemView<dim, T, HostSpace>;
+          using precomputed_type = typename View::precomputed_type;
+
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
+          if (skip_constrained_dofs && row_length == 1)
+            return;
+
+          const auto view = hyperbolic_system_views.template view<T>();
+
+          const auto U_i = U_view.template read_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+
+          /* Calls into the selected equation of state: */
+          const auto e_i = view.beos_specific_internal_energy(rho_i);
+          const auto p_i = view.beos_pressure(rho_i);
+          const auto a_i = view.beos_speed_of_sound(rho_i);
+
+          const precomputed_type prec_i{e_i, p_i, a_i};
+          precomputed_view.template write_tensor<T>(prec_i, i);
+        };
+
+        loop<HostSpace, ScalarNumber>(
+            "hyperbolic_kernel_01b", body, 0, n_internal, n_owned);
+      }
+
+      if constexpr (transfer) {
+        /* Drop the (now stale) host mirror unless it was resident before: */
+        if (!host_resident)
+          U.template move_to_memory_space<MemorySpace>();
+        precomputed.template move_to_memory_space<MemorySpace>();
+      }
     }
 
 
