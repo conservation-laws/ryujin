@@ -86,8 +86,16 @@ namespace ryujin
 
     create_matrices();
 
-    if (!dof_handler().has_hp_capabilities())
+    // You would think the dealii::Triangulation would make is easy to
+    // query this information directly...
+    const bool is_multilevel_hierarchy_constructed =
+        discretization_->mesh_type() != MeshType::parallel_shared;
+
+    if (is_multilevel_hierarchy_constructed &&
+        !dof_handler_cg().has_hp_capabilities() &&
+        !dof_handler_dg().has_hp_capabilities()) {
       create_multigrid_data();
+    }
   }
 
 
