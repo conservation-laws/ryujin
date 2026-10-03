@@ -73,15 +73,13 @@ extract_element_wise(const Extractor &extractor,
   const auto body = [=](auto sentinel, unsigned int i) {
     using T = decltype(sentinel);
 
-    T values[n_selected];
-    extractor_view.extract_element(values, i);
-
-    for (unsigned int k = 0; k < n_selected; ++k) {
-      if constexpr (std::is_same_v<T, dealii::VectorizedArray<Number>>)
-        values[k].store(destination + k * n_owned + i);
-      else
-        destination[k * n_owned + i] = values[k];
-    }
+    extractor_view.template extract_element<T>(
+        i, [&](const unsigned int k, const T &value) {
+          if constexpr (std::is_same_v<T, dealii::VectorizedArray<Number>>)
+            value.store(destination + k * n_owned + i);
+          else
+            destination[k * n_owned + i] = value;
+        });
   };
 
   loop<MemorySpace, Number>("extract_element", body, 0, n_internal, n_owned);

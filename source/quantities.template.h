@@ -621,7 +621,9 @@ namespace ryujin
 
     const auto body = [=](auto /*sentinel*/, const unsigned int p) {
       auto *values = current + p * stride;
-      extractor_view.extract_element(values, indices[p]);
+      extractor_view.extract_element(
+          indices[p],
+          [=](const unsigned int k, const Number value) { values[k] = value; });
 
       for (unsigned int k = 1; k < n_moments; ++k)
         for (unsigned int c = 0; c < n_selected; ++c)

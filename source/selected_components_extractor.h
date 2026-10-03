@@ -18,6 +18,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace ryujin
@@ -59,15 +60,12 @@ namespace ryujin
    * const auto body = [=](auto sentinel, unsigned int i) {
    *   using T = decltype(sentinel);
    *
-   *   T values[n_selected];
-   *   extractor_view.extract_element(values, i);
-   *   // ...
+   *   extractor_view.template extract_element<T>(
+   *       i, [&](unsigned int k, const T &value) {
+   *         // ...
+   *       });
    * };
    * ```
-   *
-   * All bookkeeping and all memory space transfers happen in prepare() and
-   * prepare_extraction(); a view is a cheap, copyable collection of
-   * pointers, indices, and booleans.
    *
    * @note A view is only valid as long as neither prepare(), nor
    * prepare_extraction() is called again, and as long as the state vector
@@ -94,28 +92,7 @@ namespace ryujin
 
     using ScalarVector = Vectors::ScalarVector<Number>;
 
-    using HyperbolicVector = std::tuple_element_t<0, StateVector>;
-    using PrecomputedVector = std::tuple_element_t<1, StateVector>;
-    using ParabolicVector = std::tuple_element_t<2, StateVector>;
-
-    template <typename MemorySpace>
-    using HyperbolicVectorView =
-        decltype(std::declval<const HyperbolicVector &>()
-                     .template view<MemorySpace>());
-    template <typename MemorySpace>
-    using PrecomputedVectorView =
-        decltype(std::declval<const PrecomputedVector &>()
-                     .template view<MemorySpace>());
-    template <typename MemorySpace>
-    using InitialPrecomputedVectorView =
-        decltype(std::declval<const InitialPrecomputedVector &>()
-                     .template view<MemorySpace>());
-    template <typename MemorySpace>
-    using ScalarVectorView = decltype(std::declval<const ScalarVector &>()
-                                          .template view<MemorySpace>());
-
     /*
-     *
      * A selected component is identified by an offset into the linear
      * range formed by concatenating all conserved, primitive, precomputed,
      * initial-precomputed, parabolic, and additional components (in this
@@ -178,8 +155,9 @@ namespace ryujin
      * A call to prepare_extraction() is necessary before a view for the
      * selected memory space can be created with view().
      *
-     * @note A call to this function invalidates all views for the selected
-     * memory space previously returned by view().
+     * @note A call to this function discards all information stored for a
+     * previous extraction and invalidates all views previously returned by
+     * view().
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
     void prepare_extraction(const StateVector &state_vector) const;
@@ -191,11 +169,11 @@ namespace ryujin
     //@{
 
     /**
-     * Return the number of selected components, i.e., the number of
-     * entries of the vector returned by extract() and the number of
-     * values written by extract_element().
+     * Return the number of selected components, i.e., the number of entries
+     * of the vector returned by extract() and the number of values passed
+     * to the writer by extract_element().
      */
-    std::size_t n_selected() const;
+    unsigned int n_selected() const;
 
     //@}
     /**
@@ -235,28 +213,10 @@ namespace ryujin
     const unsigned int additional_offset_;
 
     /**
-     * The combined number of parabolic components and additional vectors,
-     * i.e., the size of the scalar view array maintained in the payload.
-     */
-    const unsigned int n_scalar_;
-
-    /*
-     * Index bookkeeping that is independent of the state vector and the
-     * memory space. All of the following is set up by prepare():
-     */
-
-    /**
      * The offset of every selected component, in the order in which the
-     * components have been selected. The array is mirrored between the
-     * host and device memory spaces so that it can be captured in a
-     * computation loop.
+     * components have been selected.
      */
-    Mirrored<unsigned int *> selection_{"selected_components_selection"};
-
-    /**
-     * The number of selected components, i.e., the size of selection_.
-     */
-    unsigned int n_selected_ = 0;
+    std::vector<unsigned int> selection_;
 
     /**
      * Record which sections of the linear range of offsets have selected
@@ -267,45 +227,19 @@ namespace ryujin
     bool read_primitive_ = false;
     bool read_precomputed_ = false;
     bool read_initial_ = false;
-    bool read_scalar_ = false;
+
+    template <typename MemorySpace>
+    using ExtractorView =
+        SelectedComponentsExtractorView<Description, dim, Number, MemorySpace>;
 
     /**
-     * All state vector and memory space dependent data set up by
-     * prepare_extraction(), maintained once per memory space.
+     * A variant storing the view (on the memory space) that the extraction
+     * has last been prepared for.
      */
-    template <typename MemorySpace>
-    struct Payload {
-      const unsigned int *selection_ = nullptr;
-
-      HyperbolicVectorView<MemorySpace> U_view_;
-      PrecomputedVectorView<MemorySpace> precomputed_view_;
-      InitialPrecomputedVectorView<MemorySpace> initial_view_;
-
-      /*
-       * One view per parabolic component and additional vector, indexed by
-       * `offset - parabolic_offset`: the parabolic components come first,
-       * the additional vectors last. Only the views of selected components
-       * are populated. The array is mirrored between the host and device
-       * memory spaces so that it can be captured in a computation loop.
-       */
-      Mirrored<ScalarVectorView<MemorySpace> *> scalar_views_storage_{
-          "selected_components_scalar_views"};
-      const ScalarVectorView<MemorySpace> *scalar_views_ = nullptr;
-
-      bool prepared_ = false;
-    };
-
-    mutable Payload<dealii::MemorySpace::Host> host_payload_;
-    mutable Payload<dealii::MemorySpace::Default> default_payload_;
-
-    /**
-     * Return the payload of the selected memory space.
-     */
-    template <typename MemorySpace>
-    Payload<MemorySpace> &payload() const;
-
-    template <typename, int, typename, typename>
-    friend class SelectedComponentsExtractorView;
+    mutable std::variant<std::monostate,
+                         ExtractorView<dealii::MemorySpace::Host>,
+                         ExtractorView<dealii::MemorySpace::Default>>
+        view_;
 
     //@}
   };
@@ -341,26 +275,6 @@ namespace ryujin
 
     using Extractor = SelectedComponentsExtractor<Description, dim, Number>;
 
-    using HyperbolicSystem = typename Extractor::HyperbolicSystem;
-    using StateVector = typename Extractor::StateVector;
-
-    using EquationView = typename Extractor::View;
-
-    static constexpr auto problem_dimension = EquationView::problem_dimension;
-    static constexpr auto n_precomputed_values =
-        EquationView::n_precomputed_values;
-    static constexpr auto n_initial_precomputed_values =
-        EquationView::n_initial_precomputed_values;
-
-    using HyperbolicVectorView =
-        typename Extractor::template HyperbolicVectorView<MemorySpace>;
-    using PrecomputedVectorView =
-        typename Extractor::template PrecomputedVectorView<MemorySpace>;
-    using InitialPrecomputedVectorView =
-        typename Extractor::template InitialPrecomputedVectorView<MemorySpace>;
-    using ScalarVectorView =
-        typename Extractor::template ScalarVectorView<MemorySpace>;
-
     /**
      * Shorthand typedef for the scalar
      * dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> that
@@ -386,33 +300,34 @@ namespace ryujin
 
     /**
      * Return the number of selected components, i.e., the number of values
-     * written by extract_element().
+     * passed to the writer by extract_element().
      */
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int n_selected() const
     {
-      return n_selected_;
+      return static_cast<unsigned int>(entries_.extent(0));
     }
 
     /**
      * Extract all selected components for the single degree of freedom
-     * @p i and store them in @p result. The values are stored in the order
-     * in which the components have been selected in prepare(), i.e.,
-     * `result[k]` corresponds to the k-th entry of the vector returned by
-     * extract().
+     * @p i and hand them to @p write: The function calls
+     * `write(k, value)` exactly once for every k = 0, ..., n_selected()-1
+     * in increasing order, where `value` (of type @p T) is the value of
+     * the k-th selected component, i.e., it corresponds to the k-th entry
+     * of the vector returned by extract().
      *
-     * @note The caller has to supply storage for n_selected() values of
-     * type @p T. The function neither allocates memory, nor does it
-     * perform any memory space transfers: it can be called on the memory
+     * @note The function neither allocates memory, nor does it perform
+     * any memory space transfers: it can be called on the memory space of
+     * the view. Correspondingly, @p write has to be callable on the memory
      * space of the view.
      *
      * If the template parameter @a T is a VectorizedArray then the
-     * function returns SIMD vectorized values populated with the entries
+     * function hands out SIMD vectorized values populated with the entries
      * stored at indices i, i+1, ..., i+simd_length-1. Correspondingly,
      * @p i has to be divisible by the SIMD length.
      */
-    template <typename T = Number>
+    template <typename T = Number, typename Writer>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-    extract_element(T *result, unsigned int i) const;
+    extract_element(unsigned int i, const Writer &write) const;
 
   private:
     //@}
@@ -421,36 +336,58 @@ namespace ryujin
      */
     //@{
 
-    using Payload = typename Extractor::template Payload<MemorySpace>;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using EquationView = typename HyperbolicSystem::template View<dim, Number>;
+    using StateVector = typename EquationView::StateVector;
+
+    template <typename Vector>
+    using VectorView =
+        decltype(std::declval<const Vector &>().template view<MemorySpace>());
+
+    using HyperbolicVectorView =
+        VectorView<std::tuple_element_t<0, StateVector>>;
+    using PrecomputedVectorView =
+        VectorView<std::tuple_element_t<1, StateVector>>;
+    using InitialPrecomputedVectorView =
+        VectorView<typename EquationView::InitialPrecomputedVector>;
+    using ScalarVectorView = VectorView<Vectors::ScalarVector<Number>>;
+
+    /*
+     * A selected component: its offset, and for a parabolic component or
+     * an additional vector a view of the corresponding scalar vector.
+     */
+    struct Entry {
+      unsigned int offset;
+      ScalarVectorView scalar_view;
+    };
 
     /**
-     * Constructor.
+     * Constructor. All remaining fields are set up by
+     * SelectedComponentsExtractor::prepare_extraction().
      */
-    SelectedComponentsExtractorView(const Extractor &extractor,
-                                    const Payload &payload);
+    SelectedComponentsExtractorView(
+        const OfflineData<dim, Number> &offline_data,
+        const HyperbolicSystem &hyperbolic_system);
 
-    const Extractor *extractor_;
-
-    const unsigned int *selection_;
-    unsigned int n_selected_;
+    const OfflineData<dim, Number> *offline_data_;
 
     /* Record which vectors have views set up: */
-    bool read_conserved_;
-    bool read_primitive_;
-    bool read_precomputed_;
-    bool read_initial_;
+    bool read_conserved_ = false;
+    bool read_primitive_ = false;
+    bool read_precomputed_ = false;
+    bool read_initial_ = false;
+
+    SelectView<dim, Number, MemorySpace, HyperbolicSystem> system_views_;
 
     HyperbolicVectorView U_view_;
     PrecomputedVectorView precomputed_view_;
     InitialPrecomputedVectorView initial_view_;
 
-    SelectView<dim, Number, MemorySpace, HyperbolicSystem> system_views_;
-
     /*
-     * One view per parabolic component and additional vector, see the
-     * documentation of SelectedComponentsExtractor::Payload.
+     * One entry per selected component, in the order in which the
+     * components have been selected.
      */
-    const ScalarVectorView *scalar_views_;
+    Kokkos::View<const Entry *, typename MemorySpace::kokkos_space> entries_;
 
     friend class SelectedComponentsExtractor<Description, dim, Number>;
 
@@ -484,8 +421,6 @@ namespace ryujin
       , additional_vectors_(additional_vectors)
       , additional_offset_(parabolic_offset +
                            parabolic_system.parabolic_component_names().size())
-      , n_scalar_(additional_offset_ - parabolic_offset +
-                  additional_vectors.size())
   {
     Assert(additional_names_.size() == additional_vectors_.size(),
            dealii::ExcMessage("The number of additional component names does "
@@ -526,8 +461,6 @@ namespace ryujin
                       "initial, parabolic, or additional component name."));
     }
 
-    n_selected_ = static_cast<unsigned int>(selection.size());
-
     /*
      * Record which sections of the linear range of offsets have selected
      * components:
@@ -544,24 +477,11 @@ namespace ryujin
     read_primitive_ = selects(primitive_offset, precomputed_offset);
     read_precomputed_ = selects(precomputed_offset, initial_offset);
     read_initial_ = selects(initial_offset, parabolic_offset);
-    read_scalar_ = selects(parabolic_offset, parabolic_offset + n_scalar_);
 
-    selection_.reinit(selection.size(), TransferPolicy::implicit_transfers);
-    std::copy(selection.begin(), selection.end(), selection_.view());
+    selection_ = std::move(selection);
 
-    /*
-     * (Re)size the scalar view arrays and invalidate all views that we have
-     * handed out so far:
-     */
-
-    const std::size_t size = read_scalar_ ? n_scalar_ : 0;
-    host_payload_.scalar_views_storage_.reinit(
-        size, TransferPolicy::implicit_transfers);
-    default_payload_.scalar_views_storage_.reinit(
-        size, TransferPolicy::implicit_transfers);
-
-    host_payload_.prepared_ = false;
-    default_payload_.prepared_ = false;
+    /* Invalidate all views: */
+    view_ = std::monostate{};
   }
 
 
@@ -571,11 +491,12 @@ namespace ryujin
   SelectedComponentsExtractor<Description, dim, Number>::prepare_extraction(
       const StateVector &state_vector) const
   {
-    using HostSpace = dealii::MemorySpace::Host;
+    ExtractorView<MemorySpace> view(*offline_data_, *hyperbolic_system_);
 
-    auto &payload = this->template payload<MemorySpace>();
-
-    payload.selection_ = selection_.template view<MemorySpace>();
+    view.read_conserved_ = read_conserved_;
+    view.read_primitive_ = read_primitive_;
+    view.read_precomputed_ = read_precomputed_;
+    view.read_initial_ = read_initial_;
 
     /*
      * Only set up views for vectors that we are actually reading from:
@@ -584,57 +505,57 @@ namespace ryujin
      */
 
     if (read_conserved_ || read_primitive_)
-      payload.U_view_ = std::get<0>(state_vector).template view<MemorySpace>();
+      view.U_view_ = std::get<0>(state_vector).template view<MemorySpace>();
 
     if (read_precomputed_)
-      payload.precomputed_view_ =
+      view.precomputed_view_ =
           std::get<1>(state_vector).template view<MemorySpace>();
 
     if (read_initial_)
-      payload.initial_view_ = initial_precomputed_.template view<MemorySpace>();
+      view.initial_view_ = initial_precomputed_.template view<MemorySpace>();
 
     /*
-     * Create a view for every selected parabolic component and additional
-     * vector and store them in an array residing on the memory space of the
-     * view:
+     * Set up an entry for every selected component on the host, with a
+     * view for every selected parabolic component and additional vector,
+     * and copy them into an array residing on the memory space of the view:
      */
 
-    if (read_scalar_) {
-      auto *scalar_views = payload.scalar_views_storage_.view();
+    Kokkos::View<typename ExtractorView<MemorySpace>::Entry *,
+                 Kokkos::HostSpace>
+        entries("selected_components_entries", n_selected());
 
-      /* We iterate over the selection on the host: */
-      const auto *selection = selection_.template view<HostSpace>();
-      const auto &parabolic = std::get<2>(state_vector);
+    const auto &parabolic = std::get<2>(state_vector);
 
-      for (unsigned int k = 0; k < n_selected_; ++k) {
-        const auto offset = selection[k];
-        if (offset < parabolic_offset)
-          continue;
+    for (unsigned int k = 0; k < n_selected(); ++k) {
+      const auto offset = selection_[k];
+      entries[k].offset = offset;
 
-        const auto component = offset - parabolic_offset;
-        if (offset < additional_offset_)
-          scalar_views[component] =
-              parabolic[component].template view<MemorySpace>();
-        else
-          scalar_views[component] =
-              additional_vectors_[offset - additional_offset_]
-                  .get()
-                  .template view<MemorySpace>();
-      }
+      if (offset < parabolic_offset)
+        continue;
 
-      payload.scalar_views_ = std::as_const(payload.scalar_views_storage_)
-                                  .template view<MemorySpace>();
+      if (offset < additional_offset_)
+        entries[k].scalar_view =
+            parabolic[offset - parabolic_offset].template view<MemorySpace>();
+      else
+        entries[k].scalar_view =
+            additional_vectors_[offset - additional_offset_]
+                .get()
+                .template view<MemorySpace>();
     }
 
-    payload.prepared_ = true;
+    view.entries_ = Kokkos::create_mirror_view_and_copy(
+        typename MemorySpace::kokkos_space{}, entries);
+
+    /* Discard all information stored for a previous extraction: */
+    view_.template emplace<ExtractorView<MemorySpace>>(std::move(view));
   }
 
 
   template <typename Description, int dim, typename Number>
-  std::size_t
+  unsigned int
   SelectedComponentsExtractor<Description, dim, Number>::n_selected() const
   {
-    return n_selected_;
+    return static_cast<unsigned int>(selection_.size());
   }
 
 
@@ -643,32 +564,12 @@ namespace ryujin
   SelectedComponentsExtractorView<Description, dim, Number, MemorySpace>
   SelectedComponentsExtractor<Description, dim, Number>::view() const
   {
-    Assert(this->template payload<MemorySpace>().prepared_,
+    Assert(std::holds_alternative<ExtractorView<MemorySpace>>(view_),
            dealii::ExcMessage(
                "Invalid state: prepare_extraction() has to be called for the "
                "selected memory space before a view can be created."));
 
-    return SelectedComponentsExtractorView<Description,
-                                           dim,
-                                           Number,
-                                           MemorySpace>(
-        *this, this->template payload<MemorySpace>());
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  template <typename MemorySpace>
-  auto SelectedComponentsExtractor<Description, dim, Number>::payload() const
-      -> Payload<MemorySpace> &
-  {
-    static_assert(std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
-                      std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
-                  "Unexpected memory space");
-
-    if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
-      return host_payload_;
-    else
-      return default_payload_;
+    return std::get<ExtractorView<MemorySpace>>(view_);
   }
 
 
@@ -677,20 +578,11 @@ namespace ryujin
             typename Number,
             typename MemorySpace>
   SelectedComponentsExtractorView<Description, dim, Number, MemorySpace>::
-      SelectedComponentsExtractorView(const Extractor &extractor,
-                                      const Payload &payload)
-      : extractor_(&extractor)
-      , selection_(payload.selection_)
-      , n_selected_(extractor.n_selected_)
-      , read_conserved_(extractor.read_conserved_)
-      , read_primitive_(extractor.read_primitive_)
-      , read_precomputed_(extractor.read_precomputed_)
-      , read_initial_(extractor.read_initial_)
-      , U_view_(payload.U_view_)
-      , precomputed_view_(payload.precomputed_view_)
-      , initial_view_(payload.initial_view_)
-      , system_views_(*extractor.hyperbolic_system_)
-      , scalar_views_(payload.scalar_views_)
+      SelectedComponentsExtractorView(
+          const OfflineData<dim, Number> &offline_data,
+          const HyperbolicSystem &hyperbolic_system)
+      : offline_data_(&offline_data)
+      , system_views_(hyperbolic_system)
   {
   }
 
@@ -702,68 +594,56 @@ namespace ryujin
   auto SelectedComponentsExtractorView<Description, dim, Number, MemorySpace>::
       extract() const -> std::vector<ScalarVector>
   {
-    using HostSpace = dealii::MemorySpace::Host;
+    const auto &offline_data = *offline_data_;
 
-    const auto &offline_data = *extractor_->offline_data_;
-    const auto &scalar_partitioner = offline_data.scalar_partitioner();
+    /*
+     * Set up all destination vectors and an array of pointers to their
+     * data residing on the memory space of the view:
+     */
 
-    /* We iterate over the selection on the host: */
-    const auto *selection = extractor_->selection_.template view<HostSpace>();
+    std::vector<ScalarVector> extracted_components(n_selected());
 
-    std::vector<ScalarVector> extracted_components(n_selected_);
-    for (auto &it : extracted_components)
-      it.reinit(scalar_partitioner);
+    struct Destination {
+      Number *data;
+    };
 
-    for (unsigned int k = 0; k < n_selected_; ++k) {
-      const auto offset = selection[k];
-      auto &destination = extracted_components[k];
+    Kokkos::View<Destination *, Kokkos::HostSpace> host_destinations(
+        "selected_components_destinations", n_selected());
 
-      if (offset < Extractor::primitive_offset) {
-        U_view_.extract_component(destination,
-                                  offset - Extractor::conserved_offset);
-
-      } else if (offset < Extractor::precomputed_offset) {
-        /*
-         * Primitive components are computed from the conserved state:
-         */
-
-        const auto U_view = U_view_;
-        const auto system_views = system_views_;
-        const auto component = offset - Extractor::primitive_offset;
-        auto *data = destination.begin();
-
-        const auto body = [=](auto sentinel, unsigned int i) {
-          using T = decltype(sentinel);
-
-          const auto U_i = U_view.template read_tensor<T>(i);
-          const auto primitive_i =
-              system_views.template view<T>().to_primitive_state(U_i);
-
-          if constexpr (std::is_same_v<T, dealii::VectorizedArray<Number>>)
-            primitive_i[component].store(data + i);
-          else
-            data[i] = primitive_i[component];
-        };
-
-        loop<MemorySpace, Number>("extract_primitive_component",
-                                  body,
-                                  0,
-                                  offline_data.n_locally_internal(),
-                                  offline_data.n_locally_owned());
-
-      } else if (offset < Extractor::initial_offset) {
-        precomputed_view_.extract_component(
-            destination, offset - Extractor::precomputed_offset);
-
-      } else if (offset < Extractor::parabolic_offset) {
-        initial_view_.extract_component(destination,
-                                        offset - Extractor::initial_offset);
-
-      } else {
-        scalar_views_[offset - Extractor::parabolic_offset].extract_component(
-            destination, 0);
-      }
+    for (unsigned int k = 0; k < n_selected(); ++k) {
+      extracted_components[k].reinit(offline_data.scalar_partitioner());
+      host_destinations[k].data = extracted_components[k].begin();
     }
+
+    const auto destinations = Kokkos::create_mirror_view_and_copy(
+        typename MemorySpace::kokkos_space{}, host_destinations);
+
+    /*
+     * Extract all selected components in a single sweep:
+     */
+
+    const auto view = *this;
+
+    const auto body = [=](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+
+      view.template extract_element<T>(
+          i, [&](const unsigned int k, const T &value) {
+            if constexpr (std::is_same_v<T, dealii::VectorizedArray<Number>>)
+              value.store(destinations[k].data + i);
+            else
+              destinations[k].data[i] = value;
+          });
+    };
+
+    loop<MemorySpace, Number>("extract_selected_components",
+                              body,
+                              0,
+                              offline_data.n_locally_internal(),
+                              offline_data.n_locally_owned());
+
+    for (auto &it : extracted_components)
+      it.update_ghost_values();
 
     return extracted_components;
   }
@@ -773,10 +653,10 @@ namespace ryujin
             int dim,
             typename Number,
             typename MemorySpace>
-  template <typename T>
+  template <typename T, typename Writer>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
   SelectedComponentsExtractorView<Description, dim, Number, MemorySpace>::
-      extract_element(T *result, const unsigned int i) const
+      extract_element(const unsigned int i, const Writer &write) const
   {
     /*
      * Read all involved tensors once. Reading a single component out of a
@@ -788,26 +668,27 @@ namespace ryujin
 
     if (read_conserved_ || read_primitive_) {
       const auto U_i = U_view_.template read_tensor<T>(i);
-      for (unsigned int d = 0; d < problem_dimension; ++d)
+      for (unsigned int d = 0; d < EquationView::problem_dimension; ++d)
         staging[Extractor::conserved_offset + d] = U_i[d];
 
       if (read_primitive_) {
         const auto primitive_i =
             system_views_.template view<T>().to_primitive_state(U_i);
-        for (unsigned int d = 0; d < problem_dimension; ++d)
+        for (unsigned int d = 0; d < EquationView::problem_dimension; ++d)
           staging[Extractor::primitive_offset + d] = primitive_i[d];
       }
     }
 
     if (read_precomputed_) {
       const auto precomputed_i = precomputed_view_.template read_tensor<T>(i);
-      for (unsigned int d = 0; d < n_precomputed_values; ++d)
+      for (unsigned int d = 0; d < EquationView::n_precomputed_values; ++d)
         staging[Extractor::precomputed_offset + d] = precomputed_i[d];
     }
 
     if (read_initial_) {
       const auto initial_i = initial_view_.template read_tensor<T>(i);
-      for (unsigned int d = 0; d < n_initial_precomputed_values; ++d)
+      for (unsigned int d = 0; d < EquationView::n_initial_precomputed_values;
+           ++d)
         staging[Extractor::initial_offset + d] = initial_i[d];
     }
 
@@ -816,14 +697,13 @@ namespace ryujin
      * corresponding scalar vector directly:
      */
 
-    for (unsigned int k = 0; k < n_selected_; ++k) {
-      const auto offset = selection_[k];
+    for (unsigned int k = 0; k < n_selected(); ++k) {
+      const auto &entry = entries_[k];
 
-      if (offset < Extractor::parabolic_offset)
-        result[k] = staging[offset];
+      if (entry.offset < Extractor::parabolic_offset)
+        write(k, staging[entry.offset]);
       else
-        result[k] = scalar_views_[offset - Extractor::parabolic_offset]
-                        .template read_entry<T>(i);
+        write(k, entry.scalar_view.template read_entry<T>(i));
     }
   }
 
