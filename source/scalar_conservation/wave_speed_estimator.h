@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <gpu.h>
 #include <observer_pointer.h>
 #include <simd.h>
 
@@ -23,7 +24,9 @@ namespace ryujin
 {
   namespace ScalarConservation
   {
-    template <int dim, typename Number = double>
+    template <int dim,
+              typename Number = double,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class WaveSpeedEstimatorView;
 
     /**
@@ -46,11 +49,14 @@ namespace ryujin
       //@{
 
       /**
-       * Alias for the view on the wave speed estimator for a given dimension @p
-       * dim and choice of number type @p Number.
+       * A structure holding all runtime parameters of the wave speed
+       * estimator.
        */
-      template <int dim, typename Number = double>
-      using View = WaveSpeedEstimatorView<dim, Number>;
+      struct Parameters {
+        bool use_greedy_wavespeed;
+        bool use_averaged_entropy;
+        unsigned int random_entropies;
+      };
 
       //@}
       /**
@@ -64,75 +70,91 @@ namespace ryujin
       WaveSpeedEstimator(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection = "/WaveSpeedEstimator")
           : ParameterAcceptor(subsection)
+          , parameters_("scalar_conservation_wave_speed_estimator_parameters",
+                        TransferPolicy::implicit_transfers_host_resident)
           , hyperbolic_system_(&hyperbolic_system)
       {
-        use_greedy_wavespeed_ = false;
+        /* reference remains valid due to implicit_transfers_host_resident */
+        auto &parameters = *parameters_.view();
+
+        parameters.use_greedy_wavespeed = false;
         add_parameter("use greedy wavespeed",
-                      use_greedy_wavespeed_,
+                      parameters.use_greedy_wavespeed,
                       "Use a greedy wavespeed estimate instead of a guaranteed "
                       "upper bound "
                       "on the maximal wavespeed (for convex fluxes).");
 
-        use_averaged_entropy_ = false;
+        parameters.use_averaged_entropy = false;
         add_parameter("use averaged entropy",
-                      use_averaged_entropy_,
+                      parameters.use_averaged_entropy,
                       "In addition to the wavespeed estimate based on the Roe "
                       "average and "
                       "flux gradients of the left and right state also enforce "
                       "an entropy "
                       "inequality on the averaged Krŭzkov entropy.");
 
-        random_entropies_ = 0;
+        parameters.random_entropies = 0;
         add_parameter(
             "random entropies",
-            random_entropies_,
+            parameters.random_entropies,
             "In addition to the wavespeed estimate based on the Roe average "
             "and "
             "flux gradients of the left and right state also enforce an "
             "entropy "
             "inequality on the prescribed number of random Krŭzkov entropies.");
+
+        /* invalidates view on default memory space */
+        ParameterAcceptor::parse_parameters_call_back.connect(
+            [this] { parameters_.view(); });
       }
-
-      //@}
-      /**
-       * @name Information and statistics
-       */
-      //@{
-
-      ACCESSOR_READ_ONLY(use_greedy_wavespeed);
-      ACCESSOR_READ_ONLY(use_averaged_entropy);
-      ACCESSOR_READ_ONLY(random_entropies);
 
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
        * and choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars).
+       * double, as well as a VectorizedArray holding packed scalars). The
+       * optional @p MemorySpace template parameter selects whether the
+       * view is intended for the host or device memory space.
+       *
+       * @note Enforcing entropy inequalities for additional Krŭzkov
+       * entropies requires calling into the selected flux, which is only
+       * possible on the host. The corresponding runtime options are thus
+       * only supported for a view on the host memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
+        if constexpr (!std::is_same_v<MemorySpace, dealii::MemorySpace::Host>) {
+          const auto &parameters = *parameters_.view();
+          AssertThrow(
+              !parameters.use_averaged_entropy &&
+                  parameters.random_entropies == 0,
+              dealii::ExcMessage(
+                  "The runtime options »use averaged entropy« and »random "
+                  "entropies« evaluate the selected flux, which is only "
+                  "possible on the host memory space. They are thus not "
+                  "supported for a view on the device memory space."));
+        }
+
+        return WaveSpeedEstimatorView<dim, Number, MemorySpace>{
+            hyperbolic_system_->template view<dim, Number, MemorySpace>(),
+            *this};
       }
 
     private:
       //@}
       /**
-       * @name Run time options
+       * @name Internal fields, methods, and friends
        */
       //@{
 
-      bool use_greedy_wavespeed_;
-      bool use_averaged_entropy_;
-      unsigned int random_entropies_;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
+      Mirrored<Parameters> parameters_;
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      template <int, typename, typename>
+      friend class WaveSpeedEstimatorView;
 
       //@}
     };
@@ -146,16 +168,21 @@ namespace ryujin
      *
      * @ingroup ScalarConservationEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class WaveSpeedEstimatorView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -168,7 +195,6 @@ namespace ryujin
       using PrecomputedVectorView = typename View::PrecomputedVectorView;
 
       //@}
-
       /**
        * @name Compute wavespeed estimates
        */
@@ -182,31 +208,64 @@ namespace ryujin
           const View &view,
           const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
           : view_(view)
-          , wave_speed_estimator_(wave_speed_estimator)
+          , parameters_(
+                wave_speed_estimator.parameters_.template view<MemorySpace>())
       {
+      }
+
+      /**
+       * Return whether a greedy wavespeed estimate is used instead of a
+       * guaranteed upper bound on the maximal wavespeed.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool use_greedy_wavespeed() const
+      {
+        return parameters_->use_greedy_wavespeed;
+      }
+
+      /**
+       * Return whether an entropy inequality on the averaged Krŭzkov
+       * entropy is enforced.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool use_averaged_entropy() const
+      {
+        return parameters_->use_averaged_entropy;
+      }
+
+      /**
+       * Return the number of random Krŭzkov entropies for which an entropy
+       * inequality is enforced.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int random_entropies() const
+      {
+        return parameters_->random_entropies;
       }
 
       /**
        * For two states @p u_i, @p u_j, precomputed values @p prec_i,
        * @p prec_j, and a (normalized) "direction" n_ij
        * compute an upper bound estimate for the wavespeed.
+       *
+       * @note Entropy inequalities for additional Krŭzkov entropies are
+       * only enforced on the host memory space.
        */
-      Number compute(const Number &u_i,
-                     const Number &u_j,
-                     const precomputed_type &prec_i,
-                     const precomputed_type &prec_j,
-                     const dealii::Tensor<1, dim, Number> &n_ij) const;
+      DEAL_II_HOST_DEVICE Number
+      compute(const Number &u_i,
+              const Number &u_j,
+              const precomputed_type &prec_i,
+              const precomputed_type &prec_j,
+              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
        * compute an estimate for an upper bound of lambda.
        */
-      Number compute(const PrecomputedVectorView &pv,
-                     const state_type &U_i,
-                     const state_type &U_j,
-                     const unsigned int i,
-                     const unsigned int *js,
-                     const dealii::Tensor<1, dim, Number> &n_ij) const;
+      DEAL_II_HOST_DEVICE Number
+      compute(const PrecomputedVectorView &pv,
+              const state_type &U_i,
+              const state_type &U_j,
+              const unsigned int i,
+              const unsigned int *js,
+              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
       //@}
@@ -216,7 +275,7 @@ namespace ryujin
       //@{
 
       const View view_;
-      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
+      const WaveSpeedEstimator<ScalarNumber>::Parameters *const parameters_;
 
       //@}
     };
@@ -229,8 +288,9 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number>
-    inline Number WaveSpeedEstimatorView<dim, Number>::compute(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const Number &u_i,
         const Number &u_j,
         const precomputed_type &prec_i,
@@ -276,13 +336,13 @@ namespace ryujin
 
       constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
 
-      if (wave_speed_estimator_.use_greedy_wavespeed()) {
+      if (use_greedy_wavespeed()) {
         /*
          * In case of a greedy estimate we make sure that we always use the
          * Roe average and only fall back to the derivative approximation
          * when u_i and u_j are close to each other within 2h:
          */
-        lambda_max = dealii::compare_and_apply_mask<gte>(
+        lambda_max = ryujin::compare_and_apply_mask<gte>(
             std::abs(u_i - u_j),
             h2,
             lambda_max,
@@ -310,87 +370,95 @@ namespace ryujin
       }
 
       /*
-       * Thread-local helper lambda to generate a random number in [0,1]:
+       * Enforcing entropy inequalities for additional Krŭzkov entropies
+       * requires calling into the selected flux, which is only possible on
+       * the host memory space:
        */
 
-      thread_local static const auto draw = []() {
-        static std::random_device random_device;
-        static auto generator = std::default_random_engine(random_device());
-        static std::uniform_real_distribution<ScalarNumber> dist(0., 1.);
+      if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>) {
+        /*
+         * Thread-local helper lambda to generate a random number in [0,1]:
+         */
 
-        if constexpr (std::is_same_v<ScalarNumber, Number>) {
-          /*
-           * Scalar quantity:
-           */
-          return dist(generator);
+        thread_local static const auto draw = []() {
+          static std::random_device random_device;
+          static auto generator = std::default_random_engine(random_device());
+          static std::uniform_real_distribution<ScalarNumber> dist(0., 1.);
 
-        } else {
-          /*
-           * Populate a vectorized array:
-           */
-          Number result;
-          for (unsigned int s = 0; s < Number::size(); ++s)
-            result[s] = dist(generator);
-          return result;
-        }
-      };
+          if constexpr (std::is_same_v<ScalarNumber, Number>) {
+            /*
+             * Scalar quantity:
+             */
+            return dist(generator);
 
-      /*
-       * Helper functions for enforcing entropy inequalities:
-       */
-
-      const auto enforce_entropy = [&](const Number &k) {
-        const Number f_k = view_.flux_function(k) * n_ij;
-
-#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "k    = " << k << std::endl;
-        std::cout << "f_k  = " << f_k << std::endl;
-#endif
-
-        const Number eta_i = view_.kruzkov_entropy(k, u_i);
-        const Number q_i =
-            view_.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
-
-        const Number eta_j = view_.kruzkov_entropy(k, u_j);
-        const Number q_j =
-            view_.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
-
-        const Number a = u_i + u_j - ScalarNumber(2.) * k;
-        const Number b = f_j - f_i;
-        const Number c = eta_i + eta_j;
-        const Number d = q_j - q_i;
+          } else {
+            /*
+             * Populate a vectorized array:
+             */
+            Number result;
+            for (unsigned int s = 0; s < Number::size(); ++s)
+              result[s] = dist(generator);
+            return result;
+          }
+        };
 
         /*
-         * FIXME: Ordinarily, lambda_left and lambda_right would be
-         * computed without taking the absolute value of the numerator.
-         * (The denominator is - in the absence of rounding errors - always
-         * nonnegative. The numerator has a sign.)
-         * But empirically it turns out that taking the absolute value and
-         * letting both estimates participate in the maximal wavespeed
-         * estimate helps a lot.
+         * Helper functions for enforcing entropy inequalities:
          */
-        const Number lambda_left = std::abs(d + b) / (std::abs(c + a) + h2);
-        const Number lambda_right = std::abs(d - b) / (std::abs(c - a) + h2);
+
+        const auto enforce_entropy = [&](const Number &k) {
+          const Number f_k = view_.flux_function(k) * n_ij;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
-        std::cout << "   left  wavespeed   = " << lambda_left << std::endl;
-        std::cout << "   right wavespeed   = " << lambda_right << std::endl;
+          std::cout << "k    = " << k << std::endl;
+          std::cout << "f_k  = " << f_k << std::endl;
 #endif
-        lambda_max = std::max(lambda_max, lambda_left);
-        lambda_max = std::max(lambda_max, lambda_right);
-      };
+
+          const Number eta_i = view_.kruzkov_entropy(k, u_i);
+          const Number q_i =
+              view_.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
+
+          const Number eta_j = view_.kruzkov_entropy(k, u_j);
+          const Number q_j =
+              view_.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
+
+          const Number a = u_i + u_j - ScalarNumber(2.) * k;
+          const Number b = f_j - f_i;
+          const Number c = eta_i + eta_j;
+          const Number d = q_j - q_i;
+
+          /*
+           * FIXME: Ordinarily, lambda_left and lambda_right would be
+           * computed without taking the absolute value of the numerator.
+           * (The denominator is - in the absence of rounding errors - always
+           * nonnegative. The numerator has a sign.)
+           * But empirically it turns out that taking the absolute value and
+           * letting both estimates participate in the maximal wavespeed
+           * estimate helps a lot.
+           */
+          const Number lambda_left = std::abs(d + b) / (std::abs(c + a) + h2);
+          const Number lambda_right = std::abs(d - b) / (std::abs(c - a) + h2);
+
+#ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+          std::cout << "   left  wavespeed   = " << lambda_left << std::endl;
+          std::cout << "   right wavespeed   = " << lambda_right << std::endl;
+#endif
+          lambda_max = std::max(lambda_max, lambda_left);
+          lambda_max = std::max(lambda_max, lambda_right);
+        };
 
 
-      if (wave_speed_estimator_.use_averaged_entropy()) {
-        const Number k = ScalarNumber(0.5) * (u_i + u_j);
-        enforce_entropy(k);
-      }
+        if (use_averaged_entropy()) {
+          const Number k = ScalarNumber(0.5) * (u_i + u_j);
+          enforce_entropy(k);
+        }
 
-      const unsigned int n_entropies = wave_speed_estimator_.random_entropies();
-      for (unsigned int i = 0; i < n_entropies; ++i) {
-        const Number factor = draw();
-        const Number k = factor * u_i + (Number(1.) - factor) * u_j;
-        enforce_entropy(k);
+        const unsigned int n_entropies = random_entropies();
+        for (unsigned int i = 0; i < n_entropies; ++i) {
+          const Number factor = draw();
+          const Number k = factor * u_i + (Number(1.) - factor) * u_j;
+          enforce_entropy(k);
+        }
       }
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
@@ -400,9 +468,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const PrecomputedVectorView &pv,
         const state_type &U_i,
         const state_type &U_j,
