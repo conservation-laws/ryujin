@@ -148,9 +148,7 @@ namespace ryujin
       /**
        * Select the equation of state, update the problem name, and copy
        * the interpolatory NASG parameters of the selected equation of
-       * state into the Parameters structure. This function is called from
-       * the constructor and connected to the parse_parameters_call_back
-       * signal of this class and of all equation of state classes.
+       * state into the Parameters structure.
        */
       void update_parameters();
 
@@ -188,9 +186,7 @@ namespace ryujin
      * ```
      *
      * @note This class is designed to be copied by value into computation
-     * loops with access to either the host or device memory space. As such
-     * we do not store a reference to the underlying HyperbolicSystem but
-     * copy all runtime parameters into the view when it is created.
+     * loops with access to either the host or device memory space.
      *
      * @ingroup EulerEquations
      */

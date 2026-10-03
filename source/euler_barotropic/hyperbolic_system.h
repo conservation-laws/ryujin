@@ -125,8 +125,7 @@ namespace ryujin
 
       /**
        * Select the barotropic equation of state and update the problem
-       * name. This function is called from the constructor and connected
-       * to the parse_parameters_call_back signal of this class.
+       * name.
        */
       void update_parameters();
 
@@ -166,9 +165,7 @@ namespace ryujin
      * ```
      *
      * @note This class is designed to be copied by value into computation
-     * loops with access to either the host or device memory space. As such
-     * we do not store a reference to the underlying HyperbolicSystem but
-     * copy all runtime parameters into the view when it is created.
+     * loops with access to either the host or device memory space.
      *
      * @ingroup EulerEquations
      */
