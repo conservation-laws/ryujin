@@ -79,7 +79,8 @@ namespace ryujin
       auto view() const
       {
         return WaveSpeedEstimatorView<dim, Number, MemorySpace>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
+            hyperbolic_system_->template view<dim, Number, MemorySpace>(),
+            *this};
       }
 
     private:
@@ -120,7 +121,7 @@ namespace ryujin
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -194,6 +195,7 @@ namespace ryujin
               const unsigned int i,
               const unsigned int *js,
               const dealii::Tensor<1, dim, Number> &n_ij) const;
+
       //@}
 
     protected:

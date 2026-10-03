@@ -15,11 +15,8 @@ using namespace ryujin;
 using namespace dealii;
 
 
-static HyperbolicSystem hyperbolic_system;
-
-
 template <int dim, typename Number>
-void test(const Number gamma)
+void test(const HyperbolicSystem &hyperbolic_system, const Number gamma)
 {
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
@@ -96,6 +93,8 @@ int main(int argc, char *argv[])
 {
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
+  HyperbolicSystem hyperbolic_system;
+
   const auto set_covolume = [&](const double covolume) {
     /*
      * Set the interpolatory covolume by selecting an equation of state
@@ -113,61 +112,61 @@ int main(int argc, char *argv[])
   };
 
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.4);
-  test<2, double>(/* surrogate gamma */ 1.4);
-  test<3, double>(/* surrogate gamma */ 1.4);
+  test<1, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<2, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<3, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.4);
-  test<2, float>(/* surrogate gamma */ 1.4);
-  test<3, float>(/* surrogate gamma */ 1.4);
+  test<1, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<2, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<3, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
 
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.9);
-  test<2, double>(/* surrogate gamma */ 1.9);
-  test<3, double>(/* surrogate gamma */ 1.9);
+  test<1, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<2, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<3, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.9);
-  test<2, float>(/* surrogate gamma */ 1.9);
-  test<3, float>(/* surrogate gamma */ 1.9);
+  test<1, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<2, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<3, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
 
 
   set_covolume(0.1);
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.4);
-  test<2, double>(/* surrogate gamma */ 1.4);
-  test<3, double>(/* surrogate gamma */ 1.4);
+  test<1, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<2, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<3, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.4);
-  test<2, float>(/* surrogate gamma */ 1.4);
-  test<3, float>(/* surrogate gamma */ 1.4);
+  test<1, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<2, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<3, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
 
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.9);
-  test<2, double>(/* surrogate gamma */ 1.9);
-  test<3, double>(/* surrogate gamma */ 1.9);
+  test<1, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<2, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<3, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.9);
-  test<2, float>(/* surrogate gamma */ 1.9);
-  test<3, float>(/* surrogate gamma */ 1.9);
+  test<1, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<2, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<3, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
 
   set_covolume(0.5);
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.4);
-  test<2, double>(/* surrogate gamma */ 1.4);
-  test<3, double>(/* surrogate gamma */ 1.4);
+  test<1, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<2, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<3, double>(hyperbolic_system, /* surrogate gamma */ 1.4);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.4);
-  test<2, float>(/* surrogate gamma */ 1.4);
-  test<3, float>(/* surrogate gamma */ 1.4);
+  test<1, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<2, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
+  test<3, float>(hyperbolic_system, /* surrogate gamma */ 1.4);
 
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.9);
-  test<2, double>(/* surrogate gamma */ 1.9);
-  test<3, double>(/* surrogate gamma */ 1.9);
+  test<1, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<2, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<3, double>(hyperbolic_system, /* surrogate gamma */ 1.9);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.9);
-  test<2, float>(/* surrogate gamma */ 1.9);
-  test<3, float>(/* surrogate gamma */ 1.9);
+  test<1, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<2, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
+  test<3, float>(hyperbolic_system, /* surrogate gamma */ 1.9);
 
   return 0;
 }
