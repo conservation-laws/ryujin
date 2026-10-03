@@ -11,12 +11,14 @@
 
 #include <convenience_macros.h>
 #include <discretization.h>
+#include <gpu.h>
 #include <loop.h>
 #include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 #include <state_vector.h>
 
+#include <deal.II/base/memory_space.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
@@ -26,7 +28,9 @@ namespace ryujin
 {
   namespace ShallowWater
   {
-    template <int dim, typename Number>
+    template <int dim,
+              typename Number,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class HyperbolicSystemView;
 
     /**
@@ -47,27 +51,46 @@ namespace ryujin
       static inline const std::string problem_name = "Shallow water equations";
 
       /**
+       * A structure holding all runtime parameters of the hyperbolic
+       * system.
+       */
+      struct Parameters {
+        double gravity;
+        double manning_friction_coefficient;
+
+        double reference_water_depth;
+        double dry_state_relaxation_small;
+        double dry_state_relaxation_large;
+      };
+
+      /**
        * Constructor.
        */
       HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
       /**
        * Alias for the view on the hyperbolic system for a given dimension @p
-       * dim and choice of number type @p Number.
+       * dim, choice of number type @p Number, and memory space @p
+       * MemorySpace.
        */
-      template <int dim, typename Number = double>
-      using View = HyperbolicSystemView<dim, Number>;
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       /**
        * Return a view on the Hyperbolic System for a given dimension @p
        * dim and choice of number type @p Number (which can be a scalar
        * float, or double, as well as a VectorizedArray holding packed
-       * scalars.
+       * scalars. The optional @p MemorySpace template parameter selects
+       * whether the view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{*this};
+        return View<dim, Number, MemorySpace>{*this};
       }
 
       /**
@@ -87,24 +110,13 @@ namespace ryujin
 
     private:
       /**
-       * @name Run time options
+       * @name Internal fields, methods, and friends
        */
       //@{
 
-      double gravity_;
-      double manning_friction_coefficient_;
+      Mirrored<Parameters> parameters_;
 
-      double reference_water_depth_;
-      double dry_state_relaxation_small_;
-      double dry_state_relaxation_large_;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-      template <int dim, typename Number>
+      template <int, typename, typename>
       friend class HyperbolicSystemView;
 
       //@}
@@ -127,12 +139,20 @@ namespace ryujin
      * // etc.
      * ```
      *
+     * @note This class is designed to be copied by value into computation
+     * loops with access to either the host or device memory space.
+     *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class HyperbolicSystemView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
@@ -253,7 +273,7 @@ namespace ryujin
           ScalarNumber,
           n_precomputed_values,
           dealii::VectorizedArray<ScalarNumber>::size(),
-          dealii::MemorySpace::Host,
+          MemorySpace,
           /*writable=*/false>;
 
       /**
@@ -272,7 +292,7 @@ namespace ryujin
           ScalarNumber,
           n_initial_precomputed_values,
           dealii::VectorizedArray<ScalarNumber>::size(),
-          dealii::MemorySpace::Host,
+          MemorySpace,
           /*writable=*/false>;
 
       //@}
@@ -286,7 +306,8 @@ namespace ryujin
        * HyperbolicSystem
        */
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
+          : parameters_(
+                hyperbolic_system.parameters_.template view<MemorySpace>())
       {
       }
 
@@ -296,32 +317,33 @@ namespace ryujin
        */
       //@{
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gravity() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber gravity() const
       {
-        return hyperbolic_system_.gravity_;
+        return ScalarNumber(parameters_->gravity);
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       manning_friction_coefficient() const
       {
-        return hyperbolic_system_.manning_friction_coefficient_;
+        return ScalarNumber(parameters_->manning_friction_coefficient);
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
+      reference_water_depth() const
       {
-        return hyperbolic_system_.reference_water_depth_;
+        return ScalarNumber(parameters_->reference_water_depth);
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       dry_state_relaxation_small() const
       {
-        return hyperbolic_system_.dry_state_relaxation_small_;
+        return ScalarNumber(parameters_->dry_state_relaxation_small);
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       dry_state_relaxation_large() const
       {
-        return hyperbolic_system_.dry_state_relaxation_large_;
+        return ScalarNumber(parameters_->dry_state_relaxation_large);
       }
 
       //@}
@@ -334,7 +356,7 @@ namespace ryujin
        * For a given (1+dim dimensional) state vector <code>U</code>, return
        * the water depth <code>U[0]</code>
        */
-      static Number water_depth(const state_type &U);
+      static DEAL_II_HOST_DEVICE Number water_depth(const state_type &U);
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>,
@@ -342,7 +364,8 @@ namespace ryujin
        * returns 2h / (h^2+max(h, h_cutoff)^2), where h_cutoff is the
        * reference water depth multiplied by eps.
        */
-      Number inverse_water_depth_mollified(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number
+      inverse_water_depth_mollified(const state_type &U) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, return
@@ -350,7 +373,7 @@ namespace ryujin
        * max(h, h_cutoff), where h_cutoff is the reference water depth
        * multiplied by eps.
        */
-      Number water_depth_sharp(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number water_depth_sharp(const state_type &U) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, return
@@ -358,7 +381,8 @@ namespace ryujin
        * max(h, h_cutoff), where h_cutoff is the reference water depth
        * multiplied by eps.
        */
-      Number inverse_water_depth_sharp(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number
+      inverse_water_depth_sharp(const state_type &U) const;
 
       /**
        * Given a water depth @ref h this function returns 0 if h is in the
@@ -366,13 +390,14 @@ namespace ryujin
        * h is returned unmodified. Here, h_cutoff is the reference water
        * depth multiplied by eps.
        */
-      Number filter_dry_water_depth(const Number &h) const;
+      DEAL_II_HOST_DEVICE Number filter_dry_water_depth(const Number &h) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, return
        * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
        */
-      static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
+      static DEAL_II_HOST_DEVICE dealii::Tensor<1, dim, Number>
+      momentum(const state_type &U);
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, compute
@@ -381,7 +406,7 @@ namespace ryujin
        *   KE = 1/2 |m|^2 / h
        * \f]
        */
-      Number kinetic_energy(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number kinetic_energy(const state_type &U) const;
 
       /**
        * For a given (state dimensional) state vector <code>U</code>, compute
@@ -390,7 +415,7 @@ namespace ryujin
        *   p = 1/2 g h^2
        * \f]
        */
-      Number pressure(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number pressure(const state_type &U) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, compute
@@ -399,26 +424,28 @@ namespace ryujin
        *   c^2 = g * h
        * \f]
        */
-      Number speed_of_sound(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number speed_of_sound(const state_type &U) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, compute
        * and return the entropy \f$\eta = 1/2 g h^2 + 1/2 |m|^2 / h\f$.
        */
-      Number mathematical_entropy(const state_type &U) const;
+      DEAL_II_HOST_DEVICE Number
+      mathematical_entropy(const state_type &U) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative \f$\eta'\f$ of the entropy defined above.
        */
-      state_type mathematical_entropy_derivative(const state_type &U) const;
+      DEAL_II_HOST_DEVICE state_type
+      mathematical_entropy_derivative(const state_type &U) const;
 
       /**
        * Returns whether the state @p U is admissible. If @p U is a
        * vectorized state then @p U is admissible if all vectorized
        * values are admissible.
        */
-      bool is_admissible(const state_type &U) const;
+      DEAL_II_HOST_DEVICE bool is_admissible(const state_type &U) const;
 
       //@}
       /**
@@ -432,7 +459,7 @@ namespace ryujin
        * taken from @p U_bar state.
        */
       template <int component>
-      state_type prescribe_riemann_characteristic(
+      DEAL_II_HOST_DEVICE state_type prescribe_riemann_characteristic(
           const state_type &U,
           const state_type &U_bar,
           const dealii::Tensor<1, dim, Number> &normal) const;
@@ -441,7 +468,7 @@ namespace ryujin
        * Apply boundary conditions.
        */
       template <typename Lambda>
-      state_type
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type
       apply_boundary_conditions(const dealii::types::boundary_id id,
                                 const state_type &U,
                                 const dealii::Tensor<1, dim, Number> &normal,
@@ -462,7 +489,7 @@ namespace ryujin
        * \end{pmatrix},
        * \f]
        */
-      flux_type f(const state_type &U) const;
+      DEAL_II_HOST_DEVICE flux_type f(const state_type &U) const;
 
       /**
        * Given a state @p U compute the flux
@@ -473,23 +500,23 @@ namespace ryujin
        * \end{pmatrix},
        * \f]
        */
-      flux_type g(const state_type &U) const;
+      DEAL_II_HOST_DEVICE flux_type g(const state_type &U) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code> and
        * left/right topography states <code>Z_left</code> and
        * <code>Z_right</code>, return the star_state <code>U_star</code>
        */
-      state_type star_state(const state_type &U,
-                            const Number &Z_left,
-                            const Number &Z_right) const;
+      DEAL_II_HOST_DEVICE state_type star_state(const state_type &U,
+                                                const Number &Z_left,
+                                                const Number &Z_right) const;
 
       /**
        * Given precomputed flux contributions @p prec_i and @p prec_j
        * compute the equilibrated states \f$U_i^{\ast,j}\f$ and
        * \f$U_j^{\ast,i}\f$.
        */
-      std::array<state_type, 2>
+      DEAL_II_HOST_DEVICE std::array<state_type, 2>
       equilibrated_states(const flux_contribution_type &,
                           const flux_contribution_type &) const;
 
@@ -513,12 +540,14 @@ namespace ryujin
        * For the Shallow water equations we simply retrieve the
        * bathymetry and return, both, state and bathymetry.
        */
+      DEAL_II_HOST_DEVICE
       flux_contribution_type
       flux_contribution(const PrecomputedVectorView &pv,
                         const InitialPrecomputedVectorView &piv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
+      DEAL_II_HOST_DEVICE
       flux_contribution_type
       flux_contribution(const PrecomputedVectorView &pv,
                         const InitialPrecomputedVectorView &piv,
@@ -530,6 +559,7 @@ namespace ryujin
        * compute the equilibrated, low-order flux \f$(f(U_i^{\ast,j}) +
        * f(U_j^{\ast,i})\f$
        */
+      DEAL_II_HOST_DEVICE
       state_type
       flux_divergence(const flux_contribution_type &flux_i,
                       const flux_contribution_type &flux_j,
@@ -545,6 +575,7 @@ namespace ryujin
        * compute the high-order flux \f$(f(U_i^{\ast,j}) +
        * f(U_j^{\ast,i})\f$
        */
+      DEAL_II_HOST_DEVICE
       state_type high_order_flux_divergence(
           const flux_contribution_type &flux_i,
           const flux_contribution_type &flux_j,
@@ -555,6 +586,7 @@ namespace ryujin
        * the equilibrated, low-order affine shift
        * \f$ B_{ij} = -2d_ij(U^{\ast,j}_i)-2f((U^{\ast,j}_i))c_ij\f$.
        */
+      DEAL_II_HOST_DEVICE
       state_type affine_shift(const flux_contribution_type &flux_i,
                               const flux_contribution_type &flux_j,
                               const dealii::Tensor<1, dim, Number> &c_ij,
@@ -574,15 +606,18 @@ namespace ryujin
        *
        * FIXME: details
        */
+      DEAL_II_HOST_DEVICE
       state_type manning_friction(const state_type &U,
                                   const Number &h_star,
                                   const ScalarNumber tau) const;
 
+      DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const;
 
+      DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int *js,
                               const state_type &U_j,
@@ -605,7 +640,7 @@ namespace ryujin
        * @a ST vector.
        */
       template <typename ST>
-      state_type expand_state(const ST &state) const;
+      DEAL_II_HOST_DEVICE state_type expand_state(const ST &state) const;
 
       /**
        * Given an initial state [h, u_1, ..., u_d] return a
@@ -619,17 +654,20 @@ namespace ryujin
        * ShallowWaterInitialStateLibrary.
        */
       template <typename ST>
-      state_type from_initial_state(const ST &initial_state) const;
+      DEAL_II_HOST_DEVICE state_type
+      from_initial_state(const ST &initial_state) const;
 
       /**
        * Given a primitive state [h, u_1, ..., u_d] return a conserved
        * state
        */
+      DEAL_II_HOST_DEVICE
       state_type from_primitive_state(const state_type &primitive_state) const;
 
       /**
        * Given a conserved state return a primitive state [h, u_1, ..., u_d]
        */
+      DEAL_II_HOST_DEVICE
       state_type to_primitive_state(const state_type &state) const;
 
       /**
@@ -638,8 +676,8 @@ namespace ryujin
        * vector.
        */
       template <typename Lambda>
-      state_type apply_galilei_transform(const state_type &state,
-                                         const Lambda &lambda) const;
+      DEAL_II_HOST_DEVICE state_type apply_galilei_transform(
+          const state_type &state, const Lambda &lambda) const;
 
     private:
       //@}
@@ -648,7 +686,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system_;
+      const HyperbolicSystem::Parameters *const parameters_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -663,29 +701,39 @@ namespace ryujin
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
+        , parameters_("shallow_water_hyperbolic_system_parameters",
+                      TransferPolicy::implicit_transfers_host_resident)
     {
-      gravity_ = 9.81;
-      add_parameter("gravity", gravity_, "Gravitational constant [m/s^2]");
+      /* reference remains valid due to implicit_transfers_host_resident */
+      auto &parameters = *parameters_.view();
 
-      manning_friction_coefficient_ = 0.;
+      parameters.gravity = 9.81;
+      add_parameter(
+          "gravity", parameters.gravity, "Gravitational constant [m/s^2]");
+
+      parameters.manning_friction_coefficient = 0.;
       add_parameter("manning friction coefficient",
-                    manning_friction_coefficient_,
+                    parameters.manning_friction_coefficient,
                     "Roughness coefficient for friction source");
 
-      reference_water_depth_ = 1.;
+      parameters.reference_water_depth = 1.;
       add_parameter("reference water depth",
-                    reference_water_depth_,
+                    parameters.reference_water_depth,
                     "Problem specific water depth reference");
 
-      dry_state_relaxation_small_ = 1.e2;
+      parameters.dry_state_relaxation_small = 1.e2;
       add_parameter("dry state relaxation small",
-                    dry_state_relaxation_small_,
+                    parameters.dry_state_relaxation_small,
                     "Problem specific dry-state relaxation parameter");
 
-      dry_state_relaxation_large_ = 1.e4;
+      parameters.dry_state_relaxation_large = 1.e4;
       add_parameter("dry state relaxation large",
-                    dry_state_relaxation_large_,
+                    parameters.dry_state_relaxation_large,
                     "Problem specific dry-state relaxation parameter");
+
+      /* invalidates view on default memory space */
+      ParameterAcceptor::parse_parameters_call_back.connect(
+          [this] { parameters_.view(); });
     }
 
 
@@ -729,18 +777,19 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::water_depth(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::water_depth(
+        const state_type &U)
     {
       return U[0];
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::inverse_water_depth_mollified(
-        const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        inverse_water_depth_mollified(const state_type &U) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
@@ -755,9 +804,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::water_depth_sharp(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::water_depth_sharp(
         const state_type &U) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
@@ -771,18 +820,18 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::inverse_water_depth_sharp(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::inverse_water_depth_sharp(
         const state_type &U) const
     {
       return ScalarNumber(1.) / water_depth_sharp(U);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::filter_dry_water_depth(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::filter_dry_water_depth(
         const Number &h) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -791,14 +840,15 @@ namespace ryujin
       const Number h_cutoff_large =
           reference_water_depth() * dry_state_relaxation_large() * Number(eps);
 
-      return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+      return ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           std::abs(h), h_cutoff_large, Number(0.), h);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-    HyperbolicSystemView<dim, Number>::momentum(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::momentum(
+        const state_type &U)
     {
       dealii::Tensor<1, dim, Number> result;
 
@@ -808,9 +858,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::kinetic_energy(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::kinetic_energy(
+        const state_type &U) const
     {
       const auto h = water_depth(U);
       const auto vel = momentum(U) * inverse_water_depth_sharp(U);
@@ -820,9 +871,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::pressure(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::pressure(
+        const state_type &U) const
     {
       const Number h_sqd = U[0] * U[0];
 
@@ -831,18 +883,19 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::speed_of_sound(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::speed_of_sound(
+        const state_type &U) const
     {
       /* c^2 = g * h */
       return std::sqrt(gravity() * U[0]);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::mathematical_entropy(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::mathematical_entropy(
         const state_type &U) const
     {
       const auto p = pressure(U);
@@ -851,10 +904,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::mathematical_entropy_derivative(
-        const state_type &U) const -> state_type
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        mathematical_entropy_derivative(const state_type &U) const -> state_type
     {
       /*
        * With
@@ -884,14 +937,15 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline bool
-    HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool
+    HyperbolicSystemView<dim, Number, MemorySpace>::is_admissible(
+        const state_type &U) const
     {
       const auto h = filter_dry_water_depth(water_depth(U));
 
       constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
-      const auto test = dealii::compare_and_apply_mask<gte>(
+      const auto test = ryujin::compare_and_apply_mask<gte>(
           h, Number(0.), Number(0.), Number(-1.));
 
 #ifdef DEBUG_OUTPUT
@@ -907,13 +961,14 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <int component>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::prescribe_riemann_characteristic(
-        const state_type &U,
-        const state_type &U_bar,
-        const dealii::Tensor<1, dim, Number> &normal) const -> state_type
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        prescribe_riemann_characteristic(
+            const state_type &U,
+            const state_type &U_bar,
+            const dealii::Tensor<1, dim, Number> &normal) const -> state_type
     {
       /* Note that U_bar are the dirichlet values that are prescribed */
       static_assert(component == 1 || component == 2,
@@ -956,10 +1011,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::apply_boundary_conditions(
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_boundary_conditions(
         const dealii::types::boundary_id id,
         const state_type &U,
         const dealii::Tensor<1, dim, Number> &normal,
@@ -1034,16 +1089,17 @@ namespace ryujin
         /* Supersonic outflow: do nothing, i.e., keep U as is */
 
       } else {
-        AssertThrow(false, dealii::ExcNotImplemented());
+        Assert(false, dealii::ExcNotImplemented());
       }
 
       return result;
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::f(const state_type &U) const -> flux_type
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::f(const state_type &U) const
+        -> flux_type
     {
       const auto h_inverse = inverse_water_depth_sharp(U);
       const auto m = momentum(U);
@@ -1060,9 +1116,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::g(const state_type &U) const -> flux_type
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::g(const state_type &U) const
+        -> flux_type
     {
       const auto h_inverse = inverse_water_depth_sharp(U);
       const auto m = momentum(U);
@@ -1077,11 +1134,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::star_state(const state_type &U,
-                                                  const Number &Z_left,
-                                                  const Number &Z_right) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::star_state(
+        const state_type &U, const Number &Z_left, const Number &Z_right) const
         -> state_type
     {
       const Number Z_max = std::max(Z_left, Z_right);
@@ -1092,9 +1148,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::equilibrated_states(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::equilibrated_states(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j) const -> std::array<state_type, 2>
     {
@@ -1108,9 +1164,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_contribution(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView &piv,
         const unsigned int i,
@@ -1121,9 +1177,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_contribution(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView & /*pv*/,
         const InitialPrecomputedVectorView &piv,
         const unsigned int *js,
@@ -1134,9 +1190,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_divergence(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
@@ -1166,9 +1222,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::high_order_flux_divergence(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::high_order_flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
@@ -1193,9 +1249,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::affine_shift(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::affine_shift(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij,
@@ -1213,9 +1269,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::manning_friction(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction(
         const state_type &U, const Number &h_star, const ScalarNumber tau) const
         -> state_type
     {
@@ -1240,9 +1296,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::nodal_source(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::nodal_source(
         const PrecomputedVectorView &pv,
         const unsigned int i,
         const state_type &U_i,
@@ -1255,9 +1311,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::nodal_source(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::nodal_source(
         const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
@@ -1270,11 +1326,11 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename ST>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::expand_state(const ST &state) const
-        -> state_type
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::expand_state(
+        const ST &state) const -> state_type
     {
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
@@ -1292,10 +1348,10 @@ namespace ryujin
       return result;
     }
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename ST>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::from_initial_state(
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::from_initial_state(
         const ST &initial_state) const -> state_type
     {
       const auto primitive_state = expand_state(initial_state);
@@ -1303,9 +1359,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::from_primitive_state(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::from_primitive_state(
         const state_type &primitive_state) const -> state_type
     {
       const auto &h = primitive_state[0];
@@ -1319,9 +1375,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::to_primitive_state(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::to_primitive_state(
         const state_type &state) const -> state_type
     {
       const auto h_inverse = inverse_water_depth_sharp(state);
@@ -1335,10 +1391,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::apply_galilei_transform(
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_galilei_transform(
         const state_type &state, const Lambda &lambda) const -> state_type
     {
       auto result = state;
