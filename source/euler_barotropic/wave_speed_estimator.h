@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <gpu.h>
 #include <observer_pointer.h>
 #include <simd.h>
 
@@ -21,7 +22,9 @@ namespace ryujin
 {
   namespace EulerBarotropic
   {
-    template <int dim, typename Number = double>
+    template <int dim,
+              typename Number = double,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class WaveSpeedEstimatorView;
 
     /**
@@ -37,19 +40,6 @@ namespace ryujin
     {
     public:
       /**
-       * @name Typedefs and constexpr constants
-       */
-      //@{
-
-      /**
-       * Alias for the view on the wave speed estimator for a given dimension @p
-       * dim and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = WaveSpeedEstimatorView<dim, Number>;
-
-      //@}
-      /**
        * @name Constructor and setup
        */
       //@{
@@ -64,32 +54,34 @@ namespace ryujin
       {
       }
 
-      //@}
-      /**
-       * @name Information and statistics
-       */
-      //@{
-
       /**
        * Return a view on the WaveSpeedEstimator for a given dimension @p dim
        * and choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars).
+       * double, as well as a VectorizedArray holding packed scalars). The
+       * optional @p MemorySpace template parameter selects whether the
+       * view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
+        return WaveSpeedEstimatorView<dim, Number, MemorySpace>{
+            hyperbolic_system_->template view<dim, Number, MemorySpace>(),
+            *this};
       }
 
     private:
       //@}
       /**
-       * @name Internal data
+       * @name Internal fields, methods, and friends
        */
       //@{
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      template <int, typename, typename>
+      friend class WaveSpeedEstimatorView;
 
       //@}
     };
@@ -103,16 +95,21 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class WaveSpeedEstimatorView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -145,11 +142,9 @@ namespace ryujin
        * Constructor taking a HyperbolicSystemView and a WaveSpeedEstimator
        * object as arguments
        */
-      WaveSpeedEstimatorView(
-          const View &view,
-          const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator)
+      WaveSpeedEstimatorView(const View &view,
+                             const WaveSpeedEstimator<ScalarNumber> & /*wse*/)
           : view_(view)
-          , wave_speed_estimator_(wave_speed_estimator)
       {
       }
 
@@ -158,27 +153,22 @@ namespace ryujin
        * riemann_data_j, compute an estimate for an upper bound of the
        * maximum wavespeed lambda.
        */
-      Number compute(const primitive_type &riemann_data_i,
-                     const primitive_type &riemann_data_j) const;
+      DEAL_II_HOST_DEVICE Number
+      compute(const primitive_type &riemann_data_i,
+              const primitive_type &riemann_data_j) const;
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
        * compute an estimate for an upper bound of the maximum wavespeed
        * lambda.
        */
-      Number compute(const PrecomputedVectorView &pv,
-                     const state_type &U_i,
-                     const state_type &U_j,
-                     const unsigned int i,
-                     const unsigned int *js,
-                     const dealii::Tensor<1, dim, Number> &n_ij) const;
-      //@}
-
-    protected:
-      /**
-       * @name Internal methods
-       */
-      //@{
+      DEAL_II_HOST_DEVICE Number
+      compute(const PrecomputedVectorView &pv,
+              const state_type &U_i,
+              const state_type &U_j,
+              const unsigned int i,
+              const unsigned int *js,
+              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
       //@}
@@ -188,7 +178,6 @@ namespace ryujin
       //@{
 
       const View view_;
-      const WaveSpeedEstimator<ScalarNumber> &wave_speed_estimator_;
 
       //@}
     };
@@ -201,9 +190,9 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -223,9 +212,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    WaveSpeedEstimatorView<dim, Number>::compute(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const PrecomputedVectorView &pv,
         const state_type &U_i,
         const state_type &U_j,
