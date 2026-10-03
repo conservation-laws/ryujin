@@ -15,11 +15,8 @@ using namespace ryujin;
 using namespace dealii;
 
 
-static HyperbolicSystem hyperbolic_system;
-
-
 template <int dim, typename Number>
-void test()
+void test(const HyperbolicSystem &hyperbolic_system)
 {
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
@@ -85,6 +82,8 @@ int main(int argc, char *argv[])
 {
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
+  HyperbolicSystem hyperbolic_system;
+
   const auto set_eos = [&](const std::string &eos) {
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"
@@ -96,33 +95,33 @@ int main(int argc, char *argv[])
 
   set_eos("isentropic");
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>();
-  test<2, double>();
-  test<3, double>();
+  test<1, double>(hyperbolic_system);
+  test<2, double>(hyperbolic_system);
+  test<3, double>(hyperbolic_system);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>();
-  test<2, float>();
-  test<3, float>();
+  test<1, float>(hyperbolic_system);
+  test<2, float>(hyperbolic_system);
+  test<3, float>(hyperbolic_system);
 
   set_eos("isothermal");
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>();
-  test<2, double>();
-  test<3, double>();
+  test<1, double>(hyperbolic_system);
+  test<2, double>(hyperbolic_system);
+  test<3, double>(hyperbolic_system);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>();
-  test<2, float>();
-  test<3, float>();
+  test<1, float>(hyperbolic_system);
+  test<2, float>(hyperbolic_system);
+  test<3, float>(hyperbolic_system);
 
   set_eos("function");
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>();
-  test<2, double>();
-  test<3, double>();
+  test<1, double>(hyperbolic_system);
+  test<2, double>(hyperbolic_system);
+  test<3, double>(hyperbolic_system);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>();
-  test<2, float>();
-  test<3, float>();
+  test<1, float>(hyperbolic_system);
+  test<2, float>(hyperbolic_system);
+  test<3, float>(hyperbolic_system);
 
   return 0;
 }
