@@ -7,7 +7,6 @@ add_library(obj_euler_barotropic OBJECT
   equation_dispatch.cc
   barotropic_equation_of_state_library.cc
   initial_state_library.cc
-  limiter.cc
   wave_speed_estimator.cc
   )
 set_target_properties(obj_euler_barotropic PROPERTIES LINKER_LANGUAGE CXX)
