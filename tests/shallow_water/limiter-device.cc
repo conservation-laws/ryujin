@@ -12,9 +12,7 @@
 // bounds()) and run the convex limiter limit() over a set of states on the
 // host and on the default memory space and print both results.
 //
-// We select a noble abel stiffened gas equation of state with a nonzero
-// covolume, reference pressure, and reference specific internal energy so
-// that all interpolatory NASG parameters enter the computation.
+// We set nondefault runtime parameters. The first state is a dry state.
 //
 
 using namespace ryujin;
@@ -23,12 +21,13 @@ using HostSpace = dealii::MemorySpace::Host;
 using DefaultSpace = dealii::MemorySpace::Default;
 
 constexpr int dim = 2;
-constexpr unsigned int problem_dimension = 2 + dim;
+constexpr unsigned int problem_dimension = 1 + dim;
 constexpr unsigned int n_states = 8;
 
-using HostView = EulerAEOS::LimiterView<dim, double, HostSpace>;
-using DeviceView = EulerAEOS::LimiterView<dim, double, DefaultSpace>;
-using HostSystemView = EulerAEOS::HyperbolicSystemView<dim, double, HostSpace>;
+using HostView = ShallowWater::LimiterView<dim, double, HostSpace>;
+using DeviceView = ShallowWater::LimiterView<dim, double, DefaultSpace>;
+using HostSystemView =
+    ShallowWater::HyperbolicSystemView<dim, double, HostSpace>;
 using state_type = typename HostSystemView::state_type;
 
 constexpr unsigned int n_bounds = HostView::n_bounds;
@@ -106,8 +105,6 @@ compute_quantities(const View &limiter_view,
                    const dealii::Tensor<1, dim, double> &scaled_c_ij_2,
                    const double hd_i)
 {
-  using Bounds = typename View::Bounds;
-
   dealii::Tensor<1, n_results, double> result;
   unsigned int k = 0;
 
@@ -131,22 +128,38 @@ compute_quantities(const View &limiter_view,
   /* The view is stateful, work on a copy: */
   auto limiter = limiter_view;
 
+  /*
+   * For the shallow water equations the limiter bounds are accumulated
+   * from the equilibrated states:
+   */
   const state_type affine_shift; /* zero vector */
   const auto flux_i = system_view.flux_contribution(pv, ipv, i, U_i);
   const auto flux_j_1 = system_view.flux_contribution(pv, ipv, &j_1, U_j_1);
   const auto flux_j_2 = system_view.flux_contribution(pv, ipv, &j_2, U_j_2);
 
   limiter.reset(pv, i, U_i, flux_i);
-  limiter.accumulate(pv, &j_1, U_j_1, flux_j_1, scaled_c_ij_1, affine_shift);
-  limiter.accumulate(pv, &j_2, U_j_2, flux_j_2, scaled_c_ij_2, affine_shift);
+
+  {
+    const auto &[U_star_ij, U_star_ji] =
+        system_view.equilibrated_states(flux_i, flux_j_1);
+    limiter.accumulate(
+        pv, U_j_1, U_star_ij, U_star_ji, scaled_c_ij_1, affine_shift);
+  }
+
+  {
+    const auto &[U_star_ij, U_star_ji] =
+        system_view.equilibrated_states(flux_i, flux_j_2);
+    limiter.accumulate(
+        pv, U_j_2, U_star_ij, U_star_ji, scaled_c_ij_2, affine_shift);
+  }
 
   const auto accumulated_bounds = limiter.bounds(hd_i);
   for (unsigned int d = 0; d < n_bounds; ++d)
     result[k++] = accumulated_bounds[d];
 
-  /* Limit against strict bounds so that the quadratic Newton iterates: */
+  /* Limit against bounds so that the quadratic Newton iterates: */
   const state_type P = 8. * (U_j_1 - U_i) + 4. * (U_j_2 - U_i);
-  const auto [t_l, success] = limiter.limit(combined_bounds, U_i, P);
+  const auto [t_l, success] = limiter.limit(relaxed_bounds, U_i, P);
   result[k++] = t_l;
   result[k++] = success ? 1. : 0.;
 
@@ -162,21 +175,20 @@ int main(int argc, char *argv[])
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
-  EulerAEOS::HyperbolicSystem hyperbolic_system;
-  EulerAEOS::Limiter<double> limiter(hyperbolic_system);
+  ShallowWater::HyperbolicSystem hyperbolic_system;
+  ShallowWater::Limiter<double> limiter(hyperbolic_system);
 
   /* Exercise the parse_parameters_call_back() update path: */
 
   std::stringstream parameters;
   parameters << "subsection HyperbolicSystem\n"
-             << "set equation of state = noble abel stiffened gas\n"
-             << "subsection noble abel stiffened gas\n"
-             << "set covolume b = 0.1\n"
-             << "set reference pressure = 0.5\n"
-             << "set reference specific internal energy = 0.1\n"
-             << "end\n"
+             << "set gravity = 10.0\n"
+             << "set reference water depth = 2.0\n"
              << "end\n"
              << "subsection Limiter\n"
+             << "set iterations = 1\n"
+             << "set newton tolerance = 1.e-8\n"
+             << "set newton max iterations = 3\n"
              << "set relaxation factor = 2.0\n"
              << "end" << std::endl;
   dealii::ParameterAcceptor::initialize(parameters);
@@ -205,7 +217,7 @@ int main(int argc, char *argv[])
   typename HostSystemView::PrecomputedVector precomputed;
   precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
 
-  /* Note: the Euler equations have no precomputed initial values. */
+  /* The precomputed initial values store the bathymetry: */
   typename HostSystemView::InitialPrecomputedVector initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
 
@@ -216,34 +228,31 @@ int main(int argc, char *argv[])
   results.reinit_with_scalar_partitioner(scalar_partitioner);
 
   /*
-   * Fill states and precomputed values on the host space. The pressure
-   * has to be computed with the equation of state oracle on the host:
+   * Fill states, precomputed values, and the bathymetry on the host
+   * space. The first state is a dry state:
    */
 
   {
     const auto U_view = U.view();
     const auto precomputed_view = precomputed.view();
+    const auto initial_precomputed_view = initial_precomputed.view();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       state_type primitive;
-      primitive[0] = 1. + 0.125 * i;
-      primitive[1] = 0.1 * i;
-      primitive[2] = -0.05 * i;
-      primitive[3] = 1. + 0.25 * i;
+      primitive[0] = 0.25 * i;
+      primitive[1] = 0.8 * i;
+      primitive[2] = -0.4 * i;
       const auto U_i = host_system_view.from_primitive_state(primitive);
       U_view.write_tensor(U_i, i);
 
-      const auto rho_i = host_system_view.density(U_i);
-      const auto e_i = host_system_view.internal_energy(U_i) / rho_i;
-      const auto p_i = host_system_view.eos_pressure(rho_i, e_i);
-      const auto gamma_i = host_system_view.surrogate_gamma(U_i, p_i);
-
       const typename HostSystemView::precomputed_type prec_i{
-          p_i,
-          gamma_i,
-          host_system_view.surrogate_specific_entropy(U_i, gamma_i),
-          host_system_view.surrogate_harten_entropy(U_i, gamma_i)};
+          host_system_view.mathematical_entropy(U_i),
+          ryujin::pow(host_system_view.water_depth_sharp(U_i), 4. / 3.)};
       precomputed_view.write_tensor(prec_i, i);
+
+      const typename HostSystemView::initial_precomputed_type bathymetry_i{
+          0.05 * ((i + 7) % n_states)};
+      initial_precomputed_view.write_tensor(bathymetry_i, i);
     }
   }
 
