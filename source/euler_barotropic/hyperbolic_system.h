@@ -713,8 +713,8 @@ namespace ryujin
       const HyperbolicSystem::Parameters *const parameters_;
 
       /* Only valid (and dereferenced) on the host: */
-      const BarotropicEquationOfStateLibrary::BarotropicEquationOfState *const
-          barotropic_equation_of_state_;
+      const BarotropicEquationOfStateLibrary::BarotropicEquationOfState
+          *const barotropic_equation_of_state_;
 
       //@}
     }; /* HyperbolicSystemView */
