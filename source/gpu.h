@@ -649,15 +649,26 @@ namespace ryujin
     /*
      * FIXME: a little dance around calling the templated view<...>()
      * operator in the equation classes. We do this to support equations
-     * that have not yet been ported and do not support MemorySpace.
+     * that have not yet been ported and do not support MemorySpace. For
+     * such equations we fall back to the host view if the host and
+     * default memory spaces are unified.
      */
     template <typename T>
     static auto create_view(const Object &object)
     {
       if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
         return object.template view<dim, T>();
-      else
+      else if constexpr (requires {
+                           object.template view<dim, T, MemorySpace>();
+                         })
         return object.template view<dim, T, MemorySpace>();
+      else {
+        // Make the static_assert template dependent so that it gets
+        // evaluated at the right time...
+        static_assert(!have_separate_memory_spaces || sizeof(T) == 0,
+                      "The equation does not support MemorySpace");
+        return object.template view<dim, T>();
+      }
     }
 
     using ScalarView =
