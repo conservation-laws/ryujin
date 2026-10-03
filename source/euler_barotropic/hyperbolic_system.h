@@ -11,12 +11,14 @@
 
 #include <convenience_macros.h>
 #include <discretization.h>
+#include <gpu.h>
 #include <loop.h>
 #include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 #include <state_vector.h>
 
+#include <deal.II/base/memory_space.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
@@ -26,27 +28,9 @@ namespace ryujin
 {
   namespace EulerBarotropic
   {
-    /*
-     * For various divisions in the barotropic equation of state module we
-     * have a mathematical guarantee that the numerator and denominator are
-     * nonnegative and the limit (of zero numerator and denominator) must
-     * converge to zero. The following function takes care of rounding
-     * issues when computing such quotients by (a) avoiding division by
-     * zero and (b) ensuring non-negativity of the result.
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number safe_division(const Number &numerator,
-                                                      const Number &denominator)
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
-      constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
-
-      return std::max(numerator, Number(0.)) /
-             std::max(denominator, Number(min));
-    }
-
-
-    template <int dim, typename Number>
+    template <int dim,
+              typename Number,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class HyperbolicSystemView;
 
     /**
@@ -72,27 +56,43 @@ namespace ryujin
           "Compressible Euler equations (barotropic EOS, optimized barotropic)";
 
       /**
+       * A structure holding all runtime parameters of the hyperbolic
+       * system.
+       */
+      struct Parameters {
+        double reference_density;
+        double vacuum_state_relaxation_small;
+        double vacuum_state_relaxation_large;
+      };
+
+      /**
        * Constructor.
        */
       HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
       /**
        * Alias for the view on the hyperbolic system for a given dimension @p
-       * dim and choice of number type @p Number.
+       * dim, choice of number type @p Number, and memory space @p
+       * MemorySpace.
        */
-      template <int dim, typename Number = double>
-      using View = HyperbolicSystemView<dim, Number>;
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       /**
        * Return a view on the Hyperbolic System for a given dimension @p
        * dim and choice of number type @p Number (which can be a scalar
        * float, or double, as well as a VectorizedArray holding packed
-       * scalars.
+       * scalars. The optional @p MemorySpace template parameter selects
+       * whether the view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{*this};
+        return View<dim, Number, MemorySpace>{*this};
       }
 
       /**
@@ -102,8 +102,15 @@ namespace ryujin
        * @note The method does not update the ghost range of the state
        * vector. The precomputed part has to be synchronized by explicitly
        * calling the update ghost values function.
+       *
+       * @note The precomputed values are computed with the selected
+       * barotropic equation of state on the host memory space. If @p
+       * MemorySpace is the default (device) memory space the state vector
+       * is thus temporarily transferred to the host memory space.
        */
-      template <int dim, typename ScalarNumber>
+      template <typename MemorySpace = dealii::MemorySpace::Host,
+                int dim,
+                typename ScalarNumber>
       void fill_precomputed_values(
           const OfflineData<dim, ScalarNumber> &offline_data,
           typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
@@ -112,21 +119,20 @@ namespace ryujin
 
     private:
       /**
-       * @name Run time options
+       * @name Internal fields, methods, and friends
        */
       //@{
+
+      /**
+       * Select the barotropic equation of state and update the problem
+       * name. This function is called from the constructor and connected
+       * to the parse_parameters_call_back signal of this class.
+       */
+      void update_parameters();
+
+      Mirrored<Parameters> parameters_;
 
       std::string barotropic_equation_of_state_;
-
-      double reference_density_;
-      double vacuum_state_relaxation_small_;
-      double vacuum_state_relaxation_large_;
-
-      //@}
-      /**
-       * @name Internal data
-       */
-      //@{
 
       BarotropicEquationOfStateLibrary::equation_of_state_list_type
           barotropic_equation_of_state_list_;
@@ -136,7 +142,7 @@ namespace ryujin
       std::shared_ptr<BarotropicEquationOfState>
           selected_barotropic_equation_of_state_;
 
-      template <int dim, typename Number>
+      template <int, typename, typename>
       friend class HyperbolicSystemView;
 
       //@}
@@ -159,12 +165,22 @@ namespace ryujin
      * // etc.
      * ```
      *
+     * @note This class is designed to be copied by value into computation
+     * loops with access to either the host or device memory space. As such
+     * we do not store a reference to the underlying HyperbolicSystem but
+     * copy all runtime parameters into the view when it is created.
+     *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class HyperbolicSystemView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
@@ -285,7 +301,7 @@ namespace ryujin
           ScalarNumber,
           n_precomputed_values,
           dealii::VectorizedArray<ScalarNumber>::size(),
-          dealii::MemorySpace::Host,
+          MemorySpace,
           /*writable=*/false>;
 
       /**
@@ -304,7 +320,7 @@ namespace ryujin
           ScalarNumber,
           n_initial_precomputed_values,
           dealii::VectorizedArray<ScalarNumber>::size(),
-          dealii::MemorySpace::Host,
+          MemorySpace,
           /*writable=*/false>;
 
       //@}
@@ -318,7 +334,10 @@ namespace ryujin
        * HyperbolicSystem
        */
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
-          : hyperbolic_system_(hyperbolic_system)
+          : parameters_(
+                hyperbolic_system.parameters_.template view<MemorySpace>())
+          , barotropic_equation_of_state_(
+                hyperbolic_system.selected_barotropic_equation_of_state_.get())
       {
       }
 
@@ -328,32 +347,42 @@ namespace ryujin
        */
       //@{
 
+      /**
+       * Return the name of the selected barotropic equation of state.
+       *
+       * @note This function is only available on the host.
+       */
       DEAL_II_ALWAYS_INLINE inline const std::string &
       barotropic_equation_of_state() const
       {
-        return hyperbolic_system_.barotropic_equation_of_state_;
+        return barotropic_equation_of_state_->name();
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber reference_density() const
       {
-        return hyperbolic_system_.reference_density_;
+        return ScalarNumber(parameters_->reference_density);
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       vacuum_state_relaxation_small() const
       {
-        return hyperbolic_system_.vacuum_state_relaxation_small_;
+        return ScalarNumber(parameters_->vacuum_state_relaxation_small);
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
       vacuum_state_relaxation_large() const
       {
-        return hyperbolic_system_.vacuum_state_relaxation_large_;
+        return ScalarNumber(parameters_->vacuum_state_relaxation_large);
       }
 
       //@}
       /**
        * @name Low-level access to the selected equation of state
+       *
+       * @note The oracle functions beos_specific_internal_energy(),
+       * beos_pressure(), and beos_speed_of_sound() call into the selected
+       * barotropic equation of state and are thus only available on the
+       * host.
        */
       //@{
 
@@ -364,8 +393,7 @@ namespace ryujin
       DEAL_II_ALWAYS_INLINE inline Number
       beos_specific_internal_energy(const Number &rho) const
       {
-        const auto &beos =
-            hyperbolic_system_.selected_barotropic_equation_of_state_;
+        const auto &beos = barotropic_equation_of_state_;
 
         if constexpr (std::is_same_v<ScalarNumber, Number>) {
           return ScalarNumber(beos->specific_internal_energy(rho));
@@ -383,8 +411,7 @@ namespace ryujin
        */
       DEAL_II_ALWAYS_INLINE inline Number beos_pressure(const Number &rho) const
       {
-        const auto &beos =
-            hyperbolic_system_.selected_barotropic_equation_of_state_;
+        const auto &beos = barotropic_equation_of_state_;
 
         if constexpr (std::is_same_v<ScalarNumber, Number>) {
           return ScalarNumber(beos->pressure(rho));
@@ -404,8 +431,7 @@ namespace ryujin
       DEAL_II_ALWAYS_INLINE inline Number
       beos_speed_of_sound(const Number &rho) const
       {
-        const auto &beos =
-            hyperbolic_system_.selected_barotropic_equation_of_state_;
+        const auto &beos = barotropic_equation_of_state_;
 
         if constexpr (std::is_same_v<ScalarNumber, Number>) {
           return ScalarNumber(beos->speed_of_sound(rho));
@@ -438,7 +464,7 @@ namespace ryujin
        * For a given (1+dim dimensional) state vector <code>U</code>, return
        * the density <code>U[0]</code>
        */
-      static Number density(const state_type &U);
+      static DEAL_II_HOST_DEVICE Number density(const state_type &U);
 
       /**
        * Given a density @p rho this function returns 0 if the magnitude
@@ -446,13 +472,14 @@ namespace ryujin
        * Otherwise rho is returned unmodified. Here, rho_cutoff is the
        * reference density multiplied by eps.
        */
-      Number filter_vacuum_density(const Number &rho) const;
+      DEAL_II_HOST_DEVICE Number filter_vacuum_density(const Number &rho) const;
 
       /**
        * For a given (1+dim dimensional) state vector <code>U</code>, return
        * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
        */
-      static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
+      static DEAL_II_HOST_DEVICE dealii::Tensor<1, dim, Number>
+      momentum(const state_type &U);
 
       /**
        * For a given (1+dim dimensional) barotropic state vector
@@ -461,24 +488,25 @@ namespace ryujin
        *   \eta = \rho e(\rho) + \frac12\rho&{-1}|\vec m|^2
        * \f]
        */
-      Number total_energy(const state_type &U,
-                          const Number &specific_internal_energy) const;
+      DEAL_II_HOST_DEVICE Number total_energy(
+          const state_type &U, const Number &specific_internal_energy) const;
 
       /**
        * For a given (1+dim dimensional) barotropic state vector
        * <code>U</code>, compute and return the derivative \f$\eta'\f$ of
        * the total energy.
        */
-      state_type total_energy_derivative(const state_type &U,
-                                         const Number &specific_internal_energy,
-                                         const Number &pressure) const;
+      DEAL_II_HOST_DEVICE state_type
+      total_energy_derivative(const state_type &U,
+                              const Number &specific_internal_energy,
+                              const Number &pressure) const;
 
       /**
        * Returns whether the state @p U is admissible. If @p U is a
        * vectorized state then @p U is admissible if all vectorized values
        * are admissible.
        */
-      bool is_admissible(const state_type &U) const;
+      DEAL_II_HOST_DEVICE bool is_admissible(const state_type &U) const;
 
       //@}
       /**
@@ -491,6 +519,9 @@ namespace ryujin
        * replaces the first or second Riemann characteristic from the one
        * taken from @p U_bar state. Note that the @p U_bar state is just the
        * prescribed dirichlet values.
+       *
+       * @note This function is not implemented for the barotropic Euler
+       * equations and is only available on the host.
        */
       template <int component>
       state_type prescribe_riemann_characteristic(
@@ -517,6 +548,10 @@ namespace ryujin
        *    invariants from the return value of get_dirichlet_data()
        *    depending on the flow state (supersonic versus subsonic, outflow
        *    versus inflow).
+       *
+       * @note This function calls into the selected equation of state for
+       * dynamic boundary conditions and is thus only available on the
+       * host.
        */
       template <typename Lambda>
       state_type
@@ -540,7 +575,8 @@ namespace ryujin
        * \end{pmatrix},
        * \f]
        */
-      flux_type f(const state_type &U, const Number &p) const;
+      DEAL_II_HOST_DEVICE flux_type f(const state_type &U,
+                                      const Number &p) const;
 
       /**
        * Given a state @p U_i and an index @p i compute flux contributions.
@@ -561,12 +597,14 @@ namespace ryujin
        *
        * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
+      DEAL_II_HOST_DEVICE
       flux_contribution_type
       flux_contribution(const PrecomputedVectorView &pv,
                         const InitialPrecomputedVectorView &piv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
+      DEAL_II_HOST_DEVICE
       flux_contribution_type
       flux_contribution(const PrecomputedVectorView &pv,
                         const InitialPrecomputedVectorView &piv,
@@ -577,6 +615,7 @@ namespace ryujin
        * Given flux contributions @p flux_i and @p flux_j compute the flux
        * <code>(-f(U_i) - f(U_j)</code>
        */
+      DEAL_II_HOST_DEVICE
       state_type
       flux_divergence(const flux_contribution_type &flux_i,
                       const flux_contribution_type &flux_j,
@@ -587,6 +626,7 @@ namespace ryujin
        */
       static constexpr bool have_high_order_flux = false;
 
+      DEAL_II_HOST_DEVICE
       state_type high_order_flux_divergence(
           const flux_contribution_type &flux_i,
           const flux_contribution_type &flux_j,
@@ -601,11 +641,13 @@ namespace ryujin
       /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
+      DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const = delete;
 
+      DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
                               const unsigned int *js,
                               const state_type &U_j,
@@ -628,7 +670,7 @@ namespace ryujin
        * @a ST vector.
        */
       template <typename ST>
-      state_type expand_state(const ST &state) const;
+      DEAL_II_HOST_DEVICE state_type expand_state(const ST &state) const;
 
       /**
        * Given an initial state [rho, u_1, ..., u_d, p] return a
@@ -643,17 +685,20 @@ namespace ryujin
        * EulerBarotropic::HyperbolicSystem classes.
        */
       template <typename ST>
-      state_type from_initial_state(const ST &initial_state) const;
+      DEAL_II_HOST_DEVICE state_type
+      from_initial_state(const ST &initial_state) const;
 
       /**
        * Given a primitive state [rho, v_1, ..., v_d] return a conserved
        * state.
        */
+      DEAL_II_HOST_DEVICE
       state_type from_primitive_state(const state_type &primitive_state) const;
 
       /**
        * Given a conserved state return a primitive state [rho, v_1, ..., v_d]
        */
+      DEAL_II_HOST_DEVICE
       state_type to_primitive_state(const state_type &state) const;
 
       /**
@@ -662,8 +707,8 @@ namespace ryujin
        * vector.
        */
       template <typename Lambda>
-      state_type apply_galilei_transform(const state_type &state,
-                                         const Lambda &lambda) const;
+      DEAL_II_HOST_DEVICE state_type apply_galilei_transform(
+          const state_type &state, const Lambda &lambda) const;
 
     private:
       //@}
@@ -672,7 +717,11 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system_;
+      const HyperbolicSystem::Parameters *const parameters_;
+
+      /* Only valid (and dereferenced) on the host: */
+      const BarotropicEquationOfStateLibrary::BarotropicEquationOfState
+          *const barotropic_equation_of_state_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -685,29 +734,33 @@ namespace ryujin
      */
 
 
-    inline HyperbolicSystem::HyperbolicSystem(
-        const std::string &subsection /*= "HyperbolicSystem"*/)
+    inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
+        , parameters_("euler_barotropic_hyperbolic_system_parameters",
+                      TransferPolicy::implicit_transfers_host_resident)
     {
+      /* reference remains valid due to implicit_transfers_host_resident */
+      auto &parameters = *parameters_.view();
+
       barotropic_equation_of_state_ = "isothermal";
       add_parameter("barotropic equation of state",
                     barotropic_equation_of_state_,
                     "The barotropic equation of state. Valid names are given "
                     "by any of the subsections defined below");
 
-      reference_density_ = 1.;
+      parameters.reference_density = 1.;
       add_parameter("reference density",
-                    reference_density_,
+                    parameters.reference_density,
                     "Problem specific density reference");
 
-      vacuum_state_relaxation_small_ = 1.e2;
+      parameters.vacuum_state_relaxation_small = 1.e2;
       add_parameter("vacuum state relaxation small",
-                    vacuum_state_relaxation_small_,
+                    parameters.vacuum_state_relaxation_small,
                     "Problem specific vacuum relaxation parameter");
 
-      vacuum_state_relaxation_large_ = 1.e4;
+      parameters.vacuum_state_relaxation_large = 1.e4;
       add_parameter("vacuum state relaxation large",
-                    vacuum_state_relaxation_large_,
+                    parameters.vacuum_state_relaxation_large,
                     "Problem specific vacuum relaxation parameter");
 
       /*
@@ -717,96 +770,145 @@ namespace ryujin
       BarotropicEquationOfStateLibrary::populate_equation_of_state_list(
           barotropic_equation_of_state_list_, subsection);
 
-      const auto populate_functions = [this]() {
-        bool initialized = false;
-        for (auto &it : barotropic_equation_of_state_list_)
+      ParameterAcceptor::parse_parameters_call_back.connect(
+          [this] { update_parameters(); });
 
-          /* Populate EOS-specific quantities and functions */
-          if (it->name() == barotropic_equation_of_state_) {
-            selected_barotropic_equation_of_state_ = it;
-            problem_name = "Compressible Euler equations (" + it->name() +
-                           " EOS, optimized barotropic)";
-            initialized = true;
-            break;
-          }
-
-        AssertThrow(initialized,
-                    dealii::ExcMessage("Could not find a barotropic equation "
-                                       "of state description with name \"" +
-                                       barotropic_equation_of_state_ + "\""));
-      };
-
-      ParameterAcceptor::parse_parameters_call_back.connect(populate_functions);
-      populate_functions();
+      update_parameters();
     }
 
 
-    template <int dim, typename ScalarNumber>
+    inline void HyperbolicSystem::update_parameters()
+    {
+      bool initialized = false;
+      for (auto &it : barotropic_equation_of_state_list_)
+
+        /* Populate EOS-specific quantities and functions */
+        if (it->name() == barotropic_equation_of_state_) {
+          selected_barotropic_equation_of_state_ = it;
+          problem_name = "Compressible Euler equations (" + it->name() +
+                         " EOS, optimized barotropic)";
+          initialized = true;
+          break;
+        }
+
+      AssertThrow(initialized,
+                  dealii::ExcMessage("Could not find a barotropic equation "
+                                     "of state description with name \"" +
+                                     barotropic_equation_of_state_ + "\""));
+
+      /* invalidates view on default memory space */
+      parameters_.view();
+    }
+
+
+    template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
         typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
             &state_vector,
         const bool skip_constrained_dofs) const
     {
+      using HostSpace = dealii::MemorySpace::Host;
+
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
-      const auto sparsity_simd_view =
-          offline_data.sparsity_pattern_simd().view();
-      using VA = dealii::VectorizedArray<ScalarNumber>;
 
-      const auto U_view = std::get<0>(state_vector).view();
-      const auto precomputed_view = std::get<1>(state_vector).view();
+      auto &U = std::get<0>(state_vector);
+      auto &precomputed = std::get<1>(state_vector);
 
-      const auto body = [&](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
-        using View = HyperbolicSystemView<dim, T>;
-        using precomputed_type = typename View::precomputed_type;
+      /*
+       * Compute the specific internal energy, pressure, and speed of sound.
+       * This requires calling into the selected equation of state, which
+       * is only possible on the host memory space. Thus, temporarily
+       * transfer the state vector and the precomputed values to the host
+       * memory space:
+       */
 
-        const unsigned int row_length = sparsity_simd_view.row_length(i);
-        if (skip_constrained_dofs && row_length == 1)
-          return;
+      constexpr bool transfer =
+          have_separate_memory_spaces &&
+          !std::is_same_v<MemorySpace, dealii::MemorySpace::Host>;
 
-        const auto U_i = U_view.template read_tensor<T>(i);
-        const auto view = this->view<dim, T>();
-        const auto rho_i = view.density(U_i);
+      [[maybe_unused]] const bool host_resident =
+          U.template is_resident<HostSpace>();
 
-        const auto e_i = view.beos_specific_internal_energy(rho_i);
-        const auto p_i = view.beos_pressure(rho_i);
-        const auto a_i = view.beos_speed_of_sound(rho_i);
+      if constexpr (transfer) {
+        U.template copy_to_memory_space<HostSpace>();
+        precomputed.template move_to_memory_space<HostSpace>();
+      }
 
-        const precomputed_type prec_i{e_i, p_i, a_i};
-        precomputed_view.template write_tensor<T>(prec_i, i);
-      };
+      {
+        const auto sparsity_simd_view =
+            offline_data.sparsity_pattern_simd().template view<HostSpace>();
 
-      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
+        /* We only read the hyperbolic state vector: */
+        const auto U_view = std::as_const(U).template view<HostSpace>();
+        const auto precomputed_view = precomputed.template view<HostSpace>();
+
+        const auto hyperbolic_system_views =
+            make_select_view<dim, ScalarNumber, HostSpace>(*this);
+
+        const auto body = [=](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
+          using View = HyperbolicSystemView<dim, T, HostSpace>;
+          using precomputed_type = typename View::precomputed_type;
+
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
+          if (skip_constrained_dofs && row_length == 1)
+            return;
+
+          const auto view = hyperbolic_system_views.template view<T>();
+
+          const auto U_i = U_view.template read_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+
+          /* Calls into the selected equation of state: */
+          const auto e_i = view.beos_specific_internal_energy(rho_i);
+          const auto p_i = view.beos_pressure(rho_i);
+          const auto a_i = view.beos_speed_of_sound(rho_i);
+
+          const precomputed_type prec_i{e_i, p_i, a_i};
+          precomputed_view.template write_tensor<T>(prec_i, i);
+        };
+
+        loop<HostSpace, ScalarNumber>(
+            "hyperbolic_kernel_01b", body, 0, n_internal, n_owned);
+      }
+
+      if constexpr (transfer) {
+        /* Drop the (now stale) host mirror unless it was resident before: */
+        if (!host_resident)
+          U.template move_to_memory_space<MemorySpace>();
+        precomputed.template move_to_memory_space<MemorySpace>();
+      }
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::density(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::density(const state_type &U)
     {
       return U[0];
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::filter_vacuum_density(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::filter_vacuum_density(
         const Number &rho) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       const Number rho_cutoff_large =
           reference_density() * vacuum_state_relaxation_large() * eps;
 
-      return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+      return ryujin::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           std::abs(rho), rho_cutoff_large, Number(0.), rho);
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-    HyperbolicSystemView<dim, Number>::momentum(const state_type &U)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::momentum(
+        const state_type &U)
     {
       dealii::Tensor<1, dim, Number> result;
       for (unsigned int i = 0; i < dim; ++i)
@@ -815,9 +917,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::total_energy(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::total_energy(
         const state_type &U, const Number &specific_internal_energy) const
     {
       const auto rho = density(U);
@@ -829,9 +931,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::total_energy_derivative(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::total_energy_derivative(
         const state_type &U,
         const Number &specific_internal_energy,
         const Number &pressure) const -> state_type
@@ -852,15 +954,16 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline bool
-    HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool
+    HyperbolicSystemView<dim, Number, MemorySpace>::is_admissible(
+        const state_type &U) const
     {
       const auto rho = density(U);
       constexpr auto gt = dealii::SIMDComparison::greater_than;
       using T = Number;
       const auto test =
-          dealii::compare_and_apply_mask<gt>(rho, T(0.), T(0.), T(-1.));
+          ryujin::compare_and_apply_mask<gt>(rho, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
       if (!(test == Number(0.))) {
@@ -874,15 +977,17 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <int component>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::prescribe_riemann_characteristic(
-        const state_type & /*U*/,
-        const Number & /*p*/,
-        const state_type & /*U_bar*/,
-        const Number & /*p_bar*/,
-        const dealii::Tensor<1, dim, Number> & /*normal*/) const -> state_type
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        prescribe_riemann_characteristic(
+            const state_type & /*U*/,
+            const Number & /*p*/,
+            const state_type & /*U_bar*/,
+            const Number & /*p_bar*/,
+            const dealii::Tensor<1, dim, Number> & /*normal*/) const
+        -> state_type
     {
       // FIXME
       AssertThrow(false, dealii::ExcNotImplemented());
@@ -891,10 +996,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::apply_boundary_conditions(
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_boundary_conditions(
         dealii::types::boundary_id id,
         const state_type &U,
         const dealii::Tensor<1, dim, Number> &normal,
@@ -988,10 +1093,11 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::f(const state_type &U,
-                                         const Number &p) const -> flux_type
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::f(const state_type &U,
+                                                      const Number &p) const
+        -> flux_type
     {
       const auto rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
@@ -1008,9 +1114,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_contribution(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView &pv,
         const InitialPrecomputedVectorView & /*piv*/,
         const unsigned int i,
@@ -1022,9 +1128,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_contribution(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
         const PrecomputedVectorView &pv,
         const InitialPrecomputedVectorView & /*piv*/,
         const unsigned int *js,
@@ -1036,9 +1142,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::flux_divergence(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
@@ -1047,10 +1153,11 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename ST>
-    auto HyperbolicSystemView<dim, Number>::expand_state(const ST &state) const
-        -> state_type
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::expand_state(
+        const ST &state) const -> state_type
     {
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
@@ -1069,10 +1176,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename ST>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::from_initial_state(
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::from_initial_state(
         const ST &initial_state) const -> state_type
     {
       const auto primitive_state = expand_state(initial_state);
@@ -1080,9 +1187,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::from_primitive_state(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::from_primitive_state(
         const state_type &primitive_state) const -> state_type
     {
       const auto rho = density(primitive_state);
@@ -1096,9 +1203,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::to_primitive_state(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::to_primitive_state(
         const state_type &state) const -> state_type
     {
       const auto rho = density(state);
@@ -1113,9 +1220,10 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
-    auto HyperbolicSystemView<dim, Number>::apply_galilei_transform(
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_galilei_transform(
         const state_type &state, const Lambda &lambda) const -> state_type
     {
       auto result = state;

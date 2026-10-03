@@ -6,7 +6,6 @@
 #define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <simd.h>
 #include <wave_speed_estimator.h>
-#include <wave_speed_estimator.template.h>
 
 using namespace ryujin::EulerBarotropic;
 using namespace ryujin;
@@ -24,11 +23,11 @@ int main(int argc, char *argv[])
   const auto wave_speed_estimator_view =
       wave_speed_estimator.view<dim, double>();
 
-  const auto view = hyperbolic_system.view<dim, double>();
-
   using state_type = dealii::Tensor<1, 1 + dim, double>;
 
   const auto riemann_data = [&](const state_type &state) {
+    /* The view stores the selected equation of state, recreate it: */
+    const auto view = hyperbolic_system.view<dim, double>();
     const double rho = view.density(state);
     const double m = view.momentum(state)[0];
     const double u = m / rho;
