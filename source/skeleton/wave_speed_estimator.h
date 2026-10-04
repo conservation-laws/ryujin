@@ -35,19 +35,6 @@ namespace ryujin
     {
     public:
       /**
-       * @name Typedefs and constexpr constants
-       */
-      //@{
-
-      /**
-       * Alias for the view on the wave speed estimator for a given dimension @p
-       * dim and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = WaveSpeedEstimatorView<dim, Number>;
-
-      //@}
-      /**
        * @name Constructor and setup
        */
       //@{
@@ -76,7 +63,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return View<dim, Number>{
+        return WaveSpeedEstimatorView<dim, Number>{
             hyperbolic_system_->template view<dim, Number>(), *this};
       }
 
