@@ -397,37 +397,6 @@ namespace ryujin
 
     /**
      * Given a @p dof_handler, and constraints @p affine_constraints this
-     * function creates an extended sparsity pattern that also includes
-     * locally relevant to locally relevant couplings.
-     *
-     * @ingroup FiniteElement
-     */
-    template <int dim, typename Number, typename SPARSITY>
-    void make_extended_sparsity_pattern(
-        const dealii::DoFHandler<dim> &dof_handler,
-        SPARSITY &dsp,
-        const dealii::AffineConstraints<Number> &affine_constraints,
-        bool keep_constrained)
-    {
-      std::vector<dealii::types::global_dof_index> dof_indices;
-
-      for (auto cell : dof_handler.active_cell_iterators()) {
-        /* iterate over locally owned cells and the ghost layer */
-        if (cell->is_artificial())
-          continue;
-
-        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
-        dof_indices.resize(dofs_per_cell);
-        cell->get_dof_indices(dof_indices);
-
-        affine_constraints.add_entries_local_to_global(
-            dof_indices, dsp, keep_constrained);
-      }
-    }
-
-
-    /**
-     * Given a @p dof_handler, and constraints @p affine_constraints this
      * function creates an extended sparsity pattern for the discontinuous
      * Galerkin formulation that also includes locally relevant to locally
      * relevant couplings.
