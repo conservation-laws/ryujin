@@ -147,13 +147,9 @@ namespace ryujin
 
       using ScalarNumber = typename View::ScalarNumber;
 
-      static constexpr auto problem_dimension = View::problem_dimension;
-
       using state_type = typename View::state_type;
 
       using flux_contribution_type = typename View::flux_contribution_type;
-
-      using precomputed_type = typename View::precomputed_type;
 
       using PrecomputedVectorView = typename View::PrecomputedVectorView;
 

@@ -115,8 +115,6 @@ namespace ryujin
 
       using ScalarNumber = typename View::ScalarNumber;
 
-      static constexpr auto problem_dimension = View::problem_dimension;
-
       using state_type = typename View::state_type;
 
       /**
@@ -130,8 +128,6 @@ namespace ryujin
        * Riemann solver \f$[\rho, v, p, a]\f$
        */
       using primitive_type = typename std::array<Number, riemann_data_size>;
-
-      using precomputed_type = typename View::precomputed_type;
 
       using PrecomputedVectorView = typename View::PrecomputedVectorView;
 

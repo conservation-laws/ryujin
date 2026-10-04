@@ -125,8 +125,6 @@ namespace ryujin
 
       using ScalarNumber = typename View::ScalarNumber;
 
-      static constexpr auto problem_dimension = View::problem_dimension;
-
       using state_type = typename View::state_type;
 
       /**
