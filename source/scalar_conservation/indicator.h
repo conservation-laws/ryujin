@@ -9,6 +9,7 @@
 
 #include "hyperbolic_system.h"
 
+#include <gpu.h>
 #include <multicomponent_vector.h>
 #include <observer_pointer.h>
 #include <simd.h>
@@ -16,12 +17,13 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/vectorization.h>
 
-
 namespace ryujin
 {
   namespace ScalarConservation
   {
-    template <int dim, typename Number = double>
+    template <int dim,
+              typename Number = double,
+              typename MemorySpace = dealii::MemorySpace::Host>
     class IndicatorView;
 
     /**
@@ -40,11 +42,20 @@ namespace ryujin
       //@{
 
       /**
-       * Alias for the view on the indicator for a given dimension @p dim
-       * and choice of number type @p Number.
+       * A structure holding all runtime parameters of the indicator.
        */
-      template <int dim, typename Number = double>
-      using View = IndicatorView<dim, Number>;
+      struct Parameters {
+        double evc_factor;
+      };
+
+      /**
+       * Alias for the view on the indicator for a given dimension @p dim,
+       * choice of number type @p Number, and memory space @p MemorySpace.
+       */
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = IndicatorView<dim, Number, MemorySpace>;
 
       //@}
       /**
@@ -58,32 +69,38 @@ namespace ryujin
       Indicator(const HyperbolicSystem &hyperbolic_system,
                 const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
+          , parameters_("scalar_conservation_indicator_parameters",
+                        TransferPolicy::implicit_transfers_host_resident)
           , hyperbolic_system_(&hyperbolic_system)
       {
-        evc_factor_ = ScalarNumber(1.);
+        /* reference remains valid due to implicit_transfers_host_resident */
+        auto &parameters = *parameters_.view();
+
+        parameters.evc_factor = 1.;
         add_parameter("evc factor",
-                      evc_factor_,
+                      parameters.evc_factor,
                       "Factor for scaling the entropy viscocity commuator");
+
+        /* invalidates view on default memory space */
+        ParameterAcceptor::parse_parameters_call_back.connect(
+            [this] { parameters_.view(); });
       }
-
-      //@}
-      /**
-       * @name Information and statistics
-       */
-      //@{
-
-      ACCESSOR_READ_ONLY(evc_factor);
 
       /**
        * Return a view on the Indicator for a given dimension @p dim and
        * choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars).
+       * double, as well as a VectorizedArray holding packed scalars). The
+       * optional @p MemorySpace template parameter selects whether the
+       * view is intended for the host or device memory space.
        */
-      template <int dim, typename Number>
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number>{
-            hyperbolic_system_->template view<dim, Number>(), *this};
+        return View<dim, Number, MemorySpace>{
+            hyperbolic_system_->template view<dim, Number, MemorySpace>(),
+            *this};
       }
 
     private:
@@ -93,7 +110,7 @@ namespace ryujin
        */
       //@{
 
-      ScalarNumber evc_factor_;
+      Mirrored<Parameters> parameters_;
 
       //@}
       /**
@@ -102,6 +119,9 @@ namespace ryujin
       //@{
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+
+      template <int, typename, typename>
+      friend class IndicatorView;
 
       //@}
     };
@@ -115,16 +135,21 @@ namespace ryujin
      *
      * @ingroup ScalarConservationEquations
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename MemorySpace>
     class IndicatorView
     {
     public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
       /**
        * @name Typedefs and constexpr constants
        */
       //@{
 
-      using View = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -164,31 +189,41 @@ namespace ryujin
        */
       IndicatorView(const View &view, const Indicator<ScalarNumber> &indicator)
           : view_(view)
-          , indicator_(indicator)
+          , parameters_(indicator.parameters_.template view<MemorySpace>())
       {
+      }
+
+      /**
+       * Return the factor used for scaling the entropy viscosity
+       * commutator.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber evc_factor() const
+      {
+        return ScalarNumber(parameters_->evc_factor);
       }
 
       /**
        * Reset temporary storage and initialize for a new row corresponding
        * to state vector U_i.
        */
-      void reset(const PrecomputedVectorView &pv,
-                 const unsigned int i,
-                 const state_type &U_i);
+      DEAL_II_HOST_DEVICE void reset(const PrecomputedVectorView &pv,
+                                     const unsigned int i,
+                                     const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const PrecomputedVectorView &pv,
-                      const unsigned int *js,
-                      const state_type &U_j,
-                      const dealii::Tensor<1, dim, Number> &c_ij);
+      DEAL_II_HOST_DEVICE void
+      accumulate(const PrecomputedVectorView &pv,
+                 const unsigned int *js,
+                 const state_type &U_j,
+                 const dealii::Tensor<1, dim, Number> &c_ij);
 
       /**
        * Return the computed alpha_i value.
        */
-      Number alpha(const Number h_i) const;
+      DEAL_II_HOST_DEVICE Number alpha(const Number h_i) const;
 
 
     private:
@@ -199,13 +234,13 @@ namespace ryujin
       //@{
 
       const View view_;
-      const Indicator<ScalarNumber> &indicator_;
+      const Indicator<ScalarNumber>::Parameters *const parameters_;
 
-      Number u_i_;
-      Number u_abs_max_;
+      Number u_i_ = 0.;
+      Number u_abs_max_ = 0.;
       dealii::Tensor<1, dim, Number> f_i_;
-      Number left_;
-      Number right_;
+      Number left_ = 0.;
+      Number right_ = 0.;
       //@}
     };
 
@@ -217,11 +252,12 @@ namespace ryujin
      */
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    IndicatorView<dim, Number>::reset(const PrecomputedVectorView &pv,
-                                      const unsigned int i,
-                                      const state_type &U_i)
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    IndicatorView<dim, Number, MemorySpace>::reset(
+        const PrecomputedVectorView &pv,
+        const unsigned int i,
+        const state_type &U_i)
     {
       /* entropy viscosity commutator: */
 
@@ -235,8 +271,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void IndicatorView<dim, Number>::accumulate(
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
+    IndicatorView<dim, Number, MemorySpace>::accumulate(
         const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
@@ -256,9 +293,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    IndicatorView<dim, Number>::alpha(const Number hd_i) const
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    IndicatorView<dim, Number, MemorySpace>::alpha(const Number hd_i) const
     {
       Number numerator = left_ - right_;
       Number denominator = std::abs(left_) + std::abs(right_);
@@ -270,7 +307,7 @@ namespace ryujin
           std::abs(numerator) /
           (denominator + std::max(hd_i * std::abs(u_abs_max_), regularization));
 
-      return std::min(Number(1.), indicator_.evc_factor() * quotient);
+      return std::min(Number(1.), evc_factor() * quotient);
     }
 
   } // namespace ScalarConservation

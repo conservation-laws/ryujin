@@ -16,7 +16,6 @@ void test(const std::string &expression)
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
-  const auto view = hyperbolic_system.view<dim, Number>();
 
   {
     std::stringstream parameters;
@@ -26,6 +25,8 @@ void test(const std::string &expression)
                << std::endl;
     ParameterAcceptor::initialize(parameters);
   }
+
+  const auto view = hyperbolic_system.view<dim, Number>();
 
   using View = HyperbolicSystemView<dim, Number>;
   using state_type = typename View::state_type;

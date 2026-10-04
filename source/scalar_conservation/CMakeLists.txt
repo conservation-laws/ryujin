@@ -7,8 +7,6 @@ add_library(obj_scalar_conservation OBJECT
   equation_dispatch.cc
   flux_library.cc
   initial_state_library.cc
-  limiter.cc
-  wave_speed_estimator.cc
   )
 set_target_properties(obj_scalar_conservation PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(obj_scalar_conservation obj_common)

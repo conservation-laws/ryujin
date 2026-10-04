@@ -5,7 +5,6 @@
 #include <multicomponent_vector.h>
 #define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <wave_speed_estimator.h>
-#include <wave_speed_estimator.template.h>
 
 #include <iomanip>
 #include <iostream>
@@ -24,8 +23,6 @@ void test(const std::string &expression)
   HyperbolicSystem hyperbolic_system;
   WaveSpeedEstimator<> wave_speed_estimator(hyperbolic_system);
 
-  const auto view = hyperbolic_system.view<dim, Number>();
-
   {
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"
@@ -38,6 +35,8 @@ void test(const std::string &expression)
                << std::endl;
     ParameterAcceptor::initialize(parameters);
   }
+
+  const auto view = hyperbolic_system.view<dim, Number>();
 
   using View = HyperbolicSystemView<dim, Number>;
   using state_type = typename View::state_type;
