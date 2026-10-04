@@ -148,8 +148,6 @@ namespace ryujin
 
       using state_type = typename View::state_type;
 
-      using flux_type = typename View::flux_type;
-
       using precomputed_type = typename View::precomputed_type;
 
       using PrecomputedVectorView = typename View::PrecomputedVectorView;

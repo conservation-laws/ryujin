@@ -209,8 +209,6 @@ namespace ryujin
     mutable Kokkos::View<Number *, KokkosHost> ghost_buffer_host_;
     mutable Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
 
-    std::vector<MPI_Request> requests_;
-
     /*
      * Storage primitives used by the MirroredStorage base class:
      */

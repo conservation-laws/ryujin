@@ -8,7 +8,6 @@
 #include <compile_time_options.h>
 
 #include <deal.II/base/function.h>
-#include <deal.II/lac/vector.h>
 
 namespace ryujin
 {
@@ -35,37 +34,6 @@ namespace ryujin
     private:
       const Callable callable_;
       const unsigned int k_;
-    };
-
-
-    template <int dim, typename Number, typename Callable>
-    class ToVectorFunction : public dealii::Function<dim, Number>
-    {
-    public:
-      ToVectorFunction(const Callable &callable, const unsigned int components)
-          : dealii::Function<dim, Number>(components)
-          , callable_(callable)
-      {
-      }
-
-      Number value(const dealii::Point<dim> &point,
-                   unsigned int component) const override
-      {
-        return callable_(point)[component];
-      }
-
-      void vector_value(const dealii::Point<dim> &point,
-                        dealii::Vector<double> &values) const override
-      {
-        AssertDimension(values.size(), this->n_components);
-
-        const auto temp = callable_(point);
-        for (unsigned int k = 0; k < this->n_components; ++k)
-          values(k) = temp[k];
-      }
-
-    private:
-      const Callable callable_;
     };
   } // namespace
 #endif
@@ -105,35 +73,6 @@ namespace ryujin
                                                 const unsigned int k)
   {
     return {callable, k};
-  }
-
-
-  /**
-   * Convenience wrapper that creates a vector-valued dealii::Function
-   * object out of a (fairly general) callable object returning array-like
-   * values. An example usage is given by the interpolation of initial
-   * values performed in InitialValues::interpolate_hyperbolic_vector() and
-   * InitialValues::interpolate_initial_precomputed_vector()
-   * ```
-   * dealii::VectorTools::interpolate(
-   *   dof_handler,
-   *   to_function<dim, Number>(callable, block_size),
-   *   block_vector);
-   * ```
-   *
-   * @param callable A callable object that provides an `operator(const
-   * Point<dim> &)` and returns an array or rank-1 tensor. More precisely,
-   * the return type must have a subscript operator `operator[]`.
-   *
-   * @param n_components number of components.
-   *
-   * @ingroup Miscellaneous
-   */
-  template <int dim, typename Number, typename Callable>
-  ToVectorFunction<dim, Number, Callable>
-  to_vector_function(const Callable &callable, const unsigned int n_components)
-  {
-    return {callable, n_components};
   }
 
 
@@ -305,23 +244,6 @@ namespace
 
 
 /**
- * Compiler hint annotating a boolean to be likely true.
- *
- * Intended use:
- * ```
- * if (RYUJIN_LIKELY(thread_ready == true)) {
- *   // likely branch
- * }
- * ```
- *
- * @note The performance penalty of incorrectly marking a condition as
- * likely is severe. Use only if the condition is almost always true.
- * @ingroup Miscellaneous
- */
-#define RYUJIN_LIKELY(x) (__builtin_expect(!!(x), 1))
-
-
-/**
  * Compiler hint annotating a boolean expression to be likely false.
  *
  * Intended use:
@@ -336,13 +258,5 @@ namespace
  * @ingroup Miscellaneous
  */
 #define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
-
-
-/**
- * Injects a label into the generated assembly.
- *
- * @ingroup Miscellaneous
- */
-#define ASM_LABEL(label) asm("#" label);
 
 //@}
