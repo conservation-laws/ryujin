@@ -20,6 +20,7 @@
 #include <deal.II/lac/vector.h>
 
 #include <functional>
+#include <utility>
 
 namespace ryujin
 {
@@ -429,7 +430,8 @@ namespace ryujin
     mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
-        Limiter::template View<dim, Number>::n_bounds;
+        decltype(std::declval<const Limiter &>()
+                     .template view<dim, Number>())::n_bounds;
     mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
 
     mutable HyperbolicVector r_;

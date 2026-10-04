@@ -14,6 +14,8 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <utility>
+
 namespace ryujin
 {
   /**
@@ -42,7 +44,8 @@ namespace ryujin
 
     using Limiter = typename Description::template Limiter<Number>;
 
-    using LimiterView = typename Limiter::template View<dim, Number>;
+    using LimiterView =
+        decltype(std::declval<const Limiter &>().template view<dim, Number>());
 
     static constexpr auto problem_dimension = View::problem_dimension;
 

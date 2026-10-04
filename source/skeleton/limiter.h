@@ -32,19 +32,6 @@ namespace ryujin
     {
     public:
       /**
-       * @name Typedefs and constexpr constants
-       */
-      //@{
-
-      /**
-       * Alias for the view on the limiter for a given dimension @p dim
-       * and choice of number type @p Number.
-       */
-      template <int dim, typename Number = double>
-      using View = LimiterView<dim, Number>;
-
-      //@}
-      /**
        * @name Constructor and setup
        */
       //@{
@@ -70,7 +57,7 @@ namespace ryujin
       template <int dim, typename Number>
       auto view() const
       {
-        return View<dim, Number>{
+        return LimiterView<dim, Number>{
             hyperbolic_system_->template view<dim, Number>(), *this};
       }
 

@@ -50,15 +50,6 @@ namespace ryujin
         double evc_factor;
       };
 
-      /**
-       * Alias for the view on the indicator for a given dimension @p dim,
-       * choice of number type @p Number, and memory space @p MemorySpace.
-       */
-      template <int dim,
-                typename Number = double,
-                typename MemorySpace = dealii::MemorySpace::Host>
-      using View = IndicatorView<dim, Number, MemorySpace>;
-
       //@}
       /**
        * @name Constructor and setup
@@ -100,7 +91,7 @@ namespace ryujin
                 typename MemorySpace = dealii::MemorySpace::Host>
       auto view() const
       {
-        return View<dim, Number, MemorySpace>{
+        return IndicatorView<dim, Number, MemorySpace>{
             hyperbolic_system_->template view<dim, Number, MemorySpace>(),
             *this};
       }
