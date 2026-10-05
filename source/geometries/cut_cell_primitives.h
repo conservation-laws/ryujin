@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <reference_cell.h>
+
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/distributed/tria_base.h>
@@ -506,8 +508,12 @@ namespace ryujin
           pinned[g] = true;
           n_moved += owned[g];
         }
-        n_moved = dealii::Utilities::MPI::max(
-            n_moved, triangulation.get_mpi_communicator());
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+        const auto comm = triangulation.get_mpi_communicator();
+#else
+        const auto comm = triangulation.get_communicator();
+#endif
+        n_moved = dealii::Utilities::MPI::max(n_moved, comm);
         if (n_moved == 0)
           break;
       }
@@ -573,7 +579,11 @@ namespace ryujin
       using Alignment = MeshAlignment<dim>;
       using Face = std::pair<unsigned int, unsigned int>;
 
+#if DEAL_II_VERSION_GTE(9, 7, 0)
       const auto comm = temporary.get_mpi_communicator();
+#else
+      const auto comm = temporary.get_communicator();
+#endif
       constexpr auto invalid = dealii::numbers::invalid_unsigned_int;
 
       const auto &vertices = temporary.get_vertices();
@@ -797,7 +807,11 @@ namespace ryujin
         description.cell_infos[0].push_back(info);
       }
 
+#if DEAL_II_VERSION_GTE(9, 7, 0)
       description.comm = triangulation.get_mpi_communicator();
+#else
+      description.comm = triangulation.get_communicator();
+#endif
       description.settings = dealii::TriangulationDescription::Settings::
           construct_multigrid_hierarchy;
       description.smoothing = triangulation.get_mesh_smoothing();

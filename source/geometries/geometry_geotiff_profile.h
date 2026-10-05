@@ -89,8 +89,12 @@ namespace ryujin
         if constexpr (dim == 2) {
           std::unique_ptr<dealii::Triangulation<dim>> temporary;
           if (fully_distributed != nullptr)
+#if DEAL_II_VERSION_GTE(9, 7, 0)
             temporary =
                 std::make_unique<FD>(triangulation.get_mpi_communicator());
+#else
+            temporary = std::make_unique<FD>(triangulation.get_communicator());
+#endif
           else
             temporary = std::make_unique<dealii::Triangulation<dim>>();
 
