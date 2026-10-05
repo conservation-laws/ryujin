@@ -91,14 +91,6 @@ namespace ryujin
     std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
 #endif
 
-    /* Ensure that the state vector is resident on the host memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      const auto &[U, precomputed, parabolic] = state_vector;
-      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
-      precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
-    }
-
     /*
      * Extract quantities and store in ScalarHostVectors so that we can
      * call DataOut::add_data_vector()

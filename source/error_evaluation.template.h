@@ -110,16 +110,6 @@ namespace ryujin
     std::cout << "ErrorEvaluation<dim, Number>::compute()" << std::endl;
 #endif
 
-    /* Ensure that the state vectors are resident on the host memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      for (const auto *vector : {&state_vector, &analytic}) {
-        const auto &[U, precomputed, parabolic] = *vector;
-        U.template copy_to_memory_space<dealii::MemorySpace::Host>();
-        precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
-      }
-    }
-
     const auto &discretization = offline_data_->discretization();
     const auto &dof_handler = offline_data_->dof_handler();
 

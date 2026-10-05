@@ -86,13 +86,10 @@ namespace ryujin
         << std::endl;
 #endif
 
-    /* Ensure that the state vector is resident on the host memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      const auto &[U, precomputed, parabolic] = old_state_vector;
-      U.template copy_to_memory_space<dealii::MemorySpace::Host>();
-      precomputed.template copy_to_memory_space<dealii::MemorySpace::Host>();
-    }
+    Vectors::copy_to_memory_space<dealii::MemorySpace::Host>(
+        old_state_vector,
+        Vectors::StateVectorPart::hyperbolic,
+        Vectors::StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -396,13 +393,10 @@ namespace ryujin
               << std::endl;
 #endif
 
-    /* Ensure that the state vector is resident on the host memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      auto &[U, precomputed, parabolic] = new_state_vector;
-      U.template move_to_memory_space<dealii::MemorySpace::Host>();
-      precomputed.template move_to_memory_space<dealii::MemorySpace::Host>();
-    }
+    Vectors::move_to_memory_space<dealii::MemorySpace::Host>(
+        new_state_vector,
+        Vectors::StateVectorPart::hyperbolic,
+        Vectors::StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
