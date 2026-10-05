@@ -526,7 +526,15 @@ namespace ryujin
       std::cout << "ParabolicModule<dim, Number>::compute_potential()"
                 << std::endl;
 #endif
-      const auto U_view = std::get<0>(state_vector).view();
+      using HostSpace = dealii::MemorySpace::Host;
+      using Vectors::StateVectorPart;
+
+      Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
+                                               StateVectorPart::hyperbolic);
+      Vectors::move_to_memory_space<HostSpace>(state_vector,
+                                               StateVectorPart::parabolic);
+
+      const auto U_view = std::as_const(std::get<0>(state_vector)).view();
       auto &V = std::get<2>(state_vector);
       auto &potential = V[0].deal_ii_vector();
 
@@ -667,9 +675,17 @@ namespace ryujin
           << std::endl;
 #endif
 
+      using HostSpace = dealii::MemorySpace::Host;
+      using Vectors::StateVectorPart;
+
+      Vectors::move_to_memory_space<HostSpace>(state_vector,
+                                               StateVectorPart::hyperbolic);
+      Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
+                                               StateVectorPart::parabolic);
+
       const auto U_view = std::get<0>(state_vector).view();
-      auto &V = std::get<2>(state_vector);
-      auto &potential = V[0].deal_ii_vector();
+      const auto &V = std::get<2>(std::as_const(state_vector));
+      const auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -777,6 +793,15 @@ namespace ryujin
 #endif
 
       const Number alpha = parabolic_system_->alpha();
+
+      using HostSpace = dealii::MemorySpace::Host;
+      using Vectors::StateVectorPart;
+
+      Vectors::copy_to_memory_space<HostSpace>(old_state_vector,
+                                               StateVectorPart::hyperbolic,
+                                               StateVectorPart::parabolic);
+      Vectors::move_to_memory_space<HostSpace>(new_state_vector,
+                                               StateVectorPart::parabolic);
 
       const auto &old_U = std::get<0>(old_state_vector);
       const auto old_U_view = old_U.view();
@@ -1073,6 +1098,7 @@ namespace ryujin
        */
 
       new_U = old_U;
+      Vectors::move_to_memory_space<HostSpace>(new_U); /* invalidates default */
       const auto new_U_view = new_U.view();
 
       if (crank_nicolson_extrapolation) {

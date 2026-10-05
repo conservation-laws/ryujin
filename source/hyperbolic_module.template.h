@@ -199,16 +199,14 @@ namespace ryujin
               << std::endl;
 #endif
 
-    auto &[U, precomputed, parabolic] = state_vector;
-
     using MemorySpace = selected_memory_space_t;
+    using Vectors::StateVectorPart;
 
-    /* Ensure all vectors are resident on the correct memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      U.template move_to_memory_space<MemorySpace>();
-      precomputed.template move_to_memory_space<MemorySpace>();
-    }
+    Vectors::move_to_memory_space<MemorySpace>(state_vector,
+                                               StateVectorPart::hyperbolic,
+                                               StateVectorPart::precomputed);
+
+    auto &[U, precomputed, parabolic] = state_vector;
 
     ComputingTimer::Scope scope(
         "time step [H] 1 - update boundary values, precompute values");
@@ -404,23 +402,21 @@ namespace ryujin
               << std::endl;
 #endif
 
+    using MemorySpace = selected_memory_space_t;
+    using Vectors::StateVectorPart;
+
+    Vectors::copy_to_memory_space<MemorySpace>(old_state_vector,
+                                               StateVectorPart::hyperbolic,
+                                               StateVectorPart::precomputed);
+    for (int s = 0; s < stages; ++s)
+      Vectors::copy_to_memory_space<MemorySpace>(stage_state_vectors[s].get(),
+                                                 StateVectorPart::hyperbolic,
+                                                 StateVectorPart::precomputed);
+    Vectors::move_to_memory_space<MemorySpace>(new_state_vector,
+                                               StateVectorPart::hyperbolic);
+
     auto &[old_U, old_precomputed, old_parabolic] = old_state_vector;
     auto &new_U = std::get<0>(new_state_vector);
-
-    using MemorySpace = selected_memory_space_t;
-
-    /* Ensure all vectors are resident on the correct memory space. */
-    if constexpr (have_separate_memory_spaces) {
-      ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
-      old_U.template copy_to_memory_space<MemorySpace>();
-      old_precomputed.template copy_to_memory_space<MemorySpace>();
-      for (int s = 0; s < stages; ++s) {
-        const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
-        U_s.template copy_to_memory_space<MemorySpace>();
-        prec_s.template copy_to_memory_space<MemorySpace>();
-      }
-      new_U.template move_to_memory_space<MemorySpace>();
-    }
 
     /*
      * Taking a view<>() might imply implicit memory space transfers. Let's

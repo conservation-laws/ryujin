@@ -311,6 +311,14 @@ namespace ryujin
 #endif
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
+      using HostSpace = dealii::MemorySpace::Host;
+      using Vectors::StateVectorPart;
+
+      Vectors::copy_to_memory_space<HostSpace>(old_state_vector,
+                                               StateVectorPart::hyperbolic);
+      Vectors::move_to_memory_space<HostSpace>(new_state_vector,
+                                               StateVectorPart::hyperbolic);
+
       const auto old_U_view = std::get<0>(old_state_vector).view();
       const auto new_U_view = std::get<0>(new_state_vector).view();
 

@@ -499,20 +499,29 @@ namespace ryujin
     view.read_initial_ = read_initial_;
 
     /*
-     * Only set up views for vectors that we are actually reading from:
-     * creating a view triggers a residency assertion (or an implicit memory
-     * transfer).
+     * Only set up views for vectors that we are actually reading from,
+     * and only ensure residency of those parts of the state vector:
      */
 
-    if (read_conserved_ || read_primitive_)
-      view.U_view_ = std::get<0>(state_vector).template view<MemorySpace>();
+    using Vectors::StateVectorPart;
 
-    if (read_precomputed_)
+    if (read_conserved_ || read_primitive_) {
+      Vectors::copy_to_memory_space<MemorySpace>(state_vector,
+                                                 StateVectorPart::hyperbolic);
+      view.U_view_ = std::get<0>(state_vector).template view<MemorySpace>();
+    }
+
+    if (read_precomputed_) {
+      Vectors::copy_to_memory_space<MemorySpace>(state_vector,
+                                                 StateVectorPart::precomputed);
       view.precomputed_view_ =
           std::get<1>(state_vector).template view<MemorySpace>();
+    }
 
-    if (read_initial_)
+    if (read_initial_) {
+      Vectors::copy_to_memory_space<MemorySpace>(initial_precomputed_);
       view.initial_view_ = initial_precomputed_.template view<MemorySpace>();
+    }
 
     /*
      * Set up an entry for every selected component on the host, with a
@@ -533,14 +542,13 @@ namespace ryujin
       if (offset < parabolic_offset)
         continue;
 
-      if (offset < additional_offset_)
-        entries[k].scalar_view =
-            parabolic[offset - parabolic_offset].template view<MemorySpace>();
-      else
-        entries[k].scalar_view =
-            additional_vectors_[offset - additional_offset_]
-                .get()
-                .template view<MemorySpace>();
+      const auto &vector =
+          offset < additional_offset_
+              ? parabolic[offset - parabolic_offset]
+              : additional_vectors_[offset - additional_offset_].get();
+
+      Vectors::copy_to_memory_space<MemorySpace>(vector);
+      entries[k].scalar_view = vector.template view<MemorySpace>();
     }
 
     view.entries_ = Kokkos::create_mirror_view_and_copy(

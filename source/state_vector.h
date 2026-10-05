@@ -7,8 +7,10 @@
 
 #include <compile_time_options.h>
 
+#include "computing_timer.h"
 #include "multicomponent_vector.h"
 
+#include <concepts>
 #include <tuple>
 #include <vector>
 
@@ -59,6 +61,140 @@ namespace ryujin
 
 
     /**
+     * An enum identifying the individual parts of a StateVector: the
+     * hyperbolic state vector @p U, the precomputed values, and the
+     * parabolic state (all scalar vectors of it).
+     */
+    enum class StateVectorPart {
+      hyperbolic,
+      precomputed,
+      parabolic,
+    };
+
+
+    /**
+     * Ensure that the selected @p parts of the given @p state_vector are
+     * resident on @p MemorySpace for read access.
+     */
+    template <typename MemorySpace,
+              typename Number,
+              int prob_dim,
+              int prec_dim,
+              std::same_as<StateVectorPart>... Parts>
+    void copy_to_memory_space(
+        const StateVector<Number, prob_dim, prec_dim> &state_vector
+        [[maybe_unused]],
+        Parts... parts [[maybe_unused]])
+    {
+      static_assert(sizeof...(Parts) > 0, "No state vector part selected");
+
+      if constexpr (have_separate_memory_spaces) {
+        ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
+
+        const auto &[U, precomputed, parabolic] = state_vector;
+
+        const auto copy = [&](const StateVectorPart part) {
+          switch (part) {
+          case StateVectorPart::hyperbolic:
+            U.template copy_to_memory_space<MemorySpace>();
+            break;
+          case StateVectorPart::precomputed:
+            precomputed.template copy_to_memory_space<MemorySpace>();
+            break;
+          case StateVectorPart::parabolic:
+            for (const auto &V : parabolic)
+              V.template copy_to_memory_space<MemorySpace>();
+            break;
+          }
+        };
+
+        (copy(parts), ...);
+      }
+    }
+
+
+    /**
+     * A variant of the above function that ensures that a single
+     * (scalar, or multi-component) @p vector is resident on @p MemorySpace
+     * for read access.
+     */
+    template <typename MemorySpace,
+              typename Number,
+              int n_comp,
+              int simd_length>
+    void copy_to_memory_space(
+        const MultiComponentVector<Number, n_comp, simd_length> &vector
+        [[maybe_unused]])
+    {
+      if constexpr (have_separate_memory_spaces) {
+        ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
+        vector.template copy_to_memory_space<MemorySpace>();
+      }
+    }
+
+
+    /**
+     * Ensure that the selected @p parts of the given @p state_vector are
+     * resident on @p MemorySpace for write access.
+     */
+    template <typename MemorySpace,
+              typename Number,
+              int prob_dim,
+              int prec_dim,
+              std::same_as<StateVectorPart>... Parts>
+    void
+    move_to_memory_space(StateVector<Number, prob_dim, prec_dim> &state_vector
+                         [[maybe_unused]],
+                         Parts... parts [[maybe_unused]])
+    {
+      static_assert(sizeof...(Parts) > 0, "No state vector part selected");
+
+      if constexpr (have_separate_memory_spaces) {
+        ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
+
+        auto &[U, precomputed, parabolic] = state_vector;
+
+        const auto move = [&](const StateVectorPart part) {
+          switch (part) {
+          case StateVectorPart::hyperbolic:
+            U.template move_to_memory_space<MemorySpace>();
+            break;
+          case StateVectorPart::precomputed:
+            precomputed.template move_to_memory_space<MemorySpace>();
+            break;
+          case StateVectorPart::parabolic:
+            for (auto &V : parabolic)
+              V.template move_to_memory_space<MemorySpace>();
+            break;
+          }
+        };
+
+        (move(parts), ...);
+      }
+    }
+
+
+    /**
+     * A variant of the above function that ensures that a single
+     * (scalar, or multi-component) @p vector is resident on @p MemorySpace
+     * for write access.
+     */
+    template <typename MemorySpace,
+              typename Number,
+              int n_comp,
+              int simd_length>
+    void move_to_memory_space(
+        MultiComponentVector<Number, n_comp, simd_length> &vector
+        [[maybe_unused]])
+    {
+      if constexpr (have_separate_memory_spaces) {
+        ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
+        vector.template move_to_memory_space<MemorySpace>();
+      }
+    }
+
+
+    /**
      * A small helper function that sets all values of the hyperbolic
      * vector that are invalid after a hyperbolic substep to a NaN value.
      * This includes:
@@ -73,13 +209,12 @@ namespace ryujin
     {
 #ifdef DEBUG
 
-      auto &[U, prec, V] = state_vector;
+      move_to_memory_space<dealii::MemorySpace::Host>(
+          state_vector,
+          StateVectorPart::hyperbolic,
+          StateVectorPart::precomputed);
 
-      /* Ensure that the state vector is resident on the host memory space. */
-      if constexpr (have_separate_memory_spaces) {
-        U.template move_to_memory_space<dealii::MemorySpace::Host>();
-        prec.template move_to_memory_space<dealii::MemorySpace::Host>();
-      }
+      auto &[U, prec, V] = state_vector;
 
       constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
 
