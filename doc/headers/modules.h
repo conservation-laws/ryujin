@@ -126,11 +126,3 @@
  * This module contains classes and functions related to solving the
  * shallow water equations.
  */
-
-
-/**
- * @defgroup SkeletonEquations Minimal equation interface
- *
- * This module contains the minimal necessary interface for defining a
- * hyperbolic system.
- */
