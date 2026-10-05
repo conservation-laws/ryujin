@@ -114,6 +114,26 @@ namespace ryujin
 
 
     /**
+     * A variant of the above function that ensures that a single
+     * (scalar, or multi-component) @p vector is resident on @p MemorySpace
+     * for read access.
+     */
+    template <typename MemorySpace,
+              typename Number,
+              int n_comp,
+              int simd_length>
+    void copy_to_memory_space(
+        const MultiComponentVector<Number, n_comp, simd_length> &vector
+        [[maybe_unused]])
+    {
+      if constexpr (have_separate_memory_spaces) {
+        ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
+        vector.template copy_to_memory_space<MemorySpace>();
+      }
+    }
+
+
+    /**
      * Ensure that the selected @p parts of the given @p state_vector are
      * resident on @p MemorySpace for write access.
      */
