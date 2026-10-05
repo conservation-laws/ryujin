@@ -175,6 +175,26 @@ namespace ryujin
 
 
     /**
+     * A variant of the above function that ensures that a single
+     * (scalar, or multi-component) @p vector is resident on @p MemorySpace
+     * for write access.
+     */
+    template <typename MemorySpace,
+              typename Number,
+              int n_comp,
+              int simd_length>
+    void move_to_memory_space(
+        MultiComponentVector<Number, n_comp, simd_length> &vector
+        [[maybe_unused]])
+    {
+      if constexpr (have_separate_memory_spaces) {
+        ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
+        vector.template move_to_memory_space<MemorySpace>();
+      }
+    }
+
+
+    /**
      * A small helper function that sets all values of the hyperbolic
      * vector that are invalid after a hyperbolic substep to a NaN value.
      * This includes:
