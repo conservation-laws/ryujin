@@ -20,6 +20,12 @@ namespace ryujin
     /* Perform sadd() on the default memory space: */
 
     using MemorySpace = selected_memory_space_t;
+    using Vectors::StateVectorPart;
+
+    Vectors::copy_to_memory_space<MemorySpace>(
+        src, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
+    Vectors::move_to_memory_space<MemorySpace>(
+        dst, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
 
     const auto dst_U_view = std::get<0>(dst).template view<MemorySpace>();
     const auto src_U_view =
@@ -27,19 +33,13 @@ namespace ryujin
     dst_U_view.zero_out_ghost_values();
     dst_U_view.sadd(s, b, src_U_view);
 
-    /*
-     * FIXME: At the moment the parabolic state resides only on the host memory
-     * space. Update the following to view<MemorySpace>() when we have
-     * refactored the parabolic modules.
-     */
-
     auto &dst_V = std::get<2>(dst);
     const auto &src_V = std::get<2>(src);
     AssertDimension(dst_V.size(), src_V.size());
 
     for (std::size_t k = 0; k < dst_V.size(); ++k) {
-      const auto dst_view = dst_V[k].view();
-      const auto src_view = src_V[k].view();
+      const auto dst_view = dst_V[k].template view<MemorySpace>();
+      const auto src_view = src_V[k].template view<MemorySpace>();
       dst_view.zero_out_ghost_values();
       dst_view.sadd(s, b, src_view);
     }
