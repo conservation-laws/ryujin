@@ -123,7 +123,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(peer_communicator);
 
   private:
-    const MPI_Comm &world_communicator_;
+    const MPI_Comm world_communicator_;
 
     bool global_synchronization_;
 
