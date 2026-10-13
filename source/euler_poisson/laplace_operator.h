@@ -96,8 +96,6 @@ namespace ryujin
     static constexpr unsigned int order_fe = 1;
     static constexpr unsigned int order_quad = 2;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-
     LaplaceOperator() = default;
 
     void initialize(const dealii::MatrixFree<dim, Number> &matrix_free)
@@ -116,7 +114,8 @@ namespace ryujin
       return Number();
     }
 
-    void vmult(ScalarHostVector &dst, const ScalarHostVector &src) const
+    void vmult(ScalarHostVector<Number> &dst,
+               const ScalarHostVector<Number> &src) const
     {
       Assert(dst.get_partitioner() == src.get_partitioner(),
              dealii::ExcMessage("src and dst have 2 different partitioners"));
@@ -138,19 +137,21 @@ namespace ryujin
         }
       };
 
-      matrix_free_->template cell_loop<ScalarHostVector, ScalarHostVector>(
+      matrix_free_->template cell_loop<ScalarHostVector<Number>,
+                                       ScalarHostVector<Number>>(
           body, dst, src, /*zero destination*/ true);
     }
 
-    void Tvmult(ScalarHostVector &dst, const ScalarHostVector &src) const
+    void Tvmult(ScalarHostVector<Number> &dst,
+                const ScalarHostVector<Number> &src) const
     {
       vmult(dst, src);
     }
 
     void compute_diagonal(
-        dealii::DiagonalMatrix<ScalarHostVector> &diagonal_matrix) const
+        dealii::DiagonalMatrix<ScalarHostVector<Number>> &diagonal_matrix) const
     {
-      ScalarHostVector &diagonal_vector = diagonal_matrix.get_vector();
+      ScalarHostVector<Number> &diagonal_vector = diagonal_matrix.get_vector();
       matrix_free_->initialize_dof_vector(diagonal_vector, /*CG*/ 0);
 
       dealii::MatrixFreeTools::compute_diagonal(
@@ -207,14 +208,13 @@ namespace ryujin
     static constexpr unsigned int order_fe = 1;
     static constexpr unsigned int order_quad = 2;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
     using BlockHostVector =
         dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
     UpdateOperator() = default;
 
     void initialize(const dealii::MatrixFree<dim, Number> &matrix_free,
-                    const ScalarHostVector &density,
+                    const ScalarHostVector<Number> &density,
                     const BlockHostVector &magnetic_field)
     {
       matrix_free_ = &matrix_free;
@@ -246,7 +246,8 @@ namespace ryujin
       alpha_ = alpha;
     }
 
-    void vmult(ScalarHostVector &dst, const ScalarHostVector &src) const
+    void vmult(ScalarHostVector<Number> &dst,
+               const ScalarHostVector<Number> &src) const
     {
       Assert(dst.get_partitioner() == src.get_partitioner(),
              dealii::ExcMessage("src and dst have 2 different partitioners"));
@@ -269,7 +270,8 @@ namespace ryujin
         }
       };
 
-      matrix_free_->template cell_loop<ScalarHostVector, ScalarHostVector>(
+      matrix_free_->template cell_loop<ScalarHostVector<Number>,
+                                       ScalarHostVector<Number>>(
           body_laplace, dst, src, /*zero destination*/ true);
 
       const auto body_velocity = [this](const auto &data,
@@ -319,18 +321,20 @@ namespace ryujin
         }
       };
 
-      matrix_free_->template cell_loop<ScalarHostVector, ScalarHostVector>(
+      matrix_free_->template cell_loop<ScalarHostVector<Number>,
+                                       ScalarHostVector<Number>>(
           body_velocity, dst, src, /*zero destination*/ false);
     }
 
-    void Tvmult(ScalarHostVector &dst, const ScalarHostVector &src) const
+    void Tvmult(ScalarHostVector<Number> &dst,
+                const ScalarHostVector<Number> &src) const
     {
       vmult(dst, src);
     }
 
   private:
     const dealii::MatrixFree<dim, Number> *matrix_free_;
-    const ScalarHostVector *density_;
+    const ScalarHostVector<Number> *density_;
     const BlockHostVector *magnetic_field_;
 
     mutable Number theta_tau_;
@@ -369,7 +373,7 @@ namespace ryujin
       for (unsigned int level = matrix_free.min_level();
            level <= matrix_free.max_level();
            ++level) {
-        Vectors::ScalarHostVector<Number> vector;
+        ScalarHostVector<Number> vector;
         matrix_free[level].initialize_dof_vector(vector, /*CG*/ 0);
         partitioners[level] = vector.get_partitioner();
       }
@@ -394,12 +398,9 @@ namespace ryujin
     static constexpr unsigned int order_fe = 1;
     static constexpr unsigned int order_quad = 2;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
-
     using Preconditioner =
         dealii::PreconditionChebyshev<LaplaceOperator<dim, float>,
-                                      ScalarHostVectorFloat>;
+                                      ScalarHostVector<float>>;
 
     MGSmoother() = default;
 
@@ -503,7 +504,7 @@ namespace ryujin
 
         level_laplace_matrices_[level].initialize(level_matrix_free_[level]);
         smoother_data[level].preconditioner =
-            std::make_shared<dealii::DiagonalMatrix<ScalarHostVectorFloat>>();
+            std::make_shared<dealii::DiagonalMatrix<ScalarHostVector<float>>>();
         level_laplace_matrices_[level].compute_diagonal(
             *smoother_data[level].preconditioner);
 
@@ -560,14 +561,16 @@ namespace ryujin
       create(preconditioner_, dof_handler, *mg_, mg_transfer_);
     }
 
-    void vmult(ScalarHostVector &dst, const ScalarHostVector &src) const
+    void vmult(ScalarHostVector<Number> &dst,
+               const ScalarHostVector<Number> &src) const
     {
       Assert(dst.get_partitioner() == src.get_partitioner(),
              dealii::ExcMessage("src and dst have 2 different partitioners"));
       preconditioner_->vmult(dst, src);
     }
 
-    void Tvmult(ScalarHostVector &dst, const ScalarHostVector &src) const
+    void Tvmult(ScalarHostVector<Number> &dst,
+                const ScalarHostVector<Number> &src) const
     {
       vmult(dst, src);
     }
@@ -583,27 +586,27 @@ namespace ryujin
     MGTransfer<dim, float> mg_transfer_;
     dealii::MGLevelObject<LaplaceOperator<dim, float>> level_laplace_matrices_;
 
-    dealii::mg::SmootherRelaxation<Preconditioner, ScalarHostVectorFloat>
+    dealii::mg::SmootherRelaxation<Preconditioner, ScalarHostVector<float>>
         relaxation_;
 
     std::unique_ptr<dealii::SolverControl> coarse_solver_control_;
     using CAD =
-        typename dealii::SolverCG<ScalarHostVectorFloat>::AdditionalData;
+        typename dealii::SolverCG<ScalarHostVector<float>>::AdditionalData;
     std::unique_ptr<CAD> coarse_solver_data_;
-    std::unique_ptr<dealii::SolverCG<ScalarHostVectorFloat>> coarse_solver_;
-    std::unique_ptr<dealii::DiagonalMatrix<ScalarHostVectorFloat>>
+    std::unique_ptr<dealii::SolverCG<ScalarHostVector<float>>> coarse_solver_;
+    std::unique_ptr<dealii::DiagonalMatrix<ScalarHostVector<float>>>
         coarse_preconditioner_;
     using MGCGIS = dealii::MGCoarseGridIterativeSolver<
-        ScalarHostVectorFloat,
-        dealii::SolverCG<ScalarHostVectorFloat>,
+        ScalarHostVector<float>,
+        dealii::SolverCG<ScalarHostVector<float>>,
         LaplaceOperator<dim, float>,
-        dealii::DiagonalMatrix<ScalarHostVectorFloat>>;
+        dealii::DiagonalMatrix<ScalarHostVector<float>>>;
     std::unique_ptr<MGCGIS> coarse_grid_solver_;
 
-    std::unique_ptr<dealii::mg::Matrix<ScalarHostVectorFloat>> mg_matrix_;
-    std::unique_ptr<dealii::Multigrid<ScalarHostVectorFloat>> mg_;
+    std::unique_ptr<dealii::mg::Matrix<ScalarHostVector<float>>> mg_matrix_;
+    std::unique_ptr<dealii::Multigrid<ScalarHostVector<float>>> mg_;
     std::unique_ptr<dealii::PreconditionMG<dim,
-                                           ScalarHostVectorFloat,
+                                           ScalarHostVector<float>,
                                            MGTransfer<dim, float>>>
         preconditioner_;
     //@}

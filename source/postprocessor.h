@@ -61,8 +61,6 @@ namespace ryujin
     template <typename T>
     using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, T>;
 
-    using StateVector = typename View::StateVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -105,7 +103,7 @@ namespace ryujin
      *
      * The function requires MPI communication and is not reentrant.
      */
-    void compute(const StateVector &state_vector) const;
+    void compute(const StateVector<Number> &state_vector) const;
 
     /**
      * Reset computed normalization bounds. Calling this function will
@@ -175,8 +173,7 @@ namespace ryujin
     std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
 
     mutable std::vector<std::pair<Number, Number>> bounds_;
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    mutable std::vector<ScalarHostVector> quantities_;
+    mutable std::vector<ScalarHostVector<Number>> quantities_;
 
     //@}
   };

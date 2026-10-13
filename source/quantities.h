@@ -57,9 +57,6 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using StateVector = typename View::StateVector;
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -73,7 +70,7 @@ namespace ryujin
                const OfflineData<dim, Number> &offline_data,
                const HyperbolicSystem &hyperbolic_system,
                const ParabolicSystem &parabolic_system,
-               const InitialPrecomputedVector &initial_precomputed,
+               const MultiComponentVector<Number> &initial_precomputed,
                const std::string &subsection = "/Quantities");
 
     /**
@@ -100,12 +97,12 @@ namespace ryujin
      * Strang step) and accumulates statistics for quantities of interests
      * for all defined manifolds.
      */
-    void accumulate(const StateVector &state_vector, const Number t);
+    void accumulate(const StateVector<Number> &state_vector, const Number t);
 
     /**
      * Write quantities of interest to designated output files.
      */
-    void write_out(const StateVector &state_vector,
+    void write_out(const StateVector<Number> &state_vector,
                    const Number t,
                    unsigned int cycle);
 

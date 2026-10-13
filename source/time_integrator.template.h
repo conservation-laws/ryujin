@@ -13,39 +13,6 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <typename StateVector, typename Number>
-  void
-  sadd(StateVector &dst, const Number s, const Number b, const StateVector &src)
-  {
-    /* Perform sadd() on the default memory space: */
-
-    using MemorySpace = selected_memory_space_t;
-    using Vectors::StateVectorPart;
-
-    Vectors::copy_to_memory_space<MemorySpace>(
-        src, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
-    Vectors::move_to_memory_space<MemorySpace>(
-        dst, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
-
-    const auto dst_U_view = std::get<0>(dst).template view<MemorySpace>();
-    const auto src_U_view =
-        std::get<0>(std::as_const(src)).template view<MemorySpace>();
-    dst_U_view.zero_out_ghost_values();
-    dst_U_view.sadd(s, b, src_U_view);
-
-    auto &dst_V = std::get<2>(dst);
-    const auto &src_V = std::get<2>(src);
-    AssertDimension(dst_V.size(), src_V.size());
-
-    for (std::size_t k = 0; k < dst_V.size(); ++k) {
-      const auto dst_view = dst_V[k].template view<MemorySpace>();
-      const auto src_view = src_V[k].template view<MemorySpace>();
-      dst_view.zero_out_ghost_values();
-      dst_view.sadd(s, b, src_view);
-    }
-  }
-
-
   template <typename Description, int dim, typename Number>
   TimeIntegrator<Description, dim, Number>::TimeIntegrator(
       const MPIEnsemble &mpi_ensemble,
@@ -250,7 +217,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void TimeIntegrator<Description, dim, Number>::prepare_state_vector(
-      StateVector &state_vector, Number t) const
+      StateVector<Number> &state_vector, Number t) const
   {
     if (!ParabolicSystem::is_identity)
       parabolic_module_->prepare_state_vector(state_vector, t);
@@ -267,7 +234,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step(
-      StateVector &state_vector,
+      StateVector<Number> &state_vector,
       Number t,
       Number t_final /*=std::numeric_limits<Number>::max()*/)
   {
@@ -376,7 +343,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_ssprk_22(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     /* SSP-RK2, see @cite Shu1988, Eq. 2.15. */
 
@@ -395,16 +362,17 @@ namespace ryujin
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
 
     /* Step 2: convex combination: T1 = 1/2 U_old + 1/2 T1 at time t + tau */
-    sadd(temp_[1], Number(1.0 / 2.0), Number(1.0 / 2.0), state_vector);
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 2.0), Number(1.0 / 2.0), state_vector);
 
-    state_vector.swap(temp_[1]);
+    std::swap(state_vector, temp_[1]);
     return tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
@@ -423,23 +391,25 @@ namespace ryujin
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
 
     /* Step 2: convex combination T1 = 3/4 U_old + 1/4 T1 at time t + 0.5*tau */
-    sadd(temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), state_vector);
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), state_vector);
 
     /* Step 3: T0 = T1 + tau L(T1) at time t + 0.5*tau -> t + 1.5*tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
     hyperbolic_module_->template step<0>(temp_[1], {}, {}, temp_[0], tau);
 
     /* Step 3: convex combination: T0 = 1/3 U_old + 2/3 T0 at time t + tau */
-    sadd(temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), state_vector);
+    sadd<selected_memory_space_t>(
+        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), state_vector);
 
-    state_vector.swap(temp_[0]);
+    std::swap(state_vector, temp_[0]);
     return tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_11(
-      StateVector &state_vector, Number /*t*/, Number tau_max)
+      StateVector<Number> &state_vector, Number /*t*/, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
@@ -451,14 +421,14 @@ namespace ryujin
     Number tau = hyperbolic_module_->template step<0>(
         state_vector, {}, {}, temp_[0], Number(0.), tau_max);
 
-    state_vector.swap(temp_[0]);
+    std::swap(state_vector, temp_[0]);
     return tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_22(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
@@ -475,14 +445,14 @@ namespace ryujin
     hyperbolic_module_->template step<1>(
         temp_[0], {{state_vector}}, {{Number(-1.)}}, temp_[1], tau);
 
-    state_vector.swap(temp_[1]);
+    std::swap(state_vector, temp_[1]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_33(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;
@@ -510,14 +480,14 @@ namespace ryujin
                                          temp_[2],
                                          tau);
 
-    state_vector.swap(temp_[2]);
+    std::swap(state_vector, temp_[2]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_43(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;
@@ -550,14 +520,14 @@ namespace ryujin
                                          temp_[3],
                                          tau);
 
-    state_vector.swap(temp_[3]);
+    std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_54(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_54()" << std::endl;
@@ -621,14 +591,14 @@ namespace ryujin
         temp_[4],
         tau);
 
-    state_vector.swap(temp_[4]);
+    std::swap(state_vector, temp_[4]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_strang_ssprk_33_cn(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: avoid code duplication with step_ssprk_33
 
@@ -646,11 +616,13 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
-    sadd(temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ state_vector);
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ state_vector);
 
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
     hyperbolic_module_->template step<0>(temp_[1], {}, {}, temp_[0], tau);
-    sadd(temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ state_vector);
+    sadd<selected_memory_space_t>(
+        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ state_vector);
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
@@ -669,20 +641,22 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 2.0 * tau);
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
-    sadd(temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ temp_[2]);
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ temp_[2]);
 
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.5 * tau);
     hyperbolic_module_->template step<0>(temp_[1], {}, {}, temp_[0], tau);
-    sadd(temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
+    sadd<selected_memory_space_t>(
+        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
 
-    state_vector.swap(temp_[0]);
+    std::swap(state_vector, temp_[0]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_strang_erk_33_cn(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: refactor to avoid code duplication with step_erk_33
 
@@ -736,14 +710,14 @@ namespace ryujin
                                          temp_[2],
                                          tau);
 
-    state_vector.swap(temp_[2]);
+    std::swap(state_vector, temp_[2]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_strang_erk_43_cn(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: refactor to avoid code duplication with step_erk_43
 
@@ -805,14 +779,14 @@ namespace ryujin
                                          temp_[3],
                                          tau);
 
-    state_vector.swap(temp_[3]);
+    std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_imex_11(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_imex_11()" << std::endl;
@@ -828,14 +802,14 @@ namespace ryujin
     parabolic_module_->template backward_euler_step<0>(
         temp_[0], t, {}, {}, temp_[1], 1.0 * tau);
 
-    state_vector.swap(temp_[1]);
+    std::swap(state_vector, temp_[1]);
     return tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_imex_22(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_imex_22()" << std::endl;
@@ -864,14 +838,14 @@ namespace ryujin
                                                        temp_[3],
                                                        tau);
 
-    state_vector.swap(temp_[3]);
+    std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
   }
 
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_imex_33(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_imex_33()" << std::endl;
@@ -932,7 +906,7 @@ namespace ryujin
         temp_[5],
         tau);
 
-    state_vector.swap(temp_[5]);
+    std::swap(state_vector, temp_[5]);
     return efficiency_ * tau;
   }
 

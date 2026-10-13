@@ -49,10 +49,6 @@ namespace ryujin
 
     using precomputed_type = typename View::precomputed_type;
 
-    using StateVector = typename View::StateVector;
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarVector = Vectors::ScalarVector<Number>;
-
     //@}
     /**
      * @name Constructor and setup
@@ -67,9 +63,9 @@ namespace ryujin
               const HyperbolicSystem &hyperbolic_system,
               const ParabolicSystem &parabolic_system,
               const Postprocessor<Description, dim, Number> &postprocessor,
-              const InitialPrecomputedVector &initial_precomputed,
-              const ScalarVector &alpha,
-              const ScalarVector &smoothness_indicators,
+              const MultiComponentVector<Number> &initial_precomputed,
+              const ScalarVector<Number> &alpha,
+              const ScalarVector<Number> &smoothness_indicators,
               const std::string &subsection = "/VTUOutput");
 
     /**
@@ -104,7 +100,7 @@ namespace ryujin
      *
      * The function requires MPI communication and is not reentrant.
      */
-    void schedule_output(const StateVector &state_vector,
+    void schedule_output(const StateVector<Number> &state_vector,
                          std::string name,
                          Number t,
                          unsigned int cycle,

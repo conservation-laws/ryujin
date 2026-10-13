@@ -24,7 +24,7 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
-      const InitialPrecomputedVector &initial_precomputed,
+      const MultiComponentVector<Number> &initial_precomputed,
       const std::string &subsection /*= "ErrorEvaluation"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -104,7 +104,8 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   std::vector<Number> ErrorEvaluation<Description, dim, Number>::compute(
-      const StateVector &state_vector, const StateVector &analytic) const
+      const StateVector<Number> &state_vector,
+      const StateVector<Number> &analytic) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "ErrorEvaluation<dim, Number>::compute()" << std::endl;
@@ -117,7 +118,7 @@ namespace ryujin
         discretization.triangulation().n_active_cells());
 
     /* Compute the selected norm of a scalar vector: */
-    const auto compute_norm = [&](const ScalarHostVector &vector,
+    const auto compute_norm = [&](const ScalarHostVector<Number> &vector,
                                   const std::string &norm) -> Number {
       if (norm == "Linf")
         return vector.linfty_norm();
@@ -184,8 +185,8 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void ErrorEvaluation<Description, dim, Number>::write_out(
-      const StateVector &state_vector,
-      const StateVector &analytic,
+      const StateVector<Number> &state_vector,
+      const StateVector<Number> &analytic,
       const Number t) const
   {
 #ifdef DEBUG_OUTPUT

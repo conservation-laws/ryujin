@@ -70,25 +70,31 @@ int main(int argc, char *argv[])
    * policy so that we can create views on both memory spaces.
    */
 
-  typename SystemView::StateVector state_vector;
+  StateVector<Number> state_vector;
   auto &[U, precomputed, parabolic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
+                                   SystemView::problem_dimension,
                                    TransferPolicy::implicit_transfers);
   precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner, TransferPolicy::implicit_transfers);
+      scalar_partitioner,
+      SystemView::n_precomputed_values,
+      TransferPolicy::implicit_transfers);
 
-  typename SystemView::InitialPrecomputedVector initial_precomputed;
+  MultiComponentVector<Number> initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner, TransferPolicy::implicit_transfers);
+      scalar_partitioner,
+      SystemView::n_initial_precomputed_values,
+      TransferPolicy::implicit_transfers);
 
-  Vectors::ScalarVector<Number> alpha;
-  alpha.reinit_with_scalar_partitioner(scalar_partitioner,
-                                       TransferPolicy::implicit_transfers);
+  ScalarVector<Number> alpha;
+  alpha.reinit_with_scalar_partitioner(
+      scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 
   {
-    const auto U_view = U.view();
-    const auto precomputed_view = precomputed.view();
-    const auto alpha_view = alpha.view();
+    const auto U_view = U.view<SystemView::problem_dimension>();
+    const auto precomputed_view =
+        precomputed.view<SystemView::n_precomputed_values>();
+    const auto alpha_view = alpha.view<1>();
 
     for (unsigned int i = 0; i < n_owned; ++i) {
       /* Use the global dof index so that the values are rank independent: */
@@ -136,7 +142,7 @@ int main(int argc, char *argv[])
   extractor.prepare_extraction<DefaultSpace>(state_vector);
   const auto device_components = extractor.view<DefaultSpace>().extract();
 
-  Vectors::ScalarHostVector<Number> temp;
+  ScalarHostVector<Number> temp;
   temp.reinit(scalar_partitioner);
 
   std::cout << "n_locally_owned = " << n_owned << "\n";

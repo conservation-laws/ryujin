@@ -58,10 +58,6 @@ namespace ryujin
 
     using initial_precomputed_type = typename View::initial_precomputed_type;
 
-    using HyperbolicVector = typename View::HyperbolicVector;
-
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -121,13 +117,14 @@ namespace ryujin
      * This routine computes and returns a hyperbolic state vector
      * populated with initial values for a specified time @p t.
      */
-    HyperbolicVector interpolate_hyperbolic_vector(Number t = 0) const;
+    MultiComponentVector<Number>
+    interpolate_hyperbolic_vector(Number t = 0) const;
 
     /**
      * This routine computes and returns a vector populated with the
      * precomputed initial values returned by initial_precomputed().
      */
-    InitialPrecomputedVector interpolate_initial_precomputed_vector() const;
+    MultiComponentVector<Number> interpolate_initial_precomputed_vector() const;
 
   private:
     //@}

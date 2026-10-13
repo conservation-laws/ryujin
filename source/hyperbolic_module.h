@@ -137,11 +137,10 @@ namespace ryujin
 
     using precomputed_type = typename View::precomputed_type;
 
+    static constexpr auto n_initial_precomputed_values =
+        View::n_initial_precomputed_values;
+
     using initial_precomputed_type = typename View::initial_precomputed_type;
-
-    using StateVector = typename View::StateVector;
-
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
     //@}
     /**
@@ -178,7 +177,7 @@ namespace ryujin
      *
      * @note This routine does not modify the parabolic state vector component.
      */
-    void reinit_state_vector(StateVector &state_vector) const;
+    void reinit_state_vector(StateVector<Number> &state_vector) const;
 
     /**
      * This function preprocesses a given state vector @p U in preparation
@@ -195,7 +194,8 @@ namespace ryujin
      *    distributes the result over all MPI ranks by updating ghost
      *    ranges of the precomputed values vector.
      */
-    void prepare_state_vector(StateVector &state_vector, Number t) const;
+    void prepare_state_vector(StateVector<Number> &state_vector,
+                              Number t) const;
 
     /**
      * Given a reference to a previous state vector @p old_U perform an
@@ -260,11 +260,11 @@ namespace ryujin
      * prior to calling the step function.
      */
     template <int stages>
-    Number step(const StateVector &old_state_vector,
-                std::array<std::reference_wrapper<const StateVector>, stages>
-                    stage_state_vectors,
+    Number step(const StateVector<Number> &old_state_vector,
+                std::array<std::reference_wrapper<const StateVector<Number>>,
+                           stages> stage_state_vectors,
                 const std::array<Number, stages> stage_weights,
-                StateVector &new_state_vector,
+                StateVector<Number> &new_state_vector,
                 Number tau = Number(0.),
                 Number tau_max = std::numeric_limits<Number>::max()) const;
 
@@ -372,9 +372,6 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicVector =
-        Vectors::MultiComponentVector<Number, problem_dimension>;
-
     /**
      * Update all boundary values of the hyperbolic state vector component
      * @p U for the supplied time @p t.
@@ -389,7 +386,8 @@ namespace ryujin
      * @note The function does not update ghost values.
      */
     template <typename MemorySpace>
-    void apply_boundary_conditions(HyperbolicVector &U, const Number t) const;
+    void apply_boundary_conditions(MultiComponentVector<Number> &U,
+                                   const Number t) const;
 
     //@}
     /**
@@ -424,17 +422,16 @@ namespace ryujin
     mutable unsigned int n_corrections_;
     mutable unsigned int n_warnings_;
 
-    InitialPrecomputedVector initial_precomputed_;
+    MultiComponentVector<Number> initial_precomputed_;
 
-    using ScalarVector = typename Vectors::ScalarVector<Number>;
-    mutable ScalarVector alpha_;
+    mutable ScalarVector<Number> alpha_;
 
     static constexpr auto n_bounds =
         decltype(std::declval<const Limiter &>()
                      .template view<dim, Number>())::n_bounds;
-    mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
+    mutable MultiComponentVector<Number> bounds_;
 
-    mutable HyperbolicVector r_;
+    mutable MultiComponentVector<Number> r_;
 
     /*
      * A compact buffer holding all boundary states of the hyperbolic state

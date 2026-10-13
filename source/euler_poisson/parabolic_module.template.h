@@ -240,7 +240,7 @@ namespace ryujin
 
     template <typename Description, int dim, typename Number>
     void ParabolicModule<Description, dim, Number>::reinit_state_vector(
-        StateVector &state_vector) const
+        StateVector<Number> &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::reinit_state_vector()"
@@ -251,14 +251,14 @@ namespace ryujin
       V.resize(1);
 
       const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
-      V[0].reinit_with_scalar_partitioner(partitioner);
+      V[0].reinit_with_scalar_partitioner(partitioner, 1);
       V[0].deal_ii_vector() = 0.;
     }
 
 
     template <typename Description, int dim, typename Number>
     void ParabolicModule<Description, dim, Number>::prepare_state_vector(
-        StateVector &state_vector, Number t) const
+        StateVector<Number> &state_vector, Number t) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare_state_vector()"
@@ -293,12 +293,12 @@ namespace ryujin
     template <typename Description, int dim, typename Number>
     template <int stages>
     void ParabolicModule<Description, dim, Number>::backward_euler_step(
-        const StateVector &old_state_vector,
+        const StateVector<Number> &old_state_vector,
         const Number old_t,
-        std::array<std::reference_wrapper<const StateVector>,
+        std::array<std::reference_wrapper<const StateVector<Number>>,
                    stages> /*stage_state_vectors*/,
         const std::array<Number, stages> /*stage_weights*/,
-        StateVector &new_state_vector,
+        StateVector<Number> &new_state_vector,
         Number tau) const
     {
       step(old_state_vector,
@@ -311,9 +311,9 @@ namespace ryujin
 
     template <typename Description, int dim, typename Number>
     void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
-        const StateVector &old_state_vector,
+        const StateVector<Number> &old_state_vector,
         const Number old_t,
-        StateVector &new_state_vector,
+        StateVector<Number> &new_state_vector,
         Number tau) const
     {
       try {
@@ -520,22 +520,21 @@ namespace ryujin
 
     template <typename Description, int dim, typename Number>
     void ParabolicModule<Description, dim, Number>::compute_potential(
-        const Number t, StateVector &state_vector) const
+        const Number t, StateVector<Number> &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::compute_potential()"
                 << std::endl;
 #endif
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
-                                               StateVectorPart::hyperbolic);
-      Vectors::move_to_memory_space<HostSpace>(state_vector,
-                                               StateVectorPart::parabolic);
+      copy_to_memory_space<HostSpace>(std::as_const(state_vector),
+                                      StateVectorPart::hyperbolic);
+      move_to_memory_space<HostSpace>(state_vector, StateVectorPart::parabolic);
 
-      const auto U_view = std::as_const(std::get<0>(state_vector)).view();
-      auto &V = std::get<2>(state_vector);
+      const auto U_view =
+          std::as_const(state_vector).U.template view<problem_dimension>();
+      auto &V = state_vector.V;
       auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -600,7 +599,8 @@ namespace ryujin
         }
       };
 
-      matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
+      matrix_free_.template cell_loop<ScalarHostVector<Number>,
+                                      ScalarHostVector<Number>>(
           body_matrix_free,
           potential_rhs_,
           density_,
@@ -620,11 +620,13 @@ namespace ryujin
                                   : potential_rhs_.l2_norm()) *
           tolerance_;
 
-      typename dealii::SolverCG<ScalarHostVector>::AdditionalData solver_data;
+      typename dealii::SolverCG<ScalarHostVector<Number>>::AdditionalData
+          solver_data;
 
       try {
         SolverControl solver_control(gmg_max_iter_, tolerance);
-        dealii::SolverCG<ScalarHostVector> solver(solver_control, solver_data);
+        dealii::SolverCG<ScalarHostVector<Number>> solver(solver_control,
+                                                          solver_data);
         solver.solve(laplace_operator_,
                      potential,
                      potential_rhs_,
@@ -641,7 +643,8 @@ namespace ryujin
 
       } catch (SolverControl::NoConvergence &) {
         SolverControl solver_control(1000, tolerance);
-        dealii::SolverCG<ScalarHostVector> solver(solver_control, solver_data);
+        dealii::SolverCG<ScalarHostVector<Number>> solver(solver_control,
+                                                          solver_data);
 
         solver.solve(laplace_operator_,
                      potential,
@@ -667,7 +670,7 @@ namespace ryujin
     template <typename Description, int dim, typename Number>
     void
     ParabolicModule<Description, dim, Number>::enforce_magnetic_drift_velocity(
-        StateVector &state_vector) const
+        StateVector<Number> &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout
@@ -676,21 +679,20 @@ namespace ryujin
 #endif
 
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::move_to_memory_space<HostSpace>(state_vector,
-                                               StateVectorPart::hyperbolic);
-      Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
-                                               StateVectorPart::parabolic);
+      move_to_memory_space<HostSpace>(state_vector,
+                                      StateVectorPart::hyperbolic);
+      copy_to_memory_space<HostSpace>(std::as_const(state_vector),
+                                      StateVectorPart::parabolic);
 
-      const auto U_view = std::get<0>(state_vector).view();
-      const auto &V = std::get<2>(std::as_const(state_vector));
+      const auto U_view = state_vector.U.template view<problem_dimension>();
+      const auto &V = std::as_const(state_vector).V;
       const auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
       const auto lumped_mass_matrix_inverse_view =
-          offline_data_->lumped_mass_matrix_inverse().view();
+          offline_data_->lumped_mass_matrix_inverse().template view<1>();
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -724,11 +726,12 @@ namespace ryujin
             }
           };
 
-      matrix_free_.template cell_loop<BlockHostVector, ScalarHostVector>(
-          body_velocity,
-          velocity_rhs_,
-          potential,
-          /*zero destination*/ true);
+      matrix_free_
+          .template cell_loop<BlockHostVector, ScalarHostVector<Number>>(
+              body_velocity,
+              velocity_rhs_,
+              potential,
+              /*zero destination*/ true);
 
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -779,9 +782,9 @@ namespace ryujin
 
     template <typename Description, int dim, typename Number>
     void ParabolicModule<Description, dim, Number>::step(
-        const StateVector &old_state_vector,
+        const StateVector<Number> &old_state_vector,
         const Number t,
-        StateVector &new_state_vector,
+        StateVector<Number> &new_state_vector,
         Number tau [[maybe_unused]],
         const bool crank_nicolson_extrapolation [[maybe_unused]]) const
     {
@@ -795,27 +798,26 @@ namespace ryujin
       const Number alpha = parabolic_system_->alpha();
 
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::copy_to_memory_space<HostSpace>(old_state_vector,
-                                               StateVectorPart::hyperbolic,
-                                               StateVectorPart::parabolic);
-      Vectors::move_to_memory_space<HostSpace>(new_state_vector,
-                                               StateVectorPart::parabolic);
+      copy_to_memory_space<HostSpace>(old_state_vector,
+                                      StateVectorPart::hyperbolic,
+                                      StateVectorPart::parabolic);
+      move_to_memory_space<HostSpace>(new_state_vector,
+                                      StateVectorPart::parabolic);
 
-      const auto &old_U = std::get<0>(old_state_vector);
-      const auto old_U_view = old_U.view();
-      const auto &old_V = std::get<2>(old_state_vector);
+      const auto &old_U = old_state_vector.U;
+      const auto old_U_view = old_U.template view<problem_dimension>();
+      const auto &old_V = old_state_vector.V;
       const auto &old_potential = old_V[0].deal_ii_vector();
 
-      auto &new_U = std::get<0>(new_state_vector);
-      auto &new_V = std::get<2>(new_state_vector);
+      auto &new_U = new_state_vector.U;
+      auto &new_V = new_state_vector.V;
       auto &new_potential = new_V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
       const auto lumped_mass_matrix_inverse_view =
-          offline_data_->lumped_mass_matrix_inverse().view();
+          offline_data_->lumped_mass_matrix_inverse().template view<1>();
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -909,7 +911,8 @@ namespace ryujin
           }
         };
 
-        matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
+        matrix_free_.template cell_loop<ScalarHostVector<Number>,
+                                        ScalarHostVector<Number>>(
             body_laplace,
             potential_rhs_,
             old_potential,
@@ -945,11 +948,12 @@ namespace ryujin
           }
         };
 
-        matrix_free_.template cell_loop<ScalarHostVector, BlockHostVector>(
-            body_velocity,
-            potential_rhs_,
-            velocity_rhs_,
-            /*zero destination*/ false);
+        matrix_free_
+            .template cell_loop<ScalarHostVector<Number>, BlockHostVector>(
+                body_velocity,
+                potential_rhs_,
+                velocity_rhs_,
+                /*zero destination*/ false);
 
         /* Time-dependent background density: */
 
@@ -985,7 +989,8 @@ namespace ryujin
             }
           };
 
-          matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
+          matrix_free_.template cell_loop<ScalarHostVector<Number>,
+                                          ScalarHostVector<Number>>(
               body,
               potential_rhs_,
               background_density_,
@@ -1000,7 +1005,8 @@ namespace ryujin
 
           factor *= -1.;
 
-          matrix_free_.template cell_loop<ScalarHostVector, ScalarHostVector>(
+          matrix_free_.template cell_loop<ScalarHostVector<Number>,
+                                          ScalarHostVector<Number>>(
               body,
               potential_rhs_,
               background_density_,
@@ -1024,12 +1030,13 @@ namespace ryujin
                                     : potential_rhs_.l2_norm()) *
             tolerance_;
 
-        typename dealii::SolverCG<ScalarHostVector>::AdditionalData solver_data;
+        typename dealii::SolverCG<ScalarHostVector<Number>>::AdditionalData
+            solver_data;
 
         try {
           SolverControl solver_control(gmg_max_iter_, tolerance);
-          dealii::SolverCG<ScalarHostVector> solver(solver_control,
-                                                    solver_data);
+          dealii::SolverCG<ScalarHostVector<Number>> solver(solver_control,
+                                                            solver_data);
           solver.solve(update_operator_,
                        new_potential,
                        potential_rhs_,
@@ -1041,8 +1048,8 @@ namespace ryujin
 
         } catch (SolverControl::NoConvergence &) {
           SolverControl solver_control(1000, tolerance);
-          dealii::SolverCG<ScalarHostVector> solver(solver_control,
-                                                    solver_data);
+          dealii::SolverCG<ScalarHostVector<Number>> solver(solver_control,
+                                                            solver_data);
 
           solver.solve(update_operator_,
                        new_potential,
@@ -1085,11 +1092,12 @@ namespace ryujin
             }
           };
 
-      matrix_free_.template cell_loop<BlockHostVector, ScalarHostVector>(
-          body_velocity,
-          velocity_rhs_,
-          new_potential,
-          /*zero destination*/ true);
+      matrix_free_
+          .template cell_loop<BlockHostVector, ScalarHostVector<Number>>(
+              body_velocity,
+              velocity_rhs_,
+              new_potential,
+              /*zero destination*/ true);
 
       /*
        * Now that we have written out the gradients, copy over the old
@@ -1098,8 +1106,8 @@ namespace ryujin
        */
 
       new_U = old_U;
-      Vectors::move_to_memory_space<HostSpace>(new_U); /* invalidates default */
-      const auto new_U_view = new_U.view();
+      move_to_memory_space<HostSpace>(new_U); /* invalidates default */
+      const auto new_U_view = new_U.template view<problem_dimension>();
 
       if (crank_nicolson_extrapolation) {
         new_potential *= Number(2.);

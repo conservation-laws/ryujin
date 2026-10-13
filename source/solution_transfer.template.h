@@ -78,7 +78,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::prepare_projection(
-      const StateVector &old_state_vector [[maybe_unused]])
+      const StateVector<Number> &old_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
     std::cout
@@ -86,10 +86,10 @@ namespace ryujin
         << std::endl;
 #endif
 
-    Vectors::copy_to_memory_space<dealii::MemorySpace::Host>(
+    copy_to_memory_space<dealii::MemorySpace::Host>(
         old_state_vector,
-        Vectors::StateVectorPart::hyperbolic,
-        Vectors::StateVectorPart::precomputed);
+        StateVectorPart::hyperbolic,
+        StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -116,9 +116,11 @@ namespace ryujin
 
           const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-          const auto &U = std::get<0>(old_state_vector);
+          const auto &U = old_state_vector.U;
           /* precomputed needs to be valid for bounds computation */
-          const auto precomputed_view = std::get<1>(old_state_vector).view();
+          const auto precomputed_view =
+              old_state_vector.precomputed
+                  .template view<n_precomputed_values>();
 
           const auto limiter_view = limiter_.template view<dim, Number>();
 
@@ -386,17 +388,17 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::project(
-      StateVector &new_state_vector [[maybe_unused]])
+      StateVector<Number> &new_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "SolutionTransfer<Description, dim, Number>::project()"
               << std::endl;
 #endif
 
-    Vectors::move_to_memory_space<dealii::MemorySpace::Host>(
+    move_to_memory_space<dealii::MemorySpace::Host>(
         new_state_vector,
-        Vectors::StateVectorPart::hyperbolic,
-        Vectors::StateVectorPart::precomputed);
+        StateVectorPart::hyperbolic,
+        StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -411,12 +413,11 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    ScalarHostVector projected_mass;
+    ScalarHostVector<Number> projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
-    HyperbolicVector projected_state;
+    MultiComponentVector<Number> projected_state;
     projected_state.reinit_with_vector_partitioner(
-        offline_data_->hyperbolic_vector_partitioner());
+        offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
 
     /*
      * We only need to construct entries in a pik_matrix for a small subset
@@ -428,7 +429,7 @@ namespace ryujin
         pik_matrix;
     std::map<unsigned int /*i*/, Bounds> bounds_map;
 
-    ScalarHostVector kappa;
+    ScalarHostVector<Number> kappa;
     kappa.reinit(offline_data_->scalar_partitioner());
 
     /*
@@ -634,7 +635,8 @@ namespace ryujin
           }
         });
 
-    const auto projected_state_view = projected_state.view();
+    const auto projected_state_view =
+        projected_state.template view<problem_dimension>();
 
     projected_mass.compress(dealii::VectorOperation::add);
     projected_state_view.compress(dealii::VectorOperation::add);
@@ -653,7 +655,8 @@ namespace ryujin
      * -----------------------------------------------------------------------
      */
 
-    const auto new_U_view = std::get<0>(new_state_vector).view();
+    const auto new_U_view =
+        new_state_vector.U.template view<problem_dimension>();
 
     /*
      * A small lambda that takes the weighted average of all degrees of
@@ -680,7 +683,8 @@ namespace ryujin
 
     update_new_state_vector();
 
-    const auto precomputed_view = std::get<1>(new_state_vector).view();
+    const auto precomputed_view =
+        new_state_vector.precomputed.template view<n_precomputed_values>();
 
     /* The limiter requires valid precomputed values. Therefore, update: */
     const auto update_precomputed_values = [&]() {
@@ -865,13 +869,13 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE auto
   SolutionTransfer<Description, dim, Number>::read_tensor(
-      const HyperbolicVector &U, const dealii::types::global_dof_index global_i)
-      -> state_type
+      const MultiComponentVector<Number> &U,
+      const dealii::types::global_dof_index global_i) -> state_type
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto local_i = scalar_partitioner->global_to_local(global_i);
-    const auto U_view = U.view();
+    const auto U_view = U.template view<problem_dimension>();
     if (affine_constraints.is_constrained(global_i)) {
       state_type result;
       const auto &line = *affine_constraints.get_constraint_entries(global_i);
@@ -889,12 +893,12 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE void
   SolutionTransfer<Description, dim, Number>::add_tensor(
-      HyperbolicVector &U,
+      MultiComponentVector<Number> &U,
       const state_type &new_U_i,
       const dealii::types::global_dof_index global_i)
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto local_i = scalar_partitioner->global_to_local(global_i);
-    U.view().add_tensor(new_U_i, local_i);
+    U.template view<problem_dimension>().add_tensor(new_U_i, local_i);
   }
 } // namespace ryujin

@@ -107,16 +107,16 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void Postprocessor<Description, dim, Number>::compute(
-      const StateVector &state_vector) const
+      const StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
 
-    Vectors::copy_to_memory_space<dealii::MemorySpace::Host>(
-        state_vector, Vectors::StateVectorPart::hyperbolic);
+    copy_to_memory_space<dealii::MemorySpace::Host>(
+        state_vector, StateVectorPart::hyperbolic);
 
-    const auto U_view = std::get<0>(state_vector).view();
+    const auto U_view = state_vector.U.template view<problem_dimension>();
 
     using VA = dealii::VectorizedArray<Number>;
 
@@ -125,7 +125,7 @@ namespace ryujin
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
     const auto lumped_mass_matrix_view =
-        offline_data_->lumped_mass_matrix().view();
+        offline_data_->lumped_mass_matrix().template view<1>();
     const auto cij_matrix_view = offline_data_->cij_matrix().view();
 
     const unsigned int n_internal = offline_data_->n_locally_internal();

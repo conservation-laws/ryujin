@@ -54,10 +54,10 @@ constexpr std::size_t n_selected = 8;
  * freedom with extract_element() and store the result in a
  * (component-wise) host vector.
  */
-template <typename MemorySpace, typename Extractor, typename StateVector>
-std::vector<Vectors::ScalarHostVector<Number>>
+template <typename MemorySpace, typename Extractor>
+std::vector<ScalarHostVector<Number>>
 extract_element_wise(const Extractor &extractor,
-                     const StateVector &state_vector,
+                     const StateVector<Number> &state_vector,
                      const OfflineData<dim, Number> &offline_data)
 {
   const unsigned int n_internal = offline_data.n_locally_internal();
@@ -88,7 +88,7 @@ extract_element_wise(const Extractor &extractor,
 
   const auto *result = std::as_const(scratch).template view<HostSpace>();
 
-  std::vector<Vectors::ScalarHostVector<Number>> extracted(n_selected);
+  std::vector<ScalarHostVector<Number>> extracted(n_selected);
   for (unsigned int k = 0; k < n_selected; ++k) {
     extracted[k].reinit(offline_data.scalar_partitioner());
     for (unsigned int i = 0; i < n_owned; ++i)
@@ -135,25 +135,31 @@ int main(int argc, char *argv[])
    * policy so that we can create views on both memory spaces.
    */
 
-  typename SystemView::StateVector state_vector;
+  StateVector<Number> state_vector;
   auto &[U, precomputed, parabolic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
+                                   SystemView::problem_dimension,
                                    TransferPolicy::implicit_transfers);
   precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner, TransferPolicy::implicit_transfers);
+      scalar_partitioner,
+      SystemView::n_precomputed_values,
+      TransferPolicy::implicit_transfers);
 
-  typename SystemView::InitialPrecomputedVector initial_precomputed;
+  MultiComponentVector<Number> initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner, TransferPolicy::implicit_transfers);
+      scalar_partitioner,
+      SystemView::n_initial_precomputed_values,
+      TransferPolicy::implicit_transfers);
 
-  Vectors::ScalarVector<Number> alpha;
-  alpha.reinit_with_scalar_partitioner(scalar_partitioner,
-                                       TransferPolicy::implicit_transfers);
+  ScalarVector<Number> alpha;
+  alpha.reinit_with_scalar_partitioner(
+      scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 
   {
-    const auto U_view = U.view();
-    const auto precomputed_view = precomputed.view();
-    const auto alpha_view = alpha.view();
+    const auto U_view = U.view<SystemView::problem_dimension>();
+    const auto precomputed_view =
+        precomputed.view<SystemView::n_precomputed_values>();
+    const auto alpha_view = alpha.view<1>();
 
     for (unsigned int i = 0; i < n_owned; ++i) {
       /* Use the global dof index so that the values are rank independent: */

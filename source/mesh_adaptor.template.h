@@ -24,8 +24,8 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
-      const InitialPrecomputedVector &initial_precomputed,
-      const ScalarVector &alpha,
+      const MultiComponentVector<Number> &initial_precomputed,
+      const ScalarVector<Number> &alpha,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -190,7 +190,9 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::analyze(
-      const StateVector &state_vector, const Number t, unsigned int cycle)
+      const StateVector<Number> &state_vector,
+      const Number t,
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MeshAdaptor<dim, Number>::analyze()" << std::endl;
@@ -279,7 +281,8 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    const auto smoothness_indicators_view = smoothness_indicators_.view();
+    const auto smoothness_indicators_view =
+        smoothness_indicators_.template view<1>();
 
     const auto &dof_handler = offline_data_->dof_handler();
     for (const auto &cell : dof_handler.active_cell_iterators()) {
@@ -418,7 +421,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators(
-      const StateVector &state_vector) const
+      const StateVector<Number> &state_vector) const
   {
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
@@ -448,13 +451,12 @@ namespace ryujin
     const unsigned int n_entries = quantities.size();
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
     /*
      * Ensure we have at least one entry in numerator and denominator
      * available. We use those for temporary storage.
      */
-    std::vector<ScalarHostVector> numerator(std::max(1u, n_entries));
-    std::vector<ScalarHostVector> denominator(std::max(1u, n_entries));
+    std::vector<ScalarHostVector<Number>> numerator(std::max(1u, n_entries));
+    std::vector<ScalarHostVector<Number>> denominator(std::max(1u, n_entries));
     for (auto &it : numerator)
       it.reinit(scalar_partitioner);
     for (auto &it : denominator)
@@ -598,8 +600,10 @@ namespace ryujin
      * Insert result into smoothness_indicators_:
      */
 
-    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
-    const auto smoothness_indicators_view = smoothness_indicators_.view();
+    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner,
+                                                          1);
+    const auto smoothness_indicators_view =
+        smoothness_indicators_.template view<1>();
     smoothness_indicators_view.insert_component(numerator[0], 0);
     smoothness_indicators_view.update_ghost_values();
   }

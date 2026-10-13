@@ -21,11 +21,11 @@ int main(int argc, char *argv[])
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
   const auto vector_partitioner =
-      ryujin::Vectors::create_vector_partitioner(scalar_partitioner, 4);
+      ryujin::create_vector_partitioner(scalar_partitioner, 4);
 
-  ryujin::Vectors::MultiComponentVector<double, 4> state_vector;
+  ryujin::MultiComponentVector<double> state_vector;
 
-  state_vector.reinit_with_vector_partitioner(vector_partitioner);
+  state_vector.reinit_with_vector_partitioner(vector_partitioner, 4);
 
   using HostSpace = dealii::MemorySpace::Host;
   using DefaultSpace = dealii::MemorySpace::Default;
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.view().write_tensor<double>(tensor, i);
+    state_vector.view<4>().write_tensor<double>(tensor, i);
   }
 
   const auto print = [](const auto &vector) {
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
   scaled.reinit(scalar_partitioner);
 
   {
-    const auto view = state_vector.view<HostSpace>();
+    const auto view = state_vector.view<4, HostSpace>();
     view.extract_component(component, 2);
     view.extract_component(scaled, 1, times_two);
   }
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
   device_scaled.reinit(scalar_partitioner);
 
   {
-    const auto view = state_vector.view<DefaultSpace>();
+    const auto view = state_vector.view<4, DefaultSpace>();
     view.extract_component(device_component, 2);
     view.extract_component(device_scaled, 1, times_two);
   }

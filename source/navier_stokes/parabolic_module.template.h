@@ -222,7 +222,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     void ParabolicModule<dim, Number>::prepare_state_vector(
-        StateVector & /*state_vector*/, Number /*t*/) const
+        StateVector<Number> & /*state_vector*/, Number /*t*/) const
     {
       /*
        * There is no parabolic part of the state vector for Navier-Stokes,
@@ -234,12 +234,12 @@ namespace ryujin
     template <int dim, typename Number>
     template <int stages>
     void ParabolicModule<dim, Number>::backward_euler_step(
-        const StateVector &old_state_vector,
+        const StateVector<Number> &old_state_vector,
         const Number old_t,
-        std::array<std::reference_wrapper<const StateVector>,
+        std::array<std::reference_wrapper<const StateVector<Number>>,
                    stages> /*stage_state_vectors*/,
         const std::array<Number, stages> /*stage_weights*/,
-        StateVector &new_state_vector,
+        StateVector<Number> &new_state_vector,
         Number tau) const
     {
       /* Backward Euler step to half time step, and extrapolate: */
@@ -254,9 +254,9 @@ namespace ryujin
 
     template <int dim, typename Number>
     void ParabolicModule<dim, Number>::crank_nicolson_step(
-        const StateVector &old_state_vector,
+        const StateVector<Number> &old_state_vector,
         const Number old_t,
-        StateVector &new_state_vector,
+        StateVector<Number> &new_state_vector,
         Number tau) const
     {
       try {
@@ -300,9 +300,9 @@ namespace ryujin
 
     template <int dim, typename Number>
     void ParabolicModule<dim, Number>::step(
-        const StateVector &old_state_vector,
+        const StateVector<Number> &old_state_vector,
         const Number t,
-        StateVector &new_state_vector,
+        StateVector<Number> &new_state_vector,
         Number tau,
         const bool crank_nicolson_extrapolation) const
     {
@@ -312,18 +312,19 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::copy_to_memory_space<HostSpace>(old_state_vector,
-                                               StateVectorPart::hyperbolic);
-      Vectors::move_to_memory_space<HostSpace>(new_state_vector,
-                                               StateVectorPart::hyperbolic);
+      copy_to_memory_space<HostSpace>(old_state_vector,
+                                      StateVectorPart::hyperbolic);
+      move_to_memory_space<HostSpace>(new_state_vector,
+                                      StateVectorPart::hyperbolic);
 
-      const auto old_U_view = std::get<0>(old_state_vector).view();
-      const auto new_U_view = std::get<0>(new_state_vector).view();
+      const auto old_U_view =
+          old_state_vector.U.template view<problem_dimension>();
+      const auto new_U_view =
+          new_state_vector.U.template view<problem_dimension>();
 
       const auto lumped_mass_matrix_view =
-          offline_data_->lumped_mass_matrix().view();
+          offline_data_->lumped_mass_matrix().template view<1>();
       const auto &affine_constraints = offline_data_->affine_constraints();
 
       /* Index ranges for the iteration over the sparsity pattern : */
@@ -623,52 +624,54 @@ namespace ryujin
         ComputingTimer::Scope scope("time step [P] 2 - update internal energy");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
-        matrix_free_.template cell_loop<ScalarHostVector, BlockHostVector>(
-            [this](const auto &data,
-                   auto &dst,
-                   const auto &src,
-                   const auto cell_range) {
-              FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
-                  data);
-              FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
+        matrix_free_
+            .template cell_loop<ScalarHostVector<Number>, BlockHostVector>(
+                [this](const auto &data,
+                       auto &dst,
+                       const auto &src,
+                       const auto cell_range) {
+                  FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
+                      data);
+                  FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
+                      data);
 
-              const auto mu = parabolic_system_->mu();
-              const auto lambda = parabolic_system_->lambda();
+                  const auto mu = parabolic_system_->mu();
+                  const auto lambda = parabolic_system_->lambda();
 
-              for (unsigned int cell = cell_range.first;
-                   cell < cell_range.second;
-                   ++cell) {
-                velocity.reinit(cell);
-                energy.reinit(cell);
-                velocity.gather_evaluate(src, EvaluationFlags::gradients);
+                  for (unsigned int cell = cell_range.first;
+                       cell < cell_range.second;
+                       ++cell) {
+                    velocity.reinit(cell);
+                    energy.reinit(cell);
+                    velocity.gather_evaluate(src, EvaluationFlags::gradients);
 
-                for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
-                  if constexpr (dim == 1) {
-                    /* Workaround: no symmetric gradient for dim == 1: */
-                    const auto gradient = velocity.get_gradient(q);
-                    auto S = (4. / 3. * mu + lambda) * gradient;
-                    energy.submit_value(gradient * S, q);
+                    for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+                      if constexpr (dim == 1) {
+                        /* Workaround: no symmetric gradient for dim == 1: */
+                        const auto gradient = velocity.get_gradient(q);
+                        auto S = (4. / 3. * mu + lambda) * gradient;
+                        energy.submit_value(gradient * S, q);
 
-                  } else {
+                      } else {
 
-                    const auto symmetric_gradient =
-                        velocity.get_symmetric_gradient(q);
-                    const auto divergence = trace(symmetric_gradient);
-                    auto S = 2. * mu * symmetric_gradient;
-                    for (unsigned int d = 0; d < dim; ++d)
-                      S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-                    energy.submit_value(symmetric_gradient * S, q);
+                        const auto symmetric_gradient =
+                            velocity.get_symmetric_gradient(q);
+                        const auto divergence = trace(symmetric_gradient);
+                        auto S = 2. * mu * symmetric_gradient;
+                        for (unsigned int d = 0; d < dim; ++d)
+                          S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+                        energy.submit_value(symmetric_gradient * S, q);
+                      }
+                    }
+                    energy.integrate_scatter(EvaluationFlags::values, dst);
                   }
-                }
-                energy.integrate_scatter(EvaluationFlags::values, dst);
-              }
-            },
-            internal_energy_rhs_,
-            velocity_,
-            /* zero destination */ true);
+                },
+                internal_energy_rhs_,
+                velocity_,
+                /* zero destination */ true);
 
         const auto lumped_mass_matrix_view =
-            offline_data_->lumped_mass_matrix().view();
+            offline_data_->lumped_mass_matrix().template view<1>();
 
         const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
@@ -824,7 +827,7 @@ namespace ryujin
 
           SolverControl solver_control(gmg_max_iter_en_,
                                        tolerance_internal_energy);
-          SolverCG<ScalarHostVector> solver(solver_control);
+          SolverCG<ScalarHostVector<Number>> solver(solver_control);
           solver.solve(energy_operator,
                        internal_energy_,
                        internal_energy_rhs_,
@@ -837,7 +840,7 @@ namespace ryujin
         } catch (SolverControl::NoConvergence &) {
 
           SolverControl solver_control(1000, tolerance_internal_energy);
-          SolverCG<ScalarHostVector> solver(solver_control);
+          SolverCG<ScalarHostVector<Number>> solver(solver_control);
           solver.solve(energy_operator,
                        internal_energy_,
                        internal_energy_rhs_,

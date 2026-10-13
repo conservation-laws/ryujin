@@ -113,8 +113,7 @@ namespace ryujin
                 typename ScalarNumber>
       void fill_precomputed_values(
           const OfflineData<dim, ScalarNumber> &offline_data,
-          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
-              &state_vector,
+          StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
     private:
@@ -272,53 +271,22 @@ namespace ryujin
       static inline const auto initial_precomputed_names =
           std::array<std::string, n_initial_precomputed_values>{};
 
-      /**
-       * A compound state vector.
-       */
-      using StateVector = Vectors::
-          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing the hyperbolic state vector:
-       */
-      using HyperbolicVector =
-          Vectors::MultiComponentVector<ScalarNumber, problem_dimension>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using PrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      template <int n_comp>
+      using VectorView =
+          MultiComponentVectorView<ScalarNumber, n_comp, MemorySpace, false>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView = Vectors::MultiComponentVectorView<
-          ScalarNumber,
-          n_precomputed_values,
-          dealii::VectorizedArray<ScalarNumber>::size(),
-          MemorySpace,
-          /*writable=*/false>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using InitialPrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber,
-                                        n_initial_precomputed_values>;
+      using PrecomputedVectorView = VectorView<n_precomputed_values>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView = Vectors::MultiComponentVectorView<
-          ScalarNumber,
-          n_initial_precomputed_values,
-          dealii::VectorizedArray<ScalarNumber>::size(),
-          MemorySpace,
-          /*writable=*/false>;
+      using InitialPrecomputedVectorView =
+          VectorView<n_initial_precomputed_values>;
 
       //@}
       /**
@@ -801,8 +769,7 @@ namespace ryujin
     template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
-        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
-            &state_vector,
+        StateVector<ScalarNumber> &state_vector,
         const bool skip_constrained_dofs) const
     {
       using HostSpace = dealii::MemorySpace::Host;
@@ -810,8 +777,10 @@ namespace ryujin
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
 
-      auto &U = std::get<0>(state_vector);
-      auto &precomputed = std::get<1>(state_vector);
+      using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
+
+      auto &U = state_vector.U;
+      auto &precomputed = state_vector.precomputed;
 
       /*
        * Compute the specific internal energy, pressure, and speed of sound.
@@ -838,8 +807,12 @@ namespace ryujin
             offline_data.sparsity_pattern_simd().template view<HostSpace>();
 
         /* We only read the hyperbolic state vector: */
-        const auto U_view = std::as_const(U).template view<HostSpace>();
-        const auto precomputed_view = precomputed.template view<HostSpace>();
+        const auto U_view =
+            std::as_const(U)
+                .template view<ScalarView::problem_dimension, HostSpace>();
+        const auto precomputed_view =
+            precomputed
+                .template view<ScalarView::n_precomputed_values, HostSpace>();
 
         const auto hyperbolic_system_views =
             make_select_view<dim, ScalarNumber, HostSpace>(*this);

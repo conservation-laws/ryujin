@@ -58,7 +58,7 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
-      const InitialPrecomputedVector &initial_precomputed,
+      const MultiComponentVector<Number> &initial_precomputed,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -133,7 +133,7 @@ namespace ryujin
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
     const auto lumped_mass_matrix_view =
-        offline_data_->lumped_mass_matrix().view();
+        offline_data_->lumped_mass_matrix().template view<1>();
 
     /*
      * Create a manifold record with the name and parsed options for every
@@ -341,7 +341,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::accumulate(
-      const StateVector &state_vector, const Number t)
+      const StateVector<Number> &state_vector, const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
@@ -414,7 +414,9 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::write_out(
-      const StateVector &state_vector, const Number t, unsigned int cycle)
+      const StateVector<Number> &state_vector,
+      const Number t,
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;

@@ -429,11 +429,11 @@ namespace ryujin
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
         locally_owned, locally_relevant, mpi_ensemble_.ensemble_communicator());
 
-    hyperbolic_vector_partitioner_ = Vectors::create_vector_partitioner(
-        scalar_partitioner_, problem_dimension);
+    hyperbolic_vector_partitioner_ =
+        create_vector_partitioner(scalar_partitioner_, problem_dimension);
 
-    precomputed_vector_partitioner_ = Vectors::create_vector_partitioner(
-        scalar_partitioner_, n_precomputed_values);
+    precomputed_vector_partitioner_ =
+        create_vector_partitioner(scalar_partitioner_, n_precomputed_values);
 
     /*
      * A small lambda that performs a "logical or" over all MPI ranks:
@@ -512,10 +512,10 @@ namespace ryujin
     if (discretization_->have_discontinuous_ansatz())
       mass_matrix_inverse_.reinit(sparsity_pattern_simd_, policy);
 
-    lumped_mass_matrix_.reinit_with_scalar_partitioner(scalar_partitioner_,
-                                                       policy);
+    lumped_mass_matrix_.reinit_with_scalar_partitioner(
+        scalar_partitioner_, 1, policy);
     lumped_mass_matrix_inverse_.reinit_with_scalar_partitioner(
-        scalar_partitioner_, policy);
+        scalar_partitioner_, 1, policy);
 
     betaij_matrix_.reinit(sparsity_pattern_simd_, policy);
     cij_matrix_.reinit(sparsity_pattern_simd_, policy);
@@ -799,9 +799,10 @@ namespace ryujin
     {
       const auto sparsity_simd_view = sparsity_pattern_simd_.view();
       const auto mass_matrix_view = mass_matrix_.view();
-      const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+      const auto lumped_mass_matrix_view =
+          lumped_mass_matrix_.template view<1>();
       const auto lumped_mass_matrix_inverse_view =
-          lumped_mass_matrix_inverse_.view();
+          lumped_mass_matrix_inverse_.template view<1>();
 
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -838,7 +839,8 @@ namespace ryujin
      */
 
     if (discretization_->have_discontinuous_ansatz()) {
-      const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+      const auto lumped_mass_matrix_view =
+          lumped_mass_matrix_.template view<1>();
 
       /* The local, per-cell assembly routine: */
       const auto local_assemble_system = [&](const auto &cell,
@@ -1061,7 +1063,7 @@ namespace ryujin
      * Verify that we have consistent mass:
      */
 
-    const auto lumped_mass_matrix_view = lumped_mass_matrix_.view();
+    const auto lumped_mass_matrix_view = lumped_mass_matrix_.template view<1>();
 
     double total_mass = 0.;
     for (unsigned int i = 0; i < n_locally_owned_; ++i)

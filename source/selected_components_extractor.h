@@ -87,11 +87,6 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using StateVector = typename View::StateVector;
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-
-    using ScalarVector = Vectors::ScalarVector<Number>;
-
     /*
      * A selected component is identified by an offset into the linear
      * range formed by concatenating all conserved, primitive, precomputed,
@@ -128,9 +123,9 @@ namespace ryujin
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
-        const InitialPrecomputedVector &initial_precomputed,
+        const MultiComponentVector<Number> &initial_precomputed,
         const std::vector<std::string> &additional_names = {},
-        const std::vector<std::reference_wrapper<const ScalarVector>>
+        const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
             &additional_vectors = {});
 
     /**
@@ -160,7 +155,7 @@ namespace ryujin
      * view().
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    void prepare_extraction(const StateVector &state_vector) const;
+    void prepare_extraction(const StateVector<Number> &state_vector) const;
 
     //@}
     /**
@@ -201,10 +196,10 @@ namespace ryujin
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
-    const InitialPrecomputedVector &initial_precomputed_;
+    const MultiComponentVector<Number> &initial_precomputed_;
 
     const std::vector<std::string> additional_names_;
-    const std::vector<std::reference_wrapper<const ScalarVector>>
+    const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
         additional_vectors_;
 
     /**
@@ -338,19 +333,19 @@ namespace ryujin
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using EquationView = typename HyperbolicSystem::template View<dim, Number>;
-    using StateVector = typename EquationView::StateVector;
 
-    template <typename Vector>
-    using VectorView =
-        decltype(std::declval<const Vector &>().template view<MemorySpace>());
+    template <int n_comp>
+    using VectorView = MultiComponentVectorView<Number,
+                                                n_comp,
+                                                MemorySpace,
+                                                /*writable=*/false>;
 
-    using HyperbolicVectorView =
-        VectorView<std::tuple_element_t<0, StateVector>>;
+    using HyperbolicVectorView = VectorView<EquationView::problem_dimension>;
     using PrecomputedVectorView =
-        VectorView<std::tuple_element_t<1, StateVector>>;
+        VectorView<EquationView::n_precomputed_values>;
     using InitialPrecomputedVectorView =
-        VectorView<typename EquationView::InitialPrecomputedVector>;
-    using ScalarVectorView = VectorView<Vectors::ScalarVector<Number>>;
+        VectorView<EquationView::n_initial_precomputed_values>;
+    using ScalarVectorView = VectorView<1>;
 
     /*
      * A selected component: its offset, and for a parabolic component or
@@ -409,9 +404,9 @@ namespace ryujin
           const OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
           const ParabolicSystem &parabolic_system,
-          const InitialPrecomputedVector &initial_precomputed,
+          const MultiComponentVector<Number> &initial_precomputed,
           const std::vector<std::string> &additional_names,
-          const std::vector<std::reference_wrapper<const ScalarVector>>
+          const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
               &additional_vectors)
       : offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
@@ -489,7 +484,7 @@ namespace ryujin
   template <typename MemorySpace>
   void
   SelectedComponentsExtractor<Description, dim, Number>::prepare_extraction(
-      const StateVector &state_vector) const
+      const StateVector<Number> &state_vector) const
   {
     ExtractorView<MemorySpace> view(*offline_data_, *hyperbolic_system_);
 
@@ -503,24 +498,26 @@ namespace ryujin
      * and only ensure residency of those parts of the state vector:
      */
 
-    using Vectors::StateVectorPart;
-
     if (read_conserved_ || read_primitive_) {
-      Vectors::copy_to_memory_space<MemorySpace>(state_vector,
-                                                 StateVectorPart::hyperbolic);
-      view.U_view_ = std::get<0>(state_vector).template view<MemorySpace>();
+      copy_to_memory_space<MemorySpace>(state_vector,
+                                        StateVectorPart::hyperbolic);
+      view.U_view_ =
+          state_vector.U.template view<View::problem_dimension, MemorySpace>();
     }
 
     if (read_precomputed_) {
-      Vectors::copy_to_memory_space<MemorySpace>(state_vector,
-                                                 StateVectorPart::precomputed);
+      copy_to_memory_space<MemorySpace>(state_vector,
+                                        StateVectorPart::precomputed);
       view.precomputed_view_ =
-          std::get<1>(state_vector).template view<MemorySpace>();
+          state_vector.precomputed
+              .template view<View::n_precomputed_values, MemorySpace>();
     }
 
     if (read_initial_) {
-      Vectors::copy_to_memory_space<MemorySpace>(initial_precomputed_);
-      view.initial_view_ = initial_precomputed_.template view<MemorySpace>();
+      copy_to_memory_space<MemorySpace>(initial_precomputed_);
+      view.initial_view_ =
+          initial_precomputed_
+              .template view<View::n_initial_precomputed_values, MemorySpace>();
     }
 
     /*
@@ -533,7 +530,7 @@ namespace ryujin
                  Kokkos::HostSpace>
         entries("selected_components_entries", n_selected());
 
-    const auto &parabolic = std::get<2>(state_vector);
+    const auto &parabolic = state_vector.V;
 
     for (unsigned int k = 0; k < n_selected(); ++k) {
       const auto offset = selection_[k];
@@ -547,8 +544,8 @@ namespace ryujin
               ? parabolic[offset - parabolic_offset]
               : additional_vectors_[offset - additional_offset_].get();
 
-      Vectors::copy_to_memory_space<MemorySpace>(vector);
-      entries[k].scalar_view = vector.template view<MemorySpace>();
+      copy_to_memory_space<MemorySpace>(vector);
+      entries[k].scalar_view = vector.template view<1, MemorySpace>();
     }
 
     view.entries_ = Kokkos::create_mirror_view_and_copy(
