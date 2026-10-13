@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <concepts>
 #include <limits>
-#include <tuple>
 #include <vector>
 
 namespace ryujin
@@ -42,18 +41,19 @@ namespace ryujin
 
 
   /**
-   * A compound state vector formed by a std::tuple consisting of the
-   * hyperbolic state vector @p U, precomputed values, and a "parabolic
-   * state" stored as a std::vector of scalar vectors, one per parabolic
-   * component. All of these vectors have in common that they are
-   * associated with a hyperbolic, or parabolic state and precomputed
-   * data (derived from the hyperbolic state) for point in time.
+   * A compound state vector consisting of the hyperbolic state vector
+   * @p U, the @p precomputed values, and a "parabolic state" @p V stored
+   * as a std::vector of scalar vectors, one per parabolic component. All
+   * of these vectors have in common that they are associated with a
+   * hyperbolic, or parabolic state and precomputed data (derived from the
+   * hyperbolic state) for point in time.
    */
   template <typename Number>
-  using StateVector =
-      std::tuple<MultiComponentVector<Number> /*U*/,
-                 MultiComponentVector<Number> /*precomputed values*/,
-                 std::vector<ScalarVector<Number>> /*parabolic state*/>;
+  struct StateVector {
+    MultiComponentVector<Number> U;
+    MultiComponentVector<Number> precomputed;
+    std::vector<ScalarVector<Number>> V;
+  };
 
 
   /**
@@ -192,18 +192,16 @@ namespace ryujin
     move_to_memory_space<MemorySpace>(
         dst, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
 
-    auto &dst_U = std::get<0>(dst).template deal_ii_vector<MemorySpace>();
-    const auto &src_U = std::get<0>(src).template deal_ii_vector<MemorySpace>();
+    auto &dst_U = dst.U.template deal_ii_vector<MemorySpace>();
+    const auto &src_U = src.U.template deal_ii_vector<MemorySpace>();
     dst_U.zero_out_ghost_values();
     dst_U.sadd(s, b, src_U);
 
-    auto &dst_V = std::get<2>(dst);
-    const auto &src_V = std::get<2>(src);
-    AssertDimension(dst_V.size(), src_V.size());
+    AssertDimension(dst.V.size(), src.V.size());
 
-    for (std::size_t k = 0; k < dst_V.size(); ++k) {
-      auto &dst_V_k = dst_V[k].template deal_ii_vector<MemorySpace>();
-      const auto &src_V_k = src_V[k].template deal_ii_vector<MemorySpace>();
+    for (std::size_t k = 0; k < dst.V.size(); ++k) {
+      auto &dst_V_k = dst.V[k].template deal_ii_vector<MemorySpace>();
+      const auto &src_V_k = src.V[k].template deal_ii_vector<MemorySpace>();
       dst_V_k.zero_out_ghost_values();
       dst_V_k.sadd(s, b, src_V_k);
     }
