@@ -3,7 +3,8 @@
 int main(int argc, char *argv[])
 {
   //
-  // Test MultiComponentVectorView::sadd() on both memory spaces.
+  // Test sadd() on the underlying deal.II vectors of a
+  // MultiComponentVector on both memory spaces.
   //
 
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
@@ -22,11 +23,11 @@ int main(int argc, char *argv[])
   const auto vector_partitioner =
       ryujin::Vectors::create_vector_partitioner(scalar_partitioner, 4);
 
-  ryujin::Vectors::MultiComponentVector<double, 4> state_vector;
-  ryujin::Vectors::MultiComponentVector<double, 4> increment_vector;
+  ryujin::Vectors::MultiComponentVector<double> state_vector;
+  ryujin::Vectors::MultiComponentVector<double> increment_vector;
 
-  state_vector.reinit_with_vector_partitioner(vector_partitioner);
-  increment_vector.reinit_with_vector_partitioner(vector_partitioner);
+  state_vector.reinit_with_vector_partitioner(vector_partitioner, 4);
+  increment_vector.reinit_with_vector_partitioner(vector_partitioner, 4);
 
   using HostSpace = dealii::MemorySpace::Host;
   using DefaultSpace = dealii::MemorySpace::Default;
@@ -36,23 +37,24 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.view().write_tensor<double>(tensor, i);
+    state_vector.view<4>().write_tensor<double>(tensor, i);
 
     dealii::Tensor<1, 4, double> increment{{1., 2., 3., 4.}};
-    increment_vector.view().write_tensor<double>(increment, i);
+    increment_vector.view<4>().write_tensor<double>(increment, i);
   }
 
   const auto print = [](const auto &vector) {
     for (unsigned int i = 0; i < 4; ++i)
-      std::cout << vector.view().template read_tensor<double>(i) << "\n";
+      std::cout << vector.template view<4>().template read_tensor<double>(i)
+                << "\n";
   };
 
   /* sadd() on the host memory space: */
 
   {
-    auto view = state_vector.view<HostSpace>();
-    auto increment_view = increment_vector.view<HostSpace>();
-    view.sadd(2., 3., increment_view);
+    auto &vector = state_vector.deal_ii_vector<HostSpace>();
+    const auto &increment = std::as_const(increment_vector).deal_ii_vector();
+    vector.sadd(2., 3., increment);
   }
 
   std::cout << "After sadd() on HostSpace:\n";
@@ -64,9 +66,18 @@ int main(int argc, char *argv[])
   increment_vector.move_to_memory_space<DefaultSpace>();
 
   {
-    auto view = state_vector.view<DefaultSpace>();
-    auto increment_view = increment_vector.view<DefaultSpace>();
-    view.sadd(1., 2., increment_view);
+    /*
+     * If the host and default memory spaces coincide all storage is held
+     * by the host vector:
+     */
+    using VectorSpace = std::conditional_t<ryujin::have_separate_memory_spaces,
+                                           DefaultSpace,
+                                           HostSpace>;
+
+    auto &vector = state_vector.deal_ii_vector<VectorSpace>();
+    const auto &increment =
+        std::as_const(increment_vector).deal_ii_vector<VectorSpace>();
+    vector.sadd(1., 2., increment);
   }
 
   state_vector.move_to_memory_space<HostSpace>();

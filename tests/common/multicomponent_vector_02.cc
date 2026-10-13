@@ -18,16 +18,16 @@ int main(int argc, char *argv[])
   const auto vector_partitioner =
       ryujin::Vectors::create_vector_partitioner(scalar_partitioner, 4);
 
-  ryujin::Vectors::MultiComponentVector<double, 1> scalar_vector;
+  ryujin::Vectors::MultiComponentVector<double> scalar_vector;
 
-  scalar_vector.reinit_with_scalar_partitioner(scalar_partitioner);
+  scalar_vector.reinit_with_scalar_partitioner(scalar_partitioner, 1);
 
-  ryujin::Vectors::MultiComponentVector<double, 4> state_vector;
+  ryujin::Vectors::MultiComponentVector<double> state_vector;
 
-  state_vector.reinit_with_vector_partitioner(vector_partitioner);
+  state_vector.reinit_with_vector_partitioner(vector_partitioner, 4);
 
-  const auto scalar_vector_view = scalar_vector.view();
-  const auto state_vector_view = state_vector.view();
+  const auto scalar_vector_view = scalar_vector.view<1>();
+  const auto state_vector_view = state_vector.view<4>();
 
   for (unsigned int i = 0; i < 12; ++i) {
     scalar_vector_view.write_entry<double>(static_cast<double>(i), i);

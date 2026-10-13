@@ -18,9 +18,9 @@ int main(int argc, char *argv[])
   const auto vector_partitioner =
       ryujin::Vectors::create_vector_partitioner(scalar_partitioner, 4);
 
-  ryujin::Vectors::MultiComponentVector<double, 4> state_vector;
+  ryujin::Vectors::MultiComponentVector<double> state_vector;
 
-  state_vector.reinit_with_vector_partitioner(vector_partitioner);
+  state_vector.reinit_with_vector_partitioner(vector_partitioner, 4);
 
   using HostSpace = dealii::MemorySpace::Host;
   using DefaultSpace = dealii::MemorySpace::Default;
@@ -39,12 +39,12 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.view().write_tensor<double>(tensor, i);
+    state_vector.view<4>().write_tensor<double>(tensor, i);
   }
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 8; i += 1) {
-    std::cout << state_vector.view().read_tensor<double>(i) << "\n";
+    std::cout << state_vector.view<4>().read_tensor<double>(i) << "\n";
   }
 
   std::cout << "After move to DefaultSpace:" << std::endl;
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
   state_vector.move_to_memory_space<DefaultSpace>();
   print_status();
 
-  const auto &view = state_vector.template view<DefaultSpace>();
+  const auto &view = state_vector.template view<4, DefaultSpace>();
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
   const auto exec = ExecutionSpace{};
   Kokkos::parallel_for(
@@ -72,6 +72,6 @@ int main(int argc, char *argv[])
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 8; i += 1) {
-    std::cout << state_vector.view().read_tensor<double>(i) << "\n";
+    std::cout << state_vector.view<4>().read_tensor<double>(i) << "\n";
   }
 }

@@ -25,10 +25,10 @@ int main(int argc, char *argv[])
   const auto vector_partitioner =
       ryujin::Vectors::create_vector_partitioner(scalar_partitioner, 4);
 
-  ryujin::Vectors::MultiComponentVector<double, 4> state_vector;
+  ryujin::Vectors::MultiComponentVector<double> state_vector;
 
   state_vector.reinit_with_vector_partitioner(
-      vector_partitioner, ryujin::TransferPolicy::implicit_transfers);
+      vector_partitioner, 4, ryujin::TransferPolicy::implicit_transfers);
 
   using HostSpace = dealii::MemorySpace::Host;
   using DefaultSpace = dealii::MemorySpace::Default;
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
                                          static_cast<double>(10 * i + 1),
                                          static_cast<double>(10 * i + 2),
                                          static_cast<double>(10 * i + 3)}};
-    state_vector.view().write_tensor<double>(tensor, i);
+    state_vector.view<4>().write_tensor<double>(tensor, i);
   }
 
   /* A read-only view performs an implicit copy: */
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
   const auto &const_vector = state_vector;
   {
     [[maybe_unused]] const auto view =
-        const_vector.template view<DefaultSpace>();
+        const_vector.template view<4, DefaultSpace>();
   }
   std::cout << "After read-only view<DefaultSpace>:" << std::endl;
   print_status();
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
   /* A writable view performs an implicit move invalidating the host: */
 
   {
-    const auto view = state_vector.template view<DefaultSpace>();
+    const auto view = state_vector.template view<4, DefaultSpace>();
     std::cout << "After writable view<DefaultSpace>:" << std::endl;
     print_status();
 
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
    */
 
   {
-    const auto view = const_vector.template view<HostSpace>();
+    const auto view = const_vector.template view<4, HostSpace>();
     std::cout << "After read-only view<HostSpace>:" << std::endl;
     print_status();
 
@@ -98,7 +98,8 @@ int main(int argc, char *argv[])
   /* A writable host view invalidates the device mirror: */
 
   {
-    [[maybe_unused]] const auto view = state_vector.template view<HostSpace>();
+    [[maybe_unused]] const auto view =
+        state_vector.template view<4, HostSpace>();
   }
   std::cout << "After writable view<HostSpace>:" << std::endl;
   print_status();
@@ -107,6 +108,6 @@ int main(int argc, char *argv[])
 
   std::cout << "\nState vector:\n";
   for (unsigned int i = 0; i < 8; i += 1) {
-    std::cout << state_vector.view().read_tensor<double>(i) << "\n";
+    std::cout << state_vector.view<4>().read_tensor<double>(i) << "\n";
   }
 }

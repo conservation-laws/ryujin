@@ -57,8 +57,9 @@ void populate(typename SystemView::StateVector &state_vector,
   const unsigned int n_owned = offline_data.n_locally_owned();
 
   auto &[U, precomputed, parabolic] = state_vector;
-  const auto U_view = U.view();
-  const auto precomputed_view = precomputed.view();
+  const auto U_view = U.view<SystemView::problem_dimension>();
+  const auto precomputed_view =
+      precomputed.view<SystemView::n_precomputed_values>();
 
   for (unsigned int i = 0; i < n_owned; ++i) {
     const auto &position = positions.at(scalar_partitioner->local_to_global(i));
@@ -142,11 +143,16 @@ int main(int argc, char *argv[])
   typename SystemView::StateVector state_vector;
   auto &[U, precomputed, parabolic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
+                                   SystemView::problem_dimension,
                                    TransferPolicy::implicit_transfers);
   precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner, TransferPolicy::implicit_transfers);
+      scalar_partitioner,
+      SystemView::n_precomputed_values,
+      TransferPolicy::implicit_transfers);
   initial_precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner, TransferPolicy::implicit_transfers);
+      scalar_partitioner,
+      SystemView::n_initial_precomputed_values,
+      TransferPolicy::implicit_transfers);
 
   /* Accumulate statistics and write out: */
 

@@ -41,14 +41,14 @@ int main(int argc, char *argv[])
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
-  Vectors::MultiComponentVector<double, n_comp> U;
-  U.reinit_with_scalar_partitioner(scalar_partitioner);
+  Vectors::MultiComponentVector<double> U;
+  U.reinit_with_scalar_partitioner(scalar_partitioner, n_comp);
 
   for (unsigned int i = 0; i < n_states; ++i) {
     dealii::Tensor<1, n_comp, double> U_i;
     U_i[0] = 1. + 0.5 * i;
     U_i[1] = -2. + 0.25 * i;
-    U.view().write_tensor<double>(U_i, i);
+    U.view<n_comp>().write_tensor<double>(U_i, i);
   }
 
   /* Scalar reductions: */
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
     maxima[1] = -100.;
 
     U.template move_to_memory_space<MemorySpace>();
-    const auto U_view = U.template view<MemorySpace>();
+    const auto U_view = U.template view<n_comp, MemorySpace>();
 
     reduction_loop<MemorySpace>("loop_02",
                                 min_body,

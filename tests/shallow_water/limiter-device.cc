@@ -211,21 +211,23 @@ int main(int argc, char *argv[])
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
-  Vectors::MultiComponentVector<double, problem_dimension> U;
-  U.reinit_with_scalar_partitioner(scalar_partitioner);
+  Vectors::MultiComponentVector<double> U;
+  U.reinit_with_scalar_partitioner(scalar_partitioner, problem_dimension);
 
   typename HostSystemView::PrecomputedVector precomputed;
-  precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
+  precomputed.reinit_with_scalar_partitioner(
+      scalar_partitioner, HostSystemView::n_precomputed_values);
 
   /* The precomputed initial values store the bathymetry: */
   typename HostSystemView::InitialPrecomputedVector initial_precomputed;
-  initial_precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
+  initial_precomputed.reinit_with_scalar_partitioner(
+      scalar_partitioner, HostSystemView::n_initial_precomputed_values);
 
-  Vectors::MultiComponentVector<double, n_constants> constants;
-  constants.reinit_with_scalar_partitioner(scalar_partitioner);
+  Vectors::MultiComponentVector<double> constants;
+  constants.reinit_with_scalar_partitioner(scalar_partitioner, n_constants);
 
-  Vectors::MultiComponentVector<double, n_results> results;
-  results.reinit_with_scalar_partitioner(scalar_partitioner);
+  Vectors::MultiComponentVector<double> results;
+  results.reinit_with_scalar_partitioner(scalar_partitioner, n_results);
 
   /*
    * Fill states, precomputed values, and the bathymetry on the host
@@ -233,9 +235,12 @@ int main(int argc, char *argv[])
    */
 
   {
-    const auto U_view = U.view();
-    const auto precomputed_view = precomputed.view();
-    const auto initial_precomputed_view = initial_precomputed.view();
+    const auto U_view = U.view<problem_dimension>();
+    const auto precomputed_view =
+        precomputed.view<HostSystemView::n_precomputed_values>();
+    const auto initial_precomputed_view =
+        initial_precomputed
+            .view<HostSystemView::n_initial_precomputed_values>();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       state_type primitive;
@@ -274,9 +279,12 @@ int main(int argc, char *argv[])
 
   std::array<dealii::Tensor<1, n_results, double>, n_states> host_results;
   {
-    const auto U_view = U.view<HostSpace>();
-    const auto pv = precomputed.view<HostSpace>();
-    const auto ipv = initial_precomputed.view<HostSpace>();
+    const auto U_view = U.view<problem_dimension, HostSpace>();
+    const auto pv =
+        precomputed.view<HostSystemView::n_precomputed_values, HostSpace>();
+    const auto ipv =
+        initial_precomputed
+            .view<HostSystemView::n_initial_precomputed_values, HostSpace>();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       const unsigned int j_1 = (i + 1) % n_states;
@@ -308,11 +316,14 @@ int main(int argc, char *argv[])
   constants.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
 
-  const auto U_view = U.view<DefaultSpace>();
-  const auto pv = precomputed.view<DefaultSpace>();
-  const auto ipv = initial_precomputed.view<DefaultSpace>();
-  const auto constants_view = constants.view<DefaultSpace>();
-  const auto results_view = results.view<DefaultSpace>();
+  const auto U_view = U.view<problem_dimension, DefaultSpace>();
+  const auto pv =
+      precomputed.view<HostSystemView::n_precomputed_values, DefaultSpace>();
+  const auto ipv =
+      initial_precomputed
+          .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
+  const auto constants_view = constants.view<n_constants, DefaultSpace>();
+  const auto results_view = results.view<n_results, DefaultSpace>();
 
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
   const auto exec = ExecutionSpace{};
@@ -354,11 +365,11 @@ int main(int argc, char *argv[])
 
   const unsigned int index = 0;
   const auto device_constants =
-      constants.view<HostSpace>().read_tensor<double>(index);
+      constants.view<n_constants, HostSpace>().read_tensor<double>(index);
 
   std::array<dealii::Tensor<1, n_results, double>, n_states> device_results;
   {
-    const auto results_host_view = results.view<HostSpace>();
+    const auto results_host_view = results.view<n_results, HostSpace>();
     for (unsigned int i = 0; i < n_states; ++i)
       device_results[i] = results_host_view.read_tensor<double>(i);
   }

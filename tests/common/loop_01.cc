@@ -38,17 +38,17 @@ int main(int argc, char *argv[])
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
-  Vectors::MultiComponentVector<double, n_comp> U;
-  U.reinit_with_scalar_partitioner(scalar_partitioner);
+  Vectors::MultiComponentVector<double> U;
+  U.reinit_with_scalar_partitioner(scalar_partitioner, n_comp);
 
-  Vectors::MultiComponentVector<double, n_comp> results;
-  results.reinit_with_scalar_partitioner(scalar_partitioner);
+  Vectors::MultiComponentVector<double> results;
+  results.reinit_with_scalar_partitioner(scalar_partitioner, n_comp);
 
   for (unsigned int i = 0; i < n_states; ++i) {
     dealii::Tensor<1, n_comp, double> U_i;
     U_i[0] = 1. + 0.5 * i;
     U_i[1] = -2. + 0.25 * i;
-    U.view().write_tensor<double>(U_i, i);
+    U.view<n_comp>().write_tensor<double>(U_i, i);
   }
 
   /*
@@ -80,17 +80,18 @@ int main(int argc, char *argv[])
                         0,
                         /*no vectorization*/ 0,
                         n_states,
-                        U.view<HostSpace>(),
-                        results.view<HostSpace>());
+                        U.view<n_comp, HostSpace>(),
+                        results.view<n_comp, HostSpace>());
 
   std::array<dealii::Tensor<1, n_comp, double>, n_states> host_results;
   for (unsigned int i = 0; i < n_states; ++i)
-    host_results[i] = results.view().read_tensor<double>(i);
+    host_results[i] = results.view<n_comp>().read_tensor<double>(i);
 
   /* Reset the results vector and compute the same on the device: */
 
   for (unsigned int i = 0; i < n_states; ++i)
-    results.view().write_tensor<double>(dealii::Tensor<1, n_comp, double>(), i);
+    results.view<n_comp>().write_tensor<double>(
+        dealii::Tensor<1, n_comp, double>(), i);
 
   U.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
@@ -100,14 +101,14 @@ int main(int argc, char *argv[])
                    0,
                    /*ignored*/ 0,
                    n_states,
-                   U.view<DefaultSpace>(),
-                   results.view<DefaultSpace>());
+                   U.view<n_comp, DefaultSpace>(),
+                   results.view<n_comp, DefaultSpace>());
 
   results.move_to_memory_space<HostSpace>();
 
   std::array<dealii::Tensor<1, n_comp, double>, n_states> device_results;
   for (unsigned int i = 0; i < n_states; ++i)
-    device_results[i] = results.view().read_tensor<double>(i);
+    device_results[i] = results.view<n_comp>().read_tensor<double>(i);
 
   /* Print all results: */
 
