@@ -45,7 +45,6 @@ namespace ryujin
 
   template <typename Number,
             int n_comp,
-            int simd_length = dealii::VectorizedArray<Number>::size(),
             typename MemorySpace = dealii::MemorySpace::Host,
             bool writable = true>
   class MultiComponentVectorView;
@@ -58,10 +57,9 @@ namespace ryujin
    *
    * @ingroup LinearAlgebra
    */
-  template <typename Number,
-            int simd_length = dealii::VectorizedArray<Number>::size()>
+  template <typename Number>
   class MultiComponentVector
-      : public MirroredStorage<MultiComponentVector<Number, simd_length>>
+      : public MirroredStorage<MultiComponentVector<Number>>
   {
   public:
     /**
@@ -144,8 +142,7 @@ namespace ryujin
      * The template parameter @p n_comp has to match n_comp().
      */
     template <int n_comp, typename MemorySpace = dealii::MemorySpace::Host>
-    MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
-    view();
+    MultiComponentVectorView<Number, n_comp, MemorySpace, true> view();
 
     /**
      * Return a read-only view on the vector for the selected memory
@@ -157,8 +154,7 @@ namespace ryujin
      * The template parameter @p n_comp has to match n_comp().
      */
     template <int n_comp, typename MemorySpace = dealii::MemorySpace::Host>
-    MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
-    view() const;
+    MultiComponentVectorView<Number, n_comp, MemorySpace, false> view() const;
 
     /**
      * Return a reference to the underlying deal.II vector residing in
@@ -258,9 +254,9 @@ namespace ryujin
     void deallocate_storage();
 
 
-    friend class MirroredStorage<MultiComponentVector<Number, simd_length>>;
+    friend class MirroredStorage<MultiComponentVector<Number>>;
 
-    template <typename, int, int, typename, bool>
+    template <typename, int, typename, bool>
     friend class MultiComponentVectorView;
 
     //@}
@@ -281,11 +277,7 @@ namespace ryujin
    *
    * @ingroup LinearAlgebra
    */
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   class MultiComponentVectorView
   {
   public:
@@ -297,11 +289,11 @@ namespace ryujin
     MultiComponentVectorView() = default;
 
     MultiComponentVectorView(
-        MultiComponentVector<Number, simd_length> &multi_component_vector)
+        MultiComponentVector<Number> &multi_component_vector)
       requires(writable);
 
     MultiComponentVectorView(
-        const MultiComponentVector<Number, simd_length> &multi_component_vector)
+        const MultiComponentVector<Number> &multi_component_vector)
       requires(!writable);
 
     /**
@@ -316,7 +308,6 @@ namespace ryujin
     DEAL_II_HOST_DEVICE MultiComponentVectorView(
         const MultiComponentVectorView<Number,
                                        n_comp,
-                                       simd_length,
                                        MemorySpace,
                                        other_writable> &other)
       requires(!writable && other_writable);
@@ -418,7 +409,7 @@ namespace ryujin
      * If the template parameter @a Number2 is a VectorizedArray then
      * the function returns a SIMD vectorized dealii::Tensor populated with
      * entries from the @p n_comp component vectors stored at
-     * indices i, i+1, ..., i+simd_length-1.
+     * indices i, i+1, ..., i+n-1, where n is the SIMD width.
      *
      * @note This function is only available if `n_comp` is equal to 1.
      */
@@ -430,8 +421,8 @@ namespace ryujin
      *
      * Returns a SIMD vectorized dealii::Tensor populated with entries from
      * the @p n_comp component vectors stored at indices *(js), *(js+1),
-     * ..., *(js+simd_length-1), i.e., @p js has to point to an array of
-     * size @p simd_length containing all indices.
+     * ..., *(js+n-1), i.e., @p js has to point to an array of size n (the
+     * SIMD width) containing all indices.
      *
      * @note This function is only available if `n_comp` is equal to 1.
      */
@@ -444,7 +435,7 @@ namespace ryujin
      * If the template parameter @a Number2 is a VectorizedArray then
      * the function returns a SIMD vectorized dealii::Tensor populated with
      * entries from the @p n_compontens component vectors stored at
-     * indices i, i+1, ..., i+simd_length-1.
+     * indices i, i+1, ..., i+n-1, where n is the SIMD width.
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
@@ -455,8 +446,8 @@ namespace ryujin
      *
      * Returns a SIMD vectorized dealii::Tensor populated with entries from
      * the @p n_comp component vectors stored at indices *(js), *(js+1),
-     * ..., *(js+simd_length-1), i.e., @p js has to point to an array of
-     * size @p simd_length containing all indices.
+     * ..., *(js+n-1), i.e., @p js has to point to an array of size n (the
+     * SIMD width) containing all indices.
      */
     template <typename Number2 = Number,
               typename Tensor = dealii::Tensor<1, n_comp, Number2>>
@@ -468,8 +459,8 @@ namespace ryujin
      * If the template parameter @a Number2 is a VectorizedArray then
      * the function takes a SIMD vectorized @p tensor as argument instead
      * and updates the values of the @p n_comp component vectors at
-     * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
-     * tensor.
+     * indices i, i+1, ..., i+n-1 (n being the SIMD width) with the values
+     * supplied by @p tensor.
      *
      * @note This function is only available if `n_comp` is equal to 1.
      */
@@ -485,8 +476,8 @@ namespace ryujin
      * If the template parameter @a Number2 is a VectorizedArray then
      * the function takes a SIMD vectorized @p tensor as argument instead
      * and updates the values of the @p n_comp component vectors at
-     * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
-     * tensor.
+     * indices i, i+1, ..., i+n-1 (n being the SIMD width) with the values
+     * supplied by @p tensor.
      *
      * @note @p tensor can be an arbitrary indexable container, such as
      * dealii::Tensor or std::array, that has an `operator[]()` returning a @p
@@ -506,8 +497,8 @@ namespace ryujin
      * If the template parameter @a Number2 is a VectorizedArray then
      * the function takes a SIMD vectorized @p tensor as argument instead
      * and updates the values of the @p n_comp component vectors at
-     * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
-     * tensor.
+     * indices i, i+1, ..., i+n-1 (n being the SIMD width) with the values
+     * supplied by @p tensor.
      *
      * @note This function is only available if `n_comp` is equal to 1.
      */
@@ -524,8 +515,8 @@ namespace ryujin
      * If the template parameter @a Number2 is a VectorizedArray then
      * the function takes a SIMD vectorized @p tensor as argument instead
      * and updates the values of the @p n_comp component vectors at
-     * indices i, i+1, ..., i+simd_length_1. with the values supplied by @p
-     * tensor.
+     * indices i, i+1, ..., i+n-1 (n being the SIMD width) with the values
+     * supplied by @p tensor.
      *
      * @note @p tensor can be an arbitrary indexable container, such as
      * dealii::Tensor or std::array, that has an `operator[]()` returning a @p
@@ -571,14 +562,14 @@ namespace ryujin
      */
     //@{
 
-    using MCV = MultiComponentVector<Number, simd_length>;
+    using MCV = MultiComponentVector<Number>;
     std::conditional_t<writable, MCV *, const MCV *> multi_component_vector_;
 
     Number *data_;
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    template <typename, int, int, typename, bool>
+    template <typename, int, typename, bool>
     friend class MultiComponentVectorView;
 
     //@}
@@ -593,25 +584,24 @@ namespace ryujin
    */
 
 
-  template <typename Number, int simd_length>
-  MultiComponentVector<Number, simd_length>::MultiComponentVector(
+  template <typename Number>
+  MultiComponentVector<Number>::MultiComponentVector(
       const MultiComponentVector &other)
   {
     *this = other;
   }
 
 
-  template <typename Number, int simd_length>
-  MultiComponentVector<Number, simd_length>::MultiComponentVector(
+  template <typename Number>
+  MultiComponentVector<Number>::MultiComponentVector(
       MultiComponentVector &&other) noexcept
   {
     *this = std::move(other);
   }
 
 
-  template <typename Number, int simd_length>
-  void
-  MultiComponentVector<Number, simd_length>::reinit_with_vector_partitioner(
+  template <typename Number>
+  void MultiComponentVector<Number>::reinit_with_vector_partitioner(
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &vector_partitioner,
       const unsigned int n_comp,
@@ -660,9 +650,8 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
-  void
-  MultiComponentVector<Number, simd_length>::reinit_with_scalar_partitioner(
+  template <typename Number>
+  void MultiComponentVector<Number>::reinit_with_scalar_partitioner(
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &scalar_partitioner,
       const unsigned int n_comp,
@@ -680,9 +669,10 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
-  auto MultiComponentVector<Number, simd_length>::operator=(
-      const MultiComponentVector &other) -> MultiComponentVector &
+  template <typename Number>
+  auto
+  MultiComponentVector<Number>::operator=(const MultiComponentVector &other)
+      -> MultiComponentVector &
   {
     /* Copy residency state and transfer policy: */
     static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
@@ -696,9 +686,10 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
-  auto MultiComponentVector<Number, simd_length>::operator=(
-      MultiComponentVector &&other) noexcept -> MultiComponentVector &
+  template <typename Number>
+  auto
+  MultiComponentVector<Number>::operator=(MultiComponentVector &&other) noexcept
+      -> MultiComponentVector &
   {
     /* Copy residency state and transfer policy: */
     static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
@@ -712,10 +703,10 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <int n_comp, typename MemorySpace>
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
-  MultiComponentVector<Number, simd_length>::view()
+  MultiComponentVectorView<Number, n_comp, MemorySpace, true>
+  MultiComponentVector<Number>::view()
   {
     Assert(static_cast<unsigned int>(n_comp) == n_comp_,
            dealii::ExcMessage("The number of components of the view does "
@@ -724,18 +715,14 @@ namespace ryujin
 
     this->template prepare_write_access<MemorySpace>();
 
-    return MultiComponentVectorView<Number,
-                                    n_comp,
-                                    simd_length,
-                                    MemorySpace,
-                                    true>(*this);
+    return MultiComponentVectorView<Number, n_comp, MemorySpace, true>(*this);
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <int n_comp, typename MemorySpace>
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
-  MultiComponentVector<Number, simd_length>::view() const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, false>
+  MultiComponentVector<Number>::view() const
   {
     Assert(static_cast<unsigned int>(n_comp) == n_comp_,
            dealii::ExcMessage("The number of components of the view does "
@@ -744,18 +731,14 @@ namespace ryujin
 
     this->template prepare_read_access<MemorySpace>();
 
-    return MultiComponentVectorView<Number,
-                                    n_comp,
-                                    simd_length,
-                                    MemorySpace,
-                                    false>(*this);
+    return MultiComponentVectorView<Number, n_comp, MemorySpace, false>(*this);
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
   dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-  MultiComponentVector<Number, simd_length>::deal_ii_vector()
+  MultiComponentVector<Number>::deal_ii_vector()
   {
     this->template prepare_write_access<MemorySpace>();
 
@@ -766,10 +749,10 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
   const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-  MultiComponentVector<Number, simd_length>::deal_ii_vector() const
+  MultiComponentVector<Number>::deal_ii_vector() const
   {
     this->template prepare_read_access<MemorySpace>();
 
@@ -780,9 +763,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
-  void MultiComponentVector<Number, simd_length>::allocate_storage() const
+  void MultiComponentVector<Number>::allocate_storage() const
   {
     using HostSpace = dealii::MemorySpace::Host;
 
@@ -801,9 +784,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename To, typename From>
-  void MultiComponentVector<Number, simd_length>::deep_copy_storage() const
+  void MultiComponentVector<Number>::deep_copy_storage() const
   {
     using HostSpace = dealii::MemorySpace::Host;
 
@@ -817,9 +800,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
-  void MultiComponentVector<Number, simd_length>::deallocate_storage()
+  void MultiComponentVector<Number>::deallocate_storage()
   {
     using HostSpace = dealii::MemorySpace::Host;
 
@@ -832,11 +815,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
-  void
-  MultiComponentVector<Number,
-                       simd_length>::zero_out_ghost_values_on_memory_space()
+  void MultiComponentVector<Number>::zero_out_ghost_values_on_memory_space()
   {
     using HostSpace = dealii::MemorySpace::Host;
     using DefaultSpace = dealii::MemorySpace::Default;
@@ -856,10 +837,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
-  void MultiComponentVector<Number,
-                            simd_length>::update_ghost_values_on_memory_space()
+  void MultiComponentVector<Number>::update_ghost_values_on_memory_space()
   {
     using HostSpace = dealii::MemorySpace::Host;
     using DefaultSpace = dealii::MemorySpace::Default;
@@ -879,9 +859,9 @@ namespace ryujin
   }
 
 
-  template <typename Number, int simd_length>
+  template <typename Number>
   template <typename MemorySpace>
-  void MultiComponentVector<Number, simd_length>::compress_on_memory_space(
+  void MultiComponentVector<Number>::compress_on_memory_space(
       dealii::VectorOperation::values operation)
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -902,46 +882,33 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
-  MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       MultiComponentVectorView(
-          MultiComponentVector<Number, simd_l> &multi_component_vector)
+          MultiComponentVector<Number> &multi_component_vector)
     requires(writable)
   {
     reinit(multi_component_vector);
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
-  MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       MultiComponentVectorView(
-          const MultiComponentVector<Number, simd_l> &multi_component_vector)
+          const MultiComponentVector<Number> &multi_component_vector)
     requires(!writable)
   {
     reinit(multi_component_vector);
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <bool other_writable>
   DEAL_II_HOST_DEVICE
-  MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       MultiComponentVectorView(
           const MultiComponentVectorView<Number,
                                          n_comp,
-                                         simd_l,
                                          MemorySpace,
                                          other_writable> &other)
     requires(!writable && other_writable)
@@ -953,14 +920,10 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename MultiComponentVector>
-  void MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
-      reinit(MultiComponentVector &multi_component_vector)
+  void MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::reinit(
+      MultiComponentVector &multi_component_vector)
     requires(writable != std::is_const_v<MultiComponentVector>)
   {
     using HostSpace = dealii::MemorySpace::Host;
@@ -996,14 +959,9 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Functor>
-  void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
+  void MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       extract_component(ScalarVector &scalar_vector,
                         unsigned int component,
                         const Functor &functor) const
@@ -1034,14 +992,9 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Functor>
-  void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
+  void MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       insert_component(const ScalarVector &scalar_vector,
                        unsigned int component,
                        const Functor &functor) const
@@ -1068,14 +1021,9 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Functor>
-  void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
+  void MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       insert_component(const dealii::Vector<Number> &scalar_vector,
                        unsigned int component,
                        const Functor &functor) const
@@ -1101,15 +1049,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_entry(const unsigned int i) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::read_entry(
+      const unsigned int i) const
   {
     static_assert(
         n_comp == 1,
@@ -1122,15 +1066,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_tensor(const unsigned int i) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::read_tensor(
+      const unsigned int i) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
@@ -1145,7 +1085,7 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<VA, Number2>) {
-      /* Vectorized fast access. index must be divisible by simd_length */
+      /* Vectorized fast access. index must be divisible by the SIMD width */
       std::array<unsigned int, VA::size()> indices;
       for (unsigned int k = 0; k < VA::size(); ++k)
         indices[k] = k * n_comp;
@@ -1163,15 +1103,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number2
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_entry(const unsigned int *js) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::read_entry(
+      const unsigned int *js) const
   {
     static_assert(
         n_comp == 1,
@@ -1182,15 +1118,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE Tensor
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      read_tensor(const unsigned int *js) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::read_tensor(
+      const unsigned int *js) const
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
                   "type mismatch");
@@ -1203,7 +1135,7 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<VA, Number2>) {
-      /* Vectorized fast access. index must be divisible by simd_length */
+      /* Vectorized fast access. index must be divisible by the SIMD width */
 
       std::array<unsigned int, VA::size()> indices;
       for (unsigned int k = 0; k < VA::size(); ++k) {
@@ -1227,15 +1159,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      write_entry(const Number2 &entry, const unsigned int i) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::write_entry(
+      const Number2 &entry, const unsigned int i) const
     requires writable
   {
     static_assert(n_comp == 1,
@@ -1251,15 +1179,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      write_tensor(const Tensor &tensor, const unsigned int i) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::write_tensor(
+      const Tensor &tensor, const unsigned int i) const
     requires writable
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -1273,7 +1197,7 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<VA, Number2>) {
-      /* Vectorized fast access. index must be divisible by simd_length */
+      /* Vectorized fast access. index must be divisible by the SIMD width */
 
       std::array<unsigned int, VA::size()> indices;
       for (unsigned int k = 0; k < VA::size(); ++k)
@@ -1294,15 +1218,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      add_entry(const Number2 &entry, const unsigned int i) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::add_entry(
+      const Number2 &entry, const unsigned int i) const
     requires writable
   {
     static_assert(n_comp == 1,
@@ -1318,15 +1238,11 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_length,
-            typename MemorySpace,
-            bool writable>
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
   template <typename Number2, typename Tensor>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
-  MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, writable>::
-      add_tensor(const Tensor &tensor, const unsigned int i) const
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::add_tensor(
+      const Tensor &tensor, const unsigned int i) const
     requires writable
   {
     static_assert(std::is_same_v<Number2, typename Tensor::value_type>,
@@ -1340,7 +1256,7 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<Number>;
     if constexpr (std::is_same_v<VA, Number2>) {
-      /* Vectorized fast access. index must be divisible by simd_length */
+      /* Vectorized fast access. index must be divisible by the SIMD width */
 
       std::array<unsigned int, VA::size()> indices;
       for (unsigned int k = 0; k < VA::size(); ++k)
@@ -1361,12 +1277,8 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
-  void MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
+  void MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       zero_out_ghost_values() const
     requires(writable)
   {
@@ -1384,12 +1296,8 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
-  void MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
+  void MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       update_ghost_values() const
     requires(writable)
   {
@@ -1407,13 +1315,10 @@ namespace ryujin
   }
 
 
-  template <typename Number,
-            int n_comp,
-            int simd_l,
-            typename MemorySpace,
-            bool writable>
-  void MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
-      compress(dealii::VectorOperation::values operation) const
+  template <typename Number, int n_comp, typename MemorySpace, bool writable>
+  void
+  MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::compress(
+      dealii::VectorOperation::values operation) const
     requires(writable)
   {
     using HostSpace = dealii::MemorySpace::Host;

@@ -111,10 +111,9 @@ namespace ryujin
    * (scalar, or multi-component) @p vector is resident on @p MemorySpace
    * for read access.
    */
-  template <typename MemorySpace, typename Number, int simd_length>
-  void
-  copy_to_memory_space(const MultiComponentVector<Number, simd_length> &vector
-                       [[maybe_unused]])
+  template <typename MemorySpace, typename Number>
+  void copy_to_memory_space(const MultiComponentVector<Number> &vector
+                            [[maybe_unused]])
   {
     if constexpr (have_separate_memory_spaces) {
       ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
@@ -165,8 +164,8 @@ namespace ryujin
    * (scalar, or multi-component) @p vector is resident on @p MemorySpace
    * for write access.
    */
-  template <typename MemorySpace, typename Number, int simd_length>
-  void move_to_memory_space(MultiComponentVector<Number, simd_length> &vector
+  template <typename MemorySpace, typename Number>
+  void move_to_memory_space(MultiComponentVector<Number> &vector
                             [[maybe_unused]])
   {
     if constexpr (have_separate_memory_spaces) {
