@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
-  Vectors::MultiComponentVector<double> U;
+  MultiComponentVector<double> U;
   U.reinit_with_scalar_partitioner(scalar_partitioner, n_comp);
 
   for (unsigned int i = 0; i < n_states; ++i) {

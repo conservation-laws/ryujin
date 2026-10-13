@@ -100,14 +100,14 @@ void run(
       std::make_shared<dealii::Utilities::MPI::Partitioner>(
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
-  Vectors::MultiComponentVector<double> U;
+  MultiComponentVector<double> U;
   U.reinit_with_scalar_partitioner(scalar_partitioner, problem_dimension);
 
   typename HostSystemView::PrecomputedVector precomputed;
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
 
-  Vectors::MultiComponentVector<double> results;
+  MultiComponentVector<double> results;
   results.reinit_with_scalar_partitioner(scalar_partitioner, n_results);
 
   /*

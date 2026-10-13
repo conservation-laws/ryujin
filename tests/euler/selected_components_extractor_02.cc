@@ -55,7 +55,7 @@ constexpr std::size_t n_selected = 8;
  * (component-wise) host vector.
  */
 template <typename MemorySpace, typename Extractor, typename StateVector>
-std::vector<Vectors::ScalarHostVector<Number>>
+std::vector<ScalarHostVector<Number>>
 extract_element_wise(const Extractor &extractor,
                      const StateVector &state_vector,
                      const OfflineData<dim, Number> &offline_data)
@@ -88,7 +88,7 @@ extract_element_wise(const Extractor &extractor,
 
   const auto *result = std::as_const(scratch).template view<HostSpace>();
 
-  std::vector<Vectors::ScalarHostVector<Number>> extracted(n_selected);
+  std::vector<ScalarHostVector<Number>> extracted(n_selected);
   for (unsigned int k = 0; k < n_selected; ++k) {
     extracted[k].reinit(offline_data.scalar_partitioner());
     for (unsigned int i = 0; i < n_owned; ++i)
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
       SystemView::n_initial_precomputed_values,
       TransferPolicy::implicit_transfers);
 
-  Vectors::ScalarVector<Number> alpha;
+  ScalarVector<Number> alpha;
   alpha.reinit_with_scalar_partitioner(
       scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 

@@ -16,13 +16,13 @@ int main(int argc, char *argv[])
           locally_owned, locally_relevant, MPI_COMM_WORLD);
 
   const auto vector_partitioner =
-      ryujin::Vectors::create_vector_partitioner(scalar_partitioner, 4);
+      ryujin::create_vector_partitioner(scalar_partitioner, 4);
 
-  ryujin::Vectors::MultiComponentVector<double> scalar_vector;
+  ryujin::MultiComponentVector<double> scalar_vector;
 
   scalar_vector.reinit_with_scalar_partitioner(scalar_partitioner, 1);
 
-  ryujin::Vectors::MultiComponentVector<double> state_vector;
+  ryujin::MultiComponentVector<double> state_vector;
 
   state_vector.reinit_with_vector_partitioner(vector_partitioner, 4);
 

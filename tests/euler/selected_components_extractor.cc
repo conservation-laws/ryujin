@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
       SystemView::n_initial_precomputed_values,
       TransferPolicy::implicit_transfers);
 
-  Vectors::ScalarVector<Number> alpha;
+  ScalarVector<Number> alpha;
   alpha.reinit_with_scalar_partitioner(
       scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 
@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
   extractor.prepare_extraction<DefaultSpace>(state_vector);
   const auto device_components = extractor.view<DefaultSpace>().extract();
 
-  Vectors::ScalarHostVector<Number> temp;
+  ScalarHostVector<Number> temp;
   temp.reinit(scalar_partitioner);
 
   std::cout << "n_locally_owned = " << n_owned << "\n";
