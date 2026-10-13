@@ -66,17 +66,9 @@ int main(int argc, char *argv[])
   increment_vector.move_to_memory_space<DefaultSpace>();
 
   {
-    /*
-     * If the host and default memory spaces coincide all storage is held
-     * by the host vector:
-     */
-    using VectorSpace = std::conditional_t<ryujin::have_separate_memory_spaces,
-                                           DefaultSpace,
-                                           HostSpace>;
-
-    auto &vector = state_vector.deal_ii_vector<VectorSpace>();
+    auto &vector = state_vector.deal_ii_vector<DefaultSpace>();
     const auto &increment =
-        std::as_const(increment_vector).deal_ii_vector<VectorSpace>();
+        std::as_const(increment_vector).deal_ii_vector<DefaultSpace>();
     vector.sadd(1., 2., increment);
   }
 
