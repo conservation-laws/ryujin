@@ -90,7 +90,7 @@ namespace ryujin
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using ScalarVector = ScalarVector<Number>;
 
     /*
      * A selected component is identified by an offset into the linear
@@ -341,12 +341,12 @@ namespace ryujin
     using StateVector = typename EquationView::StateVector;
 
     template <int n_comp>
-    using VectorView = Vectors::MultiComponentVectorView<
-        Number,
-        n_comp,
-        dealii::VectorizedArray<Number>::size(),
-        MemorySpace,
-        /*writable=*/false>;
+    using VectorView =
+        MultiComponentVectorView<Number,
+                                 n_comp,
+                                 dealii::VectorizedArray<Number>::size(),
+                                 MemorySpace,
+                                 /*writable=*/false>;
 
     using HyperbolicVectorView = VectorView<EquationView::problem_dimension>;
     using PrecomputedVectorView =
@@ -506,25 +506,23 @@ namespace ryujin
      * and only ensure residency of those parts of the state vector:
      */
 
-    using Vectors::StateVectorPart;
-
     if (read_conserved_ || read_primitive_) {
-      Vectors::copy_to_memory_space<MemorySpace>(state_vector,
-                                                 StateVectorPart::hyperbolic);
+      copy_to_memory_space<MemorySpace>(state_vector,
+                                        StateVectorPart::hyperbolic);
       view.U_view_ = std::get<0>(state_vector)
                          .template view<View::problem_dimension, MemorySpace>();
     }
 
     if (read_precomputed_) {
-      Vectors::copy_to_memory_space<MemorySpace>(state_vector,
-                                                 StateVectorPart::precomputed);
+      copy_to_memory_space<MemorySpace>(state_vector,
+                                        StateVectorPart::precomputed);
       view.precomputed_view_ =
           std::get<1>(state_vector)
               .template view<View::n_precomputed_values, MemorySpace>();
     }
 
     if (read_initial_) {
-      Vectors::copy_to_memory_space<MemorySpace>(initial_precomputed_);
+      copy_to_memory_space<MemorySpace>(initial_precomputed_);
       view.initial_view_ =
           initial_precomputed_
               .template view<View::n_initial_precomputed_values, MemorySpace>();
@@ -554,7 +552,7 @@ namespace ryujin
               ? parabolic[offset - parabolic_offset]
               : additional_vectors_[offset - additional_offset_].get();
 
-      Vectors::copy_to_memory_space<MemorySpace>(vector);
+      copy_to_memory_space<MemorySpace>(vector);
       entries[k].scalar_view = vector.template view<1, MemorySpace>();
     }
 

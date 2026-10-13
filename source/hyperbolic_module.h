@@ -375,7 +375,7 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicVector = Vectors::MultiComponentVector<Number>;
+    using HyperbolicVector = MultiComponentVector<Number>;
 
     /**
      * Update all boundary values of the hyperbolic state vector component
@@ -428,13 +428,13 @@ namespace ryujin
 
     InitialPrecomputedVector initial_precomputed_;
 
-    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    using ScalarVector = typename ScalarVector<Number>;
     mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
         decltype(std::declval<const Limiter &>()
                      .template view<dim, Number>())::n_bounds;
-    mutable Vectors::MultiComponentVector<Number> bounds_;
+    mutable MultiComponentVector<Number> bounds_;
 
     mutable HyperbolicVector r_;
 

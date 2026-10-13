@@ -261,7 +261,7 @@ namespace ryujin
     HyperbolicVector U;
     U.reinit_with_vector_partitioner(vector_partitioner, problem_dimension);
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
     ScalarHostVector temp;
     temp.reinit(scalar_partitioner);
 
@@ -303,7 +303,7 @@ namespace ryujin
     if constexpr (n_initial_precomputed_values == 0)
       return precomputed;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
     ScalarHostVector temp;
     temp.reinit(scalar_partitioner);
 

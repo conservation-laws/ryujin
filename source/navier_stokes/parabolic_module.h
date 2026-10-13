@@ -127,7 +127,7 @@ namespace ryujin
 
       using StateVector = typename View::StateVector;
 
-      using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+      using ScalarHostVector = ScalarHostVector<Number>;
 
       using BlockHostVector =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;

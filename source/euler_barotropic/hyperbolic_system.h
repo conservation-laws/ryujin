@@ -275,23 +275,23 @@ namespace ryujin
       /**
        * A compound state vector.
        */
-      using StateVector = Vectors::StateVector<ScalarNumber>;
+      using StateVector = StateVector<ScalarNumber>;
 
       /**
        * MulticomponentVector for storing the hyperbolic state vector:
        */
-      using HyperbolicVector = Vectors::MultiComponentVector<ScalarNumber>;
+      using HyperbolicVector = MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed states:
        */
-      using PrecomputedVector = Vectors::MultiComponentVector<ScalarNumber>;
+      using PrecomputedVector = MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView = Vectors::MultiComponentVectorView<
+      using PrecomputedVectorView = MultiComponentVectorView<
           ScalarNumber,
           n_precomputed_values,
           dealii::VectorizedArray<ScalarNumber>::size(),
@@ -302,14 +302,13 @@ namespace ryujin
        * MulticomponentVector for storing a vector of precomputed initial
        * states:
        */
-      using InitialPrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber>;
+      using InitialPrecomputedVector = MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView = Vectors::MultiComponentVectorView<
+      using InitialPrecomputedVectorView = MultiComponentVectorView<
           ScalarNumber,
           n_initial_precomputed_values,
           dealii::VectorizedArray<ScalarNumber>::size(),

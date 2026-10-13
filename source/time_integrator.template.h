@@ -360,7 +360,7 @@ namespace ryujin
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
 
     /* Step 2: convex combination: T1 = 1/2 U_old + 1/2 T1 at time t + tau */
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[1], Number(1.0 / 2.0), Number(1.0 / 2.0), state_vector);
 
     state_vector.swap(temp_[1]);
@@ -389,7 +389,7 @@ namespace ryujin
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
 
     /* Step 2: convex combination T1 = 3/4 U_old + 1/4 T1 at time t + 0.5*tau */
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), state_vector);
 
     /* Step 3: T0 = T1 + tau L(T1) at time t + 0.5*tau -> t + 1.5*tau */
@@ -397,7 +397,7 @@ namespace ryujin
     hyperbolic_module_->template step<0>(temp_[1], {}, {}, temp_[0], tau);
 
     /* Step 3: convex combination: T0 = 1/3 U_old + 2/3 T0 at time t + tau */
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), state_vector);
 
     state_vector.swap(temp_[0]);
@@ -614,12 +614,12 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ state_vector);
 
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
     hyperbolic_module_->template step<0>(temp_[1], {}, {}, temp_[0], tau);
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ state_vector);
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
@@ -639,12 +639,12 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 2.0 * tau);
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ temp_[2]);
 
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.5 * tau);
     hyperbolic_module_->template step<0>(temp_[1], {}, {}, temp_[0], tau);
-    Vectors::sadd<selected_memory_space_t>(
+    sadd<selected_memory_space_t>(
         temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
 
     state_vector.swap(temp_[0]);

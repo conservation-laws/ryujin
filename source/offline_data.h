@@ -441,11 +441,11 @@ namespace ryujin
     SparseMatrix<Number> mass_matrix_;
     SparseMatrix<Number> mass_matrix_inverse_;
 
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using ScalarVector = ScalarVector<Number>;
     ScalarVector lumped_mass_matrix_;
     ScalarVector lumped_mass_matrix_inverse_;
 
-    using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
+    using ScalarHostVectorFloat = ScalarHostVector<float>;
     std::vector<ScalarHostVectorFloat> level_lumped_mass_matrix_;
 
     SparseMatrix<Number> betaij_matrix_;

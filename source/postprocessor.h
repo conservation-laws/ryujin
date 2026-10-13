@@ -175,7 +175,7 @@ namespace ryujin
     std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
 
     mutable std::vector<std::pair<Number, Number>> bounds_;
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
     mutable std::vector<ScalarHostVector> quantities_;
 
     //@}

@@ -86,10 +86,10 @@ namespace ryujin
         << std::endl;
 #endif
 
-    Vectors::copy_to_memory_space<dealii::MemorySpace::Host>(
+    copy_to_memory_space<dealii::MemorySpace::Host>(
         old_state_vector,
-        Vectors::StateVectorPart::hyperbolic,
-        Vectors::StateVectorPart::precomputed);
+        StateVectorPart::hyperbolic,
+        StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -395,10 +395,10 @@ namespace ryujin
               << std::endl;
 #endif
 
-    Vectors::move_to_memory_space<dealii::MemorySpace::Host>(
+    move_to_memory_space<dealii::MemorySpace::Host>(
         new_state_vector,
-        Vectors::StateVectorPart::hyperbolic,
-        Vectors::StateVectorPart::precomputed);
+        StateVectorPart::hyperbolic,
+        StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -413,7 +413,7 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
     ScalarHostVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
     HyperbolicVector projected_state;

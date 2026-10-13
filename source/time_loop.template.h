@@ -341,7 +341,7 @@ namespace ryujin
           std::get<0>(state_vector) =
               initial_values_.get().interpolate_hyperbolic_vector();
         }
-        Vectors::debug_poison_invalid_values(state_vector, offline_data_);
+        debug_poison_invalid_values(state_vector, offline_data_);
       }
     }
 
@@ -644,7 +644,7 @@ namespace ryujin
     solution_transfer_.set_handle(transfer_handle);
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
-    Vectors::debug_poison_invalid_values(state_vector, offline_data_);
+    debug_poison_invalid_values(state_vector, offline_data_);
 
     time_integrator_.prepare_state_vector(state_vector, t);
   }
@@ -726,7 +726,7 @@ namespace ryujin
 
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
-    Vectors::debug_poison_invalid_values(state_vector, offline_data_);
+    debug_poison_invalid_values(state_vector, offline_data_);
   }
 
 

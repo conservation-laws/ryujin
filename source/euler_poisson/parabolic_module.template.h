@@ -527,12 +527,10 @@ namespace ryujin
                 << std::endl;
 #endif
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
-                                               StateVectorPart::hyperbolic);
-      Vectors::move_to_memory_space<HostSpace>(state_vector,
-                                               StateVectorPart::parabolic);
+      copy_to_memory_space<HostSpace>(std::as_const(state_vector),
+                                      StateVectorPart::hyperbolic);
+      move_to_memory_space<HostSpace>(state_vector, StateVectorPart::parabolic);
 
       const auto U_view = std::as_const(std::get<0>(state_vector))
                               .template view<problem_dimension>();
@@ -677,12 +675,11 @@ namespace ryujin
 #endif
 
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::move_to_memory_space<HostSpace>(state_vector,
-                                               StateVectorPart::hyperbolic);
-      Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
-                                               StateVectorPart::parabolic);
+      move_to_memory_space<HostSpace>(state_vector,
+                                      StateVectorPart::hyperbolic);
+      copy_to_memory_space<HostSpace>(std::as_const(state_vector),
+                                      StateVectorPart::parabolic);
 
       const auto U_view =
           std::get<0>(state_vector).template view<problem_dimension>();
@@ -797,13 +794,12 @@ namespace ryujin
       const Number alpha = parabolic_system_->alpha();
 
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::copy_to_memory_space<HostSpace>(old_state_vector,
-                                               StateVectorPart::hyperbolic,
-                                               StateVectorPart::parabolic);
-      Vectors::move_to_memory_space<HostSpace>(new_state_vector,
-                                               StateVectorPart::parabolic);
+      copy_to_memory_space<HostSpace>(old_state_vector,
+                                      StateVectorPart::hyperbolic,
+                                      StateVectorPart::parabolic);
+      move_to_memory_space<HostSpace>(new_state_vector,
+                                      StateVectorPart::parabolic);
 
       const auto &old_U = std::get<0>(old_state_vector);
       const auto old_U_view = old_U.template view<problem_dimension>();
@@ -1100,7 +1096,7 @@ namespace ryujin
        */
 
       new_U = old_U;
-      Vectors::move_to_memory_space<HostSpace>(new_U); /* invalidates default */
+      move_to_memory_space<HostSpace>(new_U); /* invalidates default */
       const auto new_U_view = new_U.template view<problem_dimension>();
 
       if (crank_nicolson_extrapolation) {

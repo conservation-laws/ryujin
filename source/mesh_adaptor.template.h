@@ -449,7 +449,7 @@ namespace ryujin
     const unsigned int n_entries = quantities.size();
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
     /*
      * Ensure we have at least one entry in numerator and denominator
      * available. We use those for temporary storage.

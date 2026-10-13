@@ -96,7 +96,7 @@ namespace ryujin
     static constexpr unsigned int order_fe = 1;
     static constexpr unsigned int order_quad = 2;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
 
     LaplaceOperator() = default;
 
@@ -207,7 +207,7 @@ namespace ryujin
     static constexpr unsigned int order_fe = 1;
     static constexpr unsigned int order_quad = 2;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
+    using ScalarHostVector = ScalarHostVector<Number>;
     using BlockHostVector =
         dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
@@ -369,7 +369,7 @@ namespace ryujin
       for (unsigned int level = matrix_free.min_level();
            level <= matrix_free.max_level();
            ++level) {
-        Vectors::ScalarHostVector<Number> vector;
+        ScalarHostVector<Number> vector;
         matrix_free[level].initialize_dof_vector(vector, /*CG*/ 0);
         partitioners[level] = vector.get_partitioner();
       }
@@ -394,8 +394,8 @@ namespace ryujin
     static constexpr unsigned int order_fe = 1;
     static constexpr unsigned int order_quad = 2;
 
-    using ScalarHostVector = Vectors::ScalarHostVector<Number>;
-    using ScalarHostVectorFloat = Vectors::ScalarHostVector<float>;
+    using ScalarHostVector = ScalarHostVector<Number>;
+    using ScalarHostVectorFloat = ScalarHostVector<float>;
 
     using Preconditioner =
         dealii::PreconditionChebyshev<LaplaceOperator<dim, float>,

@@ -312,12 +312,11 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       using HostSpace = dealii::MemorySpace::Host;
-      using Vectors::StateVectorPart;
 
-      Vectors::copy_to_memory_space<HostSpace>(old_state_vector,
-                                               StateVectorPart::hyperbolic);
-      Vectors::move_to_memory_space<HostSpace>(new_state_vector,
-                                               StateVectorPart::hyperbolic);
+      copy_to_memory_space<HostSpace>(old_state_vector,
+                                      StateVectorPart::hyperbolic);
+      move_to_memory_space<HostSpace>(new_state_vector,
+                                      StateVectorPart::hyperbolic);
 
       const auto old_U_view =
           std::get<0>(old_state_vector).template view<problem_dimension>();

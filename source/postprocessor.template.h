@@ -113,8 +113,8 @@ namespace ryujin
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
 
-    Vectors::copy_to_memory_space<dealii::MemorySpace::Host>(
-        state_vector, Vectors::StateVectorPart::hyperbolic);
+    copy_to_memory_space<dealii::MemorySpace::Host>(
+        state_vector, StateVectorPart::hyperbolic);
 
     const auto U_view =
         std::get<0>(state_vector).template view<problem_dimension>();

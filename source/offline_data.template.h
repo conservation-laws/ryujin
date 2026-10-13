@@ -429,11 +429,11 @@ namespace ryujin
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
         locally_owned, locally_relevant, mpi_ensemble_.ensemble_communicator());
 
-    hyperbolic_vector_partitioner_ = Vectors::create_vector_partitioner(
-        scalar_partitioner_, problem_dimension);
+    hyperbolic_vector_partitioner_ =
+        create_vector_partitioner(scalar_partitioner_, problem_dimension);
 
-    precomputed_vector_partitioner_ = Vectors::create_vector_partitioner(
-        scalar_partitioner_, n_precomputed_values);
+    precomputed_vector_partitioner_ =
+        create_vector_partitioner(scalar_partitioner_, n_precomputed_values);
 
     /*
      * A small lambda that performs a "logical or" over all MPI ranks:

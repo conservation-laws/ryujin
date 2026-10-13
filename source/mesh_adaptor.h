@@ -121,7 +121,7 @@ namespace ryujin
 
     using StateVector = typename View::StateVector;
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarVector = Vectors::ScalarVector<Number>;
+    using ScalarVector = ScalarVector<Number>;
 
     //@}
     /**

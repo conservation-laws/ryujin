@@ -201,11 +201,10 @@ namespace ryujin
 #endif
 
     using MemorySpace = selected_memory_space_t;
-    using Vectors::StateVectorPart;
 
-    Vectors::move_to_memory_space<MemorySpace>(state_vector,
-                                               StateVectorPart::hyperbolic,
-                                               StateVectorPart::precomputed);
+    move_to_memory_space<MemorySpace>(state_vector,
+                                      StateVectorPart::hyperbolic,
+                                      StateVectorPart::precomputed);
 
     auto &[U, precomputed, parabolic] = state_vector;
 
@@ -405,17 +404,16 @@ namespace ryujin
 #endif
 
     using MemorySpace = selected_memory_space_t;
-    using Vectors::StateVectorPart;
 
-    Vectors::copy_to_memory_space<MemorySpace>(old_state_vector,
-                                               StateVectorPart::hyperbolic,
-                                               StateVectorPart::precomputed);
+    copy_to_memory_space<MemorySpace>(old_state_vector,
+                                      StateVectorPart::hyperbolic,
+                                      StateVectorPart::precomputed);
     for (int s = 0; s < stages; ++s)
-      Vectors::copy_to_memory_space<MemorySpace>(stage_state_vectors[s].get(),
-                                                 StateVectorPart::hyperbolic,
-                                                 StateVectorPart::precomputed);
-    Vectors::move_to_memory_space<MemorySpace>(new_state_vector,
-                                               StateVectorPart::hyperbolic);
+      copy_to_memory_space<MemorySpace>(stage_state_vectors[s].get(),
+                                        StateVectorPart::hyperbolic,
+                                        StateVectorPart::precomputed);
+    move_to_memory_space<MemorySpace>(new_state_vector,
+                                      StateVectorPart::hyperbolic);
 
     auto &[old_U, old_precomputed, old_parabolic] = old_state_vector;
     auto &new_U = std::get<0>(new_state_vector);
@@ -1438,7 +1436,7 @@ namespace ryujin
     }
 
     /* Poison all values that are left invalid after the update step: */
-    Vectors::debug_poison_invalid_values(new_state_vector, *offline_data_);
+    debug_poison_invalid_values(new_state_vector, *offline_data_);
 
     /* Return the time step size tau: */
     return tau;
