@@ -217,7 +217,7 @@ namespace ryujin
 
     apply_boundary_conditions<MemorySpace>(U, t);
 
-    U.template update_ghost_values_on_memory_space<MemorySpace>();
+    U.template deal_ii_vector<MemorySpace>().update_ghost_values();
 
     /*
      * Compute and populate precomputed values.
@@ -416,7 +416,7 @@ namespace ryujin
                                       StateVectorPart::hyperbolic);
 
     auto &[old_U, old_precomputed, old_parabolic] = old_state_vector;
-    auto &new_U = std::get<0>(new_state_vector);
+    auto &new_U = new_state_vector.U;
 
     /*
      * Taking a view<>() might imply implicit memory space transfers. Let's
@@ -1390,8 +1390,8 @@ namespace ryujin
     /*
      * Pass through the parabolic state vector
      */
-    const auto &old_V = std::get<2>(old_state_vector);
-    auto &new_V = std::get<2>(new_state_vector);
+    const auto &old_V = old_state_vector.V;
+    auto &new_V = new_state_vector.V;
     new_V = old_V;
 
     /*

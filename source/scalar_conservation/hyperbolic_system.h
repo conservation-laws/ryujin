@@ -239,27 +239,22 @@ namespace ryujin
       static inline const auto initial_precomputed_names =
           std::array<std::string, n_initial_precomputed_values>{};
 
+      template <int n_comp>
+      using VectorView =
+          MultiComponentVectorView<ScalarNumber, n_comp, MemorySpace, false>;
+
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView = MultiComponentVectorView<
-          ScalarNumber,
-          n_precomputed_values,
-          dealii::VectorizedArray<ScalarNumber>::size(),
-          MemorySpace,
-          /*writable=*/false>;
+      using PrecomputedVectorView = VectorView<n_precomputed_values>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView = MultiComponentVectorView<
-          ScalarNumber,
-          n_initial_precomputed_values,
-          dealii::VectorizedArray<ScalarNumber>::size(),
-          MemorySpace,
-          /*writable=*/false>;
+      using InitialPrecomputedVectorView =
+          VectorView<n_initial_precomputed_values>;
 
       //@}
       /**
@@ -641,8 +636,8 @@ namespace ryujin
 
       using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
 
-      auto &U = std::get<0>(state_vector);
-      auto &precomputed = std::get<1>(state_vector);
+      auto &U = state_vector.U;
+      auto &precomputed = state_vector.precomputed;
 
       /*
        * Compute the flux and its gradient. This requires calling into the

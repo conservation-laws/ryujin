@@ -338,7 +338,7 @@ namespace ryujin
         {
           ComputingTimer::Scope scope(
               "time step [X]   - interpolate data vectors");
-          std::get<0>(state_vector) =
+          state_vector.U =
               initial_values_.get().interpolate_hyperbolic_vector();
         }
         debug_poison_invalid_values(state_vector, offline_data_);
@@ -744,14 +744,12 @@ namespace ryujin
 
     hyperbolic_module_.reinit_state_vector(analytic);
     parabolic_module_.reinit_state_vector(analytic);
-    std::get<0>(analytic) =
-        initial_values_.get().interpolate_hyperbolic_vector(t);
+    analytic.U = initial_values_.get().interpolate_hyperbolic_vector(t);
 
     /* Populate precomputed values (without applying boundary conditions): */
     hyperbolic_system_.get().fill_precomputed_values(
         offline_data_, analytic, /*skip_constrained_dofs*/ false);
-    std::get<1>(analytic)
-        .template view<n_precomputed_values>()
+    analytic.precomputed.template view<n_precomputed_values>()
         .update_ghost_values();
   }
 

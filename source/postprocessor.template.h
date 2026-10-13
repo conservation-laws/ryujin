@@ -116,8 +116,7 @@ namespace ryujin
     copy_to_memory_space<dealii::MemorySpace::Host>(
         state_vector, StateVectorPart::hyperbolic);
 
-    const auto U_view =
-        std::get<0>(state_vector).template view<problem_dimension>();
+    const auto U_view = state_vector.U.template view<problem_dimension>();
 
     using VA = dealii::VectorizedArray<Number>;
 

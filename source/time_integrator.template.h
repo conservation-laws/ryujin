@@ -7,6 +7,8 @@
 
 #include "time_integrator.h"
 
+#include <utility>
+
 namespace ryujin
 {
   using namespace dealii;
@@ -363,7 +365,7 @@ namespace ryujin
     sadd<selected_memory_space_t>(
         temp_[1], Number(1.0 / 2.0), Number(1.0 / 2.0), state_vector);
 
-    state_vector.swap(temp_[1]);
+    std::swap(state_vector, temp_[1]);
     return tau;
   }
 
@@ -400,7 +402,7 @@ namespace ryujin
     sadd<selected_memory_space_t>(
         temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), state_vector);
 
-    state_vector.swap(temp_[0]);
+    std::swap(state_vector, temp_[0]);
     return tau;
   }
 
@@ -419,7 +421,7 @@ namespace ryujin
     Number tau = hyperbolic_module_->template step<0>(
         state_vector, {}, {}, temp_[0], Number(0.), tau_max);
 
-    state_vector.swap(temp_[0]);
+    std::swap(state_vector, temp_[0]);
     return tau;
   }
 
@@ -443,7 +445,7 @@ namespace ryujin
     hyperbolic_module_->template step<1>(
         temp_[0], {{state_vector}}, {{Number(-1.)}}, temp_[1], tau);
 
-    state_vector.swap(temp_[1]);
+    std::swap(state_vector, temp_[1]);
     return efficiency_ * tau;
   }
 
@@ -478,7 +480,7 @@ namespace ryujin
                                          temp_[2],
                                          tau);
 
-    state_vector.swap(temp_[2]);
+    std::swap(state_vector, temp_[2]);
     return efficiency_ * tau;
   }
 
@@ -518,7 +520,7 @@ namespace ryujin
                                          temp_[3],
                                          tau);
 
-    state_vector.swap(temp_[3]);
+    std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
   }
 
@@ -589,7 +591,7 @@ namespace ryujin
         temp_[4],
         tau);
 
-    state_vector.swap(temp_[4]);
+    std::swap(state_vector, temp_[4]);
     return efficiency_ * tau;
   }
 
@@ -647,7 +649,7 @@ namespace ryujin
     sadd<selected_memory_space_t>(
         temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
 
-    state_vector.swap(temp_[0]);
+    std::swap(state_vector, temp_[0]);
     return efficiency_ * tau;
   }
 
@@ -708,7 +710,7 @@ namespace ryujin
                                          temp_[2],
                                          tau);
 
-    state_vector.swap(temp_[2]);
+    std::swap(state_vector, temp_[2]);
     return efficiency_ * tau;
   }
 
@@ -777,7 +779,7 @@ namespace ryujin
                                          temp_[3],
                                          tau);
 
-    state_vector.swap(temp_[3]);
+    std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
   }
 
@@ -800,7 +802,7 @@ namespace ryujin
     parabolic_module_->template backward_euler_step<0>(
         temp_[0], t, {}, {}, temp_[1], 1.0 * tau);
 
-    state_vector.swap(temp_[1]);
+    std::swap(state_vector, temp_[1]);
     return tau;
   }
 
@@ -836,7 +838,7 @@ namespace ryujin
                                                        temp_[3],
                                                        tau);
 
-    state_vector.swap(temp_[3]);
+    std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
   }
 
@@ -904,7 +906,7 @@ namespace ryujin
         temp_[5],
         tau);
 
-    state_vector.swap(temp_[5]);
+    std::swap(state_vector, temp_[5]);
     return efficiency_ * tau;
   }
 

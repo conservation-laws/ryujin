@@ -532,9 +532,9 @@ namespace ryujin
                                       StateVectorPart::hyperbolic);
       move_to_memory_space<HostSpace>(state_vector, StateVectorPart::parabolic);
 
-      const auto U_view = std::as_const(std::get<0>(state_vector))
-                              .template view<problem_dimension>();
-      auto &V = std::get<2>(state_vector);
+      const auto U_view =
+          std::as_const(state_vector).U.template view<problem_dimension>();
+      auto &V = state_vector.V;
       auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -685,9 +685,8 @@ namespace ryujin
       copy_to_memory_space<HostSpace>(std::as_const(state_vector),
                                       StateVectorPart::parabolic);
 
-      const auto U_view =
-          std::get<0>(state_vector).template view<problem_dimension>();
-      const auto &V = std::get<2>(std::as_const(state_vector));
+      const auto U_view = state_vector.U.template view<problem_dimension>();
+      const auto &V = std::as_const(state_vector).V;
       const auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -806,13 +805,13 @@ namespace ryujin
       move_to_memory_space<HostSpace>(new_state_vector,
                                       StateVectorPart::parabolic);
 
-      const auto &old_U = std::get<0>(old_state_vector);
+      const auto &old_U = old_state_vector.U;
       const auto old_U_view = old_U.template view<problem_dimension>();
-      const auto &old_V = std::get<2>(old_state_vector);
+      const auto &old_V = old_state_vector.V;
       const auto &old_potential = old_V[0].deal_ii_vector();
 
-      auto &new_U = std::get<0>(new_state_vector);
-      auto &new_V = std::get<2>(new_state_vector);
+      auto &new_U = new_state_vector.U;
+      auto &new_V = new_state_vector.V;
       auto &new_potential = new_V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();

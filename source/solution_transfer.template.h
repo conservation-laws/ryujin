@@ -116,10 +116,10 @@ namespace ryujin
 
           const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-          const auto &U = std::get<0>(old_state_vector);
+          const auto &U = old_state_vector.U;
           /* precomputed needs to be valid for bounds computation */
           const auto precomputed_view =
-              std::get<1>(old_state_vector)
+              old_state_vector.precomputed
                   .template view<n_precomputed_values>();
 
           const auto limiter_view = limiter_.template view<dim, Number>();
@@ -656,7 +656,7 @@ namespace ryujin
      */
 
     const auto new_U_view =
-        std::get<0>(new_state_vector).template view<problem_dimension>();
+        new_state_vector.U.template view<problem_dimension>();
 
     /*
      * A small lambda that takes the weighted average of all degrees of
@@ -684,7 +684,7 @@ namespace ryujin
     update_new_state_vector();
 
     const auto precomputed_view =
-        std::get<1>(new_state_vector).template view<n_precomputed_values>();
+        new_state_vector.precomputed.template view<n_precomputed_values>();
 
     /* The limiter requires valid precomputed values. Therefore, update: */
     const auto update_precomputed_values = [&]() {

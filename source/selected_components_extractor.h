@@ -335,12 +335,10 @@ namespace ryujin
     using EquationView = typename HyperbolicSystem::template View<dim, Number>;
 
     template <int n_comp>
-    using VectorView =
-        MultiComponentVectorView<Number,
-                                 n_comp,
-                                 dealii::VectorizedArray<Number>::size(),
-                                 MemorySpace,
-                                 /*writable=*/false>;
+    using VectorView = MultiComponentVectorView<Number,
+                                                n_comp,
+                                                MemorySpace,
+                                                /*writable=*/false>;
 
     using HyperbolicVectorView = VectorView<EquationView::problem_dimension>;
     using PrecomputedVectorView =
@@ -503,15 +501,15 @@ namespace ryujin
     if (read_conserved_ || read_primitive_) {
       copy_to_memory_space<MemorySpace>(state_vector,
                                         StateVectorPart::hyperbolic);
-      view.U_view_ = std::get<0>(state_vector)
-                         .template view<View::problem_dimension, MemorySpace>();
+      view.U_view_ =
+          state_vector.U.template view<View::problem_dimension, MemorySpace>();
     }
 
     if (read_precomputed_) {
       copy_to_memory_space<MemorySpace>(state_vector,
                                         StateVectorPart::precomputed);
       view.precomputed_view_ =
-          std::get<1>(state_vector)
+          state_vector.precomputed
               .template view<View::n_precomputed_values, MemorySpace>();
     }
 
@@ -532,7 +530,7 @@ namespace ryujin
                  Kokkos::HostSpace>
         entries("selected_components_entries", n_selected());
 
-    const auto &parabolic = std::get<2>(state_vector);
+    const auto &parabolic = state_vector.V;
 
     for (unsigned int k = 0; k < n_selected(); ++k) {
       const auto offset = selection_[k];

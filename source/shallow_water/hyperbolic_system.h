@@ -248,27 +248,22 @@ namespace ryujin
       static inline const auto initial_precomputed_names =
           std::array<std::string, n_initial_precomputed_values>{"bathymetry"};
 
+      template <int n_comp>
+      using VectorView =
+          MultiComponentVectorView<ScalarNumber, n_comp, MemorySpace, false>;
+
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
-      using PrecomputedVectorView = MultiComponentVectorView<
-          ScalarNumber,
-          n_precomputed_values,
-          dealii::VectorizedArray<ScalarNumber>::size(),
-          MemorySpace,
-          /*writable=*/false>;
+      using PrecomputedVectorView = VectorView<n_precomputed_values>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * initial states:
        */
-      using InitialPrecomputedVectorView = MultiComponentVectorView<
-          ScalarNumber,
-          n_initial_precomputed_values,
-          dealii::VectorizedArray<ScalarNumber>::size(),
-          MemorySpace,
-          /*writable=*/false>;
+      using InitialPrecomputedVectorView =
+          VectorView<n_initial_precomputed_values>;
 
       //@}
       /**
@@ -727,10 +722,10 @@ namespace ryujin
           offline_data.sparsity_pattern_simd().template view<MemorySpace>();
 
       const auto U_view =
-          std::get<0>(std::as_const(state_vector))
-              .template view<ScalarView::problem_dimension, MemorySpace>();
+          std::as_const(state_vector)
+              .U.template view<ScalarView::problem_dimension, MemorySpace>();
       const auto precomputed_view =
-          std::get<1>(state_vector)
+          state_vector.precomputed
               .template view<ScalarView::n_precomputed_values, MemorySpace>();
 
       const auto hyperbolic_system_views =

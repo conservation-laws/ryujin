@@ -319,9 +319,9 @@ namespace ryujin
                                       StateVectorPart::hyperbolic);
 
       const auto old_U_view =
-          std::get<0>(old_state_vector).template view<problem_dimension>();
+          old_state_vector.U.template view<problem_dimension>();
       const auto new_U_view =
-          std::get<0>(new_state_vector).template view<problem_dimension>();
+          new_state_vector.U.template view<problem_dimension>();
 
       const auto lumped_mass_matrix_view =
           offline_data_->lumped_mass_matrix().template view<1>();
