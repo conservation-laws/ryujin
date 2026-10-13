@@ -651,6 +651,10 @@ namespace ryujin
       if constexpr (have_separate_memory_spaces)
         default_vector_.reinit(0);
 
+      /*
+       * If both memory spaces coincide the single host allocation is
+       * trivially resident on both of them:
+       */
       this->reset_residency(/*host*/ true,
                             /*default*/ !have_separate_memory_spaces);
 
@@ -666,53 +670,16 @@ namespace ryujin
         const unsigned int n_comp,
         const TransferPolicy transfer_policy)
     {
-      n_comp_ = n_comp;
-
       /*
-       * Drop the transfer policy for the duration of the reinit so that a
-       * pinned memory space of a previous policy does not interfere:
+       * A scalar vector (and a zero component vector) uses the scalar
+       * partitioner directly:
        */
-      this->set_transfer_policy(TransferPolicy::explicit_transfers);
+      const auto vector_partitioner =
+          n_comp <= 1 ? scalar_partitioner
+                      : create_vector_partitioner(scalar_partitioner, n_comp);
 
-      /* Special case of a zero component vector: */
-      if (n_comp == 0) {
-        /* Drop possibly stale storage from a previous reinit: */
-        host_vector_.reinit(0);
-        if constexpr (have_separate_memory_spaces)
-          default_vector_.reinit(0);
-
-        /* A zero component vector is trivially resident everywhere: */
-        this->reset_residency(/*host*/ true, /*default*/ true);
-        this->set_transfer_policy(transfer_policy);
-        return;
-      }
-
-      /* Special case of a scalar vector: */
-      if (n_comp == 1) {
-        host_vector_.reinit(scalar_partitioner);
-      } else {
-        auto vector_partitioner =
-            create_vector_partitioner(scalar_partitioner, n_comp);
-        host_vector_.reinit(vector_partitioner);
-      }
-
-      /*
-       * The vector is resident on the host memory space only. Device
-       * storage is allocated lazily on the first copy_to_memory_space() /
-       * move_to_memory_space(); drop possibly stale device storage from a
-       * previous reinit:
-       */
-      if constexpr (have_separate_memory_spaces)
-        default_vector_.reinit(0);
-
-      /*
-       * If both memory spaces coincide the single host allocation is
-       * trivially resident on both of them:
-       */
-      this->reset_residency(/*host*/ true,
-                            /*default*/ !have_separate_memory_spaces);
-
-      this->set_transfer_policy(transfer_policy);
+      reinit_with_vector_partitioner(
+          vector_partitioner, n_comp, transfer_policy);
     }
 
 
