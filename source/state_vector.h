@@ -192,16 +192,8 @@ namespace ryujin
     move_to_memory_space<MemorySpace>(
         dst, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
 
-    /*
-     * If the host and default memory spaces coincide all storage is
-     * held by the host vector:
-     */
-    using VectorSpace = std::conditional_t<have_separate_memory_spaces,
-                                           MemorySpace,
-                                           dealii::MemorySpace::Host>;
-
-    auto &dst_U = std::get<0>(dst).template deal_ii_vector<VectorSpace>();
-    const auto &src_U = std::get<0>(src).template deal_ii_vector<VectorSpace>();
+    auto &dst_U = std::get<0>(dst).template deal_ii_vector<MemorySpace>();
+    const auto &src_U = std::get<0>(src).template deal_ii_vector<MemorySpace>();
     dst_U.zero_out_ghost_values();
     dst_U.sadd(s, b, src_U);
 
@@ -210,8 +202,8 @@ namespace ryujin
     AssertDimension(dst_V.size(), src_V.size());
 
     for (std::size_t k = 0; k < dst_V.size(); ++k) {
-      auto &dst_V_k = dst_V[k].template deal_ii_vector<VectorSpace>();
-      const auto &src_V_k = src_V[k].template deal_ii_vector<VectorSpace>();
+      auto &dst_V_k = dst_V[k].template deal_ii_vector<MemorySpace>();
+      const auto &src_V_k = src_V[k].template deal_ii_vector<MemorySpace>();
       dst_V_k.zero_out_ghost_values();
       dst_V_k.sadd(s, b, src_V_k);
     }

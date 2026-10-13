@@ -167,8 +167,7 @@ namespace ryujin
      * view() apply.
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-    deal_ii_vector();
+    auto &deal_ii_vector();
 
     /**
      * Return a const reference to the underlying deal.II vector residing
@@ -178,41 +177,13 @@ namespace ryujin
      * read-only view() apply.
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-    deal_ii_vector() const;
+    const auto &deal_ii_vector() const;
 
     /*
      * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
      * transfer_policy(), and set_transfer_policy() methods are inherited
      * from the MirroredStorage base class.
      */
-
-    //@}
-    /**
-     * @name MPI synchronization
-     */
-    //@{
-
-    /**
-     * MPI synchronization: Zero out all ghost rows.
-     */
-    template <typename MemorySpace>
-    void zero_out_ghost_values_on_memory_space();
-
-    /**
-     * MPI synchronization: Import all ghost values from neighboring MPI
-     * ranks on the templated memory space.
-     */
-    template <typename MemorySpace>
-    void update_ghost_values_on_memory_space();
-
-    /**
-     * MPI synchronization: Copy the data that has accumulated in the
-     * ghost range to the owning processor. This function operates on the
-     * templated memory space.
-     */
-    template <typename MemorySpace>
-    void compress_on_memory_space(dealii::VectorOperation::values operation);
 
   private:
     //@}
@@ -239,6 +210,13 @@ namespace ryujin
     mutable dealii::LinearAlgebra::distributed::
         Vector<Number, dealii::MemorySpace::Default>
             default_vector_;
+
+    /*
+     * Return the deal.II vector holding the data of the selected memory
+     * space:
+     */
+    template <typename MemorySpace>
+    auto &storage() const;
 
     /*
      * Storage primitives used by the MirroredStorage base class:
@@ -737,29 +715,37 @@ namespace ryujin
 
   template <typename Number>
   template <typename MemorySpace>
-  dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-  MultiComponentVector<Number>::deal_ii_vector()
+  auto &MultiComponentVector<Number>::deal_ii_vector()
   {
     this->template prepare_write_access<MemorySpace>();
-
-    if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
-      return host_vector_;
-    else
-      return default_vector_;
+    return storage<MemorySpace>();
   }
 
 
   template <typename Number>
   template <typename MemorySpace>
-  const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-  MultiComponentVector<Number>::deal_ii_vector() const
+  const auto &MultiComponentVector<Number>::deal_ii_vector() const
   {
     this->template prepare_read_access<MemorySpace>();
+    return storage<MemorySpace>();
+  }
 
-    if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>)
-      return host_vector_;
-    else
+
+  template <typename Number>
+  template <typename MemorySpace>
+  auto &MultiComponentVector<Number>::storage() const
+  {
+    using HostSpace = dealii::MemorySpace::Host;
+    using DefaultSpace = dealii::MemorySpace::Default;
+    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
+                      std::is_same_v<MemorySpace, DefaultSpace>,
+                  "Unexpected memory space");
+
+    if constexpr (have_separate_memory_spaces &&
+                  !std::is_same_v<MemorySpace, HostSpace>)
       return default_vector_;
+    else
+      return host_vector_;
   }
 
 
@@ -815,73 +801,6 @@ namespace ryujin
   }
 
 
-  template <typename Number>
-  template <typename MemorySpace>
-  void MultiComponentVector<Number>::zero_out_ghost_values_on_memory_space()
-  {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
-    Assert(this->template is_resident<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not resident."));
-
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      default_vector_.zero_out_ghost_values();
-    } else {
-      host_vector_.zero_out_ghost_values();
-    }
-  }
-
-
-  template <typename Number>
-  template <typename MemorySpace>
-  void MultiComponentVector<Number>::update_ghost_values_on_memory_space()
-  {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
-    Assert(this->template is_resident<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not resident."));
-
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      default_vector_.update_ghost_values();
-    } else {
-      host_vector_.update_ghost_values();
-    }
-  }
-
-
-  template <typename Number>
-  template <typename MemorySpace>
-  void MultiComponentVector<Number>::compress_on_memory_space(
-      dealii::VectorOperation::values operation)
-  {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
-    Assert(this->template is_resident<MemorySpace>(),
-           dealii::ExcMessage("The chosen memory space is not resident."));
-
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      default_vector_.compress(operation);
-    } else {
-      host_vector_.compress(operation);
-    }
-  }
-
-
   template <typename Number, int n_comp, typename MemorySpace, bool writable>
   MultiComponentVectorView<Number, n_comp, MemorySpace, writable>::
       MultiComponentVectorView(
@@ -926,12 +845,6 @@ namespace ryujin
       MultiComponentVector &multi_component_vector)
     requires(writable != std::is_const_v<MultiComponentVector>)
   {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
     Assert(multi_component_vector.n_comp() == static_cast<unsigned int>(n_comp),
            dealii::ExcMessage("The number of components of the view does "
                               "not match the number of components of the "
@@ -939,23 +852,12 @@ namespace ryujin
 
     multi_component_vector_ = &multi_component_vector;
 
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      auto &vector = multi_component_vector_->default_vector_;
-      const auto &partitioner = vector.get_partitioner();
+    auto &vector = multi_component_vector_->template storage<MemorySpace>();
+    const auto &partitioner = vector.get_partitioner();
 
-      data_ = vector.begin();
-      n_locally_owned_ = partitioner->locally_owned_size();
-      n_locally_relevant_ = n_locally_owned_ + partitioner->n_ghost_indices();
-
-    } else {
-      auto &vector = multi_component_vector_->host_vector_;
-      const auto &partitioner = vector.get_partitioner();
-
-      data_ = vector.begin();
-      n_locally_owned_ = partitioner->locally_owned_size();
-      n_locally_relevant_ = n_locally_owned_ + partitioner->n_ghost_indices();
-    }
+    data_ = vector.begin();
+    n_locally_owned_ = partitioner->locally_owned_size();
+    n_locally_relevant_ = n_locally_owned_ + partitioner->n_ghost_indices();
   }
 
 
@@ -1282,17 +1184,11 @@ namespace ryujin
       zero_out_ghost_values() const
     requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
     Assert(multi_component_vector_->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
-    multi_component_vector_
-        ->template zero_out_ghost_values_on_memory_space<MemorySpace>();
+    multi_component_vector_->template storage<MemorySpace>()
+        .zero_out_ghost_values();
   }
 
 
@@ -1301,17 +1197,11 @@ namespace ryujin
       update_ghost_values() const
     requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
     Assert(multi_component_vector_->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
-    multi_component_vector_
-        ->template update_ghost_values_on_memory_space<MemorySpace>();
+    multi_component_vector_->template storage<MemorySpace>()
+        .update_ghost_values();
   }
 
 
@@ -1321,16 +1211,10 @@ namespace ryujin
       dealii::VectorOperation::values operation) const
     requires(writable)
   {
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
     Assert(multi_component_vector_->template is_resident<MemorySpace>(),
            dealii::ExcMessage("The chosen memory space is not resident."));
 
-    multi_component_vector_->template compress_on_memory_space<MemorySpace>(
+    multi_component_vector_->template storage<MemorySpace>().compress(
         operation);
   }
 
