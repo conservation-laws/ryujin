@@ -55,17 +55,15 @@ namespace ryujin
 
     /**
      * A wrapper around dealii::LinearAlgebra::distributed::Vector<Number>
-     * that stores a vector element of @p n_comp components per entry
+     * that stores a vector element of n_comp() components per entry
      * (instead of a scalar value).
      *
      * @ingroup LinearAlgebra
      */
     template <typename Number,
-              int n_comp,
               int simd_length = dealii::VectorizedArray<Number>::size()>
     class MultiComponentVector
-        : public MirroredStorage<
-              MultiComponentVector<Number, n_comp, simd_length>>
+        : public MirroredStorage<MultiComponentVector<Number, simd_length>>
     {
     public:
       /**
@@ -81,7 +79,8 @@ namespace ryujin
 
       /**
        * Reinitializes the MultiComponentVector with a vector MPI partitioner
-       * that was created first with create_vector_partitioner().
+       * that was created first with create_vector_partitioner() for @p n_comp
+       * components.
        *
        * After reinit the vector is resident on the host memory space only;
        * device storage is allocated lazily on the first
@@ -95,13 +94,15 @@ namespace ryujin
       void reinit_with_vector_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &vector_partitioner,
+          const unsigned int n_comp,
           const TransferPolicy transfer_policy =
               TransferPolicy::explicit_transfers);
 
       /**
-       * Reinitializes the MultiComponentVector with a scalar MPI partitioner.
-       * The function calls create_vector_partitioner() internally to
-       * create and store a corresponding "vector" MPI partitioner.
+       * Reinitializes the MultiComponentVector with a scalar MPI partitioner
+       * for @p n_comp components. The function calls
+       * create_vector_partitioner() internally to create and store a
+       * corresponding "vector" MPI partitioner.
        *
        * After reinit the vector is resident on the host memory space only;
        * device storage is allocated lazily on the first
@@ -115,8 +116,14 @@ namespace ryujin
       void reinit_with_scalar_partitioner(
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &scalar_partitioner,
+          const unsigned int n_comp,
           const TransferPolicy transfer_policy =
               TransferPolicy::explicit_transfers);
+
+      /**
+       * Return the number of components per entry.
+       */
+      ACCESSOR_READ_ONLY(n_comp)
 
       MultiComponentVector &operator=(const MultiComponentVector &other);
 
@@ -135,8 +142,10 @@ namespace ryujin
        * (TransferPolicy::explicit_transfers), or performs an implicit
        * move_to_memory_space() invalidating the other memory space
        * (TransferPolicy::implicit_transfers).
+       *
+       * The template parameter @p n_comp has to match n_comp().
        */
-      template <typename MemorySpace = dealii::MemorySpace::Host>
+      template <int n_comp, typename MemorySpace = dealii::MemorySpace::Host>
       MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
       view();
 
@@ -146,25 +155,26 @@ namespace ryujin
        * asserts that the memory space is resident
        * (TransferPolicy::explicit_transfers), or performs an implicit
        * copy_to_memory_space() (TransferPolicy::implicit_transfers).
+       *
+       * The template parameter @p n_comp has to match n_comp().
        */
-      template <typename MemorySpace = dealii::MemorySpace::Host>
+      template <int n_comp, typename MemorySpace = dealii::MemorySpace::Host>
       MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
       view() const;
 
       /**
        * Return a reference to the underlying deal.II vector residing in
-       * the selected memory space. This accessor is only available for
-       * scalar vectors (n_comp == 1) whose underlying deal.II vector is
-       * compatible with a scalar partitioner and can thus be used with
-       * deal.II functions and methods directly.
+       * the selected memory space.
+       *
+       * @note Only for n_comp() == 1 is the deal.II vector compatible with
+       * the scalar DoFHandler.
        *
        * @note The same residency and transfer semantics as for the writable
        * view() apply.
        */
       template <typename MemorySpace = dealii::MemorySpace::Host>
       dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-      deal_ii_vector()
-        requires(n_comp == 1);
+      deal_ii_vector();
 
       /**
        * Return a const reference to the underlying deal.II vector residing
@@ -175,8 +185,7 @@ namespace ryujin
        */
       template <typename MemorySpace = dealii::MemorySpace::Host>
       const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-      deal_ii_vector() const
-        requires(n_comp == 1);
+      deal_ii_vector() const;
 
       /*
        * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
@@ -218,6 +227,8 @@ namespace ryujin
        */
       //@{
 
+      unsigned int n_comp_ = 0;
+
       /*
        * Note: The storage is marked mutable so that the (logically const)
        * copy_to_memory_space() operation can populate a mirror from within
@@ -249,8 +260,7 @@ namespace ryujin
       void deallocate_storage();
 
 
-      friend class MirroredStorage<
-          MultiComponentVector<Number, n_comp, simd_length>>;
+      friend class MirroredStorage<MultiComponentVector<Number, simd_length>>;
 
       template <typename, int, int, typename, bool>
       friend class MultiComponentVectorView;
@@ -288,13 +298,12 @@ namespace ryujin
 
       MultiComponentVectorView() = default;
 
-      MultiComponentVectorView(MultiComponentVector<Number, n_comp, simd_length>
-                                   &multi_component_vector)
+      MultiComponentVectorView(
+          MultiComponentVector<Number, simd_length> &multi_component_vector)
         requires(writable);
 
-      MultiComponentVectorView(
-          const MultiComponentVector<Number, n_comp, simd_length>
-              &multi_component_vector)
+      MultiComponentVectorView(const MultiComponentVector<Number, simd_length>
+                                   &multi_component_vector)
         requires(!writable);
 
       /**
@@ -334,7 +343,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name Extracting and inserting components, scaled addition
+       * @name Extracting and inserting components
        */
       //@{
 
@@ -396,19 +405,6 @@ namespace ryujin
       void insert_component(const dealii::Vector<Number> &scalar_vector,
                             unsigned int component,
                             const Functor &functor = std::identity{}) const
-        requires writable;
-
-      /**
-       * Scaled addition of the given vector $U$ and the argument vector
-       * $V$: $U\leftarrow s\,U+a\,V$.
-       */
-      void sadd(const Number s,
-                const Number a,
-                const MultiComponentVectorView<Number,
-                                               n_comp,
-                                               simd_length,
-                                               MemorySpace,
-                                               /*writable=*/false> &v) const
         requires writable;
 
       //@}
@@ -577,7 +573,7 @@ namespace ryujin
        */
       //@{
 
-      using MCV = MultiComponentVector<Number, n_comp, simd_length>;
+      using MCV = MultiComponentVector<Number, simd_length>;
       std::conditional_t<writable, MCV *, const MCV *> multi_component_vector_;
 
       Number *data_;
@@ -599,29 +595,32 @@ namespace ryujin
      */
 
 
-    template <typename Number, int n_comp, int simd_length>
-    MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
+    template <typename Number, int simd_length>
+    MultiComponentVector<Number, simd_length>::MultiComponentVector(
         const MultiComponentVector &other)
     {
       *this = other;
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    MultiComponentVector<Number, n_comp, simd_length>::MultiComponentVector(
+    template <typename Number, int simd_length>
+    MultiComponentVector<Number, simd_length>::MultiComponentVector(
         MultiComponentVector &&other) noexcept
     {
-      *this = other;
+      *this = std::move(other);
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    void MultiComponentVector<Number, n_comp, simd_length>::
-        reinit_with_vector_partitioner(
-            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &vector_partitioner,
-            const TransferPolicy transfer_policy)
+    template <typename Number, int simd_length>
+    void
+    MultiComponentVector<Number, simd_length>::reinit_with_vector_partitioner(
+        const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+            &vector_partitioner,
+        const unsigned int n_comp,
+        const TransferPolicy transfer_policy)
     {
+      n_comp_ = n_comp;
+
       /*
        * Drop the transfer policy for the duration of the reinit so that a
        * pinned memory space of a previous policy does not interfere:
@@ -630,6 +629,11 @@ namespace ryujin
 
       /* Special case of a zero component vector */
       if (n_comp == 0) {
+        /* Drop possibly stale storage from a previous reinit: */
+        host_vector_.reinit(0);
+        if constexpr (have_separate_memory_spaces)
+          default_vector_.reinit(0);
+
         /* A zero component vector is trivially resident everywhere: */
         this->reset_residency(/*host*/ true, /*default*/ true);
         this->set_transfer_policy(transfer_policy);
@@ -654,13 +658,16 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    void MultiComponentVector<Number, n_comp, simd_length>::
-        reinit_with_scalar_partitioner(
-            const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                &scalar_partitioner,
-            const TransferPolicy transfer_policy)
+    template <typename Number, int simd_length>
+    void
+    MultiComponentVector<Number, simd_length>::reinit_with_scalar_partitioner(
+        const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+            &scalar_partitioner,
+        const unsigned int n_comp,
+        const TransferPolicy transfer_policy)
     {
+      n_comp_ = n_comp;
+
       /*
        * Drop the transfer policy for the duration of the reinit so that a
        * pinned memory space of a previous policy does not interfere:
@@ -669,6 +676,11 @@ namespace ryujin
 
       /* Special case of a zero component vector: */
       if (n_comp == 0) {
+        /* Drop possibly stale storage from a previous reinit: */
+        host_vector_.reinit(0);
+        if constexpr (have_separate_memory_spaces)
+          default_vector_.reinit(0);
+
         /* A zero component vector is trivially resident everywhere: */
         this->reset_residency(/*host*/ true, /*default*/ true);
         this->set_transfer_policy(transfer_policy);
@@ -704,12 +716,13 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    auto MultiComponentVector<Number, n_comp, simd_length>::operator=(
+    template <typename Number, int simd_length>
+    auto MultiComponentVector<Number, simd_length>::operator=(
         const MultiComponentVector &other) -> MultiComponentVector &
     {
       /* Copy residency state and transfer policy: */
       static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
+      n_comp_ = other.n_comp_;
 
       host_vector_ = other.host_vector_;
       if constexpr (have_separate_memory_spaces)
@@ -719,12 +732,13 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    auto MultiComponentVector<Number, n_comp, simd_length>::operator=(
+    template <typename Number, int simd_length>
+    auto MultiComponentVector<Number, simd_length>::operator=(
         MultiComponentVector &&other) noexcept -> MultiComponentVector &
     {
       /* Copy residency state and transfer policy: */
       static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
+      n_comp_ = other.n_comp_;
 
       host_vector_ = std::move(other.host_vector_);
       if constexpr (have_separate_memory_spaces)
@@ -734,11 +748,16 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    template <typename MemorySpace>
+    template <typename Number, int simd_length>
+    template <int n_comp, typename MemorySpace>
     MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, true>
-    MultiComponentVector<Number, n_comp, simd_length>::view()
+    MultiComponentVector<Number, simd_length>::view()
     {
+      Assert(static_cast<unsigned int>(n_comp) == n_comp_,
+             dealii::ExcMessage("The number of components of the view does "
+                                "not match the number of components of the "
+                                "vector."));
+
       this->template prepare_write_access<MemorySpace>();
 
       return MultiComponentVectorView<Number,
@@ -749,11 +768,16 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
-    template <typename MemorySpace>
+    template <typename Number, int simd_length>
+    template <int n_comp, typename MemorySpace>
     MultiComponentVectorView<Number, n_comp, simd_length, MemorySpace, false>
-    MultiComponentVector<Number, n_comp, simd_length>::view() const
+    MultiComponentVector<Number, simd_length>::view() const
     {
+      Assert(static_cast<unsigned int>(n_comp) == n_comp_,
+             dealii::ExcMessage("The number of components of the view does "
+                                "not match the number of components of the "
+                                "vector."));
+
       this->template prepare_read_access<MemorySpace>();
 
       return MultiComponentVectorView<Number,
@@ -764,11 +788,10 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
     dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-    MultiComponentVector<Number, n_comp, simd_length>::deal_ii_vector()
-      requires(n_comp == 1)
+    MultiComponentVector<Number, simd_length>::deal_ii_vector()
     {
       this->template prepare_write_access<MemorySpace>();
 
@@ -779,11 +802,10 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
     const dealii::LinearAlgebra::distributed::Vector<Number, MemorySpace> &
-    MultiComponentVector<Number, n_comp, simd_length>::deal_ii_vector() const
-      requires(n_comp == 1)
+    MultiComponentVector<Number, simd_length>::deal_ii_vector() const
     {
       this->template prepare_read_access<MemorySpace>();
 
@@ -794,10 +816,9 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
-    void
-    MultiComponentVector<Number, n_comp, simd_length>::allocate_storage() const
+    void MultiComponentVector<Number, simd_length>::allocate_storage() const
     {
       using HostSpace = dealii::MemorySpace::Host;
 
@@ -816,10 +837,9 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number, int simd_length>
     template <typename To, typename From>
-    void
-    MultiComponentVector<Number, n_comp, simd_length>::deep_copy_storage() const
+    void MultiComponentVector<Number, simd_length>::deep_copy_storage() const
     {
       using HostSpace = dealii::MemorySpace::Host;
 
@@ -833,9 +853,9 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_comp, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
-    void MultiComponentVector<Number, n_comp, simd_length>::deallocate_storage()
+    void MultiComponentVector<Number, simd_length>::deallocate_storage()
     {
       using HostSpace = dealii::MemorySpace::Host;
 
@@ -848,10 +868,11 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
-    void MultiComponentVector<Number, n_components, simd_length>::
-        zero_out_ghost_values_on_memory_space()
+    void
+    MultiComponentVector<Number,
+                         simd_length>::zero_out_ghost_values_on_memory_space()
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
@@ -871,10 +892,11 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
-    void MultiComponentVector<Number, n_components, simd_length>::
-        update_ghost_values_on_memory_space()
+    void
+    MultiComponentVector<Number,
+                         simd_length>::update_ghost_values_on_memory_space()
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
@@ -894,10 +916,10 @@ namespace ryujin
     }
 
 
-    template <typename Number, int n_components, int simd_length>
+    template <typename Number, int simd_length>
     template <typename MemorySpace>
-    void MultiComponentVector<Number, n_components, simd_length>::
-        compress_on_memory_space(dealii::VectorOperation::values operation)
+    void MultiComponentVector<Number, simd_length>::compress_on_memory_space(
+        dealii::VectorOperation::values operation)
     {
       using HostSpace = dealii::MemorySpace::Host;
       using DefaultSpace = dealii::MemorySpace::Default;
@@ -923,8 +945,8 @@ namespace ryujin
               typename MemorySpace,
               bool writable>
     MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
-        MultiComponentVectorView(MultiComponentVector<Number, n_comp, simd_l>
-                                     &multi_component_vector)
+        MultiComponentVectorView(
+            MultiComponentVector<Number, simd_l> &multi_component_vector)
       requires(writable)
     {
       reinit(multi_component_vector);
@@ -938,8 +960,7 @@ namespace ryujin
               bool writable>
     MultiComponentVectorView<Number, n_comp, simd_l, MemorySpace, writable>::
         MultiComponentVectorView(
-            const MultiComponentVector<Number, n_comp, simd_l>
-                &multi_component_vector)
+            const MultiComponentVector<Number, simd_l> &multi_component_vector)
       requires(!writable)
     {
       reinit(multi_component_vector);
@@ -985,6 +1006,12 @@ namespace ryujin
       static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                         std::is_same_v<MemorySpace, DefaultSpace>,
                     "Unexpected memory space");
+
+      Assert(multi_component_vector.n_comp() ==
+                 static_cast<unsigned int>(n_comp),
+             dealii::ExcMessage("The number of components of the view does "
+                                "not match the number of components of the "
+                                "vector."));
 
       multi_component_vector_ = &multi_component_vector;
 
@@ -1119,36 +1146,6 @@ namespace ryujin
 
       for (unsigned int i = 0; i < local_size; ++i)
         data_[i * n_comp + component] = functor(scalar_vector[i]);
-    }
-
-
-    template <typename Num, int n_comp, int simd_l, typename MS, bool writable>
-    void MultiComponentVectorView<Num, n_comp, simd_l, MS, writable>::sadd(
-        const Num s,
-        const Num a,
-        const MultiComponentVectorView<Num,
-                                       n_comp,
-                                       simd_l,
-                                       MS,
-                                       /*writable=*/false> &v) const
-      requires writable
-    {
-      using HS = dealii::MemorySpace::Host;
-      using DS = dealii::MemorySpace::Default;
-      static_assert(std::is_same_v<MS, HS> || std::is_same_v<MS, DS>,
-                    "Unexpected memory space");
-
-      /*
-       * Note: If the host and default memory spaces coincide all views
-       * reference the host storage.
-       */
-      if constexpr (have_separate_memory_spaces && !std::is_same_v<MS, HS>) {
-        const auto &other = v.multi_component_vector_->default_vector_;
-        multi_component_vector_->default_vector_.sadd(s, a, other);
-      } else {
-        const auto &other = v.multi_component_vector_->host_vector_;
-        multi_component_vector_->host_vector_.sadd(s, a, other);
-      }
     }
 
 

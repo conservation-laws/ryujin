@@ -10,7 +10,9 @@
 #include "computing_timer.h"
 #include "multicomponent_vector.h"
 
+#include <algorithm>
 #include <concepts>
+#include <limits>
 #include <tuple>
 #include <vector>
 
@@ -39,10 +41,11 @@ namespace ryujin
 
 
     /**
-     * A scalar vector representing a single component.
+     * A scalar vector representing a single component, i.e., a
+     * MultiComponentVector with n_comp() == 1.
      */
     template <typename Number>
-    using ScalarVector = MultiComponentVector<Number, 1>;
+    using ScalarVector = MultiComponentVector<Number>;
 
 
     /**
@@ -53,11 +56,11 @@ namespace ryujin
      * associated with a hyperbolic, or parabolic state and precomputed
      * data (derived from the hyperbolic state) for point in time.
      */
-    template <typename Number, unsigned int problem_dim, unsigned int prec_dim>
-    using StateVector = std::tuple<
-        MultiComponentVector<Number, problem_dim> /*U*/,
-        MultiComponentVector<Number, prec_dim> /*precomputed values*/,
-        std::vector<ScalarVector<Number>> /*parabolic state*/>;
+    template <typename Number>
+    using StateVector =
+        std::tuple<MultiComponentVector<Number> /*U*/,
+                   MultiComponentVector<Number> /*precomputed values*/,
+                   std::vector<ScalarVector<Number>> /*parabolic state*/>;
 
 
     /**
@@ -78,13 +81,10 @@ namespace ryujin
      */
     template <typename MemorySpace,
               typename Number,
-              int prob_dim,
-              int prec_dim,
               std::same_as<StateVectorPart>... Parts>
-    void copy_to_memory_space(
-        const StateVector<Number, prob_dim, prec_dim> &state_vector
-        [[maybe_unused]],
-        Parts... parts [[maybe_unused]])
+    void copy_to_memory_space(const StateVector<Number> &state_vector
+                              [[maybe_unused]],
+                              Parts... parts [[maybe_unused]])
     {
       static_assert(sizeof...(Parts) > 0, "No state vector part selected");
 
@@ -118,13 +118,10 @@ namespace ryujin
      * (scalar, or multi-component) @p vector is resident on @p MemorySpace
      * for read access.
      */
-    template <typename MemorySpace,
-              typename Number,
-              int n_comp,
-              int simd_length>
-    void copy_to_memory_space(
-        const MultiComponentVector<Number, n_comp, simd_length> &vector
-        [[maybe_unused]])
+    template <typename MemorySpace, typename Number, int simd_length>
+    void
+    copy_to_memory_space(const MultiComponentVector<Number, simd_length> &vector
+                         [[maybe_unused]])
     {
       if constexpr (have_separate_memory_spaces) {
         ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
@@ -139,13 +136,10 @@ namespace ryujin
      */
     template <typename MemorySpace,
               typename Number,
-              int prob_dim,
-              int prec_dim,
               std::same_as<StateVectorPart>... Parts>
-    void
-    move_to_memory_space(StateVector<Number, prob_dim, prec_dim> &state_vector
-                         [[maybe_unused]],
-                         Parts... parts [[maybe_unused]])
+    void move_to_memory_space(StateVector<Number> &state_vector
+                              [[maybe_unused]],
+                              Parts... parts [[maybe_unused]])
     {
       static_assert(sizeof...(Parts) > 0, "No state vector part selected");
 
@@ -179,17 +173,57 @@ namespace ryujin
      * (scalar, or multi-component) @p vector is resident on @p MemorySpace
      * for write access.
      */
-    template <typename MemorySpace,
-              typename Number,
-              int n_comp,
-              int simd_length>
-    void move_to_memory_space(
-        MultiComponentVector<Number, n_comp, simd_length> &vector
-        [[maybe_unused]])
+    template <typename MemorySpace, typename Number, int simd_length>
+    void move_to_memory_space(MultiComponentVector<Number, simd_length> &vector
+                              [[maybe_unused]])
     {
       if constexpr (have_separate_memory_spaces) {
         ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
         vector.template move_to_memory_space<MemorySpace>();
+      }
+    }
+
+
+    /**
+     * Scaled addition $U\leftarrow s\,U+b\,V$ of the hyperbolic state
+     * and all components of the parabolic state of the given state vectors
+     * @p dst and @p src. The operation is performed on @p MemorySpace.
+     * The precomputed values are left untouched.
+     */
+    template <typename MemorySpace, typename Number>
+    void sadd(StateVector<Number> &dst,
+              const Number s,
+              const Number b,
+              const StateVector<Number> &src)
+    {
+      copy_to_memory_space<MemorySpace>(
+          src, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
+      move_to_memory_space<MemorySpace>(
+          dst, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
+
+      /*
+       * If the host and default memory spaces coincide all storage is
+       * held by the host vector:
+       */
+      using VectorSpace = std::conditional_t<have_separate_memory_spaces,
+                                             MemorySpace,
+                                             dealii::MemorySpace::Host>;
+
+      auto &dst_U = std::get<0>(dst).template deal_ii_vector<VectorSpace>();
+      const auto &src_U =
+          std::get<0>(src).template deal_ii_vector<VectorSpace>();
+      dst_U.zero_out_ghost_values();
+      dst_U.sadd(s, b, src_U);
+
+      auto &dst_V = std::get<2>(dst);
+      const auto &src_V = std::get<2>(src);
+      AssertDimension(dst_V.size(), src_V.size());
+
+      for (std::size_t k = 0; k < dst_V.size(); ++k) {
+        auto &dst_V_k = dst_V[k].template deal_ii_vector<VectorSpace>();
+        const auto &src_V_k = src_V[k].template deal_ii_vector<VectorSpace>();
+        dst_V_k.zero_out_ghost_values();
+        dst_V_k.sadd(s, b, src_V_k);
       }
     }
 
@@ -202,10 +236,11 @@ namespace ryujin
      *  - constrained degrees of freedom of the hyperbolic state vector
      *  - the ghost range of the hyperbolic state vector
      */
-    template <typename Number, int prob_dim, int prec_dim, typename OfflineData>
-    void debug_poison_invalid_values(
-        StateVector<Number, prob_dim, prec_dim> &state_vector [[maybe_unused]],
-        const OfflineData &offline_data [[maybe_unused]])
+    template <typename Number, typename OfflineData>
+    void debug_poison_invalid_values(StateVector<Number> &state_vector
+                                     [[maybe_unused]],
+                                     const OfflineData &offline_data
+                                     [[maybe_unused]])
     {
 #ifdef DEBUG
 
@@ -222,22 +257,28 @@ namespace ryujin
       const unsigned int n_relevant = offline_data.n_locally_relevant();
       const auto &partitioner = offline_data.scalar_partitioner();
 
-      const auto U_view = U.view();
-      const auto prec_view = prec.view();
+      /*
+       * The number of components is a run time property: work on the
+       * underlying deal.II vectors with n_comp() as stride.
+       */
+      const unsigned int prob_dim = U.n_comp();
+      const unsigned int prec_dim = prec.n_comp();
+      Number *const U_data = U.deal_ii_vector().begin();
+      Number *const prec_data = prec.deal_ii_vector().begin();
 
       for (unsigned int i = 0; i < n_owned; ++i) {
-        prec_view.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
+        std::fill_n(prec_data + i * prec_dim, prec_dim, nan);
 
         if (!offline_data.affine_constraints().is_constrained(
                 partitioner->local_to_global(i)))
           continue;
-        U_view.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
+        std::fill_n(U_data + i * prob_dim, prob_dim, nan);
       }
 
       for (unsigned int i = n_owned; i < n_relevant; ++i) {
-        prec_view.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
+        std::fill_n(prec_data + i * prec_dim, prec_dim, nan);
 
-        U_view.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
+        std::fill_n(U_data + i * prob_dim, prob_dim, nan);
       }
 #endif
     }
