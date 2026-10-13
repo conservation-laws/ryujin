@@ -8,6 +8,8 @@
 #include <compile_time_options.h>
 #include <convenience_macros.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -24,15 +26,33 @@ namespace ryujin
      *
      * @ingroup EulerPoissonEquations
      */
-    class ParabolicSystem final : public dealii::ParameterAcceptor
+    class ParabolicSystem final : public Interface::ParabolicSystem
     {
     public:
-      static inline const std::string problem_name =
-          "Electrostatic force model with background magnetic field";
+      ParabolicSystem(const std::string &subsection = "/ParabolicSystem");
 
+      /**
+       * Whether the parabolic system is the identity.
+       */
       static constexpr bool is_identity = false;
 
-      ParabolicSystem(const std::string &subsection = "/ParabolicSystem");
+      /**
+       * The electrostatic potential.
+       */
+      std::vector<std::string>
+      state_names(const unsigned int /*dim*/) const override
+      {
+        return {"phi"};
+      }
+
+      /**
+       * No precomputed values.
+       */
+      std::vector<std::string>
+      precomputed_names(const unsigned int /*dim*/) const override
+      {
+        return {};
+      }
 
       ACCESSOR_READ_ONLY(alpha)
 
@@ -42,28 +62,19 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(subsection);
 
-      unsigned int n_parabolic_state_vectors() const
-      {
-        return parabolic_component_names_.size();
-      }
-
-
-      ACCESSOR_READ_ONLY(parabolic_component_names);
-
     private:
       double alpha_;
       bool magnetic_drift_limit_;
       std::string subsection_;
 
       std::string electrostatic_configuration_;
-
-      static inline const std::vector<std::string> parabolic_component_names_ =
-          {"phi"};
     };
 
 
     inline ParabolicSystem::ParabolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::ParabolicSystem(
+              "Electrostatic force model with background magnetic field",
+              subsection)
         , subsection_(subsection)
     {
       alpha_ = 1.0;

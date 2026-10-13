@@ -1,58 +1,54 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2025 by the ryujin authors
+// Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <compile_time_options.h>
 
-#include <convenience_macros.h>
-
-#include <deal.II/base/parameter_acceptor.h>
+#include <ryujin/interface/parabolic_system.h>
 
 namespace ryujin
 {
   /**
-   * The parabolic subsystem of the compressible Euler equations. This is
-   * just the idenity operator.
+   * The parabolic subsystem of a purely hyperbolic equation. This is just
+   * the identity operator.
    *
    * @ingroup ParabolicModule
    */
-  class StubParabolicSystem final : public dealii::ParameterAcceptor
+  class StubParabolicSystem final : public Interface::ParabolicSystem
   {
   public:
     /**
-     * The name of the hyperbolic system as a string.
+     * Constructor.
      */
-    static inline const std::string problem_name = "Identity";
+    StubParabolicSystem(const std::string &subsection = "/ParabolicSystem")
+        : Interface::ParabolicSystem("Identity", subsection)
+    {
+    }
 
     /**
-     * This parabolic subsystem represents an identity.
+     * Whether the parabolic system is the identity.
      */
     static constexpr bool is_identity = true;
 
     /**
-     * Constructor.
+     * No state components.
      */
-    StubParabolicSystem(const std::string &subsection = "/ParabolicSystem");
+    std::vector<std::string>
+    state_names(const unsigned int /*dim*/) const override
+    {
+      return {};
+    }
 
-    ACCESSOR_READ_ONLY(parabolic_component_names);
-
-  private:
-    const std::vector<std::string> parabolic_component_names_;
+    /**
+     * No precomputed values.
+     */
+    std::vector<std::string>
+    precomputed_names(const unsigned int /*dim*/) const override
+    {
+      return {};
+    }
   }; /* StubParabolicSystem */
-
-
-  /*
-   * -------------------------------------------------------------------------
-   * Inline definitions
-   * -------------------------------------------------------------------------
-   */
-
-
-  inline StubParabolicSystem::StubParabolicSystem(const std::string &subsection)
-      : ParameterAcceptor(subsection)
-  {
-  }
 } // namespace ryujin

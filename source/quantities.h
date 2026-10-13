@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "gpu.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
@@ -53,7 +55,6 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -69,7 +70,7 @@ namespace ryujin
     Quantities(const MPIEnsemble &mpi_ensemble,
                const OfflineData<dim, Number> &offline_data,
                const HyperbolicSystem &hyperbolic_system,
-               const ParabolicSystem &parabolic_system,
+               const Interface::ParabolicSystem &parabolic_system,
                const MultiComponentVector<Number> &initial_precomputed,
                const std::string &subsection = "/Quantities");
 

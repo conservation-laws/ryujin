@@ -1074,7 +1074,8 @@ namespace ryujin
 
     stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
     if constexpr (!ParabolicSystem::is_identity) {
-      stream << "\n             (PAR) " << parabolic_system_.get().problem_name;
+      stream << "\n             (PAR) "
+             << parabolic_system_.get().problem_name();
     }
     stream << "\n             [" << base_name_ << "] ";
     if (mpi_ensemble_.n_ensembles() > 1) {

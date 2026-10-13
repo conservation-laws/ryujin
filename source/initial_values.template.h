@@ -21,7 +21,7 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const ParabolicSystem &parabolic_system,
+      const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)

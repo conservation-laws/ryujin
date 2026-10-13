@@ -29,7 +29,7 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const ParabolicSystem &parabolic_system,
+      const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
       : ParameterAcceptor(subsection)
       , limiter_(hyperbolic_system, subsection + "/mass transfer limiter")

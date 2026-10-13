@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
@@ -47,7 +49,6 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -73,7 +74,7 @@ namespace ryujin
     Postprocessor(const MPIEnsemble &mpi_ensemble,
                   const OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
-                  const ParabolicSystem &parabolic_system,
+                  const Interface::ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/Postprocessor");
 
     /**
@@ -166,7 +167,7 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
+    dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 
     std::vector<std::string> component_names_;
     std::vector<std::pair<bool /*primitive*/, unsigned int>> schlieren_indices_;

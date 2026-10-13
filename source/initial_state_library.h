@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -106,7 +108,6 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem
      */
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
      * The type of the initial state list
@@ -123,7 +124,7 @@ namespace ryujin
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,
                                 const HyperbolicSystem &h,
-                                const ParabolicSystem &p,
+                                const Interface::ParabolicSystem &p,
                                 const std::string &s);
   };
 } // namespace ryujin

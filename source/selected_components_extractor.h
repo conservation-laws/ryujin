@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "gpu.h"
 #include "loop.h"
 #include "observer_pointer.h"
@@ -83,7 +85,6 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -122,7 +123,7 @@ namespace ryujin
     SelectedComponentsExtractor(
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
-        const ParabolicSystem &parabolic_system,
+        const Interface::ParabolicSystem &parabolic_system,
         const MultiComponentVector<Number> &initial_precomputed,
         const std::vector<std::string> &additional_names = {},
         const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
@@ -194,7 +195,7 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
+    dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 
     const MultiComponentVector<Number> &initial_precomputed_;
 
@@ -403,7 +404,7 @@ namespace ryujin
       SelectedComponentsExtractor(
           const OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
-          const ParabolicSystem &parabolic_system,
+          const Interface::ParabolicSystem &parabolic_system,
           const MultiComponentVector<Number> &initial_precomputed,
           const std::vector<std::string> &additional_names,
           const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
@@ -415,7 +416,7 @@ namespace ryujin
       , additional_names_(additional_names)
       , additional_vectors_(additional_vectors)
       , additional_offset_(parabolic_offset +
-                           parabolic_system.parabolic_component_names().size())
+                           parabolic_system.state_names(dim).size())
   {
     Assert(additional_names_.size() == additional_vectors_.size(),
            dealii::ExcMessage("The number of additional component names does "
@@ -445,8 +446,7 @@ namespace ryujin
           search(View::primitive_component_names, primitive_offset) ||
           search(View::precomputed_names, precomputed_offset) ||
           search(View::initial_precomputed_names, initial_offset) ||
-          search(parabolic_system_->parabolic_component_names(),
-                 parabolic_offset) ||
+          search(parabolic_system_->state_names(dim), parabolic_offset) ||
           search(additional_names_, additional_offset_);
 
       AssertThrow(found,

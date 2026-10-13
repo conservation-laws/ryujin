@@ -57,7 +57,7 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const ParabolicSystem &parabolic_system,
+      const Interface::ParabolicSystem &parabolic_system,
       const MultiComponentVector<Number> &initial_precomputed,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)

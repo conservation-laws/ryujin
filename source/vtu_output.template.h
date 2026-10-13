@@ -23,7 +23,7 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const ParabolicSystem &parabolic_system,
+      const Interface::ParabolicSystem &parabolic_system,
       const Postprocessor<Description, dim, Number> &postprocessor,
       const MultiComponentVector<Number> &initial_precomputed,
       const ScalarVector<Number> &alpha,
