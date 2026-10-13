@@ -166,18 +166,10 @@ namespace ryujin
 
 #ifdef DEBUG
     /* Poison all vectors: */
-    using state_type = typename View::state_type;
-
     constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
-
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto U_view = U.template view<problem_dimension>();
-    const auto precomputed_view =
-        precomputed.template view<n_precomputed_values>();
-    for (unsigned int i = 0; i < n_owned; ++i) {
-      U_view.write_tensor(state_type{} * nan, i);
-      precomputed_view.write_tensor(
-          dealii::Tensor<1, n_precomputed_values, Number>() * nan, i);
+    for (auto *vector : {&U, &precomputed}) {
+      auto &data = vector->deal_ii_vector();
+      std::fill_n(data.begin(), data.locally_owned_size(), nan);
     }
 #endif
   }
