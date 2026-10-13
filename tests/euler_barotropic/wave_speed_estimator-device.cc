@@ -103,7 +103,7 @@ void run(
   MultiComponentVector<double> U;
   U.reinit_with_scalar_partitioner(scalar_partitioner, problem_dimension);
 
-  typename HostSystemView::PrecomputedVector precomputed;
+  MultiComponentVector<double> precomputed;
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
 

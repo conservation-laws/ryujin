@@ -45,7 +45,7 @@ using SystemView = typename HyperbolicSystem::template View<dim, Number>;
  * the data is independent of the dof numbering) and are perturbed by a
  * factor f_n = sin(n * pi / 2), i.e., by 0, 1, 0, -1, 0, ...
  */
-void populate(typename SystemView::StateVector &state_vector,
+void populate(StateVector<Number> &state_vector,
               const OfflineData<dim, Number> &offline_data,
               const std::map<types::global_dof_index, Point<dim>> &positions,
               const unsigned int n)
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
   Discretization<dim> discretization(mpi_ensemble);
   OfflineData<dim, Number> offline_data(mpi_ensemble, discretization);
 
-  typename SystemView::InitialPrecomputedVector initial_precomputed;
+  MultiComponentVector<Number> initial_precomputed;
 
   Quantities<Description, dim, Number> quantities(mpi_ensemble,
                                                   offline_data,
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
    * the selected memory space, thus use an implicit transfer policy:
    */
 
-  typename SystemView::StateVector state_vector;
+  StateVector<Number> state_vector;
   auto &[U, precomputed, parabolic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
                                    SystemView::problem_dimension,

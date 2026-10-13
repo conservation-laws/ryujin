@@ -369,12 +369,12 @@ int main(int argc, char *argv[])
   MultiComponentVector<double> U;
   U.reinit_with_scalar_partitioner(scalar_partitioner, problem_dimension);
 
-  typename HostView::PrecomputedVector precomputed;
+  MultiComponentVector<double> precomputed;
   precomputed.reinit_with_scalar_partitioner(scalar_partitioner,
                                              HostView::n_precomputed_values);
 
   /* The precomputed initial values store the bathymetry: */
-  typename HostView::InitialPrecomputedVector initial_precomputed;
+  MultiComponentVector<double> initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostView::n_initial_precomputed_values);
 

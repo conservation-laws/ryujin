@@ -202,12 +202,12 @@ int main(int argc, char *argv[])
   MultiComponentVector<double> U;
   U.reinit_with_scalar_partitioner(scalar_partitioner, problem_dimension);
 
-  typename HostSystemView::PrecomputedVector precomputed;
+  MultiComponentVector<double> precomputed;
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
 
   /* Note: the Euler equations have no precomputed initial values. */
-  typename HostSystemView::InitialPrecomputedVector initial_precomputed;
+  MultiComponentVector<double> initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_initial_precomputed_values);
 

@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
    * policy so that we can create views on both memory spaces.
    */
 
-  typename SystemView::StateVector state_vector;
+  StateVector<Number> state_vector;
   auto &[U, precomputed, parabolic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
                                    SystemView::problem_dimension,
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
       SystemView::n_precomputed_values,
       TransferPolicy::implicit_transfers);
 
-  typename SystemView::InitialPrecomputedVector initial_precomputed;
+  MultiComponentVector<Number> initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner,
       SystemView::n_initial_precomputed_values,
