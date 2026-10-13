@@ -32,6 +32,7 @@ set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
 add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
 target_include_directories(obj_common PUBLIC
   ${CMAKE_BINARY_DIR}/source/
+  ${CMAKE_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 deal_ii_setup_target(obj_common)
