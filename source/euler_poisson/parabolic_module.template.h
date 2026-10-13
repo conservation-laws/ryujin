@@ -251,7 +251,7 @@ namespace ryujin
       V.resize(1);
 
       const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
-      V[0].reinit_with_scalar_partitioner(partitioner);
+      V[0].reinit_with_scalar_partitioner(partitioner, 1);
       V[0].deal_ii_vector() = 0.;
     }
 
@@ -534,7 +534,8 @@ namespace ryujin
       Vectors::move_to_memory_space<HostSpace>(state_vector,
                                                StateVectorPart::parabolic);
 
-      const auto U_view = std::as_const(std::get<0>(state_vector)).view();
+      const auto U_view = std::as_const(std::get<0>(state_vector))
+                              .template view<problem_dimension>();
       auto &V = std::get<2>(state_vector);
       auto &potential = V[0].deal_ii_vector();
 
@@ -683,14 +684,15 @@ namespace ryujin
       Vectors::copy_to_memory_space<HostSpace>(std::as_const(state_vector),
                                                StateVectorPart::parabolic);
 
-      const auto U_view = std::get<0>(state_vector).view();
+      const auto U_view =
+          std::get<0>(state_vector).template view<problem_dimension>();
       const auto &V = std::get<2>(std::as_const(state_vector));
       const auto &potential = V[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
       const auto lumped_mass_matrix_inverse_view =
-          offline_data_->lumped_mass_matrix_inverse().view();
+          offline_data_->lumped_mass_matrix_inverse().template view<1>();
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -804,7 +806,7 @@ namespace ryujin
                                                StateVectorPart::parabolic);
 
       const auto &old_U = std::get<0>(old_state_vector);
-      const auto old_U_view = old_U.view();
+      const auto old_U_view = old_U.template view<problem_dimension>();
       const auto &old_V = std::get<2>(old_state_vector);
       const auto &old_potential = old_V[0].deal_ii_vector();
 
@@ -815,7 +817,7 @@ namespace ryujin
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
       const auto lumped_mass_matrix_inverse_view =
-          offline_data_->lumped_mass_matrix_inverse().view();
+          offline_data_->lumped_mass_matrix_inverse().template view<1>();
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -1099,7 +1101,7 @@ namespace ryujin
 
       new_U = old_U;
       Vectors::move_to_memory_space<HostSpace>(new_U); /* invalidates default */
-      const auto new_U_view = new_U.view();
+      const auto new_U_view = new_U.template view<problem_dimension>();
 
       if (crank_nicolson_extrapolation) {
         new_potential *= Number(2.);

@@ -279,7 +279,8 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    const auto smoothness_indicators_view = smoothness_indicators_.view();
+    const auto smoothness_indicators_view =
+        smoothness_indicators_.template view<1>();
 
     const auto &dof_handler = offline_data_->dof_handler();
     for (const auto &cell : dof_handler.active_cell_iterators()) {
@@ -598,8 +599,10 @@ namespace ryujin
      * Insert result into smoothness_indicators_:
      */
 
-    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner);
-    const auto smoothness_indicators_view = smoothness_indicators_.view();
+    smoothness_indicators_.reinit_with_scalar_partitioner(scalar_partitioner,
+                                                          1);
+    const auto smoothness_indicators_view =
+        smoothness_indicators_.template view<1>();
     smoothness_indicators_view.insert_component(numerator[0], 0);
     smoothness_indicators_view.update_ghost_values();
   }

@@ -87,12 +87,12 @@ namespace ryujin
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
     /* The alpha vector is also read on the host memory space: */
-    alpha_.reinit_with_scalar_partitioner(scalar_partitioner,
-                                          TransferPolicy::implicit_transfers);
+    alpha_.reinit_with_scalar_partitioner(
+        scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 
-    bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
+    bounds_.reinit_with_scalar_partitioner(scalar_partitioner, n_bounds);
     r_.reinit_with_vector_partitioner(
-        offline_data_->hyperbolic_vector_partitioner());
+        offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
 
     /* Initialize the compact buffer used for updating boundary values: */
 
@@ -160,9 +160,9 @@ namespace ryujin
 
     auto &[U, precomputed, V] = state_vector;
     U.reinit_with_vector_partitioner(
-        offline_data_->hyperbolic_vector_partitioner());
+        offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
     precomputed.reinit_with_vector_partitioner(
-        offline_data_->precomputed_vector_partitioner());
+        offline_data_->precomputed_vector_partitioner(), n_precomputed_values);
 
 #ifdef DEBUG
     /* Poison all vectors: */
@@ -171,8 +171,9 @@ namespace ryujin
     constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto U_view = U.view();
-    const auto precomputed_view = precomputed.view();
+    const auto U_view = U.template view<problem_dimension>();
+    const auto precomputed_view =
+        precomputed.template view<n_precomputed_values>();
     for (unsigned int i = 0; i < n_owned; ++i) {
       U_view.write_tensor(state_type{} * nan, i);
       precomputed_view.write_tensor(
@@ -229,7 +230,8 @@ namespace ryujin
     else
       hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
 
-    precomputed.template view<MemorySpace>().update_ghost_values();
+    precomputed.template view<n_precomputed_values, MemorySpace>()
+        .update_ghost_values();
   }
 
 
@@ -247,7 +249,7 @@ namespace ryujin
     /* Gather all boundary states into a mirrored buffer: */
 
     {
-      const auto U_view = std::as_const(U).template view<MemorySpace>();
+      const auto U_view = std::as_const(U).template view<n_comp, MemorySpace>();
       const auto *indices = boundary_indices.template view<MemorySpace>();
       auto *states = boundary_states_.template view<MemorySpace>();
 
@@ -320,7 +322,7 @@ namespace ryujin
     /* Write back the updated boundary states: */
 
     {
-      const auto U_view = U.template view<MemorySpace>();
+      const auto U_view = U.template view<n_comp, MemorySpace>();
       const auto *indices = boundary_indices.template view<MemorySpace>();
       const auto *states = [&]() {
         if constexpr (have_separate_memory_spaces) {
@@ -455,10 +457,10 @@ namespace ryujin
     const auto mass_matrix_view =
         offline_data_->mass_matrix().template view<MemorySpace>();
     const auto lumped_mass_matrix_view =
-        offline_data_->lumped_mass_matrix().template view<MemorySpace>();
+        offline_data_->lumped_mass_matrix().template view<1, MemorySpace>();
     const auto lumped_mass_matrix_inverse_view =
         offline_data_->lumped_mass_matrix_inverse()
-            .template view<MemorySpace>();
+            .template view<1, MemorySpace>();
 
     const auto cij_matrix_view =
         offline_data_->cij_matrix().template view<MemorySpace>();
@@ -499,11 +501,13 @@ namespace ryujin
     /* Vectors: */
 
     const auto initial_precomputed_view =
-        initial_precomputed_.template view<MemorySpace>();
+        initial_precomputed_
+            .template view<n_initial_precomputed_values, MemorySpace>();
 
-    const auto old_U_view = old_U.template view<MemorySpace>();
+    const auto old_U_view =
+        old_U.template view<problem_dimension, MemorySpace>();
     const auto old_precomputed_view =
-        old_precomputed.template view<MemorySpace>();
+        old_precomputed.template view<n_precomputed_values, MemorySpace>();
 
     /*
      * FIXME GPU: std::array::operator[] is not device capable.
@@ -519,16 +523,18 @@ namespace ryujin
     Kokkos::Array<Number, stages> stage_weight;
     for (int s = 0; s < stages; ++s) {
       const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
-      stage_U_view[s] = U_s.template view<MemorySpace>();
-      stage_precomputed_view[s] = prec_s.template view<MemorySpace>();
+      stage_U_view[s] = U_s.template view<problem_dimension, MemorySpace>();
+      stage_precomputed_view[s] =
+          prec_s.template view<n_precomputed_values, MemorySpace>();
       stage_weight[s] = stage_weights[s];
     }
 
-    const auto new_U_view = new_U.template view<MemorySpace>();
+    const auto new_U_view =
+        new_U.template view<problem_dimension, MemorySpace>();
 
-    const auto alpha_view = alpha_.template view<MemorySpace>();
-    const auto bounds_view = bounds_.template view<MemorySpace>();
-    const auto r_view = r_.template view<MemorySpace>();
+    const auto alpha_view = alpha_.template view<1, MemorySpace>();
+    const auto bounds_view = bounds_.template view<n_bounds, MemorySpace>();
+    const auto r_view = r_.template view<problem_dimension, MemorySpace>();
 
     if (have_separate_memory_spaces)
       ComputingTimer::timer("time step [X] _ - memory space transfers").stop();

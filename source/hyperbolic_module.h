@@ -137,6 +137,9 @@ namespace ryujin
 
     using precomputed_type = typename View::precomputed_type;
 
+    static constexpr auto n_initial_precomputed_values =
+        View::n_initial_precomputed_values;
+
     using initial_precomputed_type = typename View::initial_precomputed_type;
 
     using StateVector = typename View::StateVector;
@@ -372,8 +375,7 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicVector =
-        Vectors::MultiComponentVector<Number, problem_dimension>;
+    using HyperbolicVector = Vectors::MultiComponentVector<Number>;
 
     /**
      * Update all boundary values of the hyperbolic state vector component
@@ -432,7 +434,7 @@ namespace ryujin
     static constexpr auto n_bounds =
         decltype(std::declval<const Limiter &>()
                      .template view<dim, Number>())::n_bounds;
-    mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
+    mutable Vectors::MultiComponentVector<Number> bounds_;
 
     mutable HyperbolicVector r_;
 

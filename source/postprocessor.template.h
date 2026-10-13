@@ -116,7 +116,8 @@ namespace ryujin
     Vectors::copy_to_memory_space<dealii::MemorySpace::Host>(
         state_vector, Vectors::StateVectorPart::hyperbolic);
 
-    const auto U_view = std::get<0>(state_vector).view();
+    const auto U_view =
+        std::get<0>(state_vector).template view<problem_dimension>();
 
     using VA = dealii::VectorizedArray<Number>;
 
@@ -125,7 +126,7 @@ namespace ryujin
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
     const auto lumped_mass_matrix_view =
-        offline_data_->lumped_mass_matrix().view();
+        offline_data_->lumped_mass_matrix().template view<1>();
     const auto cij_matrix_view = offline_data_->cij_matrix().view();
 
     const unsigned int n_internal = offline_data_->n_locally_internal();

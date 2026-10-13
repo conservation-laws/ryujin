@@ -340,17 +340,20 @@ namespace ryujin
     using EquationView = typename HyperbolicSystem::template View<dim, Number>;
     using StateVector = typename EquationView::StateVector;
 
-    template <typename Vector>
-    using VectorView =
-        decltype(std::declval<const Vector &>().template view<MemorySpace>());
+    template <int n_comp>
+    using VectorView = Vectors::MultiComponentVectorView<
+        Number,
+        n_comp,
+        dealii::VectorizedArray<Number>::size(),
+        MemorySpace,
+        /*writable=*/false>;
 
-    using HyperbolicVectorView =
-        VectorView<std::tuple_element_t<0, StateVector>>;
+    using HyperbolicVectorView = VectorView<EquationView::problem_dimension>;
     using PrecomputedVectorView =
-        VectorView<std::tuple_element_t<1, StateVector>>;
+        VectorView<EquationView::n_precomputed_values>;
     using InitialPrecomputedVectorView =
-        VectorView<typename EquationView::InitialPrecomputedVector>;
-    using ScalarVectorView = VectorView<Vectors::ScalarVector<Number>>;
+        VectorView<EquationView::n_initial_precomputed_values>;
+    using ScalarVectorView = VectorView<1>;
 
     /*
      * A selected component: its offset, and for a parabolic component or
@@ -508,19 +511,23 @@ namespace ryujin
     if (read_conserved_ || read_primitive_) {
       Vectors::copy_to_memory_space<MemorySpace>(state_vector,
                                                  StateVectorPart::hyperbolic);
-      view.U_view_ = std::get<0>(state_vector).template view<MemorySpace>();
+      view.U_view_ = std::get<0>(state_vector)
+                         .template view<View::problem_dimension, MemorySpace>();
     }
 
     if (read_precomputed_) {
       Vectors::copy_to_memory_space<MemorySpace>(state_vector,
                                                  StateVectorPart::precomputed);
       view.precomputed_view_ =
-          std::get<1>(state_vector).template view<MemorySpace>();
+          std::get<1>(state_vector)
+              .template view<View::n_precomputed_values, MemorySpace>();
     }
 
     if (read_initial_) {
       Vectors::copy_to_memory_space<MemorySpace>(initial_precomputed_);
-      view.initial_view_ = initial_precomputed_.template view<MemorySpace>();
+      view.initial_view_ =
+          initial_precomputed_
+              .template view<View::n_initial_precomputed_values, MemorySpace>();
     }
 
     /*
@@ -548,7 +555,7 @@ namespace ryujin
               : additional_vectors_[offset - additional_offset_].get();
 
       Vectors::copy_to_memory_space<MemorySpace>(vector);
-      entries[k].scalar_view = vector.template view<MemorySpace>();
+      entries[k].scalar_view = vector.template view<1, MemorySpace>();
     }
 
     view.entries_ = Kokkos::create_mirror_view_and_copy(

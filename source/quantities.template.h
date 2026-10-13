@@ -133,7 +133,7 @@ namespace ryujin
     const auto sparsity_simd_view =
         offline_data_->sparsity_pattern_simd().view();
     const auto lumped_mass_matrix_view =
-        offline_data_->lumped_mass_matrix().view();
+        offline_data_->lumped_mass_matrix().template view<1>();
 
     /*
      * Create a manifold record with the name and parsed options for every

@@ -281,20 +281,17 @@ namespace ryujin
       /**
        * A compound state vector.
        */
-      using StateVector = Vectors::
-          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+      using StateVector = Vectors::StateVector<ScalarNumber>;
 
       /**
        * MulticomponentVector for storing the hyperbolic state vector:
        */
-      using HyperbolicVector =
-          Vectors::MultiComponentVector<ScalarNumber, problem_dimension>;
+      using HyperbolicVector = Vectors::MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed states:
        */
-      using PrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      using PrecomputedVector = Vectors::MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
@@ -312,8 +309,7 @@ namespace ryujin
        * states:
        */
       using InitialPrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber,
-                                        n_initial_precomputed_values>;
+          Vectors::MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
@@ -813,14 +809,18 @@ namespace ryujin
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
 
+      using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
+
       const auto sparsity_simd_view =
           offline_data.sparsity_pattern_simd().template view<MemorySpace>();
 
       /* We only read the hyperbolic state vector: */
       const auto U_view =
-          std::get<0>(std::as_const(state_vector)).template view<MemorySpace>();
+          std::get<0>(std::as_const(state_vector))
+              .template view<ScalarView::problem_dimension, MemorySpace>();
       const auto precomputed_view =
-          std::get<1>(state_vector).template view<MemorySpace>();
+          std::get<1>(state_vector)
+              .template view<ScalarView::n_precomputed_values, MemorySpace>();
 
       const auto hyperbolic_system_views =
           make_select_view<dim, ScalarNumber, MemorySpace>(*this);

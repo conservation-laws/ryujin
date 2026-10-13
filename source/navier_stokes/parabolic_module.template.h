@@ -319,11 +319,13 @@ namespace ryujin
       Vectors::move_to_memory_space<HostSpace>(new_state_vector,
                                                StateVectorPart::hyperbolic);
 
-      const auto old_U_view = std::get<0>(old_state_vector).view();
-      const auto new_U_view = std::get<0>(new_state_vector).view();
+      const auto old_U_view =
+          std::get<0>(old_state_vector).template view<problem_dimension>();
+      const auto new_U_view =
+          std::get<0>(new_state_vector).template view<problem_dimension>();
 
       const auto lumped_mass_matrix_view =
-          offline_data_->lumped_mass_matrix().view();
+          offline_data_->lumped_mass_matrix().template view<1>();
       const auto &affine_constraints = offline_data_->affine_constraints();
 
       /* Index ranges for the iteration over the sparsity pattern : */
@@ -668,7 +670,7 @@ namespace ryujin
             /* zero destination */ true);
 
         const auto lumped_mass_matrix_view =
-            offline_data_->lumped_mass_matrix().view();
+            offline_data_->lumped_mass_matrix().template view<1>();
 
         const auto body = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);

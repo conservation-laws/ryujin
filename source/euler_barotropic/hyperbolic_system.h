@@ -275,20 +275,17 @@ namespace ryujin
       /**
        * A compound state vector.
        */
-      using StateVector = Vectors::
-          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+      using StateVector = Vectors::StateVector<ScalarNumber>;
 
       /**
        * MulticomponentVector for storing the hyperbolic state vector:
        */
-      using HyperbolicVector =
-          Vectors::MultiComponentVector<ScalarNumber, problem_dimension>;
+      using HyperbolicVector = Vectors::MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed states:
        */
-      using PrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      using PrecomputedVector = Vectors::MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
@@ -306,8 +303,7 @@ namespace ryujin
        * states:
        */
       using InitialPrecomputedVector =
-          Vectors::MultiComponentVector<ScalarNumber,
-                                        n_initial_precomputed_values>;
+          Vectors::MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
@@ -810,6 +806,8 @@ namespace ryujin
       const unsigned int n_internal = offline_data.n_locally_internal();
       const unsigned int n_owned = offline_data.n_locally_owned();
 
+      using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
+
       auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
 
@@ -838,8 +836,12 @@ namespace ryujin
             offline_data.sparsity_pattern_simd().template view<HostSpace>();
 
         /* We only read the hyperbolic state vector: */
-        const auto U_view = std::as_const(U).template view<HostSpace>();
-        const auto precomputed_view = precomputed.template view<HostSpace>();
+        const auto U_view =
+            std::as_const(U)
+                .template view<ScalarView::problem_dimension, HostSpace>();
+        const auto precomputed_view =
+            precomputed
+                .template view<ScalarView::n_precomputed_values, HostSpace>();
 
         const auto hyperbolic_system_views =
             make_select_view<dim, ScalarNumber, HostSpace>(*this);

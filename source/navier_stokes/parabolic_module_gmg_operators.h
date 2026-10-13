@@ -211,7 +211,8 @@ namespace ryujin
           if constexpr (std::is_same_v<Number, Number2>) {
             if constexpr (std::is_same_v<Number, float>) {
               if (level_ == dealii::numbers::invalid_unsigned_int) {
-                const auto lumped = offline_data_->lumped_mass_matrix().view();
+                const auto lumped =
+                    offline_data_->lumped_mass_matrix().template view<1>();
                 return lumped.template read_entry<T>(i);
               } else {
                 const auto &level_lumped =
@@ -221,7 +222,8 @@ namespace ryujin
             } else {
               Assert(level_ == dealii::numbers::invalid_unsigned_int,
                      dealii::ExcInternalError());
-              const auto lumped = offline_data_->lumped_mass_matrix().view();
+              const auto lumped =
+                  offline_data_->lumped_mass_matrix().template view<1>();
               return lumped.template read_entry<T>(i);
             }
           } else {
@@ -581,7 +583,8 @@ namespace ryujin
           if constexpr (std::is_same_v<Number, Number2>) {
             if constexpr (std::is_same_v<Number, float>) {
               if (level_ == dealii::numbers::invalid_unsigned_int) {
-                const auto lumped = offline_data_->lumped_mass_matrix().view();
+                const auto lumped =
+                    offline_data_->lumped_mass_matrix().template view<1>();
                 return lumped.template read_entry<T>(i);
               } else {
                 const auto &level_lumped =
@@ -591,7 +594,8 @@ namespace ryujin
             } else {
               Assert(level_ == dealii::numbers::invalid_unsigned_int,
                      dealii::ExcInternalError());
-              const auto lumped = offline_data_->lumped_mass_matrix().view();
+              const auto lumped =
+                  offline_data_->lumped_mass_matrix().template view<1>();
               return lumped.template read_entry<T>(i);
             }
           } else {

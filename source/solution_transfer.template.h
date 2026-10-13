@@ -118,7 +118,9 @@ namespace ryujin
 
           const auto &U = std::get<0>(old_state_vector);
           /* precomputed needs to be valid for bounds computation */
-          const auto precomputed_view = std::get<1>(old_state_vector).view();
+          const auto precomputed_view =
+              std::get<1>(old_state_vector)
+                  .template view<n_precomputed_values>();
 
           const auto limiter_view = limiter_.template view<dim, Number>();
 
@@ -416,7 +418,7 @@ namespace ryujin
     projected_mass.reinit(offline_data_->scalar_partitioner());
     HyperbolicVector projected_state;
     projected_state.reinit_with_vector_partitioner(
-        offline_data_->hyperbolic_vector_partitioner());
+        offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
 
     /*
      * We only need to construct entries in a pik_matrix for a small subset
@@ -634,7 +636,8 @@ namespace ryujin
           }
         });
 
-    const auto projected_state_view = projected_state.view();
+    const auto projected_state_view =
+        projected_state.template view<problem_dimension>();
 
     projected_mass.compress(dealii::VectorOperation::add);
     projected_state_view.compress(dealii::VectorOperation::add);
@@ -653,7 +656,8 @@ namespace ryujin
      * -----------------------------------------------------------------------
      */
 
-    const auto new_U_view = std::get<0>(new_state_vector).view();
+    const auto new_U_view =
+        std::get<0>(new_state_vector).template view<problem_dimension>();
 
     /*
      * A small lambda that takes the weighted average of all degrees of
@@ -680,7 +684,8 @@ namespace ryujin
 
     update_new_state_vector();
 
-    const auto precomputed_view = std::get<1>(new_state_vector).view();
+    const auto precomputed_view =
+        std::get<1>(new_state_vector).template view<n_precomputed_values>();
 
     /* The limiter requires valid precomputed values. Therefore, update: */
     const auto update_precomputed_values = [&]() {
@@ -871,7 +876,7 @@ namespace ryujin
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto local_i = scalar_partitioner->global_to_local(global_i);
-    const auto U_view = U.view();
+    const auto U_view = U.template view<problem_dimension>();
     if (affine_constraints.is_constrained(global_i)) {
       state_type result;
       const auto &line = *affine_constraints.get_constraint_entries(global_i);
@@ -895,6 +900,6 @@ namespace ryujin
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto local_i = scalar_partitioner->global_to_local(global_i);
-    U.view().add_tensor(new_U_i, local_i);
+    U.template view<problem_dimension>().add_tensor(new_U_i, local_i);
   }
 } // namespace ryujin

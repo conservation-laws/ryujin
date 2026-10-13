@@ -49,6 +49,8 @@ namespace ryujin
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
+    static constexpr auto n_precomputed_values = View::n_precomputed_values;
+
     using state_type = typename View::state_type;
 
     /**

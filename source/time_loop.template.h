@@ -749,7 +749,9 @@ namespace ryujin
     /* Populate precomputed values (without applying boundary conditions): */
     hyperbolic_system_.get().fill_precomputed_values(
         offline_data_, analytic, /*skip_constrained_dofs*/ false);
-    std::get<1>(analytic).view().update_ghost_values();
+    std::get<1>(analytic)
+        .template view<n_precomputed_values>()
+        .update_ghost_values();
   }
 
 
