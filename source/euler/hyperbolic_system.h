@@ -129,8 +129,7 @@ namespace ryujin
                 typename ScalarNumber>
       void fill_precomputed_values(
           const OfflineData<dim, ScalarNumber> &offline_data,
-          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
-              &state_vector,
+          StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
     private:
@@ -279,21 +278,6 @@ namespace ryujin
           std::array<std::string, n_initial_precomputed_values>{};
 
       /**
-       * A compound state vector.
-       */
-      using StateVector = StateVector<ScalarNumber>;
-
-      /**
-       * MulticomponentVector for storing the hyperbolic state vector:
-       */
-      using HyperbolicVector = MultiComponentVector<ScalarNumber>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using PrecomputedVector = MultiComponentVector<ScalarNumber>;
-
-      /**
        * MulticomponentVectorView for accessing a vector of precomputed
        * states:
        */
@@ -303,12 +287,6 @@ namespace ryujin
           dealii::VectorizedArray<ScalarNumber>::size(),
           MemorySpace,
           /*writable=*/false>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using InitialPrecomputedVector = MultiComponentVector<ScalarNumber>;
 
       /**
        * MulticomponentVectorView for accessing a vector of precomputed
@@ -801,8 +779,7 @@ namespace ryujin
     template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
         const OfflineData<dim, ScalarNumber> &offline_data,
-        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
-            &state_vector,
+        StateVector<ScalarNumber> &state_vector,
         const bool skip_constrained_dofs) const
     {
       const unsigned int n_internal = offline_data.n_locally_internal();
