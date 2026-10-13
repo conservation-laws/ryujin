@@ -9,11 +9,11 @@
 #define INSTANTIATE(dim, stages)                                               \
   template void                                                                \
   ParabolicModule<Description, dim, NUMBER>::backward_euler_step<stages>(      \
-      const StateVector &,                                                     \
+      const StateVector<NUMBER> &,                                             \
       const NUMBER,                                                            \
-      std::array<std::reference_wrapper<const StateVector>, stages>,           \
+      std::array<std::reference_wrapper<const StateVector<NUMBER>>, stages>,   \
       const std::array<NUMBER, stages>,                                        \
-      StateVector &,                                                           \
+      StateVector<NUMBER> &,                                                   \
       NUMBER) const
 
 namespace ryujin

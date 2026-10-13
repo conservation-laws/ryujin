@@ -247,7 +247,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   auto InitialValues<Description, dim, Number>::interpolate_hyperbolic_vector(
-      Number t) const -> HyperbolicVector
+      Number t) const -> MultiComponentVector<Number>
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::"
@@ -258,11 +258,10 @@ namespace ryujin
     const auto &vector_partitioner =
         offline_data_->hyperbolic_vector_partitioner();
 
-    HyperbolicVector U;
+    MultiComponentVector<Number> U;
     U.reinit_with_vector_partitioner(vector_partitioner, problem_dimension);
 
-    using ScalarHostVector = ScalarHostVector<Number>;
-    ScalarHostVector temp;
+    ScalarHostVector<Number> temp;
     temp.reinit(scalar_partitioner);
 
     // FIXME: it is not particularly efficient to call
@@ -287,7 +286,8 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   auto InitialValues<Description, dim, Number>::
-      interpolate_initial_precomputed_vector() const -> InitialPrecomputedVector
+      interpolate_initial_precomputed_vector() const
+      -> MultiComponentVector<Number>
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::"
@@ -296,15 +296,14 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    InitialPrecomputedVector precomputed;
+    MultiComponentVector<Number> precomputed;
     precomputed.reinit_with_scalar_partitioner(scalar_partitioner,
                                                n_initial_precomputed_values);
 
     if constexpr (n_initial_precomputed_values == 0)
       return precomputed;
 
-    using ScalarHostVector = ScalarHostVector<Number>;
-    ScalarHostVector temp;
+    ScalarHostVector<Number> temp;
     temp.reinit(scalar_partitioner);
 
     // FIXME: it is not particularly efficient to call

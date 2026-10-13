@@ -58,7 +58,7 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
-      const InitialPrecomputedVector &initial_precomputed,
+      const MultiComponentVector<Number> &initial_precomputed,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -341,7 +341,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::accumulate(
-      const StateVector &state_vector, const Number t)
+      const StateVector<Number> &state_vector, const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
@@ -414,7 +414,9 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void Quantities<Description, dim, Number>::write_out(
-      const StateVector &state_vector, const Number t, unsigned int cycle)
+      const StateVector<Number> &state_vector,
+      const Number t,
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;

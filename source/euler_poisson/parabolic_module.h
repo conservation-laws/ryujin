@@ -143,10 +143,6 @@ namespace ryujin
 
       using ParabolicSystem = typename Description::ParabolicSystem;
 
-      using StateVector = typename View::StateVector;
-
-      using ScalarHostVector = ScalarHostVector<Number>;
-
       using BlockHostVector =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
@@ -193,7 +189,7 @@ namespace ryujin
        * @note This routine does not modify the hyperbolic state vector or
        * the precomputed vector component.
        */
-      void reinit_state_vector(StateVector &state_vector) const;
+      void reinit_state_vector(StateVector<Number> &state_vector) const;
 
       /**
        * This function preprocesses a given state vector @p U in preparation
@@ -202,7 +198,8 @@ namespace ryujin
        * perform an IMEX step. In addition, this function is called whenever
        * we perform a mesh transfer or output operation.
        */
-      void prepare_state_vector(StateVector &state_vector, Number t) const;
+      void prepare_state_vector(StateVector<Number> &state_vector,
+                                Number t) const;
 
       /**
        * Given a reference to a previous state vector @p old_U at time
@@ -214,14 +211,14 @@ namespace ryujin
        * high-order right-hand side / flux.
        */
       template <int stages>
-      void
-      backward_euler_step(const StateVector &old_state_vector,
-                          const Number old_t,
-                          std::array<std::reference_wrapper<const StateVector>,
-                                     stages> stage_state_vectors,
-                          const std::array<Number, stages> stage_weights,
-                          StateVector &new_state_vector,
-                          Number tau) const;
+      void backward_euler_step(
+          const StateVector<Number> &old_state_vector,
+          const Number old_t,
+          std::array<std::reference_wrapper<const StateVector<Number>>, stages>
+              stage_state_vectors,
+          const std::array<Number, stages> stage_weights,
+          StateVector<Number> &new_state_vector,
+          Number tau) const;
 
       /**
        * Given a reference to a previous state vector @p old_U at time @p
@@ -231,9 +228,9 @@ namespace ryujin
        * This variant is used in the TimeIntegrator class for the Strang
        * split variants.
        */
-      void crank_nicolson_step(const StateVector &old_state_vector,
+      void crank_nicolson_step(const StateVector<Number> &old_state_vector,
                                const Number old_t,
-                               StateVector &new_state_vector,
+                               StateVector<Number> &new_state_vector,
                                Number tau) const;
 
       /**
@@ -336,13 +333,13 @@ namespace ryujin
       dealii::AffineConstraints<Number> affine_constraints_potential_;
 
       LaplaceOperator<dim, Number> laplace_operator_;
-      dealii::DiagonalMatrix<ScalarHostVector> diagonal_preconditioner_;
+      dealii::DiagonalMatrix<ScalarHostVector<Number>> diagonal_preconditioner_;
       MGSmoother<dim, Number> multigrid_preconditioner_;
       UpdateOperator<dim, Number> update_operator_;
 
-      mutable ScalarHostVector potential_rhs_;
-      mutable ScalarHostVector density_;
-      mutable ScalarHostVector background_density_;
+      mutable ScalarHostVector<Number> potential_rhs_;
+      mutable ScalarHostVector<Number> density_;
+      mutable ScalarHostVector<Number> background_density_;
       mutable BlockHostVector magnetic_field_;
       mutable BlockHostVector velocity_rhs_;
 
@@ -380,13 +377,15 @@ namespace ryujin
        * Compute the potential phi (the last component of the state_vector)
        * for a given density (the first component of the state_vector).
        */
-      void compute_potential(const Number t, StateVector &state_vector) const;
+      void compute_potential(const Number t,
+                             StateVector<Number> &state_vector) const;
 
       /**
        * Set the velocity field equal to the magnetic magnetic drift
        * velocity computed from the potential.
        */
-      void enforce_magnetic_drift_velocity(StateVector &state_vector) const;
+      void
+      enforce_magnetic_drift_velocity(StateVector<Number> &state_vector) const;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
@@ -397,9 +396,9 @@ namespace ryujin
        * we perform a final extrapolation on the primitive state for time
        * t + 2 * tau.
        */
-      void step(const StateVector &old_state_vector,
+      void step(const StateVector<Number> &old_state_vector,
                 const Number old_t,
-                StateVector &new_state_vector,
+                StateVector<Number> &new_state_vector,
                 Number tau,
                 const bool crank_nicolson_extrapolation) const;
 

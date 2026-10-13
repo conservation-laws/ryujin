@@ -8,10 +8,10 @@
 
 #define INSTANTIATE(dim, stages)                                               \
   template NUMBER HyperbolicModule<Description, dim, NUMBER>::step<stages>(    \
-      const StateVector &,                                                     \
-      std::array<std::reference_wrapper<const StateVector>, stages>,           \
+      const StateVector<NUMBER> &,                                             \
+      std::array<std::reference_wrapper<const StateVector<NUMBER>>, stages>,   \
       const std::array<NUMBER, stages>,                                        \
-      StateVector &,                                                           \
+      StateVector<NUMBER> &,                                                   \
       NUMBER,                                                                  \
       NUMBER) const
 

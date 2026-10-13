@@ -25,9 +25,9 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
       const Postprocessor<Description, dim, Number> &postprocessor,
-      const InitialPrecomputedVector &initial_precomputed,
-      const ScalarVector &alpha,
-      const ScalarVector &smoothness_indicators,
+      const MultiComponentVector<Number> &initial_precomputed,
+      const ScalarVector<Number> &alpha,
+      const ScalarVector<Number> &smoothness_indicators,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -80,7 +80,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void VTUOutput<Description, dim, Number>::schedule_output(
-      const StateVector &state_vector,
+      const StateVector<Number> &state_vector,
       std::string name,
       Number t [[maybe_unused]],
       unsigned int cycle,

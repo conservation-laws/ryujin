@@ -53,8 +53,6 @@ namespace ryujin
 
     static constexpr auto n_precomputed_values = View::n_precomputed_values;
 
-    using StateVector = typename View::StateVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -149,7 +147,7 @@ namespace ryujin
      * @p output_cycle.
      */
     template <typename Callable>
-    void read_checkpoint(StateVector &state_vector,
+    void read_checkpoint(StateVector<Number> &state_vector,
                          const std::string &base_name,
                          Number &t,
                          unsigned int &output_cycle,
@@ -164,7 +162,7 @@ namespace ryujin
      * @pre the state_vector has to have been prepared prior to a call to
      * write_checkpoint().
      */
-    void write_checkpoint(const StateVector &state_vector,
+    void write_checkpoint(const StateVector<Number> &state_vector,
                           const std::string &base_name,
                           const Number &t,
                           const unsigned int &output_cycle);
@@ -176,7 +174,8 @@ namespace ryujin
      */
     template <typename Callable>
     void adapt_mesh_and_transfer_state_vector(
-        StateVector &state_vector, const Callable &prepare_compute_kernels);
+        StateVector<Number> &state_vector,
+        const Callable &prepare_compute_kernels);
 
     /**
      * Interpolate the analytic solution at time @p t into the state vector
@@ -184,9 +183,9 @@ namespace ryujin
      * TimeIntegrator::prepare_state_vector() no boundary conditions are
      * applied.
      */
-    void interpolate_analytic_solution(StateVector &analytic, Number t);
+    void interpolate_analytic_solution(StateVector<Number> &analytic, Number t);
 
-    void output(const StateVector &state_vector,
+    void output(const StateVector<Number> &state_vector,
                 const std::string &name,
                 const Number t,
                 const unsigned int cycle);

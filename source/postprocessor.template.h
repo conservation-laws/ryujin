@@ -107,7 +107,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void Postprocessor<Description, dim, Number>::compute(
-      const StateVector &state_vector) const
+      const StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;

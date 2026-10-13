@@ -57,10 +57,6 @@ namespace ryujin
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
-    using StateVector = typename View::StateVector;
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarHostVector = ScalarHostVector<Number>;
-
     //@}
     /**
      * @name Constructor and setup
@@ -74,7 +70,7 @@ namespace ryujin
                     const OfflineData<dim, Number> &offline_data,
                     const HyperbolicSystem &hyperbolic_system,
                     const ParabolicSystem &parabolic_system,
-                    const InitialPrecomputedVector &initial_precomputed,
+                    const MultiComponentVector<Number> &initial_precomputed,
                     const std::string &subsection = "/ErrorEvaluation");
 
     /**
@@ -104,15 +100,15 @@ namespace ryujin
      * @note The function requires MPI communication and is not reentrant.
      * The returned values are only meaningful on world rank 0.
      */
-    std::vector<Number> compute(const StateVector &state_vector,
-                                const StateVector &analytic) const;
+    std::vector<Number> compute(const StateVector<Number> &state_vector,
+                                const StateVector<Number> &analytic) const;
 
     /**
      * Compute the consolidated error norms at time @p t and append a line
      * to the error log file.
      */
-    void write_out(const StateVector &state_vector,
-                   const StateVector &analytic,
+    void write_out(const StateVector<Number> &state_vector,
+                   const StateVector<Number> &analytic,
                    Number t) const;
 
     /**

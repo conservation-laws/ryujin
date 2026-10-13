@@ -35,8 +35,6 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using StateVector = typename View::StateVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -80,7 +78,7 @@ namespace ryujin
      * @note This routine does not modify the hyperbolic state vector or
      * the precomputed vector component.
      */
-    void reinit_state_vector(StateVector & /*state_vector*/) const
+    void reinit_state_vector(StateVector<Number> & /*state_vector*/) const
     {
       // do nothing
     }
@@ -92,7 +90,7 @@ namespace ryujin
      * perform an IMEX step. In addition, this function is called whenever
      * we perform a mesh transfer or output operation.
      */
-    void prepare_state_vector(StateVector & /*state_vector*/,
+    void prepare_state_vector(StateVector<Number> & /*state_vector*/,
                               Number /*t*/) const
     {
       Assert(false,
@@ -110,14 +108,14 @@ namespace ryujin
      * high-order right-hand side / flux.
      */
     template <int stages>
-    void
-    backward_euler_step(const StateVector &old_state_vector,
-                        const Number /*old_t*/,
-                        std::array<std::reference_wrapper<const StateVector>,
-                                   stages> /*stage_state_vectors*/,
-                        const std::array<Number, stages> /*stage_weights*/,
-                        StateVector &new_state_vector,
-                        Number /*tau*/) const
+    void backward_euler_step(
+        const StateVector<Number> &old_state_vector,
+        const Number /*old_t*/,
+        std::array<std::reference_wrapper<const StateVector<Number>>,
+                   stages> /*stage_state_vectors*/,
+        const std::array<Number, stages> /*stage_weights*/,
+        StateVector<Number> &new_state_vector,
+        Number /*tau*/) const
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
@@ -134,9 +132,9 @@ namespace ryujin
      * This variant is used in the TimeIntegrator class for the Strang
      * split variants.
      */
-    void crank_nicolson_step(const StateVector &old_state_vector,
+    void crank_nicolson_step(const StateVector<Number> &old_state_vector,
                              const Number /*old_t*/,
-                             StateVector &new_state_vector,
+                             StateVector<Number> &new_state_vector,
                              Number /*tau*/) const
     {
       Assert(false,

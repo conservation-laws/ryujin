@@ -125,10 +125,6 @@ namespace ryujin
 
       using ParabolicSystem = NavierStokes::ParabolicSystem;
 
-      using StateVector = typename View::StateVector;
-
-      using ScalarHostVector = ScalarHostVector<Number>;
-
       using BlockHostVector =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
@@ -175,7 +171,7 @@ namespace ryujin
        * @note This routine does not modify the hyperbolic state vector or
        * the precomputed vector component.
        */
-      void reinit_state_vector(StateVector & /*state_vector*/) const
+      void reinit_state_vector(StateVector<Number> & /*state_vector*/) const
       {
         // do nothing
       }
@@ -184,7 +180,8 @@ namespace ryujin
        * Prepare the parabolic part of the state vector prior to a backward
        * Euler or Crank Nicolson step.
        */
-      void prepare_state_vector(StateVector &state_vector, Number t) const;
+      void prepare_state_vector(StateVector<Number> &state_vector,
+                                Number t) const;
 
       /**
        * Given a reference to a previous state vector @p old_U at time
@@ -196,23 +193,23 @@ namespace ryujin
        * high-order right-hand side / flux.
        */
       template <int stages>
-      void
-      backward_euler_step(const StateVector &old_state_vector,
-                          const Number old_t,
-                          std::array<std::reference_wrapper<const StateVector>,
-                                     stages> stage_state_vectors,
-                          const std::array<Number, stages> stage_weights,
-                          StateVector &new_state_vector,
-                          Number tau) const;
+      void backward_euler_step(
+          const StateVector<Number> &old_state_vector,
+          const Number old_t,
+          std::array<std::reference_wrapper<const StateVector<Number>>, stages>
+              stage_state_vectors,
+          const std::array<Number, stages> stage_weights,
+          StateVector<Number> &new_state_vector,
+          Number tau) const;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
        * at time @p old_t and a time-step size @p tau perform an implicit
        * Crank Nicolson step (and store the result in @p new_state_vector).
        */
-      void crank_nicolson_step(const StateVector &old_state_vector,
+      void crank_nicolson_step(const StateVector<Number> &old_state_vector,
                                const Number old_t,
-                               StateVector &new_state_vector,
+                               StateVector<Number> &new_state_vector,
                                Number tau) const;
 
       /**
@@ -311,9 +308,9 @@ namespace ryujin
 
       mutable BlockHostVector velocity_;
       mutable BlockHostVector velocity_rhs_;
-      mutable ScalarHostVector internal_energy_;
-      mutable ScalarHostVector internal_energy_rhs_;
-      mutable ScalarHostVector density_;
+      mutable ScalarHostVector<Number> internal_energy_;
+      mutable ScalarHostVector<Number> internal_energy_rhs_;
+      mutable ScalarHostVector<Number> density_;
 
       mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
           level_matrix_free_;
@@ -358,9 +355,9 @@ namespace ryujin
        * we perform a final extrapolation on the primitive state for time
        * t + 2 * tau.
        */
-      void step(const StateVector &old_state_vector,
+      void step(const StateVector<Number> &old_state_vector,
                 const Number old_t,
-                StateVector &new_state_vector,
+                StateVector<Number> &new_state_vector,
                 Number tau,
                 const bool crank_nicolson_extrapolation) const;
 

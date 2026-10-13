@@ -263,8 +263,6 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using StateVector = typename View::StateVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -303,7 +301,8 @@ namespace ryujin
      * ParabolicModule::prepare_state_vector() and afterwards
      * HyperbolicModule::prepare_state_vector().
      */
-    void prepare_state_vector(StateVector &state_vector, Number t) const;
+    void prepare_state_vector(StateVector<Number> &state_vector,
+                              Number t) const;
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -322,7 +321,7 @@ namespace ryujin
      * prepare_state_vector() function prior to calling the step()
      * function.
      */
-    Number step(StateVector &state_vector,
+    Number step(StateVector<Number> &state_vector,
                 Number t,
                 Number t_final = std::numeric_limits<Number>::max());
 
@@ -377,7 +376,7 @@ namespace ryujin
     dealii::ObserverPointer<const ParabolicModule<Description, dim, Number>>
         parabolic_module_;
 
-    std::vector<StateVector> temp_;
+    std::vector<StateVector<Number>> temp_;
 
     //@}
     /**
@@ -392,7 +391,8 @@ namespace ryujin
      * chosen time step size tau, which is guaranteed to be less than or
      * equal to the parameter @p tau_max.
      */
-    Number step_ssprk_22(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_ssprk_22(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -401,7 +401,8 @@ namespace ryujin
      * chosen time step size tau, which is guaranteed to be less than or
      * equal to the parameter @p tau_max.
      */
-    Number step_ssprk_33(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_ssprk_33(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -409,7 +410,8 @@ namespace ryujin
      * in U). The function returns the chosen time step size tau, which is
      * guaranteed to be less than or equal to the parameter @p tau_max.
      */
-    Number step_erk_11(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_erk_11(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -417,7 +419,8 @@ namespace ryujin
      * in U). The function returns the chosen time step size tau, which is
      * guaranteed to be less than or equal to the parameter @p tau_max.
      */
-    Number step_erk_22(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_erk_22(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -425,7 +428,8 @@ namespace ryujin
      * in U). The function returns the chosen time step size tau, which is
      * guaranteed to be less than or equal to the parameter @p tau_max.
      */
-    Number step_erk_33(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_erk_33(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -434,7 +438,8 @@ namespace ryujin
      * which is guaranteed to be less than or equal to the parameter @p
      * tau_max.
      */
-    Number step_erk_43(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_erk_43(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -443,7 +448,8 @@ namespace ryujin
      * tau, which is guaranteed to be less than or equal to the parameter
      * @p tau_max.
      */
-    Number step_erk_54(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_erk_54(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -453,7 +459,7 @@ namespace ryujin
      * size tau, which is guaranteed to be less than or equal to the
      * parameter @p tau_max.
      */
-    Number step_strang_ssprk_33_cn(StateVector &state_vector,
+    Number step_strang_ssprk_33_cn(StateVector<Number> &state_vector,
                                    Number t,
                                    Number tau_max);
 
@@ -465,8 +471,9 @@ namespace ryujin
      * tau, which is guaranteed to be less than or equal to the parameter
      * @p tau_max.
      */
-    Number
-    step_strang_erk_33_cn(StateVector &state_vector, Number t, Number tau_max);
+    Number step_strang_erk_33_cn(StateVector<Number> &state_vector,
+                                 Number t,
+                                 Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -476,8 +483,9 @@ namespace ryujin
      * tau, which is guaranteed to be less than or equal to the parameter
      * @p tau_max.
      */
-    Number
-    step_strang_erk_43_cn(StateVector &state_vector, Number t, Number tau_max);
+    Number step_strang_erk_43_cn(StateVector<Number> &state_vector,
+                                 Number t,
+                                 Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an
@@ -486,7 +494,8 @@ namespace ryujin
      * parabolic subproblem. The function returns the chosen time step size
      * tau.
      */
-    Number step_imex_11(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_imex_11(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an
@@ -494,7 +503,8 @@ namespace ryujin
      * the hyperbolic subproblem and a two stage midpoint rule for the parabolic
      * subproblem. The function returns the chosen time step size tau.
      */
-    Number step_imex_22(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_imex_22(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an
@@ -502,7 +512,8 @@ namespace ryujin
      * the hyperbolic subproblem and a three stage DIRK tableau for the
      * parabolic subproblem. The function returns the chosen time step size tau.
      */
-    Number step_imex_33(StateVector &state_vector, Number t, Number tau_max);
+    Number
+    step_imex_33(StateVector<Number> &state_vector, Number t, Number tau_max);
 
     //@}
   };

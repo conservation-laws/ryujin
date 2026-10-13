@@ -63,9 +63,6 @@ namespace ryujin
      */
     using Bounds = typename LimiterView::Bounds;
 
-    using StateVector = typename View::StateVector;
-    using HyperbolicVector = typename View::HyperbolicVector;
-
     //@}
     /**
      * @name Constructor and setup
@@ -99,7 +96,7 @@ namespace ryujin
      * all necessary data to the triangulation to perform a projection
      * after mesh adaptation, or a Triangulation::store()/load() operation.
      */
-    void prepare_projection(const StateVector &old_state_vector);
+    void prepare_projection(const StateVector<Number> &old_state_vector);
 
     /**
      * Project the data stored in the triangulation into a new state vector
@@ -113,7 +110,7 @@ namespace ryujin
      * prepare() and the @p new_state_vector must be appropriately
      * initialized with the new Partitioner.
      */
-    void project(StateVector &new_state_vector);
+    void project(StateVector<Number> &new_state_vector);
 
     //@}
     /**
@@ -200,7 +197,7 @@ namespace ryujin
      * would happen with AffineConstraints<>::distribute() - but this
      * function is incompatible with our MultiComponentVector.
      */
-    state_type read_tensor(const HyperbolicVector &U,
+    state_type read_tensor(const MultiComponentVector<Number> &U,
                            const dealii::types::global_dof_index global_i);
 
     /**
@@ -208,7 +205,7 @@ namespace ryujin
      * vector. The function translates the global index @p global_i into
      * the local range (operated on by this MPI rank).
      */
-    void add_tensor(HyperbolicVector &U,
+    void add_tensor(MultiComponentVector<Number> &U,
                     const state_type &U_i,
                     const dealii::types::global_dof_index global_i);
 

@@ -119,10 +119,6 @@ namespace ryujin
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
-    using StateVector = typename View::StateVector;
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-    using ScalarVector = ScalarVector<Number>;
-
     //@}
     /**
      * @name Constructor and setup
@@ -136,8 +132,8 @@ namespace ryujin
                 const OfflineData<dim, Number> &offline_data,
                 const HyperbolicSystem &hyperbolic_system,
                 const ParabolicSystem &parabolic_system,
-                const InitialPrecomputedVector &initial_precomputed,
-                const ScalarVector &alpha,
+                const MultiComponentVector<Number> &initial_precomputed,
+                const ScalarVector<Number> &alpha,
                 const std::string &subsection = "/MeshAdaptor");
 
     /**
@@ -157,7 +153,7 @@ namespace ryujin
      * strategy and time point selection strategy and decide whether a mesh
      * adaptation cycle should be performed.
      */
-    void analyze(const StateVector &state_vector,
+    void analyze(const StateVector<Number> &state_vector,
                  const Number t,
                  unsigned int cycle);
 
@@ -172,7 +168,8 @@ namespace ryujin
      * Compute smoothness indicators. This function reinitializes and
      * populates the smoothness_indicators() vector.
      */
-    void compute_smoothness_indicators(const StateVector &state_vector) const;
+    void compute_smoothness_indicators(
+        const StateVector<Number> &state_vector) const;
 
     //@}
     /**
@@ -247,7 +244,7 @@ namespace ryujin
     mutable std::mt19937_64 mersenne_twister_;
 
     /* smoothness indicators: */
-    mutable ScalarVector smoothness_indicators_;
+    mutable ScalarVector<Number> smoothness_indicators_;
 
     //@}
     /**

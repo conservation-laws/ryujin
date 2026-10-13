@@ -151,7 +151,7 @@ namespace ryujin
    */
   template <typename Description, int dim, typename Number>
   void HyperbolicModule<Description, dim, Number>::reinit_state_vector(
-      StateVector &state_vector) const
+      StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<dim, Number>::reinit_state_vector()"
@@ -192,7 +192,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void HyperbolicModule<Description, dim, Number>::prepare_state_vector(
-      StateVector &state_vector, Number t) const
+      StateVector<Number> &state_vector, Number t) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, "
@@ -237,7 +237,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename MemorySpace>
   void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
-      HyperbolicVector &U, const Number t) const
+      MultiComponentVector<Number> &U, const Number t) const
   {
     constexpr auto n_comp = problem_dimension;
 
@@ -390,11 +390,11 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <int stages>
   Number HyperbolicModule<Description, dim, Number>::step(
-      const StateVector &old_state_vector,
-      std::array<std::reference_wrapper<const StateVector>, stages>
+      const StateVector<Number> &old_state_vector,
+      std::array<std::reference_wrapper<const StateVector<Number>>, stages>
           stage_state_vectors,
       const std::array<Number, stages> stage_weights,
-      StateVector &new_state_vector,
+      StateVector<Number> &new_state_vector,
       Number tau /*= 0.*/,
       Number tau_max /*= std::numeric_limits<Number>::max()*/) const
   {

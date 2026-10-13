@@ -215,7 +215,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void TimeIntegrator<Description, dim, Number>::prepare_state_vector(
-      StateVector &state_vector, Number t) const
+      StateVector<Number> &state_vector, Number t) const
   {
     if (!ParabolicSystem::is_identity)
       parabolic_module_->prepare_state_vector(state_vector, t);
@@ -232,7 +232,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step(
-      StateVector &state_vector,
+      StateVector<Number> &state_vector,
       Number t,
       Number t_final /*=std::numeric_limits<Number>::max()*/)
   {
@@ -341,7 +341,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_ssprk_22(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     /* SSP-RK2, see @cite Shu1988, Eq. 2.15. */
 
@@ -370,7 +370,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
@@ -407,7 +407,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_11(
-      StateVector &state_vector, Number /*t*/, Number tau_max)
+      StateVector<Number> &state_vector, Number /*t*/, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
@@ -426,7 +426,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_22(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
@@ -450,7 +450,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_33(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;
@@ -485,7 +485,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_43(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;
@@ -525,7 +525,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_54(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_54()" << std::endl;
@@ -596,7 +596,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_strang_ssprk_33_cn(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: avoid code duplication with step_ssprk_33
 
@@ -654,7 +654,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_strang_erk_33_cn(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: refactor to avoid code duplication with step_erk_33
 
@@ -715,7 +715,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_strang_erk_43_cn(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: refactor to avoid code duplication with step_erk_43
 
@@ -784,7 +784,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_imex_11(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_imex_11()" << std::endl;
@@ -807,7 +807,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_imex_22(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_imex_22()" << std::endl;
@@ -843,7 +843,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_imex_33(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_imex_33()" << std::endl;

@@ -283,7 +283,7 @@ namespace ryujin
 
     Number t = 0.;
     unsigned int timer_cycle = 0;
-    StateVector state_vector;
+    StateVector<Number> state_vector;
 
     /* Create a small lambda for preparing compute kernels: */
     const auto prepare_compute_kernels = [&]() {
@@ -402,7 +402,7 @@ namespace ryujin
             enable_compute_error_ && output_scheduled(timer_cycle);
 
         if (do_compute_error || do_output_analytic) {
-          StateVector analytic;
+          StateVector<Number> analytic;
           interpolate_analytic_solution(analytic, t);
 
           if (do_compute_error) {
@@ -543,7 +543,7 @@ namespace ryujin
 
     if (enable_compute_error_) {
       /* Output final error: */
-      StateVector analytic;
+      StateVector<Number> analytic;
       interpolate_analytic_solution(analytic, t);
       const auto norms = error_evaluation_.compute(state_vector, analytic);
 
@@ -578,7 +578,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename Callable>
   void TimeLoop<Description, dim, Number>::read_checkpoint(
-      StateVector &state_vector,
+      StateVector<Number> &state_vector,
       const std::string &base_name,
       Number &t,
       unsigned int &timer_cycle,
@@ -652,7 +652,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::write_checkpoint(
-      const StateVector &state_vector,
+      const StateVector<Number> &state_vector,
       const std::string &base_name,
       const Number &t,
       const unsigned int &timer_cycle)
@@ -696,7 +696,8 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename Callable>
   void TimeLoop<Description, dim, Number>::adapt_mesh_and_transfer_state_vector(
-      StateVector &state_vector, const Callable &prepare_compute_kernels)
+      StateVector<Number> &state_vector,
+      const Callable &prepare_compute_kernels)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::adapt_mesh_and_transfer_state_vector()"
@@ -732,7 +733,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::interpolate_analytic_solution(
-      StateVector &analytic, const Number t)
+      StateVector<Number> &analytic, const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::interpolate_analytic_solution()"
@@ -756,11 +757,11 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::output(const StateVector &state_vector,
-                                             const std::string &name,
-                                             const Number t,
-                                             const unsigned int cycle)
+  void TimeLoop<Description, dim, Number>::output(
+      const StateVector<Number> &state_vector,
+      const std::string &name,
+      const Number t,
+      const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;

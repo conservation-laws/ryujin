@@ -78,7 +78,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::prepare_projection(
-      const StateVector &old_state_vector [[maybe_unused]])
+      const StateVector<Number> &old_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
     std::cout
@@ -388,7 +388,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void SolutionTransfer<Description, dim, Number>::project(
-      StateVector &new_state_vector [[maybe_unused]])
+      StateVector<Number> &new_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "SolutionTransfer<Description, dim, Number>::project()"
@@ -413,10 +413,9 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
-    using ScalarHostVector = ScalarHostVector<Number>;
-    ScalarHostVector projected_mass;
+    ScalarHostVector<Number> projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
-    HyperbolicVector projected_state;
+    MultiComponentVector<Number> projected_state;
     projected_state.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
 
@@ -430,7 +429,7 @@ namespace ryujin
         pik_matrix;
     std::map<unsigned int /*i*/, Bounds> bounds_map;
 
-    ScalarHostVector kappa;
+    ScalarHostVector<Number> kappa;
     kappa.reinit(offline_data_->scalar_partitioner());
 
     /*
@@ -870,8 +869,8 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE auto
   SolutionTransfer<Description, dim, Number>::read_tensor(
-      const HyperbolicVector &U, const dealii::types::global_dof_index global_i)
-      -> state_type
+      const MultiComponentVector<Number> &U,
+      const dealii::types::global_dof_index global_i) -> state_type
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &affine_constraints = offline_data_->affine_constraints();
@@ -894,7 +893,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE void
   SolutionTransfer<Description, dim, Number>::add_tensor(
-      HyperbolicVector &U,
+      MultiComponentVector<Number> &U,
       const state_type &new_U_i,
       const dealii::types::global_dof_index global_i)
   {

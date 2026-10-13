@@ -87,11 +87,6 @@ namespace ryujin
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using StateVector = typename View::StateVector;
-    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
-
-    using ScalarVector = ScalarVector<Number>;
-
     /*
      * A selected component is identified by an offset into the linear
      * range formed by concatenating all conserved, primitive, precomputed,
@@ -128,9 +123,9 @@ namespace ryujin
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
-        const InitialPrecomputedVector &initial_precomputed,
+        const MultiComponentVector<Number> &initial_precomputed,
         const std::vector<std::string> &additional_names = {},
-        const std::vector<std::reference_wrapper<const ScalarVector>>
+        const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
             &additional_vectors = {});
 
     /**
@@ -160,7 +155,7 @@ namespace ryujin
      * view().
      */
     template <typename MemorySpace = dealii::MemorySpace::Host>
-    void prepare_extraction(const StateVector &state_vector) const;
+    void prepare_extraction(const StateVector<Number> &state_vector) const;
 
     //@}
     /**
@@ -201,10 +196,10 @@ namespace ryujin
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
-    const InitialPrecomputedVector &initial_precomputed_;
+    const MultiComponentVector<Number> &initial_precomputed_;
 
     const std::vector<std::string> additional_names_;
-    const std::vector<std::reference_wrapper<const ScalarVector>>
+    const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
         additional_vectors_;
 
     /**
@@ -338,7 +333,6 @@ namespace ryujin
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using EquationView = typename HyperbolicSystem::template View<dim, Number>;
-    using StateVector = typename EquationView::StateVector;
 
     template <int n_comp>
     using VectorView =
@@ -412,9 +406,9 @@ namespace ryujin
           const OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
           const ParabolicSystem &parabolic_system,
-          const InitialPrecomputedVector &initial_precomputed,
+          const MultiComponentVector<Number> &initial_precomputed,
           const std::vector<std::string> &additional_names,
-          const std::vector<std::reference_wrapper<const ScalarVector>>
+          const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
               &additional_vectors)
       : offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
@@ -492,7 +486,7 @@ namespace ryujin
   template <typename MemorySpace>
   void
   SelectedComponentsExtractor<Description, dim, Number>::prepare_extraction(
-      const StateVector &state_vector) const
+      const StateVector<Number> &state_vector) const
   {
     ExtractorView<MemorySpace> view(*offline_data_, *hyperbolic_system_);
 
