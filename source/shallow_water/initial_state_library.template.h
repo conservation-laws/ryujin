@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "description.h"
+#include "hyperbolic_description.h"
 
 #include "initial_state_library_shallow_water.h"
 #include <initial_state_library.h>

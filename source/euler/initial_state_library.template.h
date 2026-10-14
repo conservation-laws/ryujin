@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "description.h"
+#include "hyperbolic_description.h"
 
 #include "initial_state_library_euler.h"
 #include <initial_state_library.h>

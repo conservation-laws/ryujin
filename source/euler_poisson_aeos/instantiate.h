@@ -9,9 +9,11 @@
 #error Instantiation files can only be included once.
 #endif
 
-#include "description.h"
+#include "../euler_aeos/hyperbolic_description.h"
+#include "../euler_poisson/parabolic_description.h"
 
 namespace ryujin
 {
-  using EulerPoissonAEOS::HyperbolicDescription;
+  using HyperbolicDescription = EulerAEOS::HyperbolicDescription;
+  using ParabolicDescription = EulerPoisson::ParabolicDescription;
 } // namespace ryujin

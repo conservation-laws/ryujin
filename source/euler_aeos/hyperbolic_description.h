@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "../stub_parabolic_module.h"
-#include "../stub_parabolic_system.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
@@ -27,18 +25,10 @@ namespace ryujin
      * implementation with a modified approximative Riemann solver,
      * indicator, and limiter suitable for arbitrary equations of state.
      *
-     * The parabolic subsystem is chosen to be the identity.
-     *
      * @ingroup EulerEquations
      */
     struct HyperbolicDescription {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
-
-      using ParabolicSystem = ryujin::StubParabolicSystem;
-
-      template <int dim, typename Number = double>
-      using ParabolicModule =
-          ryujin::StubParabolicModule<HyperbolicDescription, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = EulerAEOS::Indicator<ScalarNumber>;

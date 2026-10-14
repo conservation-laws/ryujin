@@ -3,7 +3,8 @@
 // Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
-#include "description.h"
+#include "../euler/hyperbolic_description.h"
+#include "parabolic_description.h"
 
 #include <compile_time_options.h>
 #include <equation_dispatch.h>
@@ -12,6 +13,7 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
-    Dispatch<HyperbolicDescription, NUMBER> dispatch_instance("euler poisson");
+    Dispatch<Euler::HyperbolicDescription, ParabolicDescription, NUMBER>
+        dispatch_instance("euler poisson");
   } // namespace EulerPoisson
 } // namespace ryujin

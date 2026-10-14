@@ -8,7 +8,7 @@
 #include <deal.II/base/mpi.h>
 
 #define DEBUG_SOLUTION
-#include <description.h>
+#include <hyperbolic_description.h>
 #include <initial_state_exact_riemann_solution.h>
 
 using namespace ryujin::EulerInitialStates;

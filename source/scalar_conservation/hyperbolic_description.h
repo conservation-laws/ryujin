@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "../stub_parabolic_module.h"
-#include "../stub_parabolic_system.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
@@ -26,22 +24,10 @@ namespace ryujin
      * A scalar conservation equation for a scalar unknown u with a
      * user-specified flux depending on the state u.
      *
-     * The parabolic subsystem is chosen to be the identity.
-     *
-     * @note We group all of these templates together in this struct so
-     * that we only need to add a single template parameter to the all the
-     * algorithm classes, such as HyperbolicModule.
-     *
      * @ingroup ScalarConservationEquations
      */
     struct HyperbolicDescription {
       using HyperbolicSystem = ScalarConservation::HyperbolicSystem;
-
-      using ParabolicSystem = ryujin::StubParabolicSystem;
-
-      template <int dim, typename Number = double>
-      using ParabolicModule =
-          ryujin::StubParabolicModule<HyperbolicDescription, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = ScalarConservation::Indicator<ScalarNumber>;

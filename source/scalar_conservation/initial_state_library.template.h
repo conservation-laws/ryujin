@@ -7,7 +7,7 @@
 
 #include <initial_state_library.h>
 
-#include "description.h"
+#include "hyperbolic_description.h"
 #include "initial_state_function.h"
 #include "initial_state_uniform.h"
 

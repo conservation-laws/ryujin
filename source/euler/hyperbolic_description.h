@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "../stub_parabolic_module.h"
-#include "../stub_parabolic_system.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
@@ -26,18 +24,10 @@ namespace ryujin
      * The compressible Euler equations of gas dynamics. Specialized
      * implementation for a polytropic gas equation.
      *
-     * The parabolic subsystem is chosen to be the identity.
-     *
      * @ingroup EulerEquations
      */
     struct HyperbolicDescription {
       using HyperbolicSystem = Euler::HyperbolicSystem;
-
-      using ParabolicSystem = ryujin::StubParabolicSystem;
-
-      template <int dim, typename Number = double>
-      using ParabolicModule =
-          ryujin::StubParabolicModule<HyperbolicDescription, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = Euler::Indicator<ScalarNumber>;

@@ -3,10 +3,14 @@
 ## Copyright (C) 2026 by the ryujin authors
 ##
 
+if(NOT EQUATION_EULER)
+  message(FATAL_ERROR
+    "The equation »euler_poisson« requires the equation »euler« to be enabled")
+endif()
+
 add_library(obj_euler_poisson OBJECT
   electrostatic_configuration_library.cc
   equation_dispatch.cc
-  initial_state_library.cc
   parabolic_module.cc
   )
 set_target_properties(obj_euler_poisson PROPERTIES LINKER_LANGUAGE CXX)

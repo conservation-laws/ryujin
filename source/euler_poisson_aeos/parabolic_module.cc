@@ -3,8 +3,8 @@
 // Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
+#include "../euler_aeos/hyperbolic_description.h"
 #include "../euler_poisson/parabolic_module.template.h"
-#include "description.h"
 
 #define INSTANTIATE(dim, stages)                                               \
   template void ParabolicModule<HD, dim, NUMBER>::backward_euler_step<stages>( \
@@ -19,7 +19,7 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
-    using HD = EulerPoissonAEOS::HyperbolicDescription;
+    using HD = EulerAEOS::HyperbolicDescription;
 
     template class ParabolicModule<HD, 1, NUMBER>;
     template class ParabolicModule<HD, 2, NUMBER>;

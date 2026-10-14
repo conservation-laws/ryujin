@@ -3,7 +3,9 @@
 // Copyright (C) 2024 by the ryujin authors
 //
 
-#include "description.h"
+#include "hyperbolic_description.h"
+
+#include "../stub_parabolic_module.h"
 
 #include <compile_time_options.h>
 #include <equation_dispatch.h>
@@ -12,6 +14,7 @@ namespace ryujin
 {
   namespace ShallowWater
   {
-    Dispatch<HyperbolicDescription, NUMBER> dispatch_instance("shallow water");
+    Dispatch<HyperbolicDescription, StubParabolicDescription, NUMBER>
+        dispatch_instance("shallow water");
   } // namespace ShallowWater
 } // namespace ryujin
