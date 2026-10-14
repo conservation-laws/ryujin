@@ -9,6 +9,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/hyperbolic_system.h>
+
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <gpu.h>
@@ -42,14 +44,9 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    class HyperbolicSystem final : public dealii::ParameterAcceptor
+    class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      static inline const std::string problem_name = "Shallow water equations";
-
       /**
        * A structure holding all runtime parameters of the hyperbolic
        * system.
@@ -77,6 +74,20 @@ namespace ryujin
                 typename Number = double,
                 typename MemorySpace = dealii::MemorySpace::Host>
       using View = HyperbolicSystemView<dim, Number, MemorySpace>;
+
+      /**
+       * The names of the state components: the static component names of
+       * the view.
+       */
+      std::vector<std::string>
+      state_names(const unsigned int dim) const override;
+
+      /**
+       * The names of the precomputed values: the static precomputed names
+       * of the view.
+       */
+      std::vector<std::string>
+      precomputed_names(const unsigned int dim) const override;
 
       /**
        * Return a view on the Hyperbolic System for a given dimension @p
@@ -670,7 +681,7 @@ namespace ryujin
 
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::HyperbolicSystem("Shallow water equations", subsection)
         , parameters_("shallow_water_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
@@ -1381,6 +1392,20 @@ namespace ryujin
       for (unsigned int d = 0; d < dim; ++d)
         result[1 + d] = M[d];
       return result;
+    }
+
+
+    inline std::vector<std::string>
+    HyperbolicSystem::state_names(const unsigned int dim) const
+    {
+      return view_state_names<View>(dim);
+    }
+
+
+    inline std::vector<std::string>
+    HyperbolicSystem::precomputed_names(const unsigned int dim) const
+    {
+      return view_precomputed_names<View>(dim);
     }
 
   } // namespace ShallowWater

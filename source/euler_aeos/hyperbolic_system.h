@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/hyperbolic_system.h>
+
 #include "equation_of_state_library.h"
 
 #include <convenience_macros.h>
@@ -45,15 +47,9 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    class HyperbolicSystem final : public dealii::ParameterAcceptor
+    class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      static inline std::string problem_name =
-          "Compressible Euler equations (arbitrary EOS)";
-
       /**
        * A structure holding all runtime parameters of the hyperbolic
        * system, as well as the interpolatory NASG parameters of the
@@ -101,6 +97,20 @@ namespace ryujin
                 typename Number = double,
                 typename MemorySpace = dealii::MemorySpace::Host>
       using View = HyperbolicSystemView<dim, Number, MemorySpace>;
+
+      /**
+       * The names of the state components: the static component names of
+       * the view.
+       */
+      std::vector<std::string>
+      state_names(const unsigned int dim) const override;
+
+      /**
+       * The names of the precomputed values: the static precomputed names
+       * of the view.
+       */
+      std::vector<std::string>
+      precomputed_names(const unsigned int dim) const override;
 
       /**
        * Return a view on the Hyperbolic System for a given dimension @p
@@ -910,7 +920,8 @@ namespace ryujin
 
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::HyperbolicSystem(
+              "Compressible Euler equations (arbitrary EOS)", subsection)
         , parameters_("euler_aeos_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
@@ -980,7 +991,7 @@ namespace ryujin
         /* Populate EOS-specific quantities and functions */
         if (it->name() == equation_of_state_) {
           selected_equation_of_state_ = it;
-          problem_name =
+          problem_name_ =
               "Compressible Euler equations (" + it->name() + " EOS)";
           initialized = true;
           break;
@@ -1864,5 +1875,20 @@ namespace ryujin
         result[1 + d] = M[d];
       return result;
     }
+
+
+    inline std::vector<std::string>
+    HyperbolicSystem::state_names(const unsigned int dim) const
+    {
+      return view_state_names<View>(dim);
+    }
+
+
+    inline std::vector<std::string>
+    HyperbolicSystem::precomputed_names(const unsigned int dim) const
+    {
+      return view_precomputed_names<View>(dim);
+    }
+
   } // namespace EulerAEOS
 } // namespace ryujin

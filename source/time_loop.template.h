@@ -1069,7 +1069,7 @@ namespace ryujin
         return "SIMD, " + precision + ", width " + std::to_string(simd_size);
     }();
 
-    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
+    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name();
     if constexpr (!ParabolicSystem::is_identity) {
       stream << "\n             (PAR) "
              << parabolic_system_.get().problem_name();
