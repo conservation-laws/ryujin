@@ -31,12 +31,15 @@
 
 namespace ryujin
 {
+  namespace Euler
+  {
+    struct HyperbolicDescription;
+  }
+
   namespace NavierStokes
   {
     template <int, typename>
     class DiagonalMatrix;
-
-    struct HyperbolicDescription;
 
     /**
      * Implicit backward-Euler time stepping for the parabolic limiting
@@ -118,6 +121,8 @@ namespace ryujin
        * @name Typedefs and constexpr constants
        */
       //@{
+
+      using HyperbolicDescription = Euler::HyperbolicDescription;
 
       using HyperbolicSystem = Euler::HyperbolicSystem;
 

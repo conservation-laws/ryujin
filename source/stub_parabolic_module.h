@@ -11,6 +11,7 @@
 #include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <offline_data.h>
+#include <stub_parabolic_system.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -31,7 +32,7 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-    using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
+    using ParabolicSystem = StubParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -197,5 +198,21 @@ namespace ryujin
     }
 
     //@}
+  };
+
+
+  /**
+   * The parabolic description of a purely hyperbolic equation: the
+   * identity as parabolic system and a stub parabolic module. It can be
+   * paired with every hyperbolic description.
+   *
+   * @ingroup ParabolicModule
+   */
+  struct StubParabolicDescription {
+    using ParabolicSystem = StubParabolicSystem;
+
+    template <typename HyperbolicDescription, int dim, typename Number = double>
+    using ParabolicModule =
+        StubParabolicModule<HyperbolicDescription, dim, Number>;
   };
 } /* namespace ryujin */

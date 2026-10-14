@@ -13,13 +13,12 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  TimeIntegrator<HyperbolicDescription, dim, Number>::TimeIntegrator(
+  template <typename HD, typename PD, int dim, typename Number>
+  TimeIntegrator<HD, PD, dim, Number>::TimeIntegrator(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicModule<HD, dim, Number> &hyperbolic_module,
-      const ParabolicModule<HyperbolicDescription, dim, Number>
-          &parabolic_module,
+      const ParabolicModule<HD, PD, dim, Number> &parabolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -70,8 +69,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void TimeIntegrator<HyperbolicDescription, dim, Number>::prepare()
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeIntegrator<HD, PD, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
@@ -216,8 +215,8 @@ namespace ryujin
    */
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void TimeIntegrator<HyperbolicDescription, dim, Number>::prepare_state_vector(
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeIntegrator<HD, PD, dim, Number>::prepare_state_vector(
       StateVector<Number> &state_vector, Number t) const
   {
     if (!ParabolicSystem::is_identity)
@@ -233,8 +232,8 @@ namespace ryujin
    */
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step(
       StateVector<Number> &state_vector,
       Number t,
       Number t_final /*=std::numeric_limits<Number>::max()*/)
@@ -342,8 +341,8 @@ namespace ryujin
    */
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_ssprk_22(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_ssprk_22(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     /* SSP-RK2, see @cite Shu1988, Eq. 2.15. */
@@ -371,8 +370,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_ssprk_33(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_ssprk_33(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
@@ -408,8 +407,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_erk_11(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_erk_11(
       StateVector<Number> &state_vector, Number /*t*/, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -427,8 +426,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_erk_22(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_erk_22(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -451,8 +450,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_erk_33(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_erk_33(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -486,8 +485,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_erk_43(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_erk_43(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -526,8 +525,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_erk_54(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_erk_54(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -597,9 +596,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number
-  TimeIntegrator<HyperbolicDescription, dim, Number>::step_strang_ssprk_33_cn(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_strang_ssprk_33_cn(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: avoid code duplication with step_ssprk_33
@@ -656,9 +654,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number
-  TimeIntegrator<HyperbolicDescription, dim, Number>::step_strang_erk_33_cn(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_strang_erk_33_cn(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: refactor to avoid code duplication with step_erk_33
@@ -718,9 +715,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number
-  TimeIntegrator<HyperbolicDescription, dim, Number>::step_strang_erk_43_cn(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_strang_erk_43_cn(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
     // FIXME: refactor to avoid code duplication with step_erk_43
@@ -788,8 +784,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_imex_11(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_imex_11(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -811,8 +807,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_imex_22(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_imex_22(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
@@ -847,8 +843,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number TimeIntegrator<HyperbolicDescription, dim, Number>::step_imex_33(
+  template <typename HD, typename PD, int dim, typename Number>
+  Number TimeIntegrator<HD, PD, dim, Number>::step_imex_33(
       StateVector<Number> &state_vector, Number t, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT

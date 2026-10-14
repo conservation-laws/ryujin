@@ -33,7 +33,10 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <typename HyperbolicDescription,
+            typename ParabolicDescription,
+            int dim,
+            typename Number = double>
   class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
@@ -43,7 +46,7 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-    using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
+    using ParabolicSystem = typename ParabolicDescription::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -120,8 +123,10 @@ namespace ryujin
     MPIEnsembleContainer<InitialValues<HyperbolicDescription, dim, Number>>
         initial_values_;
     HyperbolicModule<HyperbolicDescription, dim, Number> hyperbolic_module_;
-    ParabolicModule<HyperbolicDescription, dim, Number> parabolic_module_;
-    TimeIntegrator<HyperbolicDescription, dim, Number> time_integrator_;
+    ParabolicModule<HyperbolicDescription, ParabolicDescription, dim, Number>
+        parabolic_module_;
+    TimeIntegrator<HyperbolicDescription, ParabolicDescription, dim, Number>
+        time_integrator_;
     MeshAdaptor<HyperbolicDescription, dim, Number> mesh_adaptor_;
     SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;
     Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;

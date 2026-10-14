@@ -9,6 +9,7 @@
 
 #include "electrostatic_configuration_library.h"
 #include "laplace_operator.h"
+#include "parabolic_system.h"
 
 #include <hyperbolic_module.h>
 #include <initial_values.h>
@@ -141,7 +142,7 @@ namespace ryujin
 
       using View = typename HyperbolicSystem::template View<dim, Number>;
 
-      using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
+      using ParabolicSystem = EulerPoisson::ParabolicSystem;
 
       using BlockHostVector =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;
