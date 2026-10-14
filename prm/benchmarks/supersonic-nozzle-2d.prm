@@ -1,0 +1,48 @@
+subsection A - TimeLoop
+  set basename                     = supersonic-nozzle-2d
+
+  set enable output full           = true
+
+  set final time                  = 0.01
+  set timer granularity           = 0.000001
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+subsection C - Discretization
+    set geometry  = reader
+    set mesh refinement = 2
+    set mesh repartitioning = false
+    subsection reader
+        set filename = prm/meshes/nozzle_0.5-3mm.msh
+    end
+end
+
+subsection E - InitialValues
+
+    set configuration = contrast
+    set direction = 0., 1.
+    set position = 0., -0.424
+    
+    subsection contrast
+        set primitive state right= 0.00000002323, 0.0, 2.
+        set primitive state left= 0.06969, 4.76, 6000000.
+    end
+end
+subsection H - TimeIntegrator
+  set cfl min               = 0.8
+  set cfl max               = 0.8
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set use mpi io     = true
+  set schlieren beta = 10
+end
