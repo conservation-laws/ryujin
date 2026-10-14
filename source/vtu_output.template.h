@@ -52,13 +52,13 @@ namespace ryujin
                   "List of level set functions. The description is used to "
                   "only output cells that intersect the given level set.");
 
-    std::copy(std::begin(View::component_names),
-              std::end(View::component_names),
-              std::back_inserter(vtu_output_quantities_));
+    vtu_output_quantities_ = hyperbolic_system.state_names(dim);
 
-    std::copy(std::begin(View::initial_precomputed_names),
-              std::end(View::initial_precomputed_names),
-              std::back_inserter(vtu_output_quantities_));
+    const auto &initial_names =
+        hyperbolic_system.initial_precomputed_names(dim);
+    vtu_output_quantities_.insert(vtu_output_quantities_.end(),
+                                  initial_names.begin(),
+                                  initial_names.end());
 
     add_parameter("vtu output quantities",
                   vtu_output_quantities_,

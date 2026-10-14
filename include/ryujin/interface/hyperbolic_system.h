@@ -12,7 +12,7 @@
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
 
-#include <iterator>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -27,10 +27,14 @@ namespace ryujin
      * The first View<dim>::problem_dimension state names and the first
      * View<dim>::n_precomputed_values precomputed names are static: they
      * are stored interleaved in StateVector::U and
-     * StateVector::precomputed and have to equal the names declared in
-     * the hyperbolic system view. All remaining names are dynamic: they
-     * are stored as scalar vectors in StateVector::V (state) and
+     * StateVector::precomputed. All remaining names are dynamic: they are
+     * stored as scalar vectors in StateVector::V (state) and
      * StateVector::W (precomputed values).
+     *
+     * The primitive names (View<dim>::problem_dimension entries) name the
+     * primitive state returned by View::to_primitive_state(), and the
+     * initial precomputed names (View<dim>::n_initial_precomputed_values
+     * entries) name the time-independent initial precomputed values.
      *
      * @ingroup HyperbolicModule
      */
@@ -43,31 +47,83 @@ namespace ryujin
       ACCESSOR_READ_ONLY(problem_name)
 
       /**
-       * The names of the state components for dimension @p dim. State
-       * components are evolved by the time integrator.
-       *
-       * @note Valid once the run time parameters are parsed.
+       * A list of component names for every dimension:
        */
-      virtual std::vector<std::string>
-      state_names(const unsigned int dim) const = 0;
+      using Names = std::array<std::vector<std::string>, 3>;
 
       /**
-       * The names of the precomputed values for dimension @p dim.
-       * Precomputed values are derived from the state.
+       * The names of the hyperbolic state components for dimension @p dim.
+       *
+       * Hyperbolic state components are stored in $U$ (static) and $V$
+       * (dynamic) and evolved by the time integrator.
        *
        * @note Valid once the run time parameters are parsed.
        */
-      virtual std::vector<std::string>
-      precomputed_names(const unsigned int dim) const = 0;
+      const std::vector<std::string> &state_names(const unsigned int dim) const
+      {
+        AssertIndexRange(dim - 1, 3);
+        return state_names_[dim - 1];
+      }
+
+      /**
+       * The names of the primitive state components for dimension @p dim.
+       *
+       * @note Valid once the run time parameters are parsed.
+       */
+      const std::vector<std::string> &
+      primitive_names(const unsigned int dim) const
+      {
+        AssertIndexRange(dim - 1, 3);
+        return primitive_names_[dim - 1];
+      }
+
+      /**
+       * The names of the hyperbolic precomputed values for dimension
+       * @p dim.
+       *
+       * Precomputed values are stored in StateVector::precomputed (static)
+       * and $W$ (dynamic) and are derived from the state.
+       *
+       * @note Valid once the run time parameters are parsed.
+       */
+      const std::vector<std::string> &
+      precomputed_names(const unsigned int dim) const
+      {
+        AssertIndexRange(dim - 1, 3);
+        return precomputed_names_[dim - 1];
+      }
+
+      /**
+       * The names of the initial precomputed values for dimension @p dim.
+       *
+       * Initial precomputed values are time-independent and stored outside
+       * of the state vector.
+       *
+       * @note Valid once the run time parameters are parsed.
+       */
+      const std::vector<std::string> &
+      initial_precomputed_names(const unsigned int dim) const
+      {
+        AssertIndexRange(dim - 1, 3);
+        return initial_precomputed_names_[dim - 1];
+      }
 
     protected:
       /**
        * Constructor.
        */
       HyperbolicSystem(const std::string &problem_name,
+                       const Names &state_names,
+                       const Names &primitive_names,
+                       const Names &precomputed_names,
+                       const Names &initial_precomputed_names,
                        const std::string &subsection)
           : ParameterAcceptor(subsection)
           , problem_name_(problem_name)
+          , state_names_(state_names)
+          , primitive_names_(primitive_names)
+          , precomputed_names_(precomputed_names)
+          , initial_precomputed_names_(initial_precomputed_names)
       {
       }
 
@@ -80,52 +136,36 @@ namespace ryujin
       std::string problem_name_;
 
       /**
-       * A helper for a derived class: return the names of the static state
-       * components declared in the hyperbolic system view @p View for
-       * dimension @p dim.
+       * The names of the state components for every dimension.
+       *
+       * @note A derived class may update them once the run time
+       * parameters are known.
        */
-      template <template <int, typename...> typename View>
-      static std::vector<std::string> view_state_names(const unsigned int dim)
-      {
-        switch (dim) {
-        case 1:
-          return to_vector(View<1>::component_names);
-        case 2:
-          return to_vector(View<2>::component_names);
-        case 3:
-          return to_vector(View<3>::component_names);
-        }
-        AssertThrow(false, dealii::ExcNotImplemented());
-        return {};
-      }
+      Names state_names_;
 
       /**
-       * A helper for a derived class: return the names of the static
-       * precomputed values declared in the hyperbolic system view @p View
-       * for dimension @p dim.
+       * The names of the primitive state components for every dimension.
+       *
+       * @note A derived class may update them once the run time
+       * parameters are known.
        */
-      template <template <int, typename...> typename View>
-      static std::vector<std::string>
-      view_precomputed_names(const unsigned int dim)
-      {
-        switch (dim) {
-        case 1:
-          return to_vector(View<1>::precomputed_names);
-        case 2:
-          return to_vector(View<2>::precomputed_names);
-        case 3:
-          return to_vector(View<3>::precomputed_names);
-        }
-        AssertThrow(false, dealii::ExcNotImplemented());
-        return {};
-      }
+      Names primitive_names_;
 
-    private:
-      template <typename Array>
-      static std::vector<std::string> to_vector(const Array &names)
-      {
-        return std::vector<std::string>(std::begin(names), std::end(names));
-      }
+      /**
+       * The names of the precomputed values for every dimension.
+       *
+       * @note A derived class may update them once the run time
+       * parameters are known.
+       */
+      Names precomputed_names_;
+
+      /**
+       * The names of the initial precomputed values for every dimension.
+       *
+       * @note A derived class may update them once the run time
+       * parameters are known.
+       */
+      Names initial_precomputed_names_;
     };
   } // namespace Interface
 } // namespace ryujin

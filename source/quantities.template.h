@@ -70,9 +70,7 @@ namespace ryujin
       , base_name_("")
       , mesh_files_have_been_written_(false)
   {
-    std::copy(std::begin(View::primitive_component_names),
-              std::end(View::primitive_component_names),
-              std::back_inserter(quantities_));
+    quantities_ = hyperbolic_system.primitive_names(dim);
 
     add_parameter("quantities",
                   quantities_,

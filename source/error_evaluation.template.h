@@ -35,9 +35,7 @@ namespace ryujin
                                        initial_precomputed)
       , base_name_("")
   {
-    std::copy(std::begin(View::component_names),
-              std::end(View::component_names),
-              std::back_inserter(error_quantities_));
+    error_quantities_ = hyperbolic_system.state_names(dim);
 
     add_parameter("error quantities",
                   error_quantities_,

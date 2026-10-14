@@ -76,20 +76,6 @@ namespace ryujin
       using View = HyperbolicSystemView<dim, Number, MemorySpace>;
 
       /**
-       * The names of the state components: the static component names of
-       * the view.
-       */
-      std::vector<std::string>
-      state_names(const unsigned int dim) const override;
-
-      /**
-       * The names of the precomputed values: the static precomputed names
-       * of the view.
-       */
-      std::vector<std::string>
-      precomputed_names(const unsigned int dim) const override;
-
-      /**
        * Return a view on the Hyperbolic System for a given dimension @p
        * dim and choice of number type @p Number (which can be a scalar
        * float, or double, as well as a VectorizedArray holding packed
@@ -197,36 +183,6 @@ namespace ryujin
       using flux_contribution_type = std::tuple<state_type, Number>;
 
       /**
-       * An array holding all component names of the conserved state as a
-       * string.
-       */
-      static inline const auto component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"h", "m"};
-        else if constexpr (dim == 2)
-          return {"h", "m_1", "m_2"};
-        else if constexpr (dim == 3)
-          return {"h", "m_1", "m_2", "m_3"};
-        __builtin_trap();
-      }();
-
-      /**
-       * An array holding all component names of the primitive state as a
-       * string.
-       */
-      static inline const auto primitive_component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"h", "v"};
-        else if constexpr (dim == 2)
-          return {"h", "v_1", "v_2"};
-        else if constexpr (dim == 3)
-          return {"h", "v_1", "v_2", "v_3"};
-        __builtin_trap();
-      }();
-
-      /**
        * The number of precomputed values.
        */
       static constexpr unsigned int n_precomputed_values = 2;
@@ -235,12 +191,6 @@ namespace ryujin
        * Array type used for precomputed values.
        */
       using precomputed_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_names =
-          std::array<std::string, n_precomputed_values>{"eta_m", "h_star"};
 
       /**
        * The number of precomputed initial values.
@@ -252,12 +202,6 @@ namespace ryujin
        */
       using initial_precomputed_type =
           std::array<Number, n_initial_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto initial_precomputed_names =
-          std::array<std::string, n_initial_precomputed_values>{"bathymetry"};
 
       template <int n_comp>
       using VectorView =
@@ -681,7 +625,13 @@ namespace ryujin
 
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
-        : Interface::HyperbolicSystem("Shallow water equations", subsection)
+        : Interface::HyperbolicSystem(
+              "Shallow water equations",
+              {{{"h", "m"}, {"h", "m_1", "m_2"}, {"h", "m_1", "m_2", "m_3"}}},
+              {{{"h", "v"}, {"h", "v_1", "v_2"}, {"h", "v_1", "v_2", "v_3"}}},
+              {{{"eta_m", "h_star"}, {"eta_m", "h_star"}, {"eta_m", "h_star"}}},
+              {{{"bathymetry"}, {"bathymetry"}, {"bathymetry"}}},
+              subsection)
         , parameters_("shallow_water_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
@@ -1393,20 +1343,5 @@ namespace ryujin
         result[1 + d] = M[d];
       return result;
     }
-
-
-    inline std::vector<std::string>
-    HyperbolicSystem::state_names(const unsigned int dim) const
-    {
-      return view_state_names<View>(dim);
-    }
-
-
-    inline std::vector<std::string>
-    HyperbolicSystem::precomputed_names(const unsigned int dim) const
-    {
-      return view_precomputed_names<View>(dim);
-    }
-
   } // namespace ShallowWater
 } // namespace ryujin

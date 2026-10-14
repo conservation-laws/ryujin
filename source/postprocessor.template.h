@@ -42,9 +42,9 @@ namespace ryujin
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
 
-    static_assert(View::component_names.size() > 0,
-                  "Need at least one scalar quantitity");
-    schlieren_quantities_.push_back(View::component_names[0]);
+    Assert(hyperbolic_system.state_names(dim).size() > 0,
+           dealii::ExcMessage("Need at least one scalar quantitity"));
+    schlieren_quantities_.push_back(hyperbolic_system.state_names(dim)[0]);
 
     add_parameter(
         "schlieren quantities",
@@ -75,8 +75,8 @@ namespace ryujin
     const auto populate = [&](const auto &strings,
                               auto &indices,
                               const auto &pre) {
-      const auto &cons = View::component_names;
-      const auto &prim = View::primitive_component_names;
+      const auto &cons = hyperbolic_system_->state_names(dim);
+      const auto &prim = hyperbolic_system_->primitive_names(dim);
       for (const auto &entry : strings) {
         bool found = false;
         for (const auto &[is_primitive, names] :

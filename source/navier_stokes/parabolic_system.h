@@ -42,25 +42,6 @@ namespace ryujin
        */
       static constexpr bool is_identity = false;
 
-      /**
-       * No state components: the parabolic step updates the hyperbolic
-       * state.
-       */
-      std::vector<std::string>
-      state_names(const unsigned int /*dim*/) const override
-      {
-        return {};
-      }
-
-      /**
-       * No precomputed values.
-       */
-      std::vector<std::string>
-      precomputed_names(const unsigned int /*dim*/) const override
-      {
-        return {};
-      }
-
       ACCESSOR_READ_ONLY(mu)
       ACCESSOR_READ_ONLY(lambda)
       ACCESSOR_READ_ONLY(cv_inverse_kappa)
@@ -91,6 +72,9 @@ namespace ryujin
     inline ParabolicSystem::ParabolicSystem(const std::string &subsection)
         : Interface::ParabolicSystem(
               "Newtonian fluid viscosity model with Fourier-law heat flux",
+              /* no components of its own: acts on the hyperbolic state */
+              {},
+              {},
               subsection)
     {
       mu_ = 1.e-3;

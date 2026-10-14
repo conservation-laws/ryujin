@@ -36,24 +36,6 @@ namespace ryujin
        */
       static constexpr bool is_identity = false;
 
-      /**
-       * The electrostatic potential.
-       */
-      std::vector<std::string>
-      state_names(const unsigned int /*dim*/) const override
-      {
-        return {"phi"};
-      }
-
-      /**
-       * No precomputed values.
-       */
-      std::vector<std::string>
-      precomputed_names(const unsigned int /*dim*/) const override
-      {
-        return {};
-      }
-
       ACCESSOR_READ_ONLY(alpha)
 
       ACCESSOR_READ_ONLY(magnetic_drift_limit);
@@ -74,6 +56,9 @@ namespace ryujin
     inline ParabolicSystem::ParabolicSystem(const std::string &subsection)
         : Interface::ParabolicSystem(
               "Electrostatic force model with background magnetic field",
+              /* the electrostatic potential */
+              {{{"phi"}, {"phi"}, {"phi"}}},
+              {},
               subsection)
         , subsection_(subsection)
     {

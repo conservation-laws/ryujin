@@ -9,8 +9,10 @@
 
 #include <convenience_macros.h>
 
+#include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -37,31 +39,51 @@ namespace ryujin
       ACCESSOR_READ_ONLY(problem_name)
 
       /**
-       * The names of the state components for dimension @p dim. State
-       * components are evolved by the time integrator.
-       *
-       * @note Valid once the run time parameters are parsed.
+       * A list of component names for every dimension:
        */
-      virtual std::vector<std::string>
-      state_names(const unsigned int dim) const = 0;
+      using Names = std::array<std::vector<std::string>, 3>;
 
       /**
-       * The names of the precomputed values for dimension @p dim.
-       * Precomputed values are derived from the state.
+       * The names of the parabolic state components for dimension @p dim.
+       *
+       * Parabolic state components are stored in $V$ and evolved by the
+       * time integrator.
        *
        * @note Valid once the run time parameters are parsed.
        */
-      virtual std::vector<std::string>
-      precomputed_names(const unsigned int dim) const = 0;
+      const std::vector<std::string> &state_names(const unsigned int dim) const
+      {
+        AssertIndexRange(dim - 1, 3);
+        return state_names_[dim - 1];
+      }
+
+      /**
+       * The names of the parabolic precomputed values for dimension @p dim.
+       *
+       * Precomputed values are stored in $W$ and are derived from the
+       * state.
+       *
+       * @note Valid once the run time parameters are parsed.
+       */
+      const std::vector<std::string> &
+      precomputed_names(const unsigned int dim) const
+      {
+        AssertIndexRange(dim - 1, 3);
+        return precomputed_names_[dim - 1];
+      }
 
     protected:
       /**
        * Constructor.
        */
       ParabolicSystem(const std::string &problem_name,
+                      const Names &state_names,
+                      const Names &precomputed_names,
                       const std::string &subsection)
           : ParameterAcceptor(subsection)
           , problem_name_(problem_name)
+          , state_names_(state_names)
+          , precomputed_names_(precomputed_names)
       {
       }
 
@@ -72,6 +94,22 @@ namespace ryujin
        * are known.
        */
       std::string problem_name_;
+
+      /**
+       * The names of the state components for every dimension.
+       *
+       * @note A derived class may update them once the run time
+       * parameters are known.
+       */
+      Names state_names_;
+
+      /**
+       * The names of the precomputed values for every dimension.
+       *
+       * @note A derived class may update them once the run time
+       * parameters are known.
+       */
+      Names precomputed_names_;
     };
   } // namespace Interface
 } // namespace ryujin

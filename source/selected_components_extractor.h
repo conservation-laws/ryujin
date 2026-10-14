@@ -442,10 +442,12 @@ namespace ryujin
       };
 
       const bool found =
-          search(View::component_names, conserved_offset) ||
-          search(View::primitive_component_names, primitive_offset) ||
-          search(View::precomputed_names, precomputed_offset) ||
-          search(View::initial_precomputed_names, initial_offset) ||
+          search(hyperbolic_system_->state_names(dim), conserved_offset) ||
+          search(hyperbolic_system_->primitive_names(dim), primitive_offset) ||
+          search(hyperbolic_system_->precomputed_names(dim),
+                 precomputed_offset) ||
+          search(hyperbolic_system_->initial_precomputed_names(dim),
+                 initial_offset) ||
           search(parabolic_system_->state_names(dim), parabolic_offset) ||
           search(additional_names_, additional_offset_);
 
