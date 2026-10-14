@@ -39,7 +39,7 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   class Postprocessor final : public dealii::ParameterAcceptor
   {
   public:
@@ -48,7 +48,7 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 

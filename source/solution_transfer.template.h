@@ -24,8 +24,8 @@
 
 namespace ryujin
 {
-  template <typename Description, int dim, typename Number>
-  SolutionTransfer<Description, dim, Number>::SolutionTransfer(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  SolutionTransfer<HyperbolicDescription, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
@@ -76,14 +76,14 @@ namespace ryujin
   } // namespace
 
 
-  template <typename Description, int dim, typename Number>
-  void SolutionTransfer<Description, dim, Number>::prepare_projection(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void SolutionTransfer<HyperbolicDescription, dim, Number>::prepare_projection(
       const StateVector<Number> &old_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
-    std::cout
-        << "SolutionTransfer<Description, dim, Number>::prepare_projection()"
-        << std::endl;
+    std::cout << "SolutionTransfer<HyperbolicDescription, dim, "
+                 "Number>::prepare_projection()"
+              << std::endl;
 #endif
 
     copy_to_memory_space<dealii::MemorySpace::Host>(
@@ -386,13 +386,14 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void SolutionTransfer<Description, dim, Number>::project(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void SolutionTransfer<HyperbolicDescription, dim, Number>::project(
       StateVector<Number> &new_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<Description, dim, Number>::project()"
-              << std::endl;
+    std::cout
+        << "SolutionTransfer<HyperbolicDescription, dim, Number>::project()"
+        << std::endl;
 #endif
 
     move_to_memory_space<dealii::MemorySpace::Host>(
@@ -866,9 +867,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE auto
-  SolutionTransfer<Description, dim, Number>::read_tensor(
+  SolutionTransfer<HyperbolicDescription, dim, Number>::read_tensor(
       const MultiComponentVector<Number> &U,
       const dealii::types::global_dof_index global_i) -> state_type
   {
@@ -890,9 +891,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE void
-  SolutionTransfer<Description, dim, Number>::add_tensor(
+  SolutionTransfer<HyperbolicDescription, dim, Number>::add_tensor(
       MultiComponentVector<Number> &U,
       const state_type &new_U_i,
       const dealii::types::global_dof_index global_i)

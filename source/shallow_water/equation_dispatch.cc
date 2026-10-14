@@ -12,6 +12,6 @@ namespace ryujin
 {
   namespace ShallowWater
   {
-    Dispatch<Description, NUMBER> dispatch_instance("shallow water");
+    Dispatch<HyperbolicDescription, NUMBER> dispatch_instance("shallow water");
   } // namespace ShallowWater
 } // namespace ryujin

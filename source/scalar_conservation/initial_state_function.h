@@ -16,7 +16,7 @@ namespace ryujin
 {
   namespace ScalarConservation
   {
-    struct Description;
+    struct HyperbolicDescription;
 
     /**
      * Initial state defined by a user provided function
@@ -24,7 +24,7 @@ namespace ryujin
      * @ingroup ScalarConservationEquations
      */
     template <int dim, typename Number>
-    class Function : public InitialState<Description, dim, Number>
+    class Function : public InitialState<HyperbolicDescription, dim, Number>
     {
     public:
       using View = HyperbolicSystemView<dim, Number>;
@@ -32,7 +32,8 @@ namespace ryujin
 
       Function(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
-          : InitialState<Description, dim, Number>("function", subsection)
+          : InitialState<HyperbolicDescription, dim, Number>("function",
+                                                             subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         expression_ = "0.25 * x";

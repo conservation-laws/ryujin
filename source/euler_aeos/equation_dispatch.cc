@@ -12,6 +12,6 @@ namespace ryujin
 {
   namespace EulerAEOS
   {
-    Dispatch<Description, NUMBER> dispatch_instance("euler aeos");
+    Dispatch<HyperbolicDescription, NUMBER> dispatch_instance("euler aeos");
   } // namespace EulerAEOS
 } // namespace ryujin

@@ -12,6 +12,7 @@ namespace ryujin
 {
   namespace EulerPoissonBarotropic
   {
-    Dispatch<Description, NUMBER> dispatch_instance("euler poisson barotropic");
+    Dispatch<HyperbolicDescription, NUMBER>
+        dispatch_instance("euler poisson barotropic");
   } // namespace EulerPoissonBarotropic
 } // namespace ryujin

@@ -27,14 +27,14 @@ namespace ryujin
      *
      * @ingroup EulerPoissonEquations
      */
-    struct Description {
+    struct HyperbolicDescription {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
 
       using ParabolicSystem = EulerPoisson::ParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
-          EulerPoisson::ParabolicModule<Description, dim, Number>;
+          EulerPoisson::ParabolicModule<HyperbolicDescription, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = EulerAEOS::Indicator<ScalarNumber>;

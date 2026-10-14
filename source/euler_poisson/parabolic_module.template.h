@@ -28,13 +28,13 @@ namespace ryujin
   {
     using namespace dealii;
 
-    template <typename Description, int dim, typename Number>
-    ParabolicModule<Description, dim, Number>::ParabolicModule(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    ParabolicModule<HyperbolicDescription, dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
-        const InitialValues<Description, dim, Number> &initial_values,
+        const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
         const std::string &subsection)
         : ParameterAcceptor(subsection)
         , mpi_ensemble_(mpi_ensemble)
@@ -131,8 +131,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::prepare()
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void ParabolicModule<HyperbolicDescription, dim, Number>::prepare()
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
@@ -238,8 +238,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::reinit_state_vector(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void
+    ParabolicModule<HyperbolicDescription, dim, Number>::reinit_state_vector(
         StateVector<Number> &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
@@ -256,8 +257,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::prepare_state_vector(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void
+    ParabolicModule<HyperbolicDescription, dim, Number>::prepare_state_vector(
         StateVector<Number> &state_vector, Number t) const
     {
 #ifdef DEBUG_OUTPUT
@@ -290,9 +292,10 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
+    template <typename HyperbolicDescription, int dim, typename Number>
     template <int stages>
-    void ParabolicModule<Description, dim, Number>::backward_euler_step(
+    void
+    ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
         const Number old_t,
         std::array<std::reference_wrapper<const StateVector<Number>>,
@@ -309,8 +312,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void
+    ParabolicModule<HyperbolicDescription, dim, Number>::crank_nicolson_step(
         const StateVector<Number> &old_state_vector,
         const Number old_t,
         StateVector<Number> &new_state_vector,
@@ -344,9 +348,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::print_solver_statistics(
-        std::ostream &output) const
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void ParabolicModule<HyperbolicDescription, dim, Number>::
+        print_solver_statistics(std::ostream &output) const
     {
       output << "        [ " << std::setprecision(2) << std::fixed //
              << n_iterations_gauss_ << " GMG gauss -- "            //
@@ -354,8 +358,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::create_constraints()
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void
+    ParabolicModule<HyperbolicDescription, dim, Number>::create_constraints()
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::create_constraints()"
@@ -421,9 +426,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::update_background_density(
-        const Number t) const
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void ParabolicModule<HyperbolicDescription, dim, Number>::
+        update_background_density(const Number t) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::update_background_density()"
@@ -468,8 +473,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::update_magnetic_field(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void
+    ParabolicModule<HyperbolicDescription, dim, Number>::update_magnetic_field(
         const Number t) const
     {
 #ifdef DEBUG_OUTPUT
@@ -518,8 +524,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::compute_potential(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void ParabolicModule<HyperbolicDescription, dim, Number>::compute_potential(
         const Number t, StateVector<Number> &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
@@ -667,10 +673,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void
-    ParabolicModule<Description, dim, Number>::enforce_magnetic_drift_velocity(
-        StateVector<Number> &state_vector) const
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void ParabolicModule<HyperbolicDescription, dim, Number>::
+        enforce_magnetic_drift_velocity(StateVector<Number> &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout
@@ -780,8 +785,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::step(
+    template <typename HyperbolicDescription, int dim, typename Number>
+    void ParabolicModule<HyperbolicDescription, dim, Number>::step(
         const StateVector<Number> &old_state_vector,
         const Number t,
         StateVector<Number> &new_state_vector,

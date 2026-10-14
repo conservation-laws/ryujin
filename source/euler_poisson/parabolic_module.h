@@ -128,7 +128,7 @@ namespace ryujin
      *
      * @ingroup ParabolicModule
      */
-    template <typename Description, int dim, typename Number>
+    template <typename HyperbolicDescription, int dim, typename Number>
     class ParabolicModule final : public dealii::ParameterAcceptor
     {
     public:
@@ -137,11 +137,11 @@ namespace ryujin
        */
       //@{
 
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
       using View = typename HyperbolicSystem::template View<dim, Number>;
 
-      using ParabolicSystem = typename Description::ParabolicSystem;
+      using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
 
       using BlockHostVector =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;
@@ -161,13 +161,13 @@ namespace ryujin
       /**
        * Constructor.
        */
-      ParabolicModule(
-          const MPIEnsemble &mpi_ensemle,
-          const OfflineData<dim, Number> &offline_data,
-          const HyperbolicSystem &hyperbolic_system,
-          const ParabolicSystem &parabolic_system,
-          const InitialValues<Description, dim, Number> &initial_values,
-          const std::string &subsection = "/ParabolicModule");
+      ParabolicModule(const MPIEnsemble &mpi_ensemle,
+                      const OfflineData<dim, Number> &offline_data,
+                      const HyperbolicSystem &hyperbolic_system,
+                      const ParabolicSystem &parabolic_system,
+                      const InitialValues<HyperbolicDescription, dim, Number>
+                          &initial_values,
+                      const std::string &subsection = "/ParabolicModule");
 
       /**
        * Prepare time stepping. A call to @p prepare() allocates temporary
@@ -308,7 +308,7 @@ namespace ryujin
       dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
           offline_data_;
       dealii::ObserverPointer<
-          const ryujin::InitialValues<Description, dim, Number>>
+          const ryujin::InitialValues<HyperbolicDescription, dim, Number>>
           initial_values_;
 
       ElectrostaticConfigurationLibrary::

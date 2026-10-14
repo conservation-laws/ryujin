@@ -13,5 +13,5 @@
 
 namespace ryujin
 {
-  using EulerBarotropic::Description;
+  using EulerBarotropic::HyperbolicDescription;
 } // namespace ryujin

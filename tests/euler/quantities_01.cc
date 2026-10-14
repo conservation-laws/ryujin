@@ -29,13 +29,13 @@
 using namespace ryujin;
 using namespace dealii;
 
-using Description = Euler::Description;
+using HyperbolicDescription = Euler::HyperbolicDescription;
 
 constexpr int dim = 2;
 using Number = NUMBER;
 
-using HyperbolicSystem = typename Description::HyperbolicSystem;
-using ParabolicSystem = typename Description::ParabolicSystem;
+using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
 using SystemView = typename HyperbolicSystem::template View<dim, Number>;
 
 
@@ -99,11 +99,12 @@ int main(int argc, char *argv[])
 
   MultiComponentVector<Number> initial_precomputed;
 
-  Quantities<Description, dim, Number> quantities(mpi_ensemble,
-                                                  offline_data,
-                                                  hyperbolic_system,
-                                                  parabolic_system,
-                                                  initial_precomputed);
+  Quantities<HyperbolicDescription, dim, Number> quantities(
+      mpi_ensemble,
+      offline_data,
+      hyperbolic_system,
+      parabolic_system,
+      initial_precomputed);
 
   std::stringstream parameters;
   parameters

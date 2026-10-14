@@ -18,8 +18,8 @@
 
 namespace ryujin
 {
-  template <typename Description, int dim, typename Number>
-  MeshAdaptor<Description, dim, Number>::MeshAdaptor(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  MeshAdaptor<HyperbolicDescription, dim, Number>::MeshAdaptor(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
@@ -164,8 +164,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::prepare(const Number t)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void MeshAdaptor<HyperbolicDescription, dim, Number>::prepare(const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MeshAdaptor<dim, Number>::prepare()" << std::endl;
@@ -188,8 +188,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::analyze(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void MeshAdaptor<HyperbolicDescription, dim, Number>::analyze(
       const StateVector<Number> &state_vector,
       const Number t,
       unsigned int cycle)
@@ -258,8 +258,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void MeshAdaptor<HyperbolicDescription, dim, Number>::
       populate_cell_indicators_with_random_values() const
   {
     std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
@@ -269,8 +269,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void MeshAdaptor<HyperbolicDescription, dim, Number>::
       populate_cell_indicators_from_smoothness_indicators() const
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
@@ -310,8 +310,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void MeshAdaptor<HyperbolicDescription, dim, Number>::
       mark_cells_for_coarsening_and_refinement(
           dealii::Triangulation<dim> &triangulation [[maybe_unused]]) const
   {
@@ -419,9 +419,10 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators(
-      const StateVector<Number> &state_vector) const
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void MeshAdaptor<HyperbolicDescription, dim, Number>::
+      compute_smoothness_indicators(
+          const StateVector<Number> &state_vector) const
   {
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();

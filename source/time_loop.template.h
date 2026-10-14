@@ -29,13 +29,14 @@ using namespace dealii;
 
 namespace ryujin
 {
-  template <typename Description, int dim, typename Number>
-  TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  TimeLoop<HyperbolicDescription, dim, Number>::TimeLoop(
+      const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_ensemble_(mpi_comm,
                       [] {
-                        if constexpr (has_n_mpi_ensembles_v<Description>)
-                          return Description::n_mpi_ensembles();
+                        if constexpr (has_n_mpi_ensembles_v<HD>)
+                          return HD::n_mpi_ensembles();
                         else
                           return 1;
                       }())
@@ -245,8 +246,8 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::run()
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::run()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
@@ -575,9 +576,9 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<Description, dim, Number>::read_checkpoint(
+  void TimeLoop<HyperbolicDescription, dim, Number>::read_checkpoint(
       StateVector<Number> &state_vector,
       const std::string &base_name,
       Number &t,
@@ -650,8 +651,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::write_checkpoint(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::write_checkpoint(
       const StateVector<Number> &state_vector,
       const std::string &base_name,
       const Number &t,
@@ -693,11 +694,12 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<Description, dim, Number>::adapt_mesh_and_transfer_state_vector(
-      StateVector<Number> &state_vector,
-      const Callable &prepare_compute_kernels)
+  void TimeLoop<HyperbolicDescription, dim, Number>::
+      adapt_mesh_and_transfer_state_vector(
+          StateVector<Number> &state_vector,
+          const Callable &prepare_compute_kernels)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::adapt_mesh_and_transfer_state_vector()"
@@ -731,8 +733,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::interpolate_analytic_solution(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void
+  TimeLoop<HyperbolicDescription, dim, Number>::interpolate_analytic_solution(
       StateVector<Number> &analytic, const Number t)
   {
 #ifdef DEBUG_OUTPUT
@@ -754,8 +757,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::output(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::output(
       const StateVector<Number> &state_vector,
       const std::string &name,
       const Number t,
@@ -804,9 +807,9 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_parameters(std::ostream &stream)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_parameters(
+      std::ostream &stream)
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -829,9 +832,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_mpi_partition(std::ostream &stream)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_mpi_partition(
+      std::ostream &stream)
   {
     /*
      * Fixme: this conversion to double is really not elegant. We should
@@ -908,8 +911,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_device_information(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_device_information(
       std::ostream &stream)
   {
     /* Device information is only meaningful for a device build: */
@@ -1005,8 +1008,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_info(
+      const std::string &header)
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -1015,11 +1019,11 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
-                                                 const std::string &secondary,
-                                                 std::ostream &stream)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_head(
+      const std::string &header,
+      const std::string &secondary,
+      std::ostream &stream)
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -1045,8 +1049,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_information(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_information(
       unsigned int timer_cycle,
       Number last_checkpoint,
       std::ostream &stream,
@@ -1127,8 +1131,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_memory_statistics(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_memory_statistics(
       std::ostream &stream)
   {
     Utilities::System::MemoryStats stats;
@@ -1156,8 +1160,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_timers(std::ostream &stream)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_timers(
+      std::ostream &stream)
   {
     std::vector<std::ostringstream> output(ComputingTimer::timers().size());
 
@@ -1243,8 +1248,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_throughput(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_throughput(
       unsigned int cycle, Number t, std::ostream &stream, bool final_time)
   {
     /*
@@ -1462,8 +1467,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_cycle_statistics(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void TimeLoop<HyperbolicDescription, dim, Number>::print_cycle_statistics(
       unsigned int cycle,
       Number t,
       unsigned int timer_cycle,

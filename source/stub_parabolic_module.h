@@ -21,7 +21,7 @@ namespace ryujin
    *
    * @ingroup ParabolicModule
    */
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   class StubParabolicModule final : public dealii::ParameterAcceptor
   {
   public:
@@ -30,8 +30,8 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -44,13 +44,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    StubParabolicModule(
-        const MPIEnsemble & /*mpi_ensemble*/,
-        const OfflineData<dim, Number> & /*offline_data*/,
-        const HyperbolicSystem & /*hyperbolic_system*/,
-        const ParabolicSystem & /*parabolic_system*/,
-        const InitialValues<Description, dim, Number> & /*initial_values*/,
-        const std::string &subsection = "StubParabolicModule")
+    StubParabolicModule(const MPIEnsemble & /*mpi_ensemble*/,
+                        const OfflineData<dim, Number> & /*offline_data*/,
+                        const HyperbolicSystem & /*hyperbolic_system*/,
+                        const ParabolicSystem & /*parabolic_system*/,
+                        const InitialValues<HyperbolicDescription, dim, Number>
+                            & /*initial_values*/,
+                        const std::string &subsection = "StubParabolicModule")
         : ParameterAcceptor(subsection)
     {
     }

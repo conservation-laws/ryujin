@@ -12,6 +12,7 @@ namespace ryujin
 {
   namespace ScalarConservation
   {
-    Dispatch<Description, NUMBER> dispatch_instance("scalar conservation");
+    Dispatch<HyperbolicDescription, NUMBER>
+        dispatch_instance("scalar conservation");
   } // namespace ScalarConservation
 } // namespace ryujin

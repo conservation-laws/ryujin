@@ -16,15 +16,15 @@ namespace ryujin
   using namespace ScalarConservation;
 
   template <int dim, typename Number>
-  class InitialStateLibrary<Description, dim, Number>
+  class InitialStateLibrary<HyperbolicDescription, dim, Number>
   {
   public:
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using initial_state_list_type =
-        std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
+    using initial_state_list_type = std::set<
+        std::unique_ptr<InitialState<HyperbolicDescription, dim, Number>>>;
 
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,

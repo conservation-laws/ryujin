@@ -8,7 +8,8 @@
 
 #define INSTANTIATE(dim, stages)                                               \
   template void                                                                \
-  ParabolicModule<Description, dim, NUMBER>::backward_euler_step<stages>(      \
+  ParabolicModule<HyperbolicDescription, dim, NUMBER>::backward_euler_step<    \
+      stages>(                                                                 \
       const StateVector<NUMBER> &,                                             \
       const NUMBER,                                                            \
       std::array<std::reference_wrapper<const StateVector<NUMBER>>, stages>,   \
@@ -20,9 +21,9 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
-    template class ParabolicModule<Description, 1, NUMBER>;
-    template class ParabolicModule<Description, 2, NUMBER>;
-    template class ParabolicModule<Description, 3, NUMBER>;
+    template class ParabolicModule<HyperbolicDescription, 1, NUMBER>;
+    template class ParabolicModule<HyperbolicDescription, 2, NUMBER>;
+    template class ParabolicModule<HyperbolicDescription, 3, NUMBER>;
 
     INSTANTIATE(1, 0);
     INSTANTIATE(1, 1);

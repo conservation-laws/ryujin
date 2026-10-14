@@ -12,6 +12,6 @@ namespace ryujin
 {
   namespace NavierStokes
   {
-    Dispatch<Description, NUMBER> dispatch_instance("navier stokes");
+    Dispatch<HyperbolicDescription, NUMBER> dispatch_instance("navier stokes");
   } // namespace NavierStokes
 } // namespace ryujin

@@ -18,8 +18,8 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <typename Description, int dim, typename Number>
-  ErrorEvaluation<Description, dim, Number>::ErrorEvaluation(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  ErrorEvaluation<HyperbolicDescription, dim, Number>::ErrorEvaluation(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
@@ -58,9 +58,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  ErrorEvaluation<Description, dim, Number>::prepare(const std::string &name)
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void ErrorEvaluation<HyperbolicDescription, dim, Number>::prepare(
+      const std::string &name)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "ErrorEvaluation<dim, Number>::prepare()" << std::endl;
@@ -102,8 +102,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  std::vector<Number> ErrorEvaluation<Description, dim, Number>::compute(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  std::vector<Number>
+  ErrorEvaluation<HyperbolicDescription, dim, Number>::compute(
       const StateVector<Number> &state_vector,
       const StateVector<Number> &analytic) const
   {
@@ -183,8 +184,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void ErrorEvaluation<Description, dim, Number>::write_out(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void ErrorEvaluation<HyperbolicDescription, dim, Number>::write_out(
       const StateVector<Number> &state_vector,
       const StateVector<Number> &analytic,
       const Number t) const
@@ -209,8 +210,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void ErrorEvaluation<Description, dim, Number>::print_summary(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void ErrorEvaluation<HyperbolicDescription, dim, Number>::print_summary(
       std::ostream &stream,
       const Number t,
       const dealii::types::global_dof_index n_global_dofs,
@@ -232,8 +233,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  std::string ErrorEvaluation<Description, dim, Number>::description() const
+  template <typename HyperbolicDescription, int dim, typename Number>
+  std::string
+  ErrorEvaluation<HyperbolicDescription, dim, Number>::description() const
   {
     std::string result =
         error_normalize_ ? "Normalized consolidated " : "Consolidated ";

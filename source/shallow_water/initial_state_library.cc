@@ -9,7 +9,7 @@
 
 namespace ryujin
 {
-  template class InitialStateLibrary<Description, 1, NUMBER>;
-  template class InitialStateLibrary<Description, 2, NUMBER>;
-  template class InitialStateLibrary<Description, 3, NUMBER>;
+  template class InitialStateLibrary<HyperbolicDescription, 1, NUMBER>;
+  template class InitialStateLibrary<HyperbolicDescription, 2, NUMBER>;
+  template class InitialStateLibrary<HyperbolicDescription, 3, NUMBER>;
 } // namespace ryujin

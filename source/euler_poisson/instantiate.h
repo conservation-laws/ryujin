@@ -13,5 +13,5 @@
 
 namespace ryujin
 {
-  using EulerPoisson::Description;
+  using EulerPoisson::HyperbolicDescription;
 } // namespace ryujin

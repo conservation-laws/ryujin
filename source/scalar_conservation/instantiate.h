@@ -13,5 +13,5 @@
 
 namespace ryujin
 {
-  using ScalarConservation::Description;
+  using ScalarConservation::HyperbolicDescription;
 } // namespace ryujin

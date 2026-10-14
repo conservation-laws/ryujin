@@ -19,7 +19,7 @@ namespace ryujin
 {
   namespace ShallowWater
   {
-    struct Description;
+    struct HyperbolicDescription;
   }
 
   using namespace dealii;
@@ -43,12 +43,12 @@ namespace ryujin
     }
   } // namespace
 
-  template <typename Description, int dim, typename Number>
-  HyperbolicModule<Description, dim, Number>::HyperbolicModule(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  HyperbolicModule<HyperbolicDescription, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const InitialValues<Description, dim, Number> &initial_values,
+      const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
       , indicator_(hyperbolic_system, subsection + "/indicator")
@@ -69,12 +69,13 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void HyperbolicModule<Description, dim, Number>::prepare()
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void HyperbolicModule<HyperbolicDescription, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<Description, dim, Number>::prepare()"
-              << std::endl;
+    std::cout
+        << "HyperbolicModule<HyperbolicDescription, dim, Number>::prepare()"
+        << std::endl;
 #endif
 
     const auto limiter_view = limiter_.template view<dim, Number>();
@@ -149,8 +150,9 @@ namespace ryujin
    * state vector component. The ParabolicModule itself has to ensure
    * proper setup during prepare_state_vector() and solve().
    */
-  template <typename Description, int dim, typename Number>
-  void HyperbolicModule<Description, dim, Number>::reinit_state_vector(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void
+  HyperbolicModule<HyperbolicDescription, dim, Number>::reinit_state_vector(
       StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT
@@ -182,12 +184,13 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
-  void HyperbolicModule<Description, dim, Number>::prepare_state_vector(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void
+  HyperbolicModule<HyperbolicDescription, dim, Number>::prepare_state_vector(
       StateVector<Number> &state_vector, Number t) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<Description, dim, "
+    std::cout << "HyperbolicModule<HyperbolicDescription, dim, "
                  "Number>::prepare_state_vector()"
               << std::endl;
 #endif
@@ -226,10 +229,11 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   template <typename MemorySpace>
-  void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
-      MultiComponentVector<Number> &U, const Number t) const
+  void HyperbolicModule<HyperbolicDescription, dim, Number>::
+      apply_boundary_conditions(MultiComponentVector<Number> &U,
+                                const Number t) const
   {
     constexpr auto n_comp = problem_dimension;
 
@@ -379,9 +383,9 @@ namespace ryujin
   } // namespace
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   template <int stages>
-  Number HyperbolicModule<Description, dim, Number>::step(
+  Number HyperbolicModule<HyperbolicDescription, dim, Number>::step(
       const StateVector<Number> &old_state_vector,
       std::array<std::reference_wrapper<const StateVector<Number>>, stages>
           stage_state_vectors,
@@ -391,7 +395,7 @@ namespace ryujin
       Number tau_max /*= std::numeric_limits<Number>::max()*/) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<Description, dim, Number>::step()"
+    std::cout << "HyperbolicModule<HyperbolicDescription, dim, Number>::step()"
               << std::endl;
 #endif
 
@@ -432,7 +436,8 @@ namespace ryujin
      * FIXME: Refactor into a proper abstraction layer / interface.
      */
     constexpr bool shallow_water =
-        std::is_same_v<Description, ShallowWater::Description>;
+        std::is_same_v<HyperbolicDescription,
+                       ShallowWater::HyperbolicDescription>;
 
     /* Index ranges for the iteration over the sparsity pattern : */
 

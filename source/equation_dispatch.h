@@ -31,9 +31,8 @@ namespace ryujin
    *
    * When starting up the ryujin executable we are faced with the following
    * difficulties:
-   *  - The TimeLoop class is templated in the equation Description and
-   *    dimension that have to be read from the `ryujin.prm` parameter
-   *    file.
+   *  - The TimeLoop class is templated in the equation HyperbolicDescription
+   * and dimension that have to be read from the `ryujin.prm` parameter file.
    *  - The final set of valid parameters that can be configured in the
    *    `ryujin.prm` depend on the runtime parameters "dimension" and
    *    "equation" themselves.
@@ -200,11 +199,11 @@ namespace ryujin
 
 
   /**
-   * Create default parameter files for the specified equation Description,
-   * dimension and number type. This function is called from the respective
-   * equation driver.
+   * Create default parameter files for the specified equation
+   * HyperbolicDescription, dimension and number type. This function is called
+   * from the respective equation driver.
    */
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   void create_prm_files(const std::string &name,
                         bool write_detailed_description)
   {
@@ -224,7 +223,8 @@ namespace ryujin
        */
 
       ryujin::EquationDispatch equation_dispatch;
-      ryujin::TimeLoop<Description, dim, Number> time_loop(MPI_COMM_SELF);
+      ryujin::TimeLoop<HyperbolicDescription, dim, Number> time_loop(
+          MPI_COMM_SELF);
 
       /*
        * Fix up "equation" entry:
@@ -269,24 +269,24 @@ namespace ryujin
 
 
   /**
-   * A small Dispatch struct templated in Description that registers the
-   * callbacks.
+   * A small Dispatch struct templated in HyperbolicDescription that registers
+   * the callbacks.
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, typename Number>
+  template <typename HyperbolicDescription, typename Number>
   struct Dispatch {
     Dispatch(const std::string &name)
     {
 #ifdef DEBUG_OUTPUT
-      std::cout << "Dispatch<Description, Number>::Dispatch() for »" << name
-                << "«" << std::endl;
+      std::cout << "Dispatch<HyperbolicDescription, Number>::Dispatch() for »"
+                << name << "«" << std::endl;
 #endif
 
       EquationDispatch::register_create_parameter_files([name]() {
-        create_prm_files<Description, 1, Number>(name, false);
-        create_prm_files<Description, 2, Number>(name, true);
-        create_prm_files<Description, 3, Number>(name, false);
+        create_prm_files<HyperbolicDescription, 1, Number>(name, false);
+        create_prm_files<HyperbolicDescription, 2, Number>(name, true);
+        create_prm_files<HyperbolicDescription, 3, Number>(name, false);
       });
 
       EquationDispatch::register_dispatch(
@@ -311,17 +311,17 @@ namespace ryujin
                             equation + "«"));
 
             if (dimension == 1) {
-              TimeLoop<Description, 1, Number> time_loop(mpi_comm);
+              TimeLoop<HyperbolicDescription, 1, Number> time_loop(mpi_comm);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
               time_loop_executed = true;
             } else if (dimension == 2) {
-              TimeLoop<Description, 2, Number> time_loop(mpi_comm);
+              TimeLoop<HyperbolicDescription, 2, Number> time_loop(mpi_comm);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
               time_loop_executed = true;
             } else if (dimension == 3) {
-              TimeLoop<Description, 3, Number> time_loop(mpi_comm);
+              TimeLoop<HyperbolicDescription, 3, Number> time_loop(mpi_comm);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
               time_loop_executed = true;

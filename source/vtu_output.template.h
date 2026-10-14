@@ -18,13 +18,13 @@ namespace ryujin
   using namespace dealii;
 
 
-  template <typename Description, int dim, typename Number>
-  VTUOutput<Description, dim, Number>::VTUOutput(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  VTUOutput<HyperbolicDescription, dim, Number>::VTUOutput(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
-      const Postprocessor<Description, dim, Number> &postprocessor,
+      const Postprocessor<HyperbolicDescription, dim, Number> &postprocessor,
       const MultiComponentVector<Number> &initial_precomputed,
       const ScalarVector<Number> &alpha,
       const ScalarVector<Number> &smoothness_indicators,
@@ -67,8 +67,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void VTUOutput<Description, dim, Number>::prepare()
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void VTUOutput<HyperbolicDescription, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
@@ -78,8 +78,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void VTUOutput<Description, dim, Number>::schedule_output(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void VTUOutput<HyperbolicDescription, dim, Number>::schedule_output(
       const StateVector<Number> &state_vector,
       std::string name,
       Number t [[maybe_unused]],

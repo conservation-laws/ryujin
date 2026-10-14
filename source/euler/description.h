@@ -30,14 +30,14 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    struct Description {
+    struct HyperbolicDescription {
       using HyperbolicSystem = Euler::HyperbolicSystem;
 
       using ParabolicSystem = ryujin::StubParabolicSystem;
 
       template <int dim, typename Number = double>
       using ParabolicModule =
-          ryujin::StubParabolicModule<Description, dim, Number>;
+          ryujin::StubParabolicModule<HyperbolicDescription, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = Euler::Indicator<ScalarNumber>;

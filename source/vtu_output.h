@@ -29,7 +29,7 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor
   {
   public:
@@ -38,7 +38,7 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -59,15 +59,16 @@ namespace ryujin
     /**
      * Constructor.
      */
-    VTUOutput(const MPIEnsemble &mpi_ensemble,
-              const OfflineData<dim, Number> &offline_data,
-              const HyperbolicSystem &hyperbolic_system,
-              const Interface::ParabolicSystem &parabolic_system,
-              const Postprocessor<Description, dim, Number> &postprocessor,
-              const MultiComponentVector<Number> &initial_precomputed,
-              const ScalarVector<Number> &alpha,
-              const ScalarVector<Number> &smoothness_indicators,
-              const std::string &subsection = "/VTUOutput");
+    VTUOutput(
+        const MPIEnsemble &mpi_ensemble,
+        const OfflineData<dim, Number> &offline_data,
+        const HyperbolicSystem &hyperbolic_system,
+        const Interface::ParabolicSystem &parabolic_system,
+        const Postprocessor<HyperbolicDescription, dim, Number> &postprocessor,
+        const MultiComponentVector<Number> &initial_precomputed,
+        const ScalarVector<Number> &alpha,
+        const ScalarVector<Number> &smoothness_indicators,
+        const std::string &subsection = "/VTUOutput");
 
     /**
      * Prepare VTU output. A call to @ref prepare() allocates temporary
@@ -130,10 +131,11 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const Postprocessor<Description, dim, Number>>
+    dealii::ObserverPointer<
+        const Postprocessor<HyperbolicDescription, dim, Number>>
         postprocessor_;
 
-    SelectedComponentsExtractor<Description, dim, Number>
+    SelectedComponentsExtractor<HyperbolicDescription, dim, Number>
         selected_components_extractor_;
 
     //@}

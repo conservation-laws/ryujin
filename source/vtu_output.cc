@@ -9,8 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class VTUOutput<Description, 1, NUMBER>;
-  template class VTUOutput<Description, 2, NUMBER>;
-  template class VTUOutput<Description, 3, NUMBER>;
+  template class VTUOutput<HyperbolicDescription, 1, NUMBER>;
+  template class VTUOutput<HyperbolicDescription, 2, NUMBER>;
+  template class VTUOutput<HyperbolicDescription, 3, NUMBER>;
 
 } /* namespace ryujin */

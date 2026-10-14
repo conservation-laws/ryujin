@@ -45,7 +45,7 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   class Quantities final : public dealii::ParameterAcceptor
   {
   public:
@@ -54,7 +54,7 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -201,7 +201,7 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
-    SelectedComponentsExtractor<Description, dim, Number> extractor_;
+    SelectedComponentsExtractor<HyperbolicDescription, dim, Number> extractor_;
 
     /**
      * All interior and boundary manifolds with associated point maps and

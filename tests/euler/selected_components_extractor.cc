@@ -23,15 +23,15 @@
 using namespace ryujin;
 using namespace dealii;
 
-using Description = Euler::Description;
+using HyperbolicDescription = Euler::HyperbolicDescription;
 using HostSpace = dealii::MemorySpace::Host;
 using DefaultSpace = dealii::MemorySpace::Default;
 
 constexpr int dim = 2;
 using Number = NUMBER;
 
-using HyperbolicSystem = typename Description::HyperbolicSystem;
-using ParabolicSystem = typename Description::ParabolicSystem;
+using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+using ParabolicSystem = typename HyperbolicDescription::ParabolicSystem;
 using SystemView = typename HyperbolicSystem::template View<dim, Number>;
 
 int main(int argc, char *argv[])
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 
   /* Set up the extractor: */
 
-  SelectedComponentsExtractor<Description, dim, Number> extractor(
+  SelectedComponentsExtractor<HyperbolicDescription, dim, Number> extractor(
       offline_data,
       hyperbolic_system,
       parabolic_system,

@@ -36,7 +36,7 @@ namespace ryujin
     template <int, typename>
     class DiagonalMatrix;
 
-    struct Description;
+    struct HyperbolicDescription;
 
     /**
      * Implicit backward-Euler time stepping for the parabolic limiting
@@ -143,13 +143,13 @@ namespace ryujin
       /**
        * Constructor.
        */
-      ParabolicModule(
-          const MPIEnsemble &mpi_ensemble,
-          const OfflineData<dim, Number> &offline_data,
-          const HyperbolicSystem &hyperbolic_system,
-          const ParabolicSystem &parabolic_system,
-          const InitialValues<Description, dim, Number> &initial_values,
-          const std::string &subsection = "ParabolicModule");
+      ParabolicModule(const MPIEnsemble &mpi_ensemble,
+                      const OfflineData<dim, Number> &offline_data,
+                      const HyperbolicSystem &hyperbolic_system,
+                      const ParabolicSystem &parabolic_system,
+                      const InitialValues<HyperbolicDescription, dim, Number>
+                          &initial_values,
+                      const std::string &subsection = "ParabolicModule");
 
       /**
        * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -291,7 +291,7 @@ namespace ryujin
       dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
           offline_data_;
       dealii::ObserverPointer<
-          const ryujin::InitialValues<Description, dim, Number>>
+          const ryujin::InitialValues<HyperbolicDescription, dim, Number>>
           initial_values_;
 
       mutable IDViolationStrategy id_violation_strategy_;

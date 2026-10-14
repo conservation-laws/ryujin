@@ -29,7 +29,7 @@ namespace ryujin
      *
      * @ingroup NavierStokesEquations
      */
-    struct Description {
+    struct HyperbolicDescription {
       using HyperbolicSystem = Euler::HyperbolicSystem;
 
       using ParabolicSystem = NavierStokes::ParabolicSystem;

@@ -9,7 +9,7 @@
 
 namespace ryujin
 {
-  template class SolutionTransfer<Description, 1, NUMBER>;
-  template class SolutionTransfer<Description, 2, NUMBER>;
-  template class SolutionTransfer<Description, 3, NUMBER>;
+  template class SolutionTransfer<HyperbolicDescription, 1, NUMBER>;
+  template class SolutionTransfer<HyperbolicDescription, 2, NUMBER>;
+  template class SolutionTransfer<HyperbolicDescription, 3, NUMBER>;
 } // namespace ryujin

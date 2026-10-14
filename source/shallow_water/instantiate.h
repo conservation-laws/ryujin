@@ -15,5 +15,5 @@
 
 namespace ryujin
 {
-  using ShallowWater::Description;
+  using ShallowWater::HyperbolicDescription;
 } // namespace ryujin

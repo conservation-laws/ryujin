@@ -16,8 +16,8 @@
 
 namespace ryujin
 {
-  template <typename Description, int dim, typename Number>
-  Postprocessor<Description, dim, Number>::Postprocessor(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  Postprocessor<HyperbolicDescription, dim, Number>::Postprocessor(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
@@ -60,8 +60,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void Postprocessor<Description, dim, Number>::prepare()
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void Postprocessor<HyperbolicDescription, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
@@ -105,8 +105,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void Postprocessor<Description, dim, Number>::compute(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void Postprocessor<HyperbolicDescription, dim, Number>::compute(
       const StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT

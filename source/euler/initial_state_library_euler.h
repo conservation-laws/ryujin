@@ -31,39 +31,34 @@ namespace ryujin
 {
   namespace EulerInitialStates
   {
-    template <typename Description, int dim, typename Number>
+    template <typename HyperbolicDescription, int dim, typename Number>
     void populate_initial_state_list(
-        typename ryujin::InitialStateLibrary<Description, dim, Number>::
+        typename InitialStateLibrary<HyperbolicDescription, dim, Number>::
             initial_state_list_type &initial_state_list,
-        const typename Description::HyperbolicSystem &h,
+        const typename HyperbolicDescription::HyperbolicSystem &h,
         const std::string &s)
     {
-      using std::make_unique;
-
+      using HD = HyperbolicDescription;
       auto add = [&](auto &&object) {
         initial_state_list.emplace(std::move(object));
       };
-
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using View = typename HyperbolicSystem::template View<1, double>;
-
-      add(make_unique<AstroJet<Description, dim, Number>>(h, s));
-      add(make_unique<BeckerSolution<Description, dim, Number>>(h, s));
-      add(make_unique<Contrast<Description, dim, Number>>(h, s));
-      add(make_unique<ExactRiemannSolution<Description, dim, Number>>(h, s));
-      add(make_unique<FourStateContrast<Description, dim, Number>>(h, s));
-      add(make_unique<Function<Description, dim, Number>>(h, s));
-      add(make_unique<ICFLike<Description, dim, Number>>(h, s));
-      add(make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
-      add(make_unique<LeBlanc<Description, dim, Number>>(h, s));
-      add(make_unique<Noh<Description, dim, Number>>(h, s));
-      add(make_unique<RadialContrast<Description, dim, Number>>(h, s));
-      add(make_unique<RampUp<Description, dim, Number>>(h, s));
-      add(make_unique<Rarefaction<Description, dim, Number>>(h, s));
-      add(make_unique<ShockFront<Description, dim, Number>>(h, s));
-      add(make_unique<SmoothWave<Description, dim, Number>>(h, s));
-      add(make_unique<ThreeStateContrast<Description, dim, Number>>(h, s));
-      add(make_unique<Uniform<Description, dim, Number>>(h, s));
+      add(std::make_unique<AstroJet<HD, dim, Number>>(h, s));
+      add(std::make_unique<BeckerSolution<HD, dim, Number>>(h, s));
+      add(std::make_unique<Contrast<HD, dim, Number>>(h, s));
+      add(std::make_unique<ExactRiemannSolution<HD, dim, Number>>(h, s));
+      add(std::make_unique<FourStateContrast<HD, dim, Number>>(h, s));
+      add(std::make_unique<Function<HD, dim, Number>>(h, s));
+      add(std::make_unique<ICFLike<HD, dim, Number>>(h, s));
+      add(std::make_unique<IsentropicVortex<HD, dim, Number>>(h, s));
+      add(std::make_unique<LeBlanc<HD, dim, Number>>(h, s));
+      add(std::make_unique<Noh<HD, dim, Number>>(h, s));
+      add(std::make_unique<RadialContrast<HD, dim, Number>>(h, s));
+      add(std::make_unique<RampUp<HD, dim, Number>>(h, s));
+      add(std::make_unique<Rarefaction<HD, dim, Number>>(h, s));
+      add(std::make_unique<ShockFront<HD, dim, Number>>(h, s));
+      add(std::make_unique<SmoothWave<HD, dim, Number>>(h, s));
+      add(std::make_unique<ThreeStateContrast<HD, dim, Number>>(h, s));
+      add(std::make_unique<Uniform<HD, dim, Number>>(h, s));
     }
   } // namespace EulerInitialStates
 } // namespace ryujin

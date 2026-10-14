@@ -7,7 +7,8 @@
 #include <instantiate.h>
 
 #define INSTANTIATE(dim, stages)                                               \
-  template NUMBER HyperbolicModule<Description, dim, NUMBER>::step<stages>(    \
+  template NUMBER                                                              \
+  HyperbolicModule<HyperbolicDescription, dim, NUMBER>::step<stages>(          \
       const StateVector<NUMBER> &,                                             \
       std::array<std::reference_wrapper<const StateVector<NUMBER>>, stages>,   \
       const std::array<NUMBER, stages>,                                        \
@@ -19,9 +20,9 @@ namespace ryujin
 {
   /* instantiations */
 
-  template class HyperbolicModule<Description, 1, NUMBER>;
-  template class HyperbolicModule<Description, 2, NUMBER>;
-  template class HyperbolicModule<Description, 3, NUMBER>;
+  template class HyperbolicModule<HyperbolicDescription, 1, NUMBER>;
+  template class HyperbolicModule<HyperbolicDescription, 2, NUMBER>;
+  template class HyperbolicModule<HyperbolicDescription, 3, NUMBER>;
 
   INSTANTIATE(1, 0);
   INSTANTIATE(1, 1);

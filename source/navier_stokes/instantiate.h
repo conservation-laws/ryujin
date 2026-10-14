@@ -13,5 +13,5 @@
 
 namespace ryujin
 {
-  using NavierStokes::Description;
+  using NavierStokes::HyperbolicDescription;
 } // namespace ryujin

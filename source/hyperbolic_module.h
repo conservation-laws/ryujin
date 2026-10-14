@@ -109,7 +109,7 @@ namespace ryujin
    *
    * @ingroup HyperbolicModule
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   class HyperbolicModule final : public dealii::ParameterAcceptor
   {
   public:
@@ -118,16 +118,17 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using Indicator = typename Description::template Indicator<Number>;
+    using Indicator =
+        typename HyperbolicDescription::template Indicator<Number>;
 
-    using Limiter = typename Description::template Limiter<Number>;
+    using Limiter = typename HyperbolicDescription::template Limiter<Number>;
 
     using WaveSpeedEstimator =
-        typename Description::template WaveSpeedEstimator<Number>;
+        typename HyperbolicDescription::template WaveSpeedEstimator<Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
@@ -155,7 +156,7 @@ namespace ryujin
         const MPIEnsemble &mpi_ensemble,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
-        const InitialValues<Description, dim, Number> &initial_values,
+        const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
         const std::string &subsection = "/HyperbolicModule");
 
     /**
@@ -410,7 +411,8 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const InitialValues<Description, dim, Number>>
+    dealii::ObserverPointer<
+        const InitialValues<HyperbolicDescription, dim, Number>>
         initial_values_;
 
     mutable Number cfl_;

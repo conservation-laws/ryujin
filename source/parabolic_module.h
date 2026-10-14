@@ -9,12 +9,12 @@ namespace ryujin
 {
   /**
    * Compatibility using declaration that selects the correct
-   * ParabolicModule class type from the equation-specific Description
+   * ParabolicModule class type from the equation-specific HyperbolicDescription
    * proxy class.
    *
    * @ingroup ParabolicModule
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   using ParabolicModule =
-      typename Description::template ParabolicModule<dim, Number>;
+      typename HyperbolicDescription::template ParabolicModule<dim, Number>;
 } /* namespace ryujin */
