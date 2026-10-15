@@ -9,8 +9,6 @@
 
 #include <compile_time_options.h>
 
-#include "../stub_parabolic_module.h"
-#include "../stub_parabolic_system.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
@@ -27,18 +25,10 @@ namespace ryujin
      *
      * The compressible shallow water equations.
      *
-     * The parabolic subsystem is chosen to be the identity.
-     *
      * @ingroup ShallowWaterEquations
      */
-    struct Description {
+    struct HyperbolicDescription {
       using HyperbolicSystem = ShallowWater::HyperbolicSystem;
-
-      using ParabolicSystem = ryujin::StubParabolicSystem;
-
-      template <int dim, typename Number = double>
-      using ParabolicModule =
-          ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = ShallowWater::Indicator<ScalarNumber>;

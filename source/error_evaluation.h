@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
@@ -41,7 +43,7 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   class ErrorEvaluation final : public dealii::ParameterAcceptor
   {
   public:
@@ -50,8 +52,7 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -69,7 +70,7 @@ namespace ryujin
     ErrorEvaluation(const MPIEnsemble &mpi_ensemble,
                     const OfflineData<dim, Number> &offline_data,
                     const HyperbolicSystem &hyperbolic_system,
-                    const ParabolicSystem &parabolic_system,
+                    const Interface::ParabolicSystem &parabolic_system,
                     const MultiComponentVector<Number> &initial_precomputed,
                     const std::string &subsection = "/ErrorEvaluation");
 
@@ -144,7 +145,7 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
-    SelectedComponentsExtractor<Description, dim, Number>
+    SelectedComponentsExtractor<HyperbolicDescription, dim, Number>
         selected_components_extractor_;
 
     std::string base_name_;

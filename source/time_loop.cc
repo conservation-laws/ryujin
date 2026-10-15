@@ -9,8 +9,11 @@
 namespace ryujin
 {
   /* instantiations */
-  template class TimeLoop<Description, 1, NUMBER>;
-  template class TimeLoop<Description, 2, NUMBER>;
-  template class TimeLoop<Description, 3, NUMBER>;
+  using HD = HyperbolicDescription;
+  using PD = ParabolicDescription;
+
+  template class TimeLoop<HD, PD, 1, NUMBER>;
+  template class TimeLoop<HD, PD, 2, NUMBER>;
+  template class TimeLoop<HD, PD, 3, NUMBER>;
 
 } // namespace ryujin

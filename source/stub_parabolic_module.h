@@ -11,6 +11,7 @@
 #include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <offline_data.h>
+#include <stub_parabolic_system.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -21,7 +22,7 @@ namespace ryujin
    *
    * @ingroup ParabolicModule
    */
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   class StubParabolicModule final : public dealii::ParameterAcceptor
   {
   public:
@@ -30,8 +31,8 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using ParabolicSystem = StubParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -44,13 +45,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    StubParabolicModule(
-        const MPIEnsemble & /*mpi_ensemble*/,
-        const OfflineData<dim, Number> & /*offline_data*/,
-        const HyperbolicSystem & /*hyperbolic_system*/,
-        const ParabolicSystem & /*parabolic_system*/,
-        const InitialValues<Description, dim, Number> & /*initial_values*/,
-        const std::string &subsection = "StubParabolicModule")
+    StubParabolicModule(const MPIEnsemble & /*mpi_ensemble*/,
+                        const OfflineData<dim, Number> & /*offline_data*/,
+                        const HyperbolicSystem & /*hyperbolic_system*/,
+                        const ParabolicSystem & /*parabolic_system*/,
+                        const InitialValues<HyperbolicDescription, dim, Number>
+                            & /*initial_values*/,
+                        const std::string &subsection = "StubParabolicModule")
         : ParameterAcceptor(subsection)
     {
     }
@@ -197,5 +198,21 @@ namespace ryujin
     }
 
     //@}
+  };
+
+
+  /**
+   * The parabolic description of a purely hyperbolic equation: the
+   * identity as parabolic system and a stub parabolic module. It can be
+   * paired with every hyperbolic description.
+   *
+   * @ingroup ParabolicModule
+   */
+  struct StubParabolicDescription {
+    using ParabolicSystem = StubParabolicSystem;
+
+    template <typename HyperbolicDescription, int dim, typename Number = double>
+    using ParabolicModule =
+        StubParabolicModule<HyperbolicDescription, dim, Number>;
   };
 } /* namespace ryujin */

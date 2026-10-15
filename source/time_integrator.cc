@@ -9,8 +9,11 @@
 namespace ryujin
 {
   /* instantiations */
-  template class TimeIntegrator<Description, 1, NUMBER>;
-  template class TimeIntegrator<Description, 2, NUMBER>;
-  template class TimeIntegrator<Description, 3, NUMBER>;
+  using HD = HyperbolicDescription;
+  using PD = ParabolicDescription;
+
+  template class TimeIntegrator<HD, PD, 1, NUMBER>;
+  template class TimeIntegrator<HD, PD, 2, NUMBER>;
+  template class TimeIntegrator<HD, PD, 3, NUMBER>;
 
 } /* namespace ryujin */

@@ -16,12 +16,12 @@
 
 namespace ryujin
 {
-  template <typename Description, int dim, typename Number>
-  Postprocessor<Description, dim, Number>::Postprocessor(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  Postprocessor<HyperbolicDescription, dim, Number>::Postprocessor(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const ParabolicSystem &parabolic_system,
+      const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /*= "Postprocessor"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -42,9 +42,9 @@ namespace ryujin
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
 
-    static_assert(View::component_names.size() > 0,
-                  "Need at least one scalar quantitity");
-    schlieren_quantities_.push_back(View::component_names[0]);
+    Assert(hyperbolic_system.state_names(dim).size() > 0,
+           dealii::ExcMessage("Need at least one scalar quantitity"));
+    schlieren_quantities_.push_back(hyperbolic_system.state_names(dim)[0]);
 
     add_parameter(
         "schlieren quantities",
@@ -60,8 +60,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void Postprocessor<Description, dim, Number>::prepare()
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void Postprocessor<HyperbolicDescription, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
@@ -75,8 +75,8 @@ namespace ryujin
     const auto populate = [&](const auto &strings,
                               auto &indices,
                               const auto &pre) {
-      const auto &cons = View::component_names;
-      const auto &prim = View::primitive_component_names;
+      const auto &cons = hyperbolic_system_->state_names(dim);
+      const auto &prim = hyperbolic_system_->primitive_names(dim);
       for (const auto &entry : strings) {
         bool found = false;
         for (const auto &[is_primitive, names] :
@@ -105,8 +105,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void Postprocessor<Description, dim, Number>::compute(
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void Postprocessor<HyperbolicDescription, dim, Number>::compute(
       const StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT

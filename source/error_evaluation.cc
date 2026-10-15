@@ -9,8 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ErrorEvaluation<Description, 1, NUMBER>;
-  template class ErrorEvaluation<Description, 2, NUMBER>;
-  template class ErrorEvaluation<Description, 3, NUMBER>;
+  template class ErrorEvaluation<HyperbolicDescription, 1, NUMBER>;
+  template class ErrorEvaluation<HyperbolicDescription, 2, NUMBER>;
+  template class ErrorEvaluation<HyperbolicDescription, 3, NUMBER>;
 
 } /* namespace ryujin */

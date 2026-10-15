@@ -33,7 +33,10 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription,
+            typename ParabolicDescription,
+            int dim,
+            typename Number = double>
   class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
@@ -42,8 +45,8 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using ParabolicSystem = typename ParabolicDescription::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -117,17 +120,19 @@ namespace ryujin
     MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
-    MPIEnsembleContainer<InitialValues<Description, dim, Number>>
+    MPIEnsembleContainer<InitialValues<HyperbolicDescription, dim, Number>>
         initial_values_;
-    HyperbolicModule<Description, dim, Number> hyperbolic_module_;
-    ParabolicModule<Description, dim, Number> parabolic_module_;
-    TimeIntegrator<Description, dim, Number> time_integrator_;
-    MeshAdaptor<Description, dim, Number> mesh_adaptor_;
-    SolutionTransfer<Description, dim, Number> solution_transfer_;
-    Postprocessor<Description, dim, Number> postprocessor_;
-    VTUOutput<Description, dim, Number> vtu_output_;
-    Quantities<Description, dim, Number> quantities_;
-    ErrorEvaluation<Description, dim, Number> error_evaluation_;
+    HyperbolicModule<HyperbolicDescription, dim, Number> hyperbolic_module_;
+    ParabolicModule<HyperbolicDescription, ParabolicDescription, dim, Number>
+        parabolic_module_;
+    TimeIntegrator<HyperbolicDescription, ParabolicDescription, dim, Number>
+        time_integrator_;
+    MeshAdaptor<HyperbolicDescription, dim, Number> mesh_adaptor_;
+    SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;
+    Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
+    VTUOutput<HyperbolicDescription, dim, Number> vtu_output_;
+    Quantities<HyperbolicDescription, dim, Number> quantities_;
+    ErrorEvaluation<HyperbolicDescription, dim, Number> error_evaluation_;
 
     dealii::types::global_dof_index n_global_dofs_;
     unsigned int n_devices_;

@@ -32,6 +32,7 @@ set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
 add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
 target_include_directories(obj_common PUBLIC
   ${CMAKE_BINARY_DIR}/source/
+  ${CMAKE_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 deal_ii_setup_target(obj_common)
@@ -41,7 +42,11 @@ target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 # Common, equation-dependent source files:
 #
 
-set(DEPENDENT_SOURCE_FILES
+#
+# Sources that depend on the hyperbolic description only. They are
+# compiled once per hyperbolic description:
+#
+set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
   error_evaluation.cc
   hyperbolic_module.cc
   initial_values.cc
@@ -49,9 +54,16 @@ set(DEPENDENT_SOURCE_FILES
   postprocessor.cc
   quantities.cc
   solution_transfer.cc
+  vtu_output.cc
+  )
+
+#
+# Sources that depend on the pairing of a hyperbolic and a parabolic
+# description. They are compiled once per equation:
+#
+set(PAIRING_DEPENDENT_SOURCE_FILES
   time_integrator.cc
   time_loop.cc
-  vtu_output.cc
   )
 
 #
@@ -67,10 +79,23 @@ macro(setup_equation EQUATION)
   add_subdirectory(${EQUATION})
 
   #
-  # obj_${EQUATION}_dependent object library: equation dependent common code:
+  # obj_${EQUATION}_dependent object library: equation dependent common code.
+  #
+  # An equation directory with a hyperbolic_description.h pairs the
+  # hyperbolic description with the stub parabolic description. All other
+  # equation directories pair a parabolic description with the hyperbolic
+  # description of another equation directory.
   #
 
-  add_library(obj_${EQUATION}_dependent OBJECT ${DEPENDENT_SOURCE_FILES})
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}/hyperbolic_description.h)
+    set(_sources
+      ${HYPERBOLIC_DEPENDENT_SOURCE_FILES} ${PAIRING_DEPENDENT_SOURCE_FILES}
+      )
+  else()
+    set(_sources ${PAIRING_DEPENDENT_SOURCE_FILES})
+  endif()
+
+  add_library(obj_${EQUATION}_dependent OBJECT ${_sources})
   deal_ii_setup_target(obj_${EQUATION}_dependent)
 
   target_link_libraries(obj_${EQUATION}_dependent

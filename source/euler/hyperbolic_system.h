@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/hyperbolic_system.h>
+
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <gpu.h>
@@ -41,15 +43,9 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    class HyperbolicSystem final : public dealii::ParameterAcceptor
+    class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      static inline const std::string problem_name =
-          "Compressible Euler equations (polytropic gas EOS, optimized)";
-
       /**
        * A structure holding all runtime parameters of the hyperbolic
        * system, as well as a number of derived quantities that would
@@ -215,36 +211,6 @@ namespace ryujin
       using flux_contribution_type = flux_type;
 
       /**
-       * An array holding all component names of the conserved state as a
-       * string.
-       */
-      static inline const auto component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"rho", "m", "E"};
-        else if constexpr (dim == 2)
-          return {"rho", "m_1", "m_2", "E"};
-        else if constexpr (dim == 3)
-          return {"rho", "m_1", "m_2", "m_3", "E"};
-        __builtin_trap();
-      }();
-
-      /**
-       * An array holding all component names of the primitive state as a
-       * string.
-       */
-      static inline const auto primitive_component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"rho", "v", "p"};
-        else if constexpr (dim == 2)
-          return {"rho", "v_1", "v_2", "p"};
-        else if constexpr (dim == 3)
-          return {"rho", "v_1", "v_2", "v_3", "p"};
-        __builtin_trap();
-      }();
-
-      /**
        * The number of precomputed values.
        */
       static constexpr unsigned int n_precomputed_values = 2;
@@ -253,12 +219,6 @@ namespace ryujin
        * Array type used for precomputed values.
        */
       using precomputed_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_names =
-          std::array<std::string, n_precomputed_values>{"s", "eta_h"};
 
       /**
        * The number of precomputed initial values.
@@ -270,12 +230,6 @@ namespace ryujin
        */
       using initial_precomputed_type =
           std::array<Number, n_initial_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto initial_precomputed_names =
-          std::array<std::string, n_initial_precomputed_values>{};
 
       template <int n_comp>
       using VectorView =
@@ -722,7 +676,17 @@ namespace ryujin
      */
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::HyperbolicSystem(
+              "Compressible Euler equations (polytropic gas EOS, optimized)",
+              {{{"rho", "m", "E"},
+                {"rho", "m_1", "m_2", "E"},
+                {"rho", "m_1", "m_2", "m_3", "E"}}},
+              {{{"rho", "v", "p"},
+                {"rho", "v_1", "v_2", "p"},
+                {"rho", "v_1", "v_2", "v_3", "p"}}},
+              {{{"s", "eta_h"}, {"s", "eta_h"}, {"s", "eta_h"}}},
+              {},
+              subsection)
         , parameters_("euler_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
@@ -1428,6 +1392,5 @@ namespace ryujin
         result[1 + d] = M[d];
       return result;
     }
-
   } // namespace Euler
 } // namespace ryujin

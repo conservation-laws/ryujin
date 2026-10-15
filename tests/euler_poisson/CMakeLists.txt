@@ -11,7 +11,10 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/source/
   )
 
-set(TEST_LIBRARIES obj_common obj_${EQUATION} obj_${EQUATION}_dependent)
+set(TEST_LIBRARIES
+  obj_common obj_${EQUATION} obj_${EQUATION}_dependent
+  obj_euler obj_euler_dependent
+  )
 set(TEST_TARGET ryujin)
 
 if(TARGET obj_${EQUATION})

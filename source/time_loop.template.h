@@ -29,13 +29,13 @@ using namespace dealii;
 
 namespace ryujin
 {
-  template <typename Description, int dim, typename Number>
-  TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
+  template <typename HD, typename PD, int dim, typename Number>
+  TimeLoop<HD, PD, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_ensemble_(mpi_comm,
                       [] {
-                        if constexpr (has_n_mpi_ensembles_v<Description>)
-                          return Description::n_mpi_ensembles();
+                        if constexpr (has_n_mpi_ensembles_v<HD>)
+                          return HD::n_mpi_ensembles();
                         else
                           return 1;
                       }())
@@ -245,8 +245,8 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::run()
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::run()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
@@ -575,9 +575,9 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HD, typename PD, int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<Description, dim, Number>::read_checkpoint(
+  void TimeLoop<HD, PD, dim, Number>::read_checkpoint(
       StateVector<Number> &state_vector,
       const std::string &base_name,
       Number &t,
@@ -650,8 +650,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::write_checkpoint(
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::write_checkpoint(
       const StateVector<Number> &state_vector,
       const std::string &base_name,
       const Number &t,
@@ -693,9 +693,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
+  template <typename HD, typename PD, int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<Description, dim, Number>::adapt_mesh_and_transfer_state_vector(
+  void TimeLoop<HD, PD, dim, Number>::adapt_mesh_and_transfer_state_vector(
       StateVector<Number> &state_vector,
       const Callable &prepare_compute_kernels)
   {
@@ -731,8 +731,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::interpolate_analytic_solution(
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::interpolate_analytic_solution(
       StateVector<Number> &analytic, const Number t)
   {
 #ifdef DEBUG_OUTPUT
@@ -754,12 +754,12 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::output(
-      const StateVector<Number> &state_vector,
-      const std::string &name,
-      const Number t,
-      const unsigned int cycle)
+  template <typename HD, typename PD, int dim, typename Number>
+  void
+  TimeLoop<HD, PD, dim, Number>::output(const StateVector<Number> &state_vector,
+                                        const std::string &name,
+                                        const Number t,
+                                        const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
@@ -804,9 +804,8 @@ namespace ryujin
    */
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_parameters(std::ostream &stream)
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_parameters(std::ostream &stream)
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -829,9 +828,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_mpi_partition(std::ostream &stream)
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_mpi_partition(std::ostream &stream)
   {
     /*
      * Fixme: this conversion to double is really not elegant. We should
@@ -908,9 +906,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_device_information(
-      std::ostream &stream)
+  template <typename HD, typename PD, int dim, typename Number>
+  void
+  TimeLoop<HD, PD, dim, Number>::print_device_information(std::ostream &stream)
   {
     /* Device information is only meaningful for a device build: */
     if constexpr (!have_separate_memory_spaces)
@@ -1005,8 +1003,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_info(const std::string &header)
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -1015,9 +1013,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_head(const std::string &header,
                                                  const std::string &secondary,
                                                  std::ostream &stream)
   {
@@ -1045,12 +1042,12 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_information(
-      unsigned int timer_cycle,
-      Number last_checkpoint,
-      std::ostream &stream,
-      bool final_time)
+  template <typename HD, typename PD, int dim, typename Number>
+  void
+  TimeLoop<HD, PD, dim, Number>::print_information(unsigned int timer_cycle,
+                                                   Number last_checkpoint,
+                                                   std::ostream &stream,
+                                                   bool final_time)
   {
     static const std::string backend_name = [] {
       const auto precision = [] {
@@ -1072,9 +1069,10 @@ namespace ryujin
         return "SIMD, " + precision + ", width " + std::to_string(simd_size);
     }();
 
-    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
+    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name();
     if constexpr (!ParabolicSystem::is_identity) {
-      stream << "\n             (PAR) " << parabolic_system_.get().problem_name;
+      stream << "\n             (PAR) "
+             << parabolic_system_.get().problem_name();
     }
     stream << "\n             [" << base_name_ << "] ";
     if (mpi_ensemble_.n_ensembles() > 1) {
@@ -1126,9 +1124,9 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_memory_statistics(
-      std::ostream &stream)
+  template <typename HD, typename PD, int dim, typename Number>
+  void
+  TimeLoop<HD, PD, dim, Number>::print_memory_statistics(std::ostream &stream)
   {
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
@@ -1155,8 +1153,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_timers(std::ostream &stream)
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_timers(std::ostream &stream)
   {
     std::vector<std::ostringstream> output(ComputingTimer::timers().size());
 
@@ -1242,9 +1240,11 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_throughput(
-      unsigned int cycle, Number t, std::ostream &stream, bool final_time)
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_throughput(unsigned int cycle,
+                                                       Number t,
+                                                       std::ostream &stream,
+                                                       bool final_time)
   {
     /*
      * Fixme: The global state kept in this function should be refactored
@@ -1461,8 +1461,8 @@ namespace ryujin
   }
 
 
-  template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_cycle_statistics(
+  template <typename HD, typename PD, int dim, typename Number>
+  void TimeLoop<HD, PD, dim, Number>::print_cycle_statistics(
       unsigned int cycle,
       Number t,
       unsigned int timer_cycle,

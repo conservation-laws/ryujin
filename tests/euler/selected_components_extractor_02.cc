@@ -1,4 +1,4 @@
-#include <description.h>
+#include <hyperbolic_description.h>
 
 #include <discretization.h>
 #include <gpu.h>
@@ -6,6 +6,7 @@
 #include <mpi_ensemble.h>
 #include <offline_data.h>
 #include <selected_components_extractor.h>
+#include <stub_parabolic_system.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -32,15 +33,15 @@
 using namespace ryujin;
 using namespace dealii;
 
-using Description = Euler::Description;
+using HyperbolicDescription = Euler::HyperbolicDescription;
 using HostSpace = dealii::MemorySpace::Host;
 using DefaultSpace = dealii::MemorySpace::Default;
 
 constexpr int dim = 2;
 using Number = NUMBER;
 
-using HyperbolicSystem = typename Description::HyperbolicSystem;
-using ParabolicSystem = typename Description::ParabolicSystem;
+using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+using ParabolicSystem = StubParabolicSystem;
 using SystemView = typename HyperbolicSystem::template View<dim, Number>;
 
 static const std::vector<std::string> selected{
@@ -187,7 +188,7 @@ int main(int argc, char *argv[])
 
   /* Set up the extractor: */
 
-  SelectedComponentsExtractor<Description, dim, Number> extractor(
+  SelectedComponentsExtractor<HyperbolicDescription, dim, Number> extractor(
       offline_data,
       hyperbolic_system,
       parabolic_system,

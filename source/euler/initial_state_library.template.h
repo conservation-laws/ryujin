@@ -5,35 +5,35 @@
 
 #pragma once
 
-#include "description.h"
+#include "hyperbolic_description.h"
 
 #include "initial_state_library_euler.h"
 #include <initial_state_library.h>
 
 namespace ryujin
 {
-  using Description = Euler::Description;
+  using HyperbolicDescription = Euler::HyperbolicDescription;
 
   template <int dim, typename Number>
-  class InitialStateLibrary<Description, dim, Number>
+  class InitialStateLibrary<HyperbolicDescription, dim, Number>
   {
   public:
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using initial_state_list_type =
-        std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
+    using initial_state_list_type = std::set<
+        std::unique_ptr<InitialState<HyperbolicDescription, dim, Number>>>;
 
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,
                                 const HyperbolicSystem &h,
-                                const ParabolicSystem & /*p*/,
+                                const Interface::ParabolicSystem & /*p*/,
                                 const std::string &s)
     {
-      EulerInitialStates::populate_initial_state_list<Description, dim, Number>(
-          initial_state_list, h, s);
+      EulerInitialStates::
+          populate_initial_state_list<HyperbolicDescription, dim, Number>(
+              initial_state_list, h, s);
     }
   };
 } // namespace ryujin

@@ -9,8 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class MeshAdaptor<Description, 1, NUMBER>;
-  template class MeshAdaptor<Description, 2, NUMBER>;
-  template class MeshAdaptor<Description, 3, NUMBER>;
+  template class MeshAdaptor<HyperbolicDescription, 1, NUMBER>;
+  template class MeshAdaptor<HyperbolicDescription, 2, NUMBER>;
+  template class MeshAdaptor<HyperbolicDescription, 3, NUMBER>;
 
 } /* namespace ryujin */

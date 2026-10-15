@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "../stub_parabolic_module.h"
-#include "../stub_parabolic_system.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
@@ -29,18 +27,10 @@ namespace ryujin
      * density. We use a specialied Riemann solver, entropy viscosity
      * commutator, and limiter for this class of equations.
      *
-     * The parabolic subsystem is chosen to be the identity.
-     *
      * @ingroup EulerEquations
      */
-    struct Description {
+    struct HyperbolicDescription {
       using HyperbolicSystem = EulerBarotropic::HyperbolicSystem;
-
-      using ParabolicSystem = ryujin::StubParabolicSystem;
-
-      template <int dim, typename Number = double>
-      using ParabolicModule =
-          ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = EulerBarotropic::Indicator<ScalarNumber>;

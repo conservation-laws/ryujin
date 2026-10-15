@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -29,12 +31,12 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription, int dim, typename Number = double>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    using View =
-        typename Description::HyperbolicSystem::template View<dim, Number>;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using View = typename HyperbolicSystem::template View<dim, Number>;
 
     using state_type = typename View::state_type;
 
@@ -87,43 +89,38 @@ namespace ryujin
 
   /**
    * A "factory" class that is used to populate a list of all possible
-   * initial states for a given equation described by @p Description.
+   * initial states for a given @p HyperbolicDescription.
    *
    * This works by specializing the static member function
-   * populate_initial_state_list for all possible equation @p Description.
+   * populate_initial_state_list for every @p HyperbolicDescription.
    *
    * @ingroup InitialValues
    */
-  template <typename Description, int dim, typename Number>
+  template <typename HyperbolicDescription, int dim, typename Number>
   class InitialStateLibrary
   {
   public:
     /**
      * @copydoc HyperbolicSystem
      */
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-
-    /**
-     * @copydoc HyperbolicSystem
-     */
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     /**
      * The type of the initial state list
      */
-    using initial_state_list_type =
-        std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
+    using initial_state_list_type = std::set<
+        std::unique_ptr<InitialState<HyperbolicDescription, dim, Number>>>;
 
     /**
      * Populate a given container with all initial states defined for the
-     * given equation @p Description and dimension @p dim.
+     * given @p HyperbolicDescription and dimension @p dim.
      *
      * @ingroup InitialValues
      */
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,
                                 const HyperbolicSystem &h,
-                                const ParabolicSystem &p,
+                                const Interface::ParabolicSystem &p,
                                 const std::string &s);
   };
 } // namespace ryujin

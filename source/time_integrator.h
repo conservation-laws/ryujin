@@ -249,7 +249,10 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename Description, int dim, typename Number = double>
+  template <typename HyperbolicDescription,
+            typename ParabolicDescription,
+            int dim,
+            typename Number = double>
   class TimeIntegrator final : public dealii::ParameterAcceptor
   {
   public:
@@ -258,8 +261,8 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-    using ParabolicSystem = typename Description::ParabolicSystem;
+    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using ParabolicSystem = typename ParabolicDescription::ParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -272,12 +275,15 @@ namespace ryujin
     /**
      * Constructor.
      */
-    TimeIntegrator(
-        const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
-        const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
-        const ParabolicModule<Description, dim, Number> &parabolic_module,
-        const std::string &subsection = "/TimeIntegrator");
+    TimeIntegrator(const MPIEnsemble &mpi_ensemble,
+                   const OfflineData<dim, Number> &offline_data,
+                   const HyperbolicModule<HyperbolicDescription, dim, Number>
+                       &hyperbolic_module,
+                   const ParabolicModule<HyperbolicDescription,
+                                         ParabolicDescription,
+                                         dim,
+                                         Number> &parabolic_module,
+                   const std::string &subsection = "/TimeIntegrator");
 
     /**
      * Prepare time integration. A call to prepare() allocates temporary
@@ -371,9 +377,13 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<const HyperbolicModule<Description, dim, Number>>
+    dealii::ObserverPointer<
+        const HyperbolicModule<HyperbolicDescription, dim, Number>>
         hyperbolic_module_;
-    dealii::ObserverPointer<const ParabolicModule<Description, dim, Number>>
+    dealii::ObserverPointer<const ParabolicModule<HyperbolicDescription,
+                                                  ParabolicDescription,
+                                                  dim,
+                                                  Number>>
         parabolic_module_;
 
     std::vector<StateVector<Number>> temp_;

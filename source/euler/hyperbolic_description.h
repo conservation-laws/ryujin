@@ -7,35 +7,27 @@
 
 #include <compile_time_options.h>
 
-#include "../euler/hyperbolic_system.h"
-#include "../euler/indicator.h"
-#include "../euler/limiter.h"
-#include "../euler/wave_speed_estimator.h"
-#include "parabolic_module.h"
-#include "parabolic_system.h"
+#include "hyperbolic_system.h"
+#include "indicator.h"
+#include "limiter.h"
+#include "wave_speed_estimator.h"
 
 namespace ryujin
 {
-  namespace NavierStokes
+  namespace Euler
   {
     /**
      * A struct that contains all equation specific classes describing the
      * chosen hyperbolic system, the indicator, the limiter and
      * (approximate) Riemann solver.
      *
-     * We group all of these templates together in this struct so that we
-     * only need to add a single template parameter to the all the
-     * algorithm classes, such as HyperbolicModule.
+     * The compressible Euler equations of gas dynamics. Specialized
+     * implementation for a polytropic gas equation.
      *
-     * @ingroup NavierStokesEquations
+     * @ingroup EulerEquations
      */
-    struct Description {
+    struct HyperbolicDescription {
       using HyperbolicSystem = Euler::HyperbolicSystem;
-
-      using ParabolicSystem = NavierStokes::ParabolicSystem;
-
-      template <int dim, typename Number = double>
-      using ParabolicModule = NavierStokes::ParabolicModule<dim, Number>;
 
       template <typename ScalarNumber = double>
       using Indicator = Euler::Indicator<ScalarNumber>;
@@ -46,5 +38,5 @@ namespace ryujin
       template <typename ScalarNumber = double>
       using WaveSpeedEstimator = Euler::WaveSpeedEstimator<ScalarNumber>;
     };
-  } // namespace NavierStokes
+  } // namespace Euler
 } // namespace ryujin

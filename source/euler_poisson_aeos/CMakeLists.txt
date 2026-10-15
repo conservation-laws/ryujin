@@ -3,9 +3,18 @@
 ## Copyright (C) 2026 by the ryujin authors
 ##
 
+if(NOT EQUATION_EULER_AEOS)
+  message(FATAL_ERROR
+    "The equation »euler_poisson_aeos« requires the equation »euler_aeos« to be enabled")
+endif()
+
+if(NOT EQUATION_EULER_POISSON)
+  message(FATAL_ERROR
+    "The equation »euler_poisson_aeos« requires the equation »euler_poisson« to be enabled")
+endif()
+
 add_library(obj_euler_poisson_aeos OBJECT
   equation_dispatch.cc
-  initial_state_library.cc
   parabolic_module.cc
   )
 set_target_properties(obj_euler_poisson_aeos PROPERTIES LINKER_LANGUAGE CXX)

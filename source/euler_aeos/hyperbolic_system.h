@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/hyperbolic_system.h>
+
 #include "equation_of_state_library.h"
 
 #include <convenience_macros.h>
@@ -45,15 +47,9 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    class HyperbolicSystem final : public dealii::ParameterAcceptor
+    class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      static inline std::string problem_name =
-          "Compressible Euler equations (arbitrary EOS)";
-
       /**
        * A structure holding all runtime parameters of the hyperbolic
        * system, as well as the interpolatory NASG parameters of the
@@ -230,36 +226,6 @@ namespace ryujin
       using flux_contribution_type = flux_type;
 
       /**
-       * An array holding all component names of the conserved state as a
-       * string.
-       */
-      static inline const auto component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"rho", "m", "E"};
-        else if constexpr (dim == 2)
-          return {"rho", "m_1", "m_2", "E"};
-        else if constexpr (dim == 3)
-          return {"rho", "m_1", "m_2", "m_3", "E"};
-        __builtin_trap();
-      }();
-
-      /**
-       * An array holding all component names of the primitive state as a
-       * string.
-       */
-      static inline const auto primitive_component_names =
-          []() -> std::array<std::string, problem_dimension> {
-        if constexpr (dim == 1)
-          return {"rho", "v", "e"};
-        else if constexpr (dim == 2)
-          return {"rho", "v_1", "v_2", "e"};
-        else if constexpr (dim == 3)
-          return {"rho", "v_1", "v_2", "v_3", "e"};
-        __builtin_trap();
-      }();
-
-      /**
        * The number of precomputed values.
        */
       static constexpr unsigned int n_precomputed_values = 4;
@@ -268,16 +234,6 @@ namespace ryujin
        * Array type used for precomputed values.
        */
       using precomputed_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_names =
-          std::array<std::string, n_precomputed_values>{
-              {"p",
-               "surrogate_gamma_min",
-               "surrogate_specific_entropy",
-               "surrogate_harten_entropy"}};
 
       /**
        * The number of precomputed initial values.
@@ -289,12 +245,6 @@ namespace ryujin
        */
       using initial_precomputed_type =
           std::array<Number, n_initial_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto initial_precomputed_names =
-          std::array<std::string, n_initial_precomputed_values>{};
 
       template <int n_comp>
       using VectorView =
@@ -910,7 +860,28 @@ namespace ryujin
 
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::HyperbolicSystem(
+              "Compressible Euler equations (arbitrary EOS)",
+              {{{"rho", "m", "E"},
+                {"rho", "m_1", "m_2", "E"},
+                {"rho", "m_1", "m_2", "m_3", "E"}}},
+              {{{"rho", "v", "e"},
+                {"rho", "v_1", "v_2", "e"},
+                {"rho", "v_1", "v_2", "v_3", "e"}}},
+              {{{"p",
+                 "surrogate_gamma_min",
+                 "surrogate_specific_entropy",
+                 "surrogate_harten_entropy"},
+                {"p",
+                 "surrogate_gamma_min",
+                 "surrogate_specific_entropy",
+                 "surrogate_harten_entropy"},
+                {"p",
+                 "surrogate_gamma_min",
+                 "surrogate_specific_entropy",
+                 "surrogate_harten_entropy"}}},
+              {},
+              subsection)
         , parameters_("euler_aeos_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
@@ -980,7 +951,7 @@ namespace ryujin
         /* Populate EOS-specific quantities and functions */
         if (it->name() == equation_of_state_) {
           selected_equation_of_state_ = it;
-          problem_name =
+          problem_name_ =
               "Compressible Euler equations (" + it->name() + " EOS)";
           initialized = true;
           break;

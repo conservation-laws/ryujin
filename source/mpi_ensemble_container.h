@@ -90,7 +90,7 @@ namespace ryujin
 
 
   /**
-   * A trait class that determines whether a given equation Description
+   * A trait class that determines whether a given HyperbolicDescription
    * struct contains a method or field "n_mpi_ensembles".
    */
   namespace

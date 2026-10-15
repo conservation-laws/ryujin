@@ -3,7 +3,8 @@
 // Copyright (C) 2025 by the ryujin authors
 //
 
-#include "description.h"
+#include "../euler/hyperbolic_description.h"
+#include "parabolic_description.h"
 #include "parabolic_module.template.h"
 
 #define INSTANTIATE(dim, stages)                                               \

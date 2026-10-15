@@ -9,6 +9,8 @@
 
 #include <convenience_macros.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
@@ -27,30 +29,22 @@ namespace ryujin
      *
      * @ingroup NavierStokesEquations
      */
-    class ParabolicSystem final : public dealii::ParameterAcceptor
+    class ParabolicSystem final : public Interface::ParabolicSystem
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      static inline const std::string problem_name =
-          "Newtonian fluid viscosity model with Fourier-law heat flux";
-
-      /**
-       * This parabolic subsystem represents an identity.
-       */
-      static constexpr bool is_identity = false;
-
       /**
        * Constructor.
        */
       ParabolicSystem(const std::string &subsection = "/B - Equation");
 
+      /**
+       * Whether the parabolic system is the identity.
+       */
+      static constexpr bool is_identity = false;
+
       ACCESSOR_READ_ONLY(mu)
       ACCESSOR_READ_ONLY(lambda)
       ACCESSOR_READ_ONLY(cv_inverse_kappa)
-
-      ACCESSOR_READ_ONLY(parabolic_component_names);
 
     private:
       /**
@@ -65,14 +59,6 @@ namespace ryujin
 
 
       //@}
-      /**
-       * @name Internal data
-       */
-      //@{
-
-      const std::vector<std::string> parabolic_component_names_;
-
-      //@}
     }; /* ParabolicSystem */
 
 
@@ -84,7 +70,12 @@ namespace ryujin
 
 
     inline ParabolicSystem::ParabolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::ParabolicSystem(
+              "Newtonian fluid viscosity model with Fourier-law heat flux",
+              /* no components of its own: acts on the hyperbolic state */
+              {},
+              {},
+              subsection)
     {
       mu_ = 1.e-3;
       add_parameter("mu", mu_, "The shear viscosity constant");

@@ -9,8 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class Postprocessor<Description, 1, NUMBER>;
-  template class Postprocessor<Description, 2, NUMBER>;
-  template class Postprocessor<Description, 3, NUMBER>;
+  template class Postprocessor<HyperbolicDescription, 1, NUMBER>;
+  template class Postprocessor<HyperbolicDescription, 2, NUMBER>;
+  template class Postprocessor<HyperbolicDescription, 3, NUMBER>;
 
 } /* namespace ryujin */

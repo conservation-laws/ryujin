@@ -8,7 +8,7 @@
 #include <deal.II/base/mpi.h>
 
 #define DEBUG_SOLUTION
-#include <description.h>
+#include <hyperbolic_description.h>
 #include <initial_state_exact_riemann_solution.h>
 
 using namespace ryujin::EulerInitialStates;
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
   std::cout << std::scientific;
 
   std::cout << "Calling default constructor..." << std::endl;
-  ExactRiemannSolution<Description, dim, double> initial_state(
+  ExactRiemannSolution<HyperbolicDescription, dim, double> initial_state(
       hyperbolic_system, "");
 
   {

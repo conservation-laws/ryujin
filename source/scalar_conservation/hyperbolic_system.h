@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/hyperbolic_system.h>
+
 #include "flux_library.h"
 
 #include <convenience_macros.h>
@@ -39,14 +41,9 @@ namespace ryujin
      *
      * @ingroup ScalarConservationEquations
      */
-    class HyperbolicSystem final : public dealii::ParameterAcceptor
+    class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      static inline std::string problem_name = "Scalar conservation equation";
-
       /**
        * A structure holding the cached parameters of the selected flux.
        * These are recomputed in update_parameters().
@@ -185,20 +182,6 @@ namespace ryujin
       using flux_contribution_type = flux_type;
 
       /**
-       * An array holding all component names of the conserved state as a
-       * string.
-       */
-      static inline const auto component_names =
-          std::array<std::string, problem_dimension>{"u"};
-
-      /**
-       * An array holding all component names of the primitive state as a
-       * string.
-       */
-      static inline const auto primitive_component_names =
-          std::array<std::string, problem_dimension>{"u"};
-
-      /**
        * The number of precomputed values.
        */
       static constexpr unsigned int n_precomputed_values = 2 * dim;
@@ -207,20 +190,6 @@ namespace ryujin
        * Array type used for precomputed values.
        */
       using precomputed_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_names =
-          []() -> std::array<std::string, n_precomputed_values> {
-        if constexpr (dim == 1)
-          return {"f", "df"};
-        else if constexpr (dim == 2)
-          return {"f_1", "f_2", "df_1", "df_2"};
-        else if constexpr (dim == 3)
-          return {"f_1", "f_2", "f_3", "df_1", "df_2", "df_3"};
-        __builtin_trap();
-      }();
 
       /**
        * The number of precomputed initial values.
@@ -232,12 +201,6 @@ namespace ryujin
        */
       using initial_precomputed_type =
           std::array<Number, n_initial_precomputed_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto initial_precomputed_names =
-          std::array<std::string, n_initial_precomputed_values>{};
 
       template <int n_comp>
       using VectorView =
@@ -566,7 +529,15 @@ namespace ryujin
 
 
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
-        : ParameterAcceptor(subsection)
+        : Interface::HyperbolicSystem(
+              "Scalar conservation equation",
+              {{{"u"}, {"u"}, {"u"}}},
+              {{{"u"}, {"u"}, {"u"}}},
+              {{{"f", "df"},
+                {"f_1", "f_2", "df_1", "df_2"},
+                {"f_1", "f_2", "f_3", "df_1", "df_2", "df_3"}}},
+              {},
+              subsection)
         , parameters_("scalar_conservation_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
@@ -604,8 +575,8 @@ namespace ryujin
         /* Populate flux functions: */
         if (it->name() == flux_) {
           selected_flux_ = it;
-          problem_name = "Scalar conservation equation (" + it->name() + ": " +
-                         it->flux_formula() + ")";
+          problem_name_ = "Scalar conservation equation (" + it->name() + ": " +
+                          it->flux_formula() + ")";
           initialized = true;
           break;
         }
@@ -927,6 +898,5 @@ namespace ryujin
     {
       return -contract(add(flux_i, flux_j), c_ij);
     }
-
   } // namespace ScalarConservation
 } // namespace ryujin
