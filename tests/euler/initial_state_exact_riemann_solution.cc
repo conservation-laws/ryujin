@@ -7,7 +7,6 @@
 
 #include <deal.II/base/mpi.h>
 
-#define DEBUG_SOLUTION
 #include <hyperbolic_description.h>
 #include <initial_state_exact_riemann_solution.h>
 
