@@ -16,7 +16,6 @@
 #include "mpi_ensemble_container.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
-#include "postprocessor.h"
 #include "quantities.h"
 #include "solution_transfer.h"
 #include "time_integrator.h"
@@ -129,7 +128,6 @@ namespace ryujin
         time_integrator_;
     MeshAdaptor<HyperbolicDescription, dim, Number> mesh_adaptor_;
     SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;
-    Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
     VTUOutput<HyperbolicDescription, dim, Number> vtu_output_;
     Quantities<HyperbolicDescription, dim, Number> quantities_;
     ErrorEvaluation<HyperbolicDescription, dim, Number> error_evaluation_;

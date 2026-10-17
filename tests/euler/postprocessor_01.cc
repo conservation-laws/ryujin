@@ -1,41 +1,34 @@
 #include <hyperbolic_description.h>
 
 #include <discretization.h>
-#include <gpu.h>
-#include <loop.h>
 #include <mpi_ensemble.h>
 #include <offline_data.h>
-#include <selected_components_extractor.h>
 #include <stub_parabolic_system.h>
+
+#include <ryujin/typed/postprocessor.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 
 //
-// Test SelectedComponentsExtractorView::extract_element(): We set up a
-// small rectangular domain, populate a state vector with synthetic data
-// and extract a selection of conserved, primitive, precomputed, and
-// additional components for every degree of freedom individually. The
-// loop is run on the host memory space (where it exercises both the
-// vectorized and the scalar instantiation) and on the default memory
-// space. Both results are printed and compared against the vectors
-// returned by extract().
-//
-// Note that Euler has neither initial precomputed values, nor parabolic
-// components. Those two code paths remain covered by the shallow water
-// and navier stokes regression tests.
+// Test the Postprocessor: We set up a small rectangular domain, populate
+// a state vector with synthetic data and extract a selection of
+// conserved, primitive, precomputed, and additional components. All components
+// are extracted on the host with extract(), and at all locally owned degrees of
+// freedom with the gather variant of extract() on the selected memory space.
+// Both results are printed.
 //
 
 using namespace ryujin;
 using namespace dealii;
 
 using HyperbolicDescription = Euler::HyperbolicDescription;
-using HostSpace = dealii::MemorySpace::Host;
-using DefaultSpace = dealii::MemorySpace::Default;
 
 constexpr int dim = 2;
 using Number = NUMBER;
@@ -44,61 +37,49 @@ using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 using ParabolicSystem = StubParabolicSystem;
 using SystemView = typename HyperbolicSystem::template View<dim, Number>;
 
-static const std::vector<std::string> selected{
-    "rho", "m_1", "E", "v_1", "p", "s", "eta_h", "alpha"};
-
-constexpr std::size_t n_selected = 8;
-
 
 /*
- * Extract all selected components for every locally owned degree of
- * freedom with extract_element() and store the result in a
- * (component-wise) host vector.
+ * Extract all selected components at the locally owned degrees of
+ * freedom, visited in the given @p order, with the gather variant of
+ * extract() and store the result in a (component-wise) host vector.
  */
-template <typename MemorySpace, typename Extractor>
-std::vector<ScalarHostVector<Number>>
-extract_element_wise(const Extractor &extractor,
-                     const StateVector<Number> &state_vector,
-                     const OfflineData<dim, Number> &offline_data)
+std::vector<ScalarHostVector<Number>> extract_gather(
+    const Interface::Postprocessor<dim, Number> &postprocessor,
+    const Interface::Postprocessor<dim, Number>::Selection &selection,
+    const StateVector<Number> &state_vector,
+    const OfflineData<dim, Number> &offline_data,
+    const std::vector<unsigned int> &order)
 {
-  const unsigned int n_internal = offline_data.n_locally_internal();
-  const unsigned int n_owned = offline_data.n_locally_owned();
+  const unsigned int n_selected = selection.size();
+  const auto n_points = static_cast<unsigned int>(order.size());
 
-  Mirrored<Number *> scratch("selected_components_extractor_02_scratch");
-  scratch.reinit(n_selected * n_owned, TransferPolicy::implicit_transfers);
+  Mirrored<unsigned int *> indices("extract_gather_indices");
+  indices.reinit(n_points, TransferPolicy::implicit_transfers);
+  std::copy(order.begin(), order.end(), indices.view());
 
-  extractor.template prepare_extraction<MemorySpace>(state_vector);
-  const auto extractor_view = extractor.template view<MemorySpace>();
-  auto *destination = scratch.template view<MemorySpace>();
+  Mirrored<Number *> values("extract_gather_values");
+  values.reinit(n_selected * n_points, TransferPolicy::implicit_transfers);
 
-  const auto body = [=](auto sentinel, unsigned int i) {
-    using T = decltype(sentinel);
-
-    extractor_view.template extract_element<T>(
-        i, [&](const unsigned int k, const T &value) {
-          if constexpr (std::is_same_v<T, dealii::VectorizedArray<Number>>)
-            value.store(destination + k * n_owned + i);
-          else
-            destination[k * n_owned + i] = value;
-        });
-  };
-
-  loop<MemorySpace, Number>("extract_element", body, 0, n_internal, n_owned);
+  postprocessor.extract(
+      selection,
+      state_vector,
+      std::as_const(indices).template view<selected_memory_space_t>(),
+      n_points,
+      values.template view<selected_memory_space_t>());
 
   /* Repackage the result in a vector of scalar host vectors: */
 
-  const auto *result = std::as_const(scratch).template view<HostSpace>();
+  const auto *result = std::as_const(values).view();
 
   std::vector<ScalarHostVector<Number>> extracted(n_selected);
   for (unsigned int k = 0; k < n_selected; ++k) {
     extracted[k].reinit(offline_data.scalar_partitioner());
-    for (unsigned int i = 0; i < n_owned; ++i)
-      extracted[k].local_element(i) = result[k * n_owned + i];
+    for (unsigned int p = 0; p < n_points; ++p)
+      extracted[k].local_element(order[p]) = result[p * n_selected + k];
   }
 
   return extracted;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -186,9 +167,9 @@ int main(int argc, char *argv[])
     alpha_view.update_ghost_values();
   }
 
-  /* Set up the extractor: */
+  /* Set up the postprocessor: */
 
-  SelectedComponentsExtractor<HyperbolicDescription, dim, Number> extractor(
+  Postprocessor<HyperbolicDescription, dim, Number> postprocessor(
       offline_data,
       hyperbolic_system,
       parabolic_system,
@@ -196,45 +177,28 @@ int main(int argc, char *argv[])
       {"alpha"},
       {alpha});
 
-  extractor.prepare(selected);
+  const std::vector<std::string> selected{
+      "rho", "m_1", "E", "v_1", "p", "s", "eta_h", "alpha"};
+  const auto selection = postprocessor.prepare(selected);
 
-  AssertThrow(extractor.n_selected() == n_selected, dealii::ExcInternalError());
+  /* Extract on the host and gather on the selected memory space: */
 
-  /* Extract element wise on the host and on the default memory space: */
+  const auto host_components = postprocessor.extract(selection, state_vector);
 
-  const auto host_components =
-      extract_element_wise<HostSpace>(extractor, state_vector, offline_data);
-  const auto device_components =
-      extract_element_wise<DefaultSpace>(extractor, state_vector, offline_data);
-
-  /* And compare against the component wise extraction: */
-
-  extractor.prepare_extraction<HostSpace>(state_vector);
-  const auto reference = extractor.view<HostSpace>().extract();
+  std::vector<unsigned int> order(n_owned);
+  std::iota(order.begin(), order.end(), 0u);
+  const auto device_components = extract_gather(
+      postprocessor, selection, state_vector, offline_data, order);
 
   std::cout << "n_locally_owned = " << n_owned << "\n";
 
-  for (std::size_t k = 0; k < n_selected; ++k) {
+  for (std::size_t k = 0; k < selected.size(); ++k) {
     std::cout << "\ncomponent \"" << selected[k] << "\":\n";
-
-    Number host_difference = 0.;
-    Number device_difference = 0.;
-
     for (unsigned int i = 0; i < n_owned; ++i) {
-      const auto host = host_components[k].local_element(i);
-      const auto device = device_components[k].local_element(i);
-
-      std::cout << "  i = " << i      //
-                << "  host: " << host //
-                << "  device: " << device << "\n";
-
-      host_difference = std::max(
-          host_difference, std::abs(host - reference[k].local_element(i)));
-      device_difference = std::max(
-          device_difference, std::abs(device - reference[k].local_element(i)));
+      std::cout << "  i = " << i                                     //
+                << "  host: " << host_components[k].local_element(i) //
+                << "  device: " << device_components[k].local_element(i)
+                << "\n";
     }
-
-    std::cout << "  difference to extract(): host: " << host_difference
-              << "  device: " << device_difference << "\n";
   }
 }
