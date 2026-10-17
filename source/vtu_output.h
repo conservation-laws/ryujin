@@ -7,13 +7,12 @@
 
 #include <compile_time_options.h>
 
-#include <ryujin/interface/parabolic_system.h>
+#include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/postprocessor.h>
 
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
-#include "postprocessor.h"
-#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -23,34 +22,23 @@ namespace ryujin
 {
 
   /**
-   * The VTUOutput class implements output of the conserved state vector
-   * and a number of postprocessed quantities computed by the Postprocessor
-   * class.
+   * The VTUOutput class implements output of a selection of components of
+   * the state vector and of postprocessed quantities.
+   *
+   * The postprocessed quantities, "schlieren_<name>" and
+   * "vorticity_<name>" (see Postprocessor), are scaled and
+   * normalized for visualization as follows:
+   * \f[
+   *   \text{quantity}[i] = 1 - \exp\left(-\beta \frac{ |q_i| - \min_k
+   *   |q_k|}{\max_k |q_k| - \min_k |q_k|}\right).
+   * \f]
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Typedefs and constexpr constants
-     */
-    //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-
-    using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    static constexpr auto problem_dimension = View::problem_dimension;
-
-    using state_type = typename View::state_type;
-
-    static constexpr auto n_precomputed_values = View::n_precomputed_values;
-
-    using precomputed_type = typename View::precomputed_type;
-
-    //@}
     /**
      * @name Constructor and setup
      */
@@ -59,16 +47,11 @@ namespace ryujin
     /**
      * Constructor.
      */
-    VTUOutput(
-        const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
-        const HyperbolicSystem &hyperbolic_system,
-        const Interface::ParabolicSystem &parabolic_system,
-        const Postprocessor<HyperbolicDescription, dim, Number> &postprocessor,
-        const MultiComponentVector<Number> &initial_precomputed,
-        const ScalarVector<Number> &alpha,
-        const ScalarVector<Number> &smoothness_indicators,
-        const std::string &subsection = "/VTUOutput");
+    VTUOutput(const MPIEnsemble &mpi_ensemble,
+              const OfflineData<dim, Number> &offline_data,
+              const Interface::HyperbolicSystem &hyperbolic_system,
+              const Interface::Postprocessor<dim, Number> &postprocessor,
+              const std::string &subsection = "/VTUOutput");
 
     /**
      * Prepare VTU output. A call to @ref prepare() allocates temporary
@@ -109,6 +92,16 @@ namespace ryujin
                          bool output_full = true,
                          bool output_cutplanes = true);
 
+    /**
+     * Reset computed normalization bounds. Calling this function will
+     * force a recomputation of the normalization bounds during the next
+     * call to schedule_output().
+     */
+    void reset_bounds()
+    {
+      bounds_.clear();
+    }
+
   private:
     //@}
     /**
@@ -117,6 +110,9 @@ namespace ryujin
     //@{
 
     bool use_mpi_io_;
+
+    Number beta_;
+    bool recompute_bounds_;
 
     std::vector<std::string> manifolds_;
 
@@ -131,12 +127,16 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<
-        const Postprocessor<HyperbolicDescription, dim, Number>>
-        postprocessor_;
 
-    SelectedComponentsExtractor<HyperbolicDescription, dim, Number>
-        selected_components_extractor_;
+    const Interface::Postprocessor<dim, Number> &postprocessor_;
+
+    typename Interface::Postprocessor<dim, Number>::Selection selection_;
+
+    /**
+     * The normalization bounds (maximum, minimum) of every selected
+     * component; only used for postprocessed quantities.
+     */
+    std::vector<std::pair<Number, Number>> bounds_;
 
     //@}
   };

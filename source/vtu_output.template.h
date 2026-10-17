@@ -18,27 +18,17 @@ namespace ryujin
   using namespace dealii;
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  VTUOutput<HyperbolicDescription, dim, Number>::VTUOutput(
+  template <int dim, typename Number>
+  VTUOutput<dim, Number>::VTUOutput(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicSystem &hyperbolic_system,
-      const Interface::ParabolicSystem &parabolic_system,
-      const Postprocessor<HyperbolicDescription, dim, Number> &postprocessor,
-      const MultiComponentVector<Number> &initial_precomputed,
-      const ScalarVector<Number> &alpha,
-      const ScalarVector<Number> &smoothness_indicators,
+      const Interface::HyperbolicSystem &hyperbolic_system,
+      const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , postprocessor_(&postprocessor)
-      , selected_components_extractor_(offline_data,
-                                       hyperbolic_system,
-                                       parabolic_system,
-                                       initial_precomputed,
-                                       {"alpha", "smoothness_indicators"},
-                                       {alpha, smoothness_indicators})
+      , postprocessor_(postprocessor)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -52,7 +42,8 @@ namespace ryujin
                   "List of level set functions. The description is used to "
                   "only output cells that intersect the given level set.");
 
-    vtu_output_quantities_ = hyperbolic_system.state_names(dim);
+    const auto &state_names = hyperbolic_system.state_names(dim);
+    vtu_output_quantities_ = state_names;
 
     const auto &initial_names =
         hyperbolic_system.initial_precomputed_names(dim);
@@ -60,26 +51,46 @@ namespace ryujin
                                   initial_names.begin(),
                                   initial_names.end());
 
-    add_parameter("vtu output quantities",
-                  vtu_output_quantities_,
-                  "List of conserved, primitive, precomputed, or postprocessed "
-                  "quantities that will be written to the vtu files.");
+    Assert(state_names.size() > 0,
+           dealii::ExcMessage("Need at least one scalar quantitity"));
+    vtu_output_quantities_.push_back("schlieren_" + state_names[0]);
+
+    add_parameter(
+        "vtu output quantities",
+        vtu_output_quantities_,
+        "List of conserved, primitive, precomputed, or postprocessed "
+        "(schlieren_<name>, vorticity_<name>) quantities that will be "
+        "written to the vtu files.");
+
+    beta_ = 10.;
+    add_parameter("schlieren beta",
+                  beta_,
+                  "Beta factor used in the exponential scale for the schlieren "
+                  "and vorticity plots");
+
+    recompute_bounds_ = true;
+    add_parameter(
+        "schlieren recompute bounds",
+        recompute_bounds_,
+        "Recompute bounds for every output cycle. If set to false, bounds once "
+        "at the beginning and reused thereafter.");
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void VTUOutput<HyperbolicDescription, dim, Number>::prepare()
+  template <int dim, typename Number>
+  void VTUOutput<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
 
-    selected_components_extractor_.prepare(vtu_output_quantities_);
+    selection_ = postprocessor_.prepare(vtu_output_quantities_);
+    bounds_.clear();
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void VTUOutput<HyperbolicDescription, dim, Number>::schedule_output(
+  template <int dim, typename Number>
+  void VTUOutput<dim, Number>::schedule_output(
       const StateVector<Number> &state_vector,
       std::string name,
       Number t [[maybe_unused]],
@@ -96,8 +107,68 @@ namespace ryujin
      * call DataOut::add_data_vector()
      */
 
-    selected_components_extractor_.prepare_extraction(state_vector);
-    auto selected_components = selected_components_extractor_.view().extract();
+    auto selected_components = postprocessor_.extract(selection_, state_vector);
+
+    /*
+     * Normalize postprocessed quantities on an exponential scale:
+     */
+
+    const auto n_selected =
+        static_cast<unsigned int>(selected_components.size());
+
+    const auto is_postprocessed = [&](const unsigned int k) {
+      const auto &name = vtu_output_quantities_[k];
+      return name.rfind("schlieren_", 0) == 0 ||
+             name.rfind("vorticity_", 0) == 0;
+    };
+
+    if (recompute_bounds_ || bounds_.size() != n_selected) {
+      bounds_.assign(
+          n_selected,
+          std::make_pair(Number(0.), std::numeric_limits<Number>::max()));
+
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+
+      for (unsigned int k = 0; k < n_selected; ++k) {
+        if (!is_postprocessed(k))
+          continue;
+
+        auto &[q_max, q_min] = bounds_[k];
+        for (unsigned int i = 0; i < n_owned; ++i) {
+          const auto q = selected_components[k].local_element(i);
+          q_max = std::max(q_max, std::abs(q));
+          q_min = std::min(q_min, std::abs(q));
+        }
+        q_max = dealii::Utilities::MPI::max(
+            q_max, mpi_ensemble_.ensemble_communicator());
+        q_min = dealii::Utilities::MPI::min(
+            q_min, mpi_ensemble_.ensemble_communicator());
+        Assert(q_max >= q_min, dealii::ExcInternalError());
+      }
+    }
+
+    {
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
+      constexpr Number floor = std::max(Number(1.0e-10), eps);
+
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+
+      for (unsigned int k = 0; k < n_selected; ++k) {
+        if (!is_postprocessed(k))
+          continue;
+
+        const auto &[q_max, q_min] = bounds_[k];
+        for (unsigned int i = 0; i < n_owned; ++i) {
+          auto &q = selected_components[k].local_element(i);
+          /* clip off everything that is below the noise "floor": */
+          const auto ratio = std::max(Number(0.), std::abs(q) - q_min - floor) /
+                             std::max(q_max - q_min, eps);
+
+          const auto magnitude = Number(1.) - std::exp(-beta_ * ratio);
+          q = std::copysign(magnitude, q);
+        }
+      }
+    }
 
     /*
      * Attach data vectors to DataOut object:
@@ -129,14 +200,6 @@ namespace ryujin
 
     for (unsigned int d = 0; d < selected_components.size(); ++d) {
       attach_data_vector(selected_components[d], vtu_output_quantities_[d]);
-    }
-
-    const auto n_quantities = postprocessor_->n_quantities();
-    for (unsigned int i = 0; i < n_quantities; ++i) {
-      // FIXME maybe also refactor to use attach_data_vector()
-      data_out->add_data_vector(offline_data_->dof_handler(),
-                                postprocessor_->quantities()[i],
-                                postprocessor_->component_names()[i]);
     }
 
     DataOutBase::VtkFlags flags(

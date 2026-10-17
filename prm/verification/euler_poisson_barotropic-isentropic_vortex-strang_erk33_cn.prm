@@ -116,7 +116,7 @@ subsection H - TimeIntegrator
 end
 
 subsection J - VTUOutput
-  set vtu output quantities      = rho, m_1, m_2, phi
+  set vtu output quantities      = rho, m_1, m_2, phi, schlieren_rho
 end
 
 subsection L - ErrorEvaluation

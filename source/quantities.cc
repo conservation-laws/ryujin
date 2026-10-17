@@ -4,13 +4,12 @@
 //
 
 #include "quantities.template.h"
-#include <instantiate.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class Quantities<HyperbolicDescription, 1, NUMBER>;
-  template class Quantities<HyperbolicDescription, 2, NUMBER>;
-  template class Quantities<HyperbolicDescription, 3, NUMBER>;
+  template class Quantities<1, NUMBER>;
+  template class Quantities<2, NUMBER>;
+  template class Quantities<3, NUMBER>;
 
 } /* namespace ryujin */

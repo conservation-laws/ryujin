@@ -7,13 +7,13 @@
 
 #include <compile_time_options.h>
 
-#include <ryujin/interface/parabolic_system.h>
+#include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/postprocessor.h>
 
 #include "gpu.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
-#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -45,20 +45,10 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <int dim, typename Number = double>
   class Quantities final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Typedefs and constexpr constants
-     */
-    //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-
-    using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    //@}
     /**
      * @name Constructor and setup
      */
@@ -69,9 +59,8 @@ namespace ryujin
      */
     Quantities(const MPIEnsemble &mpi_ensemble,
                const OfflineData<dim, Number> &offline_data,
-               const HyperbolicSystem &hyperbolic_system,
-               const Interface::ParabolicSystem &parabolic_system,
-               const MultiComponentVector<Number> &initial_precomputed,
+               const Interface::HyperbolicSystem &hyperbolic_system,
+               const Interface::Postprocessor<dim, Number> &postprocessor,
                const std::string &subsection = "/Quantities");
 
     /**
@@ -155,6 +144,12 @@ namespace ryujin
       Number mass_sum;
 
       /**
+       * Scratch space for the values of all selected quantities at all
+       * points.
+       */
+      Mirrored<Number *> extracted{"quantities_extracted"};
+
+      /**
        * Temporal statistics: the raw moments of the previous and the
        * current time step, and the trapezoidal sum over time.
        */
@@ -201,7 +196,9 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
-    SelectedComponentsExtractor<HyperbolicDescription, dim, Number> extractor_;
+    const Interface::Postprocessor<dim, Number> &postprocessor_;
+
+    typename Interface::Postprocessor<dim, Number>::Selection selection_;
 
     /**
      * All interior and boundary manifolds with associated point maps and
@@ -235,13 +232,16 @@ namespace ryujin
 
     void clear_statistics();
 
+    void clear_time_averages();
+
     /**
-     * Read the current values of all points of the manifold into the
-     * current statistics and return the mass weighted spatial average of
-     * the raw moments. The extraction has to be prepared on the selected
-     * memory space beforehand.
+     * Extract the current values of all points of the manifold out of
+     * @p state_vector into the current statistics and return the mass
+     * weighted spatial average of the raw moments.
      */
-    std::vector<Number> internal_accumulate(Manifold &manifold);
+    std::vector<Number>
+    internal_accumulate(Manifold &manifold,
+                        const StateVector<Number> &state_vector);
 
     /**
      * Write out instantaneous values, or (if @p averaged is set) the mean

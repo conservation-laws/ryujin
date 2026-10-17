@@ -4,13 +4,12 @@
 //
 
 #include "vtu_output.template.h"
-#include <instantiate.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class VTUOutput<HyperbolicDescription, 1, NUMBER>;
-  template class VTUOutput<HyperbolicDescription, 2, NUMBER>;
-  template class VTUOutput<HyperbolicDescription, 3, NUMBER>;
+  template class VTUOutput<1, NUMBER>;
+  template class VTUOutput<2, NUMBER>;
+  template class VTUOutput<3, NUMBER>;
 
 } /* namespace ryujin */
