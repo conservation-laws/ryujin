@@ -24,7 +24,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <functional>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -60,18 +59,11 @@ namespace ryujin
 
     /**
      * Constructor.
-     *
-     * A caller can supply a list of @p additional_names with corresponding
-     * @p additional_vectors that can be selected as well.
      */
-    Postprocessor(
-        const OfflineData<dim, Number> &offline_data,
-        const HyperbolicSystem &hyperbolic_system,
-        const Interface::ParabolicSystem &parabolic_system,
-        const MultiComponentVector<Number> &initial_precomputed,
-        const std::vector<std::string> &additional_names = {},
-        const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
-            &additional_vectors = {});
+    Postprocessor(const OfflineData<dim, Number> &offline_data,
+                  const HyperbolicSystem &hyperbolic_system,
+                  const Interface::ParabolicSystem &parabolic_system,
+                  const MultiComponentVector<Number> &initial_precomputed);
 
     Selection prepare(const std::vector<std::string> &selected) const override;
 
@@ -101,7 +93,6 @@ namespace ryujin
       precomputed,
       initial_precomputed,
       dynamic_state,
-      additional,
     };
 
     /**
@@ -126,10 +117,6 @@ namespace ryujin
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
     const MultiComponentVector<Number> &initial_precomputed_;
-
-    const std::vector<std::string> additional_names_;
-    const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
-        additional_vectors_;
   };
 
 
@@ -146,20 +133,12 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
-      const MultiComponentVector<Number> &initial_precomputed,
-      const std::vector<std::string> &additional_names,
-      const std::vector<std::reference_wrapper<const ScalarVector<Number>>>
-          &additional_vectors)
+      const MultiComponentVector<Number> &initial_precomputed)
       : offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , initial_precomputed_(initial_precomputed)
-      , additional_names_(additional_names)
-      , additional_vectors_(additional_vectors)
   {
-    Assert(additional_names_.size() == additional_vectors_.size(),
-           dealii::ExcMessage("The number of additional component names does "
-                              "not match the number of additional vectors."));
   }
 
 
@@ -188,7 +167,6 @@ namespace ryujin
             {Section::initial_precomputed,
              &hyperbolic_system.initial_precomputed_names(dim)},
             {Section::dynamic_state, &parabolic_system_->state_names(dim)},
-            {Section::additional, &additional_names_},
     };
 
     /*
@@ -230,7 +208,7 @@ namespace ryujin
                   dealii::ExcMessage(
                       "Invalid component name: \"" + entry +
                       "\" is not a valid conserved, primitive, precomputed, "
-                      "initial, parabolic, additional, or postprocessed "
+                      "initial, parabolic, or postprocessed "
                       "component name."));
 
       const auto [section, index, n_names] = *found;
@@ -305,9 +283,8 @@ namespace ryujin
     }
 
     /*
-     * Set up the components, and a view for every parabolic component and
-     * additional vector, on the host, and copy them into arrays residing
-     * on the memory space:
+     * Set up the components, and a view for every parabolic component, on
+     * the host, and copy them into arrays residing on the memory space:
      */
 
     const auto n_components = selected.size();
@@ -321,10 +298,8 @@ namespace ryujin
       const auto index = selected[k].second;
       host_components[k] = {section, index};
 
-      if (section == Section::dynamic_state || section == Section::additional) {
-        const auto &vector = section == Section::dynamic_state
-                                 ? state_vector.dynamic_state[index]
-                                 : additional_vectors_[index].get();
+      if (section == Section::dynamic_state) {
+        const auto &vector = state_vector.dynamic_state[index];
         copy_to_memory_space<MemorySpace>(vector);
         host_scalars[k] = vector.template view<1, MemorySpace>();
       }

@@ -23,9 +23,8 @@ namespace ryujin
      * of selected (and postprocessed) components out of a state vector.
      *
      * A component can be selected by any of its conserved, primitive,
-     * precomputed, initial-precomputed, or parabolic name, or by one of the
-     * additional names supplied by the caller. In addition, the following
-     * postprocessed quantities can be selected:
+     * precomputed, initial-precomputed, or parabolic name. In addition, the
+     * following postprocessed quantities can be selected:
      *
      *  - "schlieren_<name>": the magnitude of the gradient of the
      *    component <name>,

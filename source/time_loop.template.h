@@ -68,9 +68,7 @@ namespace ryujin
       , postprocessor_(offline_data_,
                        hyperbolic_system_,
                        parabolic_system_,
-                       hyperbolic_module_.initial_precomputed(),
-                       {"alpha"},
-                       {hyperbolic_module_.alpha()})
+                       hyperbolic_module_.initial_precomputed())
       , mesh_adaptor_(
             mpi_ensemble_, offline_data_, postprocessor_, "/I - MeshAdaptor")
       , solution_transfer_(mpi_ensemble_,
