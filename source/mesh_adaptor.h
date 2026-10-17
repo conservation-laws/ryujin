@@ -8,11 +8,11 @@
 #include <compile_time_options.h>
 
 #include <ryujin/interface/parabolic_system.h>
+#include <ryujin/typed/postprocessor.h>
 
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
-#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -234,8 +234,10 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
-    SelectedComponentsExtractor<HyperbolicDescription, dim, Number>
-        selected_components_extractor_;
+    Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
+
+    typename Postprocessor<HyperbolicDescription, dim, Number>::Selection
+        selection_;
 
     bool need_mesh_adaptation_;
 
