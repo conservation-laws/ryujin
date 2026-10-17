@@ -29,10 +29,10 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , selected_components_extractor_(offline_data,
-                                       hyperbolic_system,
-                                       parabolic_system,
-                                       initial_precomputed)
+      , postprocessor_(offline_data,
+                       hyperbolic_system,
+                       parabolic_system,
+                       initial_precomputed)
       , base_name_("")
   {
     error_quantities_ = hyperbolic_system.state_names(dim);
@@ -66,7 +66,7 @@ namespace ryujin
 
     base_name_ = name;
 
-    selected_components_extractor_.prepare(error_quantities_);
+    selection_ = postprocessor_.prepare(error_quantities_);
 
     AssertThrow(!error_norms_.empty(),
                 dealii::ExcMessage("No error norms selected."));
@@ -140,11 +140,8 @@ namespace ryujin
                               mpi_ensemble_.ensemble_communicator())));
     };
 
-    selected_components_extractor_.prepare_extraction(analytic);
-    auto analytic_components = selected_components_extractor_.view().extract();
-
-    selected_components_extractor_.prepare_extraction(state_vector);
-    auto error_components = selected_components_extractor_.view().extract();
+    auto analytic_components = postprocessor_.extract(selection_, analytic);
+    auto error_components = postprocessor_.extract(selection_, state_vector);
 
     std::vector<Number> norms(error_norms_.size(), Number(0.));
 
@@ -152,8 +149,6 @@ namespace ryujin
     for (std::size_t k = 0; k < error_quantities_.size(); ++k) {
       auto &analytic_component = analytic_components[k];
       auto &error_component = error_components[k];
-
-      analytic_component.update_ghost_values();
 
       /* Populate constrained dofs due to periodicity: */
       offline_data_->affine_constraints().distribute(error_component);

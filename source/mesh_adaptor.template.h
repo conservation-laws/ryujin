@@ -30,12 +30,12 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , selected_components_extractor_(offline_data,
-                                       hyperbolic_system,
-                                       parabolic_system,
-                                       initial_precomputed,
-                                       {"alpha"},
-                                       {alpha})
+      , postprocessor_(offline_data,
+                       hyperbolic_system,
+                       parabolic_system,
+                       initial_precomputed,
+                       {"alpha"},
+                       {alpha})
       , need_mesh_adaptation_(false)
   {
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
@@ -181,7 +181,7 @@ namespace ryujin
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     }
 
-    selected_components_extractor_.prepare(smoothness_selected_quantities_);
+    selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
     need_mesh_adaptation_ = false;
@@ -436,11 +436,9 @@ namespace ryujin
      * Extract selected quantities:
      */
 
-    selected_components_extractor_.prepare_extraction(state_vector);
-    auto quantities = selected_components_extractor_.view().extract();
+    auto quantities = postprocessor_.extract(selection_, state_vector);
 
     for (auto &it : quantities) {
-      it.update_ghost_values();
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
