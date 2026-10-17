@@ -1,0 +1,4 @@
+schlieren_rho: exact up to round-off: yes
+vorticity_v_1: exact up to round-off: yes
+gather: exception
+vorticity_p: exception
