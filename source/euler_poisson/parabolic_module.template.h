@@ -228,8 +228,12 @@ namespace ryujin
         velocity_rhs_.block(i).reinit(scalar_partitioner);
 
       /*
-       * Populate background fields:
+       * Populate background fields. The vectors have just been
+       * reinitialized, so invalidate the times they were populated for:
        */
+
+      t_background_density_ = std::numeric_limits<Number>::lowest();
+      t_magnetic_field_ = std::numeric_limits<Number>::lowest();
 
       if (!selected_electrostatic_configuration_->is_time_dependent()) {
         update_background_density(Number(0.));
