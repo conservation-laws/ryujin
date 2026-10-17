@@ -160,16 +160,16 @@ namespace ryujin
               << std::endl;
 #endif
 
-    auto &[U, precomputed, V] = state_vector;
+    auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
     U.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
-    precomputed.reinit_with_vector_partitioner(
+    Q.reinit_with_vector_partitioner(
         offline_data_->precomputed_vector_partitioner(), n_precomputed_values);
 
 #ifdef DEBUG
     /* Poison all vectors: */
     constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
-    for (auto *vector : {&U, &precomputed}) {
+    for (auto *vector : {&U, &Q}) {
       auto &data = vector->deal_ii_vector();
       std::fill_n(data.begin(), data.locally_owned_size(), nan);
     }
@@ -197,11 +197,10 @@ namespace ryujin
 
     using MemorySpace = selected_memory_space_t;
 
-    move_to_memory_space<MemorySpace>(state_vector,
-                                      StateVectorPart::hyperbolic,
-                                      StateVectorPart::precomputed);
+    move_to_memory_space<MemorySpace>(
+        state_vector, StateVectorPart::state, StateVectorPart::precomputed);
 
-    auto &[U, precomputed, parabolic] = state_vector;
+    auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
 
     ComputingTimer::Scope scope(
         "time step [H] 1 - update boundary values, precompute values");
@@ -224,8 +223,7 @@ namespace ryujin
     else
       hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
 
-    precomputed.template view<n_precomputed_values, MemorySpace>()
-        .update_ghost_values();
+    Q.template view<n_precomputed_values, MemorySpace>().update_ghost_values();
   }
 
 
@@ -401,18 +399,16 @@ namespace ryujin
 
     using MemorySpace = selected_memory_space_t;
 
-    copy_to_memory_space<MemorySpace>(old_state_vector,
-                                      StateVectorPart::hyperbolic,
-                                      StateVectorPart::precomputed);
+    copy_to_memory_space<MemorySpace>(
+        old_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
     for (int s = 0; s < stages; ++s)
       copy_to_memory_space<MemorySpace>(stage_state_vectors[s].get(),
-                                        StateVectorPart::hyperbolic,
+                                        StateVectorPart::state,
                                         StateVectorPart::precomputed);
-    move_to_memory_space<MemorySpace>(new_state_vector,
-                                      StateVectorPart::hyperbolic);
+    move_to_memory_space<MemorySpace>(new_state_vector, StateVectorPart::state);
 
-    auto &[old_U, old_precomputed, old_parabolic] = old_state_vector;
-    auto &new_U = new_state_vector.U;
+    auto &[old_U, old_Q, old_U_dynamic, old_Q_dynamic] = old_state_vector;
+    auto &new_U = new_state_vector.state;
 
     /*
      * Taking a view<>() might imply implicit memory space transfers. Let's
@@ -502,7 +498,7 @@ namespace ryujin
     const auto old_U_view =
         old_U.template view<problem_dimension, MemorySpace>();
     const auto old_precomputed_view =
-        old_precomputed.template view<n_precomputed_values, MemorySpace>();
+        old_Q.template view<n_precomputed_values, MemorySpace>();
 
     /*
      * FIXME GPU: std::array::operator[] is not device capable.
@@ -517,10 +513,11 @@ namespace ryujin
     Kokkos::Array<PrecomputedVectorView, stages> stage_precomputed_view;
     Kokkos::Array<Number, stages> stage_weight;
     for (int s = 0; s < stages; ++s) {
-      const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+      const auto &[U_s, Q_s, U_dynamic_s, Q_dynamic_s] =
+          stage_state_vectors[s].get();
       stage_U_view[s] = U_s.template view<problem_dimension, MemorySpace>();
       stage_precomputed_view[s] =
-          prec_s.template view<n_precomputed_values, MemorySpace>();
+          Q_s.template view<n_precomputed_values, MemorySpace>();
       stage_weight[s] = stage_weights[s];
     }
 
@@ -1385,11 +1382,9 @@ namespace ryujin
     } /* limiter_iter_ */
 
     /*
-     * Pass through the parabolic state vector
+     * Pass through the dynamic state
      */
-    const auto &old_V = old_state_vector.V;
-    auto &new_V = new_state_vector.V;
-    new_V = old_V;
+    new_state_vector.dynamic_state = old_U_dynamic;
 
     /*
      * Do we have to restart?

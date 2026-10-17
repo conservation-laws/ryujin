@@ -639,8 +639,8 @@ namespace ryujin
       const HyperbolicSystem::Parameters *const parameters_;
 
       /* Only valid (and dereferenced) on the host: */
-      const BarotropicEquationOfStateLibrary::BarotropicEquationOfState
-          *const barotropic_equation_of_state_;
+      const BarotropicEquationOfStateLibrary::BarotropicEquationOfState *const
+          barotropic_equation_of_state_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -744,7 +744,7 @@ namespace ryujin
 
       using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
 
-      auto &U = state_vector.U;
+      auto &U = state_vector.state;
       auto &precomputed = state_vector.precomputed;
 
       /*

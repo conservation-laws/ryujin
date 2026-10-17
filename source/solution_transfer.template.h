@@ -87,9 +87,7 @@ namespace ryujin
 #endif
 
     copy_to_memory_space<dealii::MemorySpace::Host>(
-        old_state_vector,
-        StateVectorPart::hyperbolic,
-        StateVectorPart::precomputed);
+        old_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -116,7 +114,7 @@ namespace ryujin
 
           const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-          const auto &U = old_state_vector.U;
+          const auto &U = old_state_vector.state;
           /* precomputed needs to be valid for bounds computation */
           const auto precomputed_view =
               old_state_vector.precomputed
@@ -397,9 +395,7 @@ namespace ryujin
 #endif
 
     move_to_memory_space<dealii::MemorySpace::Host>(
-        new_state_vector,
-        StateVectorPart::hyperbolic,
-        StateVectorPart::precomputed);
+        new_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -657,7 +653,7 @@ namespace ryujin
      */
 
     const auto new_U_view =
-        new_state_vector.U.template view<problem_dimension>();
+        new_state_vector.state.template view<problem_dimension>();
 
     /*
      * A small lambda that takes the weighted average of all degrees of

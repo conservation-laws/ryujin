@@ -284,10 +284,9 @@ namespace ryujin
     VectorView<View::n_initial_precomputed_values, MemorySpace> initial_view;
 
     if (read_state) {
-      copy_to_memory_space<MemorySpace>(state_vector,
-                                        StateVectorPart::hyperbolic);
-      U_view =
-          state_vector.U.template view<View::problem_dimension, MemorySpace>();
+      copy_to_memory_space<MemorySpace>(state_vector, StateVectorPart::state);
+      U_view = state_vector.state
+                   .template view<View::problem_dimension, MemorySpace>();
     }
 
     if (read_precomputed) {
@@ -324,7 +323,7 @@ namespace ryujin
 
       if (section == Section::dynamic_state || section == Section::additional) {
         const auto &vector = section == Section::dynamic_state
-                                 ? state_vector.V[index]
+                                 ? state_vector.dynamic_state[index]
                                  : additional_vectors_[index].get();
         copy_to_memory_space<MemorySpace>(vector);
         host_scalars[k] = vector.template view<1, MemorySpace>();

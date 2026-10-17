@@ -752,7 +752,8 @@ namespace ryujin
       /* We only read the hyperbolic state vector: */
       const auto U_view =
           std::as_const(state_vector)
-              .U.template view<ScalarView::problem_dimension, MemorySpace>();
+              .state
+              .template view<ScalarView::problem_dimension, MemorySpace>();
       const auto precomputed_view =
           state_vector.precomputed
               .template view<ScalarView::n_precomputed_values, MemorySpace>();

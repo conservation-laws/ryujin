@@ -248,12 +248,12 @@ namespace ryujin
                 << std::endl;
 #endif
 
-      auto &[U, precomputed, V] = state_vector;
-      V.resize(1);
+      auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
+      U_dynamic.resize(1);
 
       const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
-      V[0].reinit_with_scalar_partitioner(partitioner, 1);
-      V[0].deal_ii_vector() = 0.;
+      U_dynamic[0].reinit_with_scalar_partitioner(partitioner, 1);
+      U_dynamic[0].deal_ii_vector() = 0.;
     }
 
 
@@ -535,13 +535,14 @@ namespace ryujin
       using HostSpace = dealii::MemorySpace::Host;
 
       copy_to_memory_space<HostSpace>(std::as_const(state_vector),
-                                      StateVectorPart::hyperbolic);
-      move_to_memory_space<HostSpace>(state_vector, StateVectorPart::parabolic);
+                                      StateVectorPart::state);
+      move_to_memory_space<HostSpace>(state_vector,
+                                      StateVectorPart::dynamic_state);
 
       const auto U_view =
-          std::as_const(state_vector).U.template view<problem_dimension>();
-      auto &V = state_vector.V;
-      auto &potential = V[0].deal_ii_vector();
+          std::as_const(state_vector).state.template view<problem_dimension>();
+      auto &U_dynamic = state_vector.dynamic_state;
+      auto &potential = U_dynamic[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -685,14 +686,13 @@ namespace ryujin
 
       using HostSpace = dealii::MemorySpace::Host;
 
-      move_to_memory_space<HostSpace>(state_vector,
-                                      StateVectorPart::hyperbolic);
+      move_to_memory_space<HostSpace>(state_vector, StateVectorPart::state);
       copy_to_memory_space<HostSpace>(std::as_const(state_vector),
-                                      StateVectorPart::parabolic);
+                                      StateVectorPart::dynamic_state);
 
-      const auto U_view = state_vector.U.template view<problem_dimension>();
-      const auto &V = std::as_const(state_vector).V;
-      const auto &potential = V[0].deal_ii_vector();
+      const auto U_view = state_vector.state.template view<problem_dimension>();
+      const auto &U_dynamic = std::as_const(state_vector).dynamic_state;
+      const auto &potential = U_dynamic[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -805,19 +805,19 @@ namespace ryujin
       using HostSpace = dealii::MemorySpace::Host;
 
       copy_to_memory_space<HostSpace>(old_state_vector,
-                                      StateVectorPart::hyperbolic,
-                                      StateVectorPart::parabolic);
+                                      StateVectorPart::state,
+                                      StateVectorPart::dynamic_state);
       move_to_memory_space<HostSpace>(new_state_vector,
-                                      StateVectorPart::parabolic);
+                                      StateVectorPart::dynamic_state);
 
-      const auto &old_U = old_state_vector.U;
+      const auto &old_U = old_state_vector.state;
       const auto old_U_view = old_U.template view<problem_dimension>();
-      const auto &old_V = old_state_vector.V;
-      const auto &old_potential = old_V[0].deal_ii_vector();
+      const auto &old_U_dynamic = old_state_vector.dynamic_state;
+      const auto &old_potential = old_U_dynamic[0].deal_ii_vector();
 
-      auto &new_U = new_state_vector.U;
-      auto &new_V = new_state_vector.V;
-      auto &new_potential = new_V[0].deal_ii_vector();
+      auto &new_U = new_state_vector.state;
+      auto &new_U_dynamic = new_state_vector.dynamic_state;
+      auto &new_potential = new_U_dynamic[0].deal_ii_vector();
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
