@@ -79,6 +79,6 @@ end
 
 
 subsection J - VTUOutput
-  set schlieren quantities =
   set use mpi io           = true
+  set vtu output quantities = u
 end

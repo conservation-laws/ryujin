@@ -7,12 +7,11 @@
 
 #include <compile_time_options.h>
 
-#include <ryujin/interface/parabolic_system.h>
+#include <ryujin/interface/postprocessor.h>
 
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
-#include "selected_components_extractor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -105,22 +104,10 @@ namespace ryujin
    *
    * @ingroup Mesh
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <int dim, typename Number = double>
   class MeshAdaptor final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Typedefs and constexpr constants
-     */
-    //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-
-    using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    static constexpr auto problem_dimension = View::problem_dimension;
-
-    //@}
     /**
      * @name Constructor and setup
      */
@@ -131,10 +118,7 @@ namespace ryujin
      */
     MeshAdaptor(const MPIEnsemble &mpi_ensemble,
                 const OfflineData<dim, Number> &offline_data,
-                const HyperbolicSystem &hyperbolic_system,
-                const Interface::ParabolicSystem &parabolic_system,
-                const MultiComponentVector<Number> &initial_precomputed,
-                const ScalarVector<Number> &alpha,
+                const Interface::Postprocessor<dim, Number> &postprocessor,
                 const std::string &subsection = "/MeshAdaptor");
 
     /**
@@ -234,8 +218,9 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
-    SelectedComponentsExtractor<HyperbolicDescription, dim, Number>
-        selected_components_extractor_;
+    const Interface::Postprocessor<dim, Number> &postprocessor_;
+
+    typename Interface::Postprocessor<dim, Number>::Selection selection_;
 
     bool need_mesh_adaptation_;
 

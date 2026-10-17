@@ -18,24 +18,16 @@
 
 namespace ryujin
 {
-  template <typename HyperbolicDescription, int dim, typename Number>
-  MeshAdaptor<HyperbolicDescription, dim, Number>::MeshAdaptor(
+  template <int dim, typename Number>
+  MeshAdaptor<dim, Number>::MeshAdaptor(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicSystem &hyperbolic_system,
-      const Interface::ParabolicSystem &parabolic_system,
-      const MultiComponentVector<Number> &initial_precomputed,
-      const ScalarVector<Number> &alpha,
+      const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , selected_components_extractor_(offline_data,
-                                       hyperbolic_system,
-                                       parabolic_system,
-                                       initial_precomputed,
-                                       {"alpha"},
-                                       {alpha})
+      , postprocessor_(postprocessor)
       , need_mesh_adaptation_(false)
   {
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
@@ -164,8 +156,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void MeshAdaptor<HyperbolicDescription, dim, Number>::prepare(const Number t)
+  template <int dim, typename Number>
+  void MeshAdaptor<dim, Number>::prepare(const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MeshAdaptor<dim, Number>::prepare()" << std::endl;
@@ -181,18 +173,18 @@ namespace ryujin
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     }
 
-    selected_components_extractor_.prepare(smoothness_selected_quantities_);
+    selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
     need_mesh_adaptation_ = false;
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void MeshAdaptor<HyperbolicDescription, dim, Number>::analyze(
-      const StateVector<Number> &state_vector,
-      const Number t,
-      unsigned int cycle)
+  template <int dim, typename Number>
+  void
+  MeshAdaptor<dim, Number>::analyze(const StateVector<Number> &state_vector,
+                                    const Number t,
+                                    unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MeshAdaptor<dim, Number>::analyze()" << std::endl;
@@ -258,9 +250,9 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void MeshAdaptor<HyperbolicDescription, dim, Number>::
-      populate_cell_indicators_with_random_values() const
+  template <int dim, typename Number>
+  void
+  MeshAdaptor<dim, Number>::populate_cell_indicators_with_random_values() const
   {
     std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
       static std::uniform_real_distribution<double> distribution(0.0, 10.0);
@@ -269,8 +261,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void MeshAdaptor<HyperbolicDescription, dim, Number>::
+  template <int dim, typename Number>
+  void MeshAdaptor<dim, Number>::
       populate_cell_indicators_from_smoothness_indicators() const
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
@@ -310,10 +302,9 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void MeshAdaptor<HyperbolicDescription, dim, Number>::
-      mark_cells_for_coarsening_and_refinement(
-          dealii::Triangulation<dim> &triangulation [[maybe_unused]]) const
+  template <int dim, typename Number>
+  void MeshAdaptor<dim, Number>::mark_cells_for_coarsening_and_refinement(
+      dealii::Triangulation<dim> &triangulation [[maybe_unused]]) const
   {
     auto &discretization [[maybe_unused]] = offline_data_->discretization();
     Assert(&triangulation == &discretization.triangulation(),
@@ -419,10 +410,9 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void MeshAdaptor<HyperbolicDescription, dim, Number>::
-      compute_smoothness_indicators(
-          const StateVector<Number> &state_vector) const
+  template <int dim, typename Number>
+  void MeshAdaptor<dim, Number>::compute_smoothness_indicators(
+      const StateVector<Number> &state_vector) const
   {
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
@@ -436,11 +426,9 @@ namespace ryujin
      * Extract selected quantities:
      */
 
-    selected_components_extractor_.prepare_extraction(state_vector);
-    auto quantities = selected_components_extractor_.view().extract();
+    auto quantities = postprocessor_.extract(selection_, state_vector);
 
     for (auto &it : quantities) {
-      it.update_ghost_values();
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }

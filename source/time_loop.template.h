@@ -65,43 +65,33 @@ namespace ryujin
                          hyperbolic_module_,
                          parabolic_module_,
                          "/H - TimeIntegrator")
-      , mesh_adaptor_(mpi_ensemble_,
-                      offline_data_,
-                      hyperbolic_system_,
-                      parabolic_system_,
-                      hyperbolic_module_.initial_precomputed(),
-                      hyperbolic_module_.alpha(),
-                      "/I - MeshAdaptor")
+      , postprocessor_(offline_data_,
+                       hyperbolic_system_,
+                       parabolic_system_,
+                       hyperbolic_module_.initial_precomputed(),
+                       {"alpha"},
+                       {hyperbolic_module_.alpha()})
+      , mesh_adaptor_(
+            mpi_ensemble_, offline_data_, postprocessor_, "/I - MeshAdaptor")
       , solution_transfer_(mpi_ensemble_,
                            offline_data_,
                            hyperbolic_system_,
                            parabolic_system_,
                            "/I - MeshAdaptor")
-      , postprocessor_(mpi_ensemble_,
-                       offline_data_,
-                       hyperbolic_system_,
-                       parabolic_system_,
-                       "/J - VTUOutput")
       , vtu_output_(mpi_ensemble_,
                     offline_data_,
                     hyperbolic_system_,
-                    parabolic_system_,
                     postprocessor_,
-                    hyperbolic_module_.initial_precomputed(),
-                    hyperbolic_module_.alpha(),
-                    mesh_adaptor_.smoothness_indicators(),
                     "/J - VTUOutput")
       , quantities_(mpi_ensemble_,
                     offline_data_,
                     hyperbolic_system_,
-                    parabolic_system_,
-                    hyperbolic_module_.initial_precomputed(),
+                    postprocessor_,
                     "/K - Quantities")
       , error_evaluation_(mpi_ensemble_,
                           offline_data_,
                           hyperbolic_system_,
-                          parabolic_system_,
-                          hyperbolic_module_.initial_precomputed(),
+                          postprocessor_,
                           "/L - ErrorEvaluation")
       , n_global_dofs_(0)
       , n_devices_(0)
@@ -296,7 +286,6 @@ namespace ryujin
       parabolic_module_.prepare();
       time_integrator_.prepare();
       mesh_adaptor_.prepare(/*needs current timepoint*/ t);
-      postprocessor_.prepare();
       vtu_output_.prepare();
       quantities_.prepare(base_name_ensemble_);
       print_mpi_partition(logfile_);
@@ -780,20 +769,16 @@ namespace ryujin
     ComputingTimer::Scope scope("time step [X]   - perform vtu output");
     print_info("scheduling output");
 
-    postprocessor_.compute(state_vector);
+    vtu_output_.schedule_output(
+        state_vector, name, t, cycle, do_full_output, do_levelsets);
+
     /*
      * Workaround: Manually reset bounds during the first output cycle
      * (which is often just a uniform flow field) to obtain a better
      * normailization:
      */
     if (cycle == 0)
-      postprocessor_.reset_bounds();
-
-    /* Make sure we have a valid vector of smoothness indicators. */
-    mesh_adaptor_.compute_smoothness_indicators(state_vector);
-
-    vtu_output_.schedule_output(
-        state_vector, name, t, cycle, do_full_output, do_levelsets);
+      vtu_output_.reset_bounds();
   }
 
 
