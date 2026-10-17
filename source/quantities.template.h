@@ -63,10 +63,10 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , extractor_(offline_data,
-                   hyperbolic_system,
-                   parabolic_system,
-                   initial_precomputed)
+      , postprocessor_(offline_data,
+                       hyperbolic_system,
+                       parabolic_system,
+                       initial_precomputed)
       , base_name_("")
       , mesh_files_have_been_written_(false)
   {
@@ -121,7 +121,7 @@ namespace ryujin
 
     base_name_ = name;
 
-    extractor_.prepare(quantities_);
+    selection_ = postprocessor_.prepare(quantities_);
 
     AssertThrow(1 <= n_moments_ && n_moments_ <= 4,
                 dealii::ExcMessage("Invalid number of moments: \"" +
@@ -318,7 +318,7 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   unsigned int Quantities<HyperbolicDescription, dim, Number>::stride() const
   {
-    return n_moments_ * extractor_.n_selected();
+    return n_moments_ * selection_.size();
   }
 
 
@@ -348,8 +348,6 @@ namespace ryujin
 
     using MemorySpace = selected_memory_space_t;
 
-    extractor_.template prepare_extraction<MemorySpace>(state_vector);
-
     for (auto &manifold : manifolds_) {
       /* skip if we don't average in space or time: */
       if (!manifold.time_averaged && !manifold.space_averaged)
@@ -360,7 +358,7 @@ namespace ryujin
 
       /* accumulate new values */
 
-      auto spatial_average = internal_accumulate(manifold);
+      auto spatial_average = internal_accumulate(manifold, state_vector);
 
       /* Average in time with trapezoidal rule: */
 
@@ -404,8 +402,7 @@ namespace ryujin
       }
 
       /* Record average in space: */
-      to_central_moments(
-          spatial_average.data(), n_moments_, extractor_.n_selected());
+      to_central_moments(spatial_average.data(), n_moments_, selection_.size());
       manifold.time_series.emplace_back(t, std::move(spatial_average));
     }
   }
@@ -430,18 +427,6 @@ namespace ryujin
     }
 
     /*
-     * Manifolds that are only output instantaneously have not been
-     * evaluated in accumulate(). Prepare the extractor if we have to
-     * evaluate any of them:
-     */
-
-    if (std::any_of(manifolds_.begin(), manifolds_.end(), [](const auto &m) {
-          return m.instantaneous && !m.time_averaged && !m.space_averaged;
-        }))
-      extractor_.template prepare_extraction<selected_memory_space_t>(
-          state_vector);
-
-    /*
      * Next write out instantaneous and time_averaged maps, and flush the
      * space_averaged values to the corresponding log files:
      */
@@ -464,7 +449,7 @@ namespace ryujin
         /* We have not computed any updated statistics yet: */
 
         if (!manifold.time_averaged && !manifold.space_averaged)
-          internal_accumulate(manifold);
+          internal_accumulate(manifold, state_vector);
         else
           AssertThrow(manifold.t_new == t, dealii::ExcInternalError());
 
@@ -570,7 +555,7 @@ namespace ryujin
           else
             output << x_i << "\t" << m_i << "\n";
         } /*entry*/
-      }   /*entries*/
+      } /*entries*/
 
       output << std::flush;
     }
@@ -588,6 +573,9 @@ namespace ryujin
       for (auto *values : {&manifold.old, &manifold.current, &manifold.sum})
         values->reinit(
             n_entries, TransferPolicy::implicit_transfers, MemorySpace{});
+      manifold.extracted.reinit(manifold.points.size() * selection_.size(),
+                                TransferPolicy::implicit_transfers,
+                                MemorySpace{});
 
       manifold.t_old = manifold.t_new = manifold.t_sum = 0.;
       manifold.time_series.clear();
@@ -598,12 +586,11 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   std::vector<Number>
   Quantities<HyperbolicDescription, dim, Number>::internal_accumulate(
-      Manifold &manifold)
+      Manifold &manifold, const StateVector<Number> &state_vector)
   {
     using MemorySpace = selected_memory_space_t;
 
-    const auto extractor_view = extractor_.template view<MemorySpace>();
-    const unsigned int n_selected = extractor_.n_selected();
+    const unsigned int n_selected = selection_.size();
     const unsigned int n_moments = n_moments_;
     const unsigned int stride = this->stride();
     const auto n_points = static_cast<unsigned int>(manifold.points.size());
@@ -612,20 +599,23 @@ namespace ryujin
         std::as_const(manifold.indices).template view<MemorySpace>();
     const auto *masses =
         std::as_const(manifold.masses).template view<MemorySpace>();
+    auto *extracted = manifold.extracted.template view<MemorySpace>();
     auto *current = manifold.current.template view<MemorySpace>();
 
+    postprocessor_.extract(
+        selection_, state_vector, indices, n_points, extracted);
+
     /*
-     * Extract the values of all selected quantities of a point directly
-     * into the first moment block, compute all higher raw moments (i.e.,
-     * powers of the values), and return the mass weighted values as
-     * contribution to the spatial sums:
+     * Copy the values of all selected quantities of a point into the first
+     * moment block, compute all higher raw moments (i.e., powers of the
+     * values), and return the mass weighted values as contribution to the
+     * spatial sums:
      */
 
     const auto body = [=](auto /*sentinel*/, const unsigned int p) {
       auto *values = current + p * stride;
-      extractor_view.extract_element(
-          indices[p],
-          [=](const unsigned int k, const Number value) { values[k] = value; });
+      for (unsigned int c = 0; c < n_selected; ++c)
+        values[c] = extracted[p * n_selected + c];
 
       for (unsigned int k = 1; k < n_moments; ++k)
         for (unsigned int c = 0; c < n_selected; ++c)
@@ -683,7 +673,7 @@ namespace ryujin
             mpi_ensemble_.ensemble_communicator()) != 0)
       return;
 
-    const unsigned int n_selected = extractor_.n_selected();
+    const unsigned int n_selected = selection_.size();
     const unsigned int stride = this->stride();
 
     /* For instantaneous values we only output the first moment: */
