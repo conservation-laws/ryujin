@@ -52,21 +52,17 @@ namespace ryujin
   } // namespace
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Quantities<HyperbolicDescription, dim, Number>::Quantities(
+  template <int dim, typename Number>
+  Quantities<dim, Number>::Quantities(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicSystem &hyperbolic_system,
-      const Interface::ParabolicSystem &parabolic_system,
-      const MultiComponentVector<Number> &initial_precomputed,
+      const Interface::HyperbolicSystem &hyperbolic_system,
+      const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , postprocessor_(offline_data,
-                       hyperbolic_system,
-                       parabolic_system,
-                       initial_precomputed)
+      , postprocessor_(postprocessor)
       , base_name_("")
       , mesh_files_have_been_written_(false)
   {
@@ -111,9 +107,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::prepare(
-      const std::string &name)
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::prepare(const std::string &name)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
@@ -315,16 +310,15 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  unsigned int Quantities<HyperbolicDescription, dim, Number>::stride() const
+  template <int dim, typename Number>
+  unsigned int Quantities<dim, Number>::stride() const
   {
     return n_moments_ * selection_.size();
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  std::string Quantities<HyperbolicDescription, dim, Number>::header(
-      const bool averaged) const
+  template <int dim, typename Number>
+  std::string Quantities<dim, Number>::header(const bool averaged) const
   {
     static const std::array<std::string, 4> labels{
         "mean", "var", "mu_3", "mu_4"};
@@ -338,9 +332,10 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::accumulate(
-      const StateVector<Number> &state_vector, const Number t)
+  template <int dim, typename Number>
+  void
+  Quantities<dim, Number>::accumulate(const StateVector<Number> &state_vector,
+                                      const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
@@ -408,11 +403,11 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::write_out(
-      const StateVector<Number> &state_vector,
-      const Number t,
-      unsigned int cycle)
+  template <int dim, typename Number>
+  void
+  Quantities<dim, Number>::write_out(const StateVector<Number> &state_vector,
+                                     const Number t,
+                                     unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
@@ -511,9 +506,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::write_mesh_files(
-      unsigned int cycle)
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::write_mesh_files(unsigned int cycle)
   {
     for (const auto &manifold : manifolds_) {
       /* Skip outputting the point map for spatial averages. */
@@ -562,8 +556,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::clear_statistics()
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::clear_statistics()
   {
     using MemorySpace = selected_memory_space_t;
 
@@ -583,9 +577,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  std::vector<Number>
-  Quantities<HyperbolicDescription, dim, Number>::internal_accumulate(
+  template <int dim, typename Number>
+  std::vector<Number> Quantities<dim, Number>::internal_accumulate(
       Manifold &manifold, const StateVector<Number> &state_vector)
   {
     using MemorySpace = selected_memory_space_t;
@@ -647,13 +640,13 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::internal_write_out(
-      const std::string &file_name,
-      const std::string &time_stamp,
-      const Mirrored<Number *> &values,
-      const Number scale,
-      const bool averaged)
+  template <int dim, typename Number>
+  void
+  Quantities<dim, Number>::internal_write_out(const std::string &file_name,
+                                              const std::string &time_stamp,
+                                              const Mirrored<Number *> &values,
+                                              const Number scale,
+                                              const bool averaged)
   {
     /*
      * Gather the values of all MPI ranks on the root rank, which then
@@ -705,12 +698,11 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void Quantities<HyperbolicDescription, dim, Number>::
-      internal_write_out_time_series(
-          const std::string &file_name,
-          const std::vector<std::pair<Number, std::vector<Number>>> &values,
-          bool append)
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::internal_write_out_time_series(
+      const std::string &file_name,
+      const std::vector<std::pair<Number, std::vector<Number>>> &values,
+      bool append)
   {
     if (Utilities::MPI::this_mpi_process(
             mpi_ensemble_.ensemble_communicator()) != 0)

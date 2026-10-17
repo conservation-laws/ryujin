@@ -15,12 +15,16 @@ configure_file(
 set(COMMON_SOURCE_FILES
   discretization.cc
   equation_dispatch.cc
+  error_evaluation.cc
+  mesh_adaptor.cc
   mpi_ensemble.cc
   multicomponent_vector.cc
   offline_data.cc
+  quantities.cc
   simd.cc
   sparsity_pattern.cc
   version_info.cc
+  vtu_output.cc
   )
 
 set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
@@ -47,13 +51,9 @@ target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 # compiled once per hyperbolic description:
 #
 set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
-  error_evaluation.cc
   hyperbolic_module.cc
   initial_values.cc
-  mesh_adaptor.cc
-  quantities.cc
   solution_transfer.cc
-  vtu_output.cc
   )
 
 #

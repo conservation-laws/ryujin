@@ -6,6 +6,8 @@
 #include <quantities.h>
 #include <stub_parabolic_system.h>
 
+#include <ryujin/typed/postprocessor.h>
+
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -100,12 +102,11 @@ int main(int argc, char *argv[])
 
   MultiComponentVector<Number> initial_precomputed;
 
-  Quantities<HyperbolicDescription, dim, Number> quantities(
-      mpi_ensemble,
-      offline_data,
-      hyperbolic_system,
-      parabolic_system,
-      initial_precomputed);
+  Postprocessor<HyperbolicDescription, dim, Number> postprocessor(
+      offline_data, hyperbolic_system, parabolic_system, initial_precomputed);
+
+  Quantities<dim, Number> quantities(
+      mpi_ensemble, offline_data, hyperbolic_system, postprocessor);
 
   std::stringstream parameters;
   parameters
