@@ -41,30 +41,36 @@ namespace ryujin
 
 
   /**
-   * A compound state vector consisting of the hyperbolic state vector
-   * @p U, the @p precomputed values, and a "parabolic state" @p V stored
-   * as a std::vector of scalar vectors, one per parabolic component. All
-   * of these vectors have in common that they are associated with a
-   * hyperbolic, or parabolic state and precomputed data (derived from the
-   * hyperbolic state) for point in time.
+   * A compound state vector consisting of four parts:
+   *
+   *                 static (interleaved)    dynamic (scalar vectors)
+   *   state         state                   dynamic_state
+   *   precomputed   precomputed             dynamic_precomputed
+   *
+   * The parts @p state and @p precomputed belong to the hyperbolic system,
+   * @p dynamic_state and @p dynamic_precomputed to the parabolic system.
+   * The parts @p state and @p dynamic_state take part in sadd(), in the
+   * solution transfer, and in a checkpoint. The precomputed parts are
+   * recomputed.
    */
   template <typename Number>
   struct StateVector {
-    MultiComponentVector<Number> U;
+    MultiComponentVector<Number> state;
     MultiComponentVector<Number> precomputed;
-    std::vector<ScalarVector<Number>> V;
+    std::vector<ScalarVector<Number>> dynamic_state;
+    std::vector<ScalarVector<Number>> dynamic_precomputed;
   };
 
 
   /**
-   * An enum identifying the individual parts of a StateVector: the
-   * hyperbolic state vector @p U, the precomputed values, and the
-   * parabolic state (all scalar vectors of it).
+   * An enum identifying the individual parts of a StateVector. A dynamic
+   * part selects all scalar vectors of it.
    */
   enum class StateVectorPart {
-    hyperbolic,
+    state,
     precomputed,
-    parabolic,
+    dynamic_state,
+    dynamic_precomputed,
   };
 
 
@@ -84,19 +90,23 @@ namespace ryujin
     if constexpr (have_separate_memory_spaces) {
       ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
 
-      const auto &[U, precomputed, parabolic] = state_vector;
+      const auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
 
       const auto copy = [&](const StateVectorPart part) {
         switch (part) {
-        case StateVectorPart::hyperbolic:
+        case StateVectorPart::state:
           U.template copy_to_memory_space<MemorySpace>();
           break;
         case StateVectorPart::precomputed:
-          precomputed.template copy_to_memory_space<MemorySpace>();
+          Q.template copy_to_memory_space<MemorySpace>();
           break;
-        case StateVectorPart::parabolic:
-          for (const auto &V : parabolic)
-            V.template copy_to_memory_space<MemorySpace>();
+        case StateVectorPart::dynamic_state:
+          for (const auto &U_k : U_dynamic)
+            U_k.template copy_to_memory_space<MemorySpace>();
+          break;
+        case StateVectorPart::dynamic_precomputed:
+          for (const auto &Q_k : Q_dynamic)
+            Q_k.template copy_to_memory_space<MemorySpace>();
           break;
         }
       };
@@ -137,19 +147,23 @@ namespace ryujin
     if constexpr (have_separate_memory_spaces) {
       ComputingTimer::Scope scope("time step [X] _ - memory space transfers");
 
-      auto &[U, precomputed, parabolic] = state_vector;
+      auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
 
       const auto move = [&](const StateVectorPart part) {
         switch (part) {
-        case StateVectorPart::hyperbolic:
+        case StateVectorPart::state:
           U.template move_to_memory_space<MemorySpace>();
           break;
         case StateVectorPart::precomputed:
-          precomputed.template move_to_memory_space<MemorySpace>();
+          Q.template move_to_memory_space<MemorySpace>();
           break;
-        case StateVectorPart::parabolic:
-          for (auto &V : parabolic)
-            V.template move_to_memory_space<MemorySpace>();
+        case StateVectorPart::dynamic_state:
+          for (auto &U_k : U_dynamic)
+            U_k.template move_to_memory_space<MemorySpace>();
+          break;
+        case StateVectorPart::dynamic_precomputed:
+          for (auto &Q_k : Q_dynamic)
+            Q_k.template move_to_memory_space<MemorySpace>();
           break;
         }
       };
@@ -176,10 +190,10 @@ namespace ryujin
 
 
   /**
-   * Scaled addition $U\leftarrow s\,U+b\,V$ of the hyperbolic state
-   * and all components of the parabolic state of the given state vectors
-   * @p dst and @p src. The operation is performed on @p MemorySpace.
-   * The precomputed values are left untouched.
+   * Scaled addition $U\leftarrow s\,U+b\,V$ of the parts @p state and
+   * @p dynamic_state of the given state vectors @p dst and @p src. The
+   * operation is performed on @p MemorySpace. The precomputed parts are
+   * left untouched.
    */
   template <typename MemorySpace, typename Number>
   void sadd(StateVector<Number> &dst,
@@ -188,22 +202,25 @@ namespace ryujin
             const StateVector<Number> &src)
   {
     copy_to_memory_space<MemorySpace>(
-        src, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
+        src, StateVectorPart::state, StateVectorPart::dynamic_state);
     move_to_memory_space<MemorySpace>(
-        dst, StateVectorPart::hyperbolic, StateVectorPart::parabolic);
+        dst, StateVectorPart::state, StateVectorPart::dynamic_state);
 
-    auto &dst_U = dst.U.template deal_ii_vector<MemorySpace>();
-    const auto &src_U = src.U.template deal_ii_vector<MemorySpace>();
-    dst_U.zero_out_ghost_values();
-    dst_U.sadd(s, b, src_U);
+    auto &[dst_U, dst_Q, dst_U_dynamic, dst_Q_dynamic] = dst;
+    const auto &[src_U, src_Q, src_U_dynamic, src_Q_dynamic] = src;
 
-    AssertDimension(dst.V.size(), src.V.size());
+    auto &dst_U_vector = dst_U.template deal_ii_vector<MemorySpace>();
+    dst_U_vector.zero_out_ghost_values();
+    dst_U_vector.sadd(s, b, src_U.template deal_ii_vector<MemorySpace>());
 
-    for (std::size_t k = 0; k < dst.V.size(); ++k) {
-      auto &dst_V_k = dst.V[k].template deal_ii_vector<MemorySpace>();
-      const auto &src_V_k = src.V[k].template deal_ii_vector<MemorySpace>();
-      dst_V_k.zero_out_ghost_values();
-      dst_V_k.sadd(s, b, src_V_k);
+    AssertDimension(dst_U_dynamic.size(), src_U_dynamic.size());
+
+    for (std::size_t k = 0; k < dst_U_dynamic.size(); ++k) {
+      auto &dst_k = dst_U_dynamic[k].template deal_ii_vector<MemorySpace>();
+      const auto &src_k =
+          src_U_dynamic[k].template deal_ii_vector<MemorySpace>();
+      dst_k.zero_out_ghost_values();
+      dst_k.sadd(s, b, src_k);
     }
   }
 
@@ -225,11 +242,9 @@ namespace ryujin
 #ifdef DEBUG
 
     move_to_memory_space<dealii::MemorySpace::Host>(
-        state_vector,
-        StateVectorPart::hyperbolic,
-        StateVectorPart::precomputed);
+        state_vector, StateVectorPart::state, StateVectorPart::precomputed);
 
-    auto &[U, prec, V] = state_vector;
+    auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
 
     constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
 
@@ -242,9 +257,9 @@ namespace ryujin
      * underlying deal.II vectors with n_comp() as stride.
      */
     const unsigned int prob_dim = U.n_comp();
-    const unsigned int prec_dim = prec.n_comp();
+    const unsigned int prec_dim = Q.n_comp();
     Number *const U_data = U.deal_ii_vector().begin();
-    Number *const prec_data = prec.deal_ii_vector().begin();
+    Number *const prec_data = Q.deal_ii_vector().begin();
 
     for (unsigned int i = 0; i < n_owned; ++i) {
       std::fill_n(prec_data + i * prec_dim, prec_dim, nan);
