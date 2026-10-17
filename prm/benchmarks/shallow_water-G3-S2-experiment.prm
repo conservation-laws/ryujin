@@ -109,10 +109,9 @@ end
 subsection J - VTUOutput
   set manifolds                  = 
   set schlieren beta             = 10
-  set schlieren quantities       = h
   set schlieren recompute bounds = true
   set use mpi io                 = true
-  set vtu output quantities      = h, m_1, m_2, bathymetry, alpha, v_1
+  set vtu output quantities      = h, m_1, m_2, bathymetry, alpha, v_1, schlieren_h
 end
 
 subsection K - Quantities
