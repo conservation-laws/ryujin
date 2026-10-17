@@ -77,7 +77,7 @@ subsection J - VTUOutput
   set schlieren beta             = 10
   set schlieren recompute bounds = true
   set use mpi io                 = true
-  set vtu output quantities      = h, m, bathymetry, alpha, eta_m, schlieren_h
+  set vtu output quantities      = h, m, bathymetry, eta_m, schlieren_h
 end
 
 subsection L - ErrorEvaluation
