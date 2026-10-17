@@ -502,7 +502,7 @@ namespace ryujin
     }
 
     if (clear_temporal_statistics_on_writeout_)
-      clear_statistics();
+      clear_time_averages();
   }
 
 
@@ -573,6 +573,21 @@ namespace ryujin
 
       manifold.t_old = manifold.t_new = manifold.t_sum = 0.;
       manifold.time_series.clear();
+    }
+  }
+
+
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::clear_time_averages()
+  {
+    using MemorySpace = selected_memory_space_t;
+
+    /* Only reset the time integral: */
+    for (auto &manifold : manifolds_) {
+      manifold.sum.reinit(manifold.points.size() * stride(),
+                          TransferPolicy::implicit_transfers,
+                          MemorySpace{});
+      manifold.t_sum = 0.;
     }
   }
 

@@ -232,6 +232,8 @@ namespace ryujin
 
     void clear_statistics();
 
+    void clear_time_averages();
+
     /**
      * Extract the current values of all points of the manifold out of
      * @p state_vector into the current statistics and return the mass
