@@ -271,14 +271,27 @@ namespace ryujin
                 << std::endl;
 #endif
 
-      /*
-       * We (re)compute the potential on the first step and if the restart
-       * strategy is set to full_restart or static_full_restart.
-       */
-
       AssertThrow(gauss_law_restart_strategy_ !=
                       GaussLawRestartStrategy::correction,
                   dealii::ExcNotImplemented());
+
+      /*
+       * Check whether the potential has been populated by a solution transfer:
+       */
+
+      if (!potential_initialized_) {
+        copy_to_memory_space<dealii::MemorySpace::Host>(
+            std::as_const(state_vector), StateVectorPart::dynamic_state);
+        const auto &phi = std::as_const(state_vector).dynamic_state[0];
+        potential_initialized_ = !phi.deal_ii_vector().all_zero();
+      }
+
+      /*
+       * We (re)compute the potential (and enforce the magnetic drift
+       * velocity) if it is not initialized, and recompute it on every
+       * step if the restart strategy is set to full_restart or
+       * static_full_restart.
+       */
 
       if (!potential_initialized_ ||
           (gauss_law_restart_strategy_ ==
