@@ -7,8 +7,8 @@
 
 #include <compile_time_options.h>
 
-#include <ryujin/interface/parabolic_system.h>
-#include <ryujin/typed/postprocessor.h>
+#include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/postprocessor.h>
 
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
@@ -35,28 +35,10 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Typedefs and constexpr constants
-     */
-    //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-
-    using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    static constexpr auto problem_dimension = View::problem_dimension;
-
-    using state_type = typename View::state_type;
-
-    static constexpr auto n_precomputed_values = View::n_precomputed_values;
-
-    using precomputed_type = typename View::precomputed_type;
-
-    //@}
     /**
      * @name Constructor and setup
      */
@@ -67,11 +49,8 @@ namespace ryujin
      */
     VTUOutput(const MPIEnsemble &mpi_ensemble,
               const OfflineData<dim, Number> &offline_data,
-              const HyperbolicSystem &hyperbolic_system,
-              const Interface::ParabolicSystem &parabolic_system,
-              const MultiComponentVector<Number> &initial_precomputed,
-              const ScalarVector<Number> &alpha,
-              const ScalarVector<Number> &smoothness_indicators,
+              const Interface::HyperbolicSystem &hyperbolic_system,
+              const Interface::Postprocessor<dim, Number> &postprocessor,
               const std::string &subsection = "/VTUOutput");
 
     /**
@@ -149,10 +128,9 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
-    Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
+    const Interface::Postprocessor<dim, Number> &postprocessor_;
 
-    typename Postprocessor<HyperbolicDescription, dim, Number>::Selection
-        selection_;
+    typename Interface::Postprocessor<dim, Number>::Selection selection_;
 
     /**
      * The normalization bounds (maximum, minimum) of every selected

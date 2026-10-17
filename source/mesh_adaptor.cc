@@ -4,13 +4,12 @@
 //
 
 #include "mesh_adaptor.template.h"
-#include <instantiate.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class MeshAdaptor<HyperbolicDescription, 1, NUMBER>;
-  template class MeshAdaptor<HyperbolicDescription, 2, NUMBER>;
-  template class MeshAdaptor<HyperbolicDescription, 3, NUMBER>;
+  template class MeshAdaptor<1, NUMBER>;
+  template class MeshAdaptor<2, NUMBER>;
+  template class MeshAdaptor<3, NUMBER>;
 
 } /* namespace ryujin */

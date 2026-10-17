@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/typed/postprocessor.h>
+
 #include "discretization.h"
 #include "error_evaluation.h"
 #include "hyperbolic_module.h"
@@ -126,11 +128,12 @@ namespace ryujin
         parabolic_module_;
     TimeIntegrator<HyperbolicDescription, ParabolicDescription, dim, Number>
         time_integrator_;
-    MeshAdaptor<HyperbolicDescription, dim, Number> mesh_adaptor_;
+    Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
+    MeshAdaptor<dim, Number> mesh_adaptor_;
     SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;
-    VTUOutput<HyperbolicDescription, dim, Number> vtu_output_;
-    Quantities<HyperbolicDescription, dim, Number> quantities_;
-    ErrorEvaluation<HyperbolicDescription, dim, Number> error_evaluation_;
+    VTUOutput<dim, Number> vtu_output_;
+    Quantities<dim, Number> quantities_;
+    ErrorEvaluation<dim, Number> error_evaluation_;
 
     dealii::types::global_dof_index n_global_dofs_;
     unsigned int n_devices_;

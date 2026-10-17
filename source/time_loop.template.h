@@ -65,13 +65,14 @@ namespace ryujin
                          hyperbolic_module_,
                          parabolic_module_,
                          "/H - TimeIntegrator")
-      , mesh_adaptor_(mpi_ensemble_,
-                      offline_data_,
-                      hyperbolic_system_,
-                      parabolic_system_,
-                      hyperbolic_module_.initial_precomputed(),
-                      hyperbolic_module_.alpha(),
-                      "/I - MeshAdaptor")
+      , postprocessor_(offline_data_,
+                       hyperbolic_system_,
+                       parabolic_system_,
+                       hyperbolic_module_.initial_precomputed(),
+                       {"alpha"},
+                       {hyperbolic_module_.alpha()})
+      , mesh_adaptor_(
+            mpi_ensemble_, offline_data_, postprocessor_, "/I - MeshAdaptor")
       , solution_transfer_(mpi_ensemble_,
                            offline_data_,
                            hyperbolic_system_,
@@ -80,22 +81,17 @@ namespace ryujin
       , vtu_output_(mpi_ensemble_,
                     offline_data_,
                     hyperbolic_system_,
-                    parabolic_system_,
-                    hyperbolic_module_.initial_precomputed(),
-                    hyperbolic_module_.alpha(),
-                    mesh_adaptor_.smoothness_indicators(),
+                    postprocessor_,
                     "/J - VTUOutput")
       , quantities_(mpi_ensemble_,
                     offline_data_,
                     hyperbolic_system_,
-                    parabolic_system_,
-                    hyperbolic_module_.initial_precomputed(),
+                    postprocessor_,
                     "/K - Quantities")
       , error_evaluation_(mpi_ensemble_,
                           offline_data_,
                           hyperbolic_system_,
-                          parabolic_system_,
-                          hyperbolic_module_.initial_precomputed(),
+                          postprocessor_,
                           "/L - ErrorEvaluation")
       , n_global_dofs_(0)
       , n_devices_(0)
@@ -772,9 +768,6 @@ namespace ryujin
 
     ComputingTimer::Scope scope("time step [X]   - perform vtu output");
     print_info("scheduling output");
-
-    /* Make sure we have a valid vector of smoothness indicators. */
-    mesh_adaptor_.compute_smoothness_indicators(state_vector);
 
     vtu_output_.schedule_output(
         state_vector, name, t, cycle, do_full_output, do_levelsets);

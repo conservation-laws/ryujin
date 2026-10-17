@@ -18,25 +18,17 @@ namespace ryujin
   using namespace dealii;
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  VTUOutput<HyperbolicDescription, dim, Number>::VTUOutput(
+  template <int dim, typename Number>
+  VTUOutput<dim, Number>::VTUOutput(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicSystem &hyperbolic_system,
-      const Interface::ParabolicSystem &parabolic_system,
-      const MultiComponentVector<Number> &initial_precomputed,
-      const ScalarVector<Number> &alpha,
-      const ScalarVector<Number> &smoothness_indicators,
+      const Interface::HyperbolicSystem &hyperbolic_system,
+      const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
-      , postprocessor_(offline_data,
-                       hyperbolic_system,
-                       parabolic_system,
-                       initial_precomputed,
-                       {"alpha", "smoothness_indicators"},
-                       {alpha, smoothness_indicators})
+      , postprocessor_(postprocessor)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -85,8 +77,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void VTUOutput<HyperbolicDescription, dim, Number>::prepare()
+  template <int dim, typename Number>
+  void VTUOutput<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
@@ -97,8 +89,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void VTUOutput<HyperbolicDescription, dim, Number>::schedule_output(
+  template <int dim, typename Number>
+  void VTUOutput<dim, Number>::schedule_output(
       const StateVector<Number> &state_vector,
       std::string name,
       Number t [[maybe_unused]],
