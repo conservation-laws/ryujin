@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/discretization.h>
 #include <ryujin/interface/parabolic_system.h>
 
 #include "mpi_ensemble.h"
@@ -78,9 +79,10 @@ namespace ryujin
     //@{
 
     /**
-     * Constructor
+     * Constructor.
      */
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
+                     Interface::Discretization<dim> &discretization, /*mutable*/
                      const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const Interface::ParabolicSystem &parabolic_system,
@@ -183,6 +185,7 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
+    dealii::ObserverPointer<Interface::Discretization<dim>> discretization_;
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;

@@ -123,16 +123,6 @@ namespace ryujin
 
     std::set<std::shared_ptr<Geometry<dim>>> geometry_list_;
 
-    /**
-     * In the SolutionTransfer class we need writable access to the
-     * triangulation object in order to prepare data for mesh adaptation
-     * and checkpointing / restart. Work around this issue by declaring the
-     * solution transfer class to be a friend rather than changing the
-     * constructor, or augmenting the methods in SolutionTransfer.
-     */
-    template <typename Discretization, int dim_, typename Number_>
-    friend class SolutionTransfer;
-
     //@}
   };
 } /* namespace ryujin */

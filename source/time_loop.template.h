@@ -73,6 +73,7 @@ namespace ryujin
       , mesh_adaptor_(
             mpi_ensemble_, offline_data_, postprocessor_, "/I - MeshAdaptor")
       , solution_transfer_(mpi_ensemble_,
+                           discretization_,
                            offline_data_,
                            hyperbolic_system_,
                            parabolic_system_,

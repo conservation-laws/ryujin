@@ -27,6 +27,7 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   SolutionTransfer<HyperbolicDescription, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
+      Interface::Discretization<dim> &discretization,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
@@ -34,6 +35,7 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , limiter_(hyperbolic_system, subsection + "/mass transfer limiter")
       , mpi_ensemble_(mpi_ensemble)
+      , discretization_(&discretization)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
@@ -116,8 +118,7 @@ namespace ryujin
         StateVectorPart::precomputed,
         StateVectorPart::dynamic_state);
 
-    const auto &discretization = offline_data_->discretization();
-    auto &triangulation = *discretization.triangulation_; /* writable */
+    auto &triangulation = discretization_->triangulation();
 
     Assert(handle_ == dealii::numbers::invalid_unsigned_int,
            dealii::ExcMessage(
@@ -459,8 +460,7 @@ namespace ryujin
         StateVectorPart::precomputed,
         StateVectorPart::dynamic_state);
 
-    const auto &discretization = offline_data_->discretization();
-    auto &triangulation = *discretization.triangulation_; /* writable */
+    auto &triangulation = discretization_->triangulation();
 
     Assert(
         handle_ != dealii::numbers::invalid_unsigned_int,
