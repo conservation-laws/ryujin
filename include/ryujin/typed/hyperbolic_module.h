@@ -8,12 +8,12 @@
 #include <compile_time_options.h>
 
 #include <ryujin/interface/hyperbolic_module.h>
+#include <ryujin/interface/offline_data.h>
 
 #include <convenience_macros.h>
 #include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <observer_pointer.h>
-#include <offline_data.h>
 #include <sparse_matrix.h>
 #include <state_vector.h>
 
@@ -86,7 +86,7 @@ namespace ryujin
      */
     HyperbolicModule(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const Interface::OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
         const std::string &subsection = "/HyperbolicModule");
@@ -295,7 +295,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<
         const InitialValues<HyperbolicDescription, dim, Number>>

@@ -8,13 +8,13 @@
 #include <compile_time_options.h>
 
 #include <ryujin/interface/hyperbolic_module.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
 
 #include "convenience_macros.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
-#include "offline_data.h"
 #include "patterns_conversion.h"
 
 #include <numbers>
@@ -265,7 +265,7 @@ namespace ryujin
      */
     TimeIntegrator(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const Interface::OfflineData<dim, Number> &offline_data,
         const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
         const Interface::ParabolicModule<dim, Number> &parabolic_module,
         const Interface::ParabolicSystem &parabolic_system,
@@ -362,7 +362,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const Interface::HyperbolicModule<dim, Number>>
         hyperbolic_module_;
     dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>

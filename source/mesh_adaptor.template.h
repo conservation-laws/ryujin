@@ -21,7 +21,7 @@ namespace ryujin
   template <int dim, typename Number>
   MeshAdaptor<dim, Number>::MeshAdaptor(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)

@@ -7,12 +7,12 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 
 #include "initial_state_library.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
-#include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -69,7 +69,7 @@ namespace ryujin
      * Constructor.
      */
     InitialValues(const MPIEnsemble &mpi_ensemble,
-                  const OfflineData<dim, Number> &offline_data,
+                  const Interface::OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
                   const Interface::ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/InitialValues");
@@ -150,7 +150,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 

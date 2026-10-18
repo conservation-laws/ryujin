@@ -16,7 +16,7 @@ namespace ryujin
   template <int dim, typename Number>
   TimeIntegrator<dim, Number>::TimeIntegrator(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
       const Interface::ParabolicModule<dim, Number> &parabolic_module,
       const Interface::ParabolicSystem &parabolic_system,

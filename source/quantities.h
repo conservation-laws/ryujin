@@ -8,12 +8,12 @@
 #include <compile_time_options.h>
 
 #include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 
 #include "gpu.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
-#include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -58,7 +58,7 @@ namespace ryujin
      * Constructor.
      */
     Quantities(const MPIEnsemble &mpi_ensemble,
-               const OfflineData<dim, Number> &offline_data,
+               const Interface::OfflineData<dim, Number> &offline_data,
                const Interface::HyperbolicSystem &hyperbolic_system,
                const Interface::Postprocessor<dim, Number> &postprocessor,
                const std::string &subsection = "/Quantities");
@@ -112,7 +112,7 @@ namespace ryujin
      * boundary id is set to dealii::numbers::internal_face_boundary_id.
      */
     using ManifoldPoint =
-        typename OfflineData<dim, Number>::BoundaryDescription;
+        typename Interface::OfflineData<dim, Number>::BoundaryDescription;
 
     /**
      * All data associated with a single interior or boundary manifold.
@@ -194,7 +194,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 

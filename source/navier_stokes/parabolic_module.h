@@ -7,13 +7,13 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 
 #include "observer_pointer.h"
 #include <convenience_macros.h>
 #include <initial_values.h>
 #include <mpi_ensemble.h>
-#include <offline_data.h>
 #include <simd.h>
 
 #include "parabolic_module_gmg_operators.h"
@@ -155,7 +155,7 @@ namespace ryujin
        * Constructor.
        */
       ParabolicModule(const MPIEnsemble &mpi_ensemble,
-                      const OfflineData<dim, Number> &offline_data,
+                      const Interface::OfflineData<dim, Number> &offline_data,
                       const HyperbolicSystem &hyperbolic_system,
                       const ParabolicSystem &parabolic_system,
                       const InitialValues<HyperbolicDescription, dim, Number>
@@ -272,7 +272,7 @@ namespace ryujin
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
-      dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
+      dealii::ObserverPointer<const ryujin::Interface::OfflineData<dim, Number>>
           offline_data_;
       dealii::ObserverPointer<
           const ryujin::InitialValues<HyperbolicDescription, dim, Number>>

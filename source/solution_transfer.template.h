@@ -28,7 +28,7 @@ namespace ryujin
   SolutionTransfer<HyperbolicDescription, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
       Interface::Discretization<dim> &discretization,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)

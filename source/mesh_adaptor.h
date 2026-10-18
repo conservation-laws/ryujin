@@ -7,11 +7,11 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
-#include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -117,7 +117,7 @@ namespace ryujin
      * Constructor.
      */
     MeshAdaptor(const MPIEnsemble &mpi_ensemble,
-                const OfflineData<dim, Number> &offline_data,
+                const Interface::OfflineData<dim, Number> &offline_data,
                 const Interface::Postprocessor<dim, Number> &postprocessor,
                 const std::string &subsection = "/MeshAdaptor");
 
@@ -216,7 +216,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 

@@ -99,7 +99,7 @@ namespace ryujin
                 int dim,
                 typename ScalarNumber>
       void fill_precomputed_values(
-          const OfflineData<dim, ScalarNumber> &offline_data,
+          const Interface::OfflineData<dim, ScalarNumber> &offline_data,
           StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
@@ -596,7 +596,7 @@ namespace ryujin
 
     template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
-        const OfflineData<dim, ScalarNumber> &offline_data,
+        const Interface::OfflineData<dim, ScalarNumber> &offline_data,
         StateVector<ScalarNumber> &state_vector,
         const bool skip_constrained_dofs) const
     {
