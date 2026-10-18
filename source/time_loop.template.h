@@ -61,10 +61,10 @@ namespace ryujin
                           initial_values_,
                           "/G - ParabolicModule")
       , time_integrator_(mpi_ensemble_,
-                         offline_data_,
+                         hyperbolic_system_,
+                         parabolic_system_,
                          hyperbolic_module_,
                          parabolic_module_,
-                         parabolic_system_,
                          "/H - TimeIntegrator")
       , postprocessor_(offline_data_,
                        hyperbolic_system_,
@@ -1383,9 +1383,8 @@ namespace ryujin
            << std::setprecision(2) << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
-    const auto &scheme = time_integrator_.time_stepping_scheme();
     output << "        [ "
-           << Patterns::Tools::Convert<TimeSteppingScheme>::to_string(scheme)
+           << time_integrator_.time_stepping_scheme_name()
            << " with CFL = "
            << std::setprecision(2) << std::fixed << hyperbolic_module_.cfl()
            << " ("

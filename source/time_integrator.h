@@ -8,9 +8,10 @@
 #include <compile_time_options.h>
 
 #include <ryujin/interface/hyperbolic_module.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
+#include <ryujin/interface/time_integrator.h>
 
 #include "convenience_macros.h"
 #include "mpi_ensemble.h"
@@ -252,7 +253,7 @@ namespace ryujin
    * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
-  class TimeIntegrator final : public dealii::ParameterAcceptor
+  class TimeIntegrator final : public Interface::TimeIntegrator<dim, Number>
   {
   public:
     /**
@@ -265,10 +266,10 @@ namespace ryujin
      */
     TimeIntegrator(
         const MPIEnsemble &mpi_ensemble,
-        const Interface::OfflineData<dim, Number> &offline_data,
+        const Interface::HyperbolicSystem &hyperbolic_system,
+        const Interface::ParabolicSystem &parabolic_system,
         const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
         const Interface::ParabolicModule<dim, Number> &parabolic_module,
-        const Interface::ParabolicSystem &parabolic_system,
         const std::string &subsection = "/TimeIntegrator");
 
     /**
@@ -276,7 +277,7 @@ namespace ryujin
      * storage and is necessary before any of the following time-stepping
      * functions can be called.
      */
-    void prepare();
+    void prepare() override;
 
     //@}
     /**
@@ -294,7 +295,7 @@ namespace ryujin
      * HyperbolicModule::prepare_state_vector().
      */
     void prepare_state_vector(StateVector<Number> &state_vector,
-                              Number t) const;
+                              Number t) const override;
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -315,7 +316,7 @@ namespace ryujin
      */
     Number step(StateVector<Number> &state_vector,
                 Number t,
-                Number t_final = std::numeric_limits<Number>::max());
+                Number t_final = std::numeric_limits<Number>::max()) override;
 
     //@}
     /**
@@ -326,15 +327,7 @@ namespace ryujin
     /**
      * The selected time-stepping scheme.
      */
-    ACCESSOR_READ_ONLY(time_stepping_scheme);
-
-    /**
-     * The efficiency of the selected time-stepping scheme expressed as the
-     * ratio of step size of the combined method to step size of an
-     * elementary forward Euler step. For example, SSPRK33 has an
-     * efficiency ratio of 1 whereas ERK33 has an efficiency ratio of 3.
-     */
-    ACCESSOR_READ_ONLY(efficiency);
+    ACCESSOR_READ_ONLY(time_stepping_scheme)
 
   private:
     //@}
@@ -352,7 +345,6 @@ namespace ryujin
     Number tau_max_;
 
     TimeSteppingScheme time_stepping_scheme_;
-    Number efficiency_;
 
     //@}
     /**
@@ -362,13 +354,13 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const Interface::HyperbolicSystem>
+        hyperbolic_system_;
+    dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
     dealii::ObserverPointer<const Interface::HyperbolicModule<dim, Number>>
         hyperbolic_module_;
     dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>
         parabolic_module_;
-    dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 
     std::vector<StateVector<Number>> temp_;
 
