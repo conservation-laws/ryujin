@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/mesh_adaptor.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 
@@ -105,7 +106,7 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <int dim, typename Number = double>
-  class MeshAdaptor final : public dealii::ParameterAcceptor
+  class MeshAdaptor final : public Interface::MeshAdaptor<dim, Number>
   {
   public:
     /**
@@ -125,7 +126,7 @@ namespace ryujin
      * Prepare temporary storage and clean up internal data for the
      * analyze() facility.
      */
-    void prepare(const Number t);
+    void prepare(const Number t) override;
 
     //@}
     /**
@@ -140,49 +141,18 @@ namespace ryujin
      */
     void analyze(const StateVector<Number> &state_vector,
                  const Number t,
-                 unsigned int cycle);
+                 unsigned int cycle) override;
 
     /**
      * Mark cells for coarsening and refinement with the configured mesh
      * adaptation and marking strategies.
      */
     void mark_cells_for_coarsening_and_refinement(
-        dealii::Triangulation<dim> &triangulation) const;
-
-    /**
-     * Compute smoothness indicators. This function reinitializes and
-     * populates the smoothness_indicators() vector.
-     */
-    void compute_smoothness_indicators(
-        const StateVector<Number> &state_vector) const;
+        dealii::Triangulation<dim> &triangulation) const override;
 
     //@}
-    /**
-     * @name Information and statistics
-     */
-    //@{
-
-    /**
-     * A boolean indicating whether we should perform a mesh adaptation step
-     * in the current cycle. The analyze() method will set this boolean to
-     * true whenever the selected adaptation strategy advises to perform an
-     * adaptation cycle.
-     */
-    ACCESSOR_READ_ONLY(need_mesh_adaptation)
-
-    /**
-     * The computed cell indicators.
-     */
-    ACCESSOR_READ_ONLY(indicators);
-
-    /**
-     * The computed smoothness indicators. The vector is only valid if the
-     * "smoothness indicator" refinement strategy has been selected.
-     */
-    ACCESSOR_READ_ONLY(smoothness_indicators);
 
   private:
-    //@}
     /**
      * @name Run time options
      */
@@ -223,14 +193,16 @@ namespace ryujin
 
     typename Interface::Postprocessor<dim, Number>::Selection selection_;
 
-    bool need_mesh_adaptation_;
-
+    /* The computed cell indicators. */
     mutable dealii::Vector<float> indicators_;
 
     /* random adaptation: */
     mutable std::mt19937_64 mersenne_twister_;
 
-    /* smoothness indicators: */
+    /*
+     * smoothness indicators: only valid if the "smoothness indicator"
+     * refinement strategy has been selected.
+     */
     mutable ScalarVector<Number> smoothness_indicators_;
 
     //@}
@@ -244,6 +216,13 @@ namespace ryujin
 
     /* smoothness indicators: */
     void populate_cell_indicators_from_smoothness_indicators() const;
+
+    /*
+     * Compute smoothness indicators. This function reinitializes and
+     * populates the smoothness_indicators_ vector.
+     */
+    void compute_smoothness_indicators(
+        const StateVector<Number> &state_vector) const;
 
     //@}
   };
