@@ -513,6 +513,11 @@ namespace ryujin
               dealii::internal::EigenvalueAlgorithm::power_iteration;
         }
 
+        auto &constraints = smoother_data[level].constraints;
+        constraints.reinit(relevant_sets[level], relevant_sets[level]);
+        constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
+        constraints.close();
+
         if (level == level_matrix_free_.min_level()) {
           smoother_data[level].degree = numbers::invalid_unsigned_int;
           smoother_data[level].eig_cg_n_iterations = 500;
