@@ -26,11 +26,7 @@ namespace ryujin
     StubParabolicSystem(const std::string &subsection = "/ParabolicSystem")
         : Interface::ParabolicSystem("Identity", {}, {}, subsection)
     {
+      is_identity_ = true;
     }
-
-    /**
-     * Whether the parabolic system is the identity.
-     */
-    static constexpr bool is_identity = true;
   }; /* StubParabolicSystem */
 } // namespace ryujin

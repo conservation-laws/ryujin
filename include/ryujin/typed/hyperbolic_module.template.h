@@ -5,12 +5,13 @@
 
 #pragma once
 
-#include "computing_timer.h"
-#include "gpu.h"
-#include "hyperbolic_module.h"
-#include "loop.h"
-#include "mpi_ensemble.h"
-#include "simd.h"
+#include <ryujin/typed/hyperbolic_module.h>
+
+#include <computing_timer.h>
+#include <gpu.h>
+#include <loop.h>
+#include <mpi_ensemble.h>
+#include <simd.h>
 
 #include <numeric>
 #include <utility>
@@ -50,7 +51,8 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
-      : ParameterAcceptor(subsection)
+      : Interface::HyperbolicModule<dim, Number>(
+            problem_dimension, n_precomputed_values, subsection)
       , indicator_(hyperbolic_system, subsection + "/indicator")
       , limiter_(hyperbolic_system, subsection + "/limiter")
       , wave_speed_estimator_(hyperbolic_system,
@@ -59,12 +61,6 @@ namespace ryujin
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , initial_values_(&initial_values)
-      , cfl_(0.2)
-      , acceptable_tau_max_ratio_(1.e6)
-      , id_violation_strategy_(IDViolationStrategy::warn)
-      , n_restarts_(0)
-      , n_corrections_(0)
-      , n_warnings_(0)
   {
   }
 
@@ -382,16 +378,72 @@ namespace ryujin
 
 
   template <typename HyperbolicDescription, int dim, typename Number>
-  template <int stages>
   Number HyperbolicModule<HyperbolicDescription, dim, Number>::step(
       const StateVector<Number> &old_state_vector,
-      std::array<std::reference_wrapper<const StateVector<Number>>, stages>
-          stage_state_vectors,
-      const std::array<Number, stages> stage_weights,
+      StageVectors stage_state_vectors,
+      StageWeights stage_weights,
       StateVector<Number> &new_state_vector,
       Number tau /*= 0.*/,
       Number tau_max /*= std::numeric_limits<Number>::max()*/) const
   {
+    switch (stage_state_vectors.size()) {
+    case 0:
+      return step<0>(old_state_vector,
+                     stage_state_vectors,
+                     stage_weights,
+                     new_state_vector,
+                     tau,
+                     tau_max);
+    case 1:
+      return step<1>(old_state_vector,
+                     stage_state_vectors,
+                     stage_weights,
+                     new_state_vector,
+                     tau,
+                     tau_max);
+    case 2:
+      return step<2>(old_state_vector,
+                     stage_state_vectors,
+                     stage_weights,
+                     new_state_vector,
+                     tau,
+                     tau_max);
+    case 3:
+      return step<3>(old_state_vector,
+                     stage_state_vectors,
+                     stage_weights,
+                     new_state_vector,
+                     tau,
+                     tau_max);
+    case 4:
+      return step<4>(old_state_vector,
+                     stage_state_vectors,
+                     stage_weights,
+                     new_state_vector,
+                     tau,
+                     tau_max);
+    default:
+      AssertThrow(false, dealii::ExcMessage("Unsupported number of stages."));
+      __builtin_trap();
+    }
+  }
+
+
+  template <typename HyperbolicDescription, int dim, typename Number>
+  template <int stages>
+  Number HyperbolicModule<HyperbolicDescription, dim, Number>::step(
+      const StateVector<Number> &old_state_vector,
+      StageVectors stage_state_vectors,
+      StageWeights stage_weights,
+      StateVector<Number> &new_state_vector,
+      Number tau,
+      Number tau_max) const
+  {
+    Assert(stage_state_vectors.size() == stages &&
+               stage_weights.size() == stages,
+           dealii::ExcMessage("The number of stage state vectors and stage "
+                              "weights must match the number of stages."));
+
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<HyperbolicDescription, dim, Number>::step()"
               << std::endl;
@@ -402,7 +454,7 @@ namespace ryujin
     copy_to_memory_space<MemorySpace>(
         old_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
     for (int s = 0; s < stages; ++s)
-      copy_to_memory_space<MemorySpace>(stage_state_vectors[s].get(),
+      copy_to_memory_space<MemorySpace>(stage_state_vectors.begin()[s].get(),
                                         StateVectorPart::state,
                                         StateVectorPart::precomputed);
     move_to_memory_space<MemorySpace>(new_state_vector, StateVectorPart::state);
@@ -514,11 +566,11 @@ namespace ryujin
     Kokkos::Array<Number, stages> stage_weight;
     for (int s = 0; s < stages; ++s) {
       const auto &[U_s, Q_s, U_dynamic_s, Q_dynamic_s] =
-          stage_state_vectors[s].get();
+          stage_state_vectors.begin()[s].get();
       stage_U_view[s] = U_s.template view<problem_dimension, MemorySpace>();
       stage_precomputed_view[s] =
           Q_s.template view<n_precomputed_values, MemorySpace>();
-      stage_weight[s] = stage_weights[s];
+      stage_weight[s] = stage_weights.begin()[s];
     }
 
     const auto new_U_view =
@@ -535,7 +587,7 @@ namespace ryujin
      * Create a local copy of cfl_ so that we do not capture "this" in the
      * compute kernels
      */
-    const Number cfl = cfl_;
+    const Number cfl = this->cfl_;
 
     const auto hyperbolic_system_views =
         make_select_view<dim, Number, MemorySpace>(*hyperbolic_system_);
@@ -814,12 +866,13 @@ namespace ryujin
 #endif
 
       /* We need to signal a restart if the enforced tau is too wacky: */
-      *restart_needed.view() = (tau > acceptable_tau_max_ratio_ * tau_max);
+      *restart_needed.view() =
+          (tau > this->acceptable_tau_max_ratio_ * tau_max);
 
       /* Don't bother with computing the update step, signal a restart: */
-      if (*restart_needed.view() &&
-          id_violation_strategy_ == IDViolationStrategy::raise_exception) {
-        n_restarts_++;
+      if (*restart_needed.view() && this->id_violation_strategy_ ==
+                                        IDViolationStrategy::raise_exception) {
+        this->n_restarts_++;
         /* Suggest a restart with tau_max: */
 #ifdef DEBUG_OUTPUT
         std::cout << "        signalling restart (suggested_tau_max = "
@@ -1408,16 +1461,16 @@ namespace ryujin
     }
 
     if (*restart_needed.view()) {
-      switch (id_violation_strategy_) {
+      switch (this->id_violation_strategy_) {
       case IDViolationStrategy::warn:
-        n_warnings_++;
+        this->n_warnings_++;
 #ifdef DEBUG_OUTPUT
         std::cout << "        raised warning, CFL/IDP violation encountered "
                   << std::endl;
 #endif
         break;
       case IDViolationStrategy::raise_exception:
-        n_restarts_++;
+        this->n_restarts_++;
         /* Suggest a restart with tau_max: */
 #ifdef DEBUG_OUTPUT
         std::cout << "        signalling restart (suggested_tau_max = "

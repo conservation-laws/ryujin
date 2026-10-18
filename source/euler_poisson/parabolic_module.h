@@ -11,7 +11,8 @@
 #include "laplace_operator.h"
 #include "parabolic_system.h"
 
-#include <hyperbolic_module.h>
+#include <ryujin/interface/parabolic_module.h>
+
 #include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <offline_data.h>
@@ -130,13 +131,19 @@ namespace ryujin
      * @ingroup ParabolicModule
      */
     template <typename HyperbolicDescription, int dim, typename Number>
-    class ParabolicModule final : public dealii::ParameterAcceptor
+    class ParabolicModule final : public Interface::ParabolicModule<dim, Number>
     {
     public:
       /**
        * @name Typedefs and constexpr constants
        */
       //@{
+
+      using StageVectors =
+          typename Interface::ParabolicModule<dim, Number>::StageVectors;
+
+      using StageWeights =
+          typename Interface::ParabolicModule<dim, Number>::StageWeights;
 
       using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
@@ -175,7 +182,7 @@ namespace ryujin
        * storage and is necessary before any of the following time-stepping
        * functions can be called.
        */
-      void prepare();
+      void prepare() override;
 
       //@}
       /**
@@ -190,7 +197,8 @@ namespace ryujin
        * @note This routine does not modify the hyperbolic state vector or
        * the precomputed vector component.
        */
-      void reinit_state_vector(StateVector<Number> &state_vector) const;
+      void
+      reinit_state_vector(StateVector<Number> &state_vector) const override;
 
       /**
        * This function preprocesses a given state vector @p U in preparation
@@ -200,26 +208,24 @@ namespace ryujin
        * we perform a mesh transfer or output operation.
        */
       void prepare_state_vector(StateVector<Number> &state_vector,
-                                Number t) const;
+                                Number t) const override;
 
       /**
-       * Given a reference to a previous state vector @p old_U at time
-       * @p old_t and a time-step size @p tau perform an implicit backward
-       * euler step (and store the result in @p new_U).
+       * Given a reference to a previous state vector @p old_state_vector
+       * at time @p old_t and a time-step size @p tau perform an implicit
+       * backward euler step (and store the result in @p new_state_vector).
        *
-       * The function takes an optional array of states @p stage_U together
-       * with a an array of weights @p stage_weights to construct a modified
-       * high-order right-hand side / flux.
+       * The function takes an optional list of states @p
+       * stage_state_vectors together with a list of weights @p
+       * stage_weights to construct a modified high-order right-hand side /
+       * flux.
        */
-      template <int stages>
-      void backward_euler_step(
-          const StateVector<Number> &old_state_vector,
-          const Number old_t,
-          std::array<std::reference_wrapper<const StateVector<Number>>, stages>
-              stage_state_vectors,
-          const std::array<Number, stages> stage_weights,
-          StateVector<Number> &new_state_vector,
-          Number tau) const;
+      void backward_euler_step(const StateVector<Number> &old_state_vector,
+                               const Number old_t,
+                               StageVectors stage_state_vectors,
+                               StageWeights stage_weights,
+                               StateVector<Number> &new_state_vector,
+                               Number tau) const override;
 
       /**
        * Given a reference to a previous state vector @p old_U at time @p
@@ -232,15 +238,7 @@ namespace ryujin
       void crank_nicolson_step(const StateVector<Number> &old_state_vector,
                                const Number old_t,
                                StateVector<Number> &new_state_vector,
-                               Number tau) const;
-
-      /**
-       * Sets the invariant domain violation strategy.
-       */
-      void set_id_violation_strategy(const IDViolationStrategy &strategy) const
-      {
-        id_violation_strategy_ = strategy;
-      }
+                               Number tau) const override;
 
       //@}
       /**
@@ -253,25 +251,7 @@ namespace ryujin
        * for constructing the status message displayed periodically in the
        * TimeLoop.
        */
-      void print_solver_statistics(std::ostream &output) const;
-
-      /**
-       * The number of restarts signalled by the step() function.
-       */
-      ACCESSOR_READ_ONLY(n_restarts)
-
-      /**
-       * The number of corrections performed by the step() function. This
-       * function exists to mirror the ParabolicModule interface and will
-       * always return 0.
-       */
-      ACCESSOR_READ_ONLY(n_corrections)
-
-      /**
-       * The number of ID violation warnings encounterd in the step()
-       * function.
-       */
-      ACCESSOR_READ_ONLY(n_warnings)
+      void print_solver_statistics(std::ostream &output) const override;
 
     private:
       //@}
@@ -320,15 +300,9 @@ namespace ryujin
                           ElectrostaticConfiguration<dim, Number>>
           selected_electrostatic_configuration_;
 
-      mutable IDViolationStrategy id_violation_strategy_;
-
       mutable unsigned int cycle_;
       mutable double n_iterations_gauss_;
       mutable double n_iterations_step_;
-
-      mutable unsigned int n_restarts_;
-      mutable unsigned int n_corrections_;
-      mutable unsigned int n_warnings_;
 
       dealii::MatrixFree<dim, Number> matrix_free_;
       dealii::AffineConstraints<Number> affine_constraints_potential_;
@@ -352,6 +326,20 @@ namespace ryujin
        * @name Internal methods
        */
       //@{
+
+      /**
+       * The implementation of the backward_euler_step() function for a
+       * fixed number of stages @p stages. The backward_euler_step()
+       * function dispatches to it with the number of supplied stage state
+       * vectors.
+       */
+      template <int stages>
+      void backward_euler_step(const StateVector<Number> &old_state_vector,
+                               const Number old_t,
+                               StageVectors stage_state_vectors,
+                               StageWeights stage_weights,
+                               StateVector<Number> &new_state_vector,
+                               Number tau) const;
 
       /**
        * Set up affine constraints. Internally used in prepare().

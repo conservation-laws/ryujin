@@ -7,12 +7,10 @@
 
 #include <compile_time_options.h>
 
-#include <convenience_macros.h>
+#include <ryujin/interface/system.h>
 
 #include <deal.II/base/exceptions.h>
-#include <deal.II/base/parameter_acceptor.h>
 
-#include <array>
 #include <string>
 #include <vector>
 
@@ -38,34 +36,9 @@ namespace ryujin
      *
      * @ingroup HyperbolicModule
      */
-    class HyperbolicSystem : public dealii::ParameterAcceptor
+    class HyperbolicSystem : public System
     {
     public:
-      /**
-       * The name of the hyperbolic system as a string.
-       */
-      ACCESSOR_READ_ONLY(problem_name)
-
-      /**
-       * A list of component names for every dimension:
-       */
-      using Names = std::array<std::vector<std::string>, 3>;
-
-      /**
-       * The names of the hyperbolic state components for dimension @p dim.
-       *
-       * Hyperbolic state components are stored in StateVector::state
-       * (static) and StateVector::dynamic_state (dynamic) and evolved by
-       * the time integrator.
-       *
-       * @note Valid once the run time parameters are parsed.
-       */
-      const std::vector<std::string> &state_names(const unsigned int dim) const
-      {
-        AssertIndexRange(dim - 1, 3);
-        return state_names_[dim - 1];
-      }
-
       /**
        * The names of the primitive state components for dimension @p dim.
        *
@@ -76,23 +49,6 @@ namespace ryujin
       {
         AssertIndexRange(dim - 1, 3);
         return primitive_names_[dim - 1];
-      }
-
-      /**
-       * The names of the hyperbolic precomputed values for dimension
-       * @p dim.
-       *
-       * Precomputed values are stored in StateVector::precomputed (static)
-       * and StateVector::dynamic_precomputed (dynamic) and are derived
-       * from the state.
-       *
-       * @note Valid once the run time parameters are parsed.
-       */
-      const std::vector<std::string> &
-      precomputed_names(const unsigned int dim) const
-      {
-        AssertIndexRange(dim - 1, 3);
-        return precomputed_names_[dim - 1];
       }
 
       /**
@@ -120,30 +76,11 @@ namespace ryujin
                        const Names &precomputed_names,
                        const Names &initial_precomputed_names,
                        const std::string &subsection)
-          : ParameterAcceptor(subsection)
-          , problem_name_(problem_name)
-          , state_names_(state_names)
+          : System(problem_name, state_names, precomputed_names, subsection)
           , primitive_names_(primitive_names)
-          , precomputed_names_(precomputed_names)
           , initial_precomputed_names_(initial_precomputed_names)
       {
       }
-
-      /**
-       * The name of the hyperbolic system.
-       *
-       * @note A derived class may update it once the run time parameters
-       * are known.
-       */
-      std::string problem_name_;
-
-      /**
-       * The names of the state components for every dimension.
-       *
-       * @note A derived class may update them once the run time
-       * parameters are known.
-       */
-      Names state_names_;
 
       /**
        * The names of the primitive state components for every dimension.
@@ -152,14 +89,6 @@ namespace ryujin
        * parameters are known.
        */
       Names primitive_names_;
-
-      /**
-       * The names of the precomputed values for every dimension.
-       *
-       * @note A derived class may update them once the run time
-       * parameters are known.
-       */
-      Names precomputed_names_;
 
       /**
        * The names of the initial precomputed values for every dimension.

@@ -3,18 +3,9 @@
 // Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
-#include "hyperbolic_module.template.h"
 #include <instantiate.h>
 
-#define INSTANTIATE(dim, stages)                                               \
-  template NUMBER                                                              \
-  HyperbolicModule<HyperbolicDescription, dim, NUMBER>::step<stages>(          \
-      const StateVector<NUMBER> &,                                             \
-      std::array<std::reference_wrapper<const StateVector<NUMBER>>, stages>,   \
-      const std::array<NUMBER, stages>,                                        \
-      StateVector<NUMBER> &,                                                   \
-      NUMBER,                                                                  \
-      NUMBER) const
+#include <ryujin/typed/hyperbolic_module.template.h>
 
 namespace ryujin
 {
@@ -23,22 +14,4 @@ namespace ryujin
   template class HyperbolicModule<HyperbolicDescription, 1, NUMBER>;
   template class HyperbolicModule<HyperbolicDescription, 2, NUMBER>;
   template class HyperbolicModule<HyperbolicDescription, 3, NUMBER>;
-
-  INSTANTIATE(1, 0);
-  INSTANTIATE(1, 1);
-  INSTANTIATE(1, 2);
-  INSTANTIATE(1, 3);
-  INSTANTIATE(1, 4);
-
-  INSTANTIATE(2, 0);
-  INSTANTIATE(2, 1);
-  INSTANTIATE(2, 2);
-  INSTANTIATE(2, 3);
-  INSTANTIATE(2, 4);
-
-  INSTANTIATE(3, 0);
-  INSTANTIATE(3, 1);
-  INSTANTIATE(3, 2);
-  INSTANTIATE(3, 3);
-  INSTANTIATE(3, 4);
 } /* namespace ryujin */

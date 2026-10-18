@@ -7,12 +7,14 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/hyperbolic_module.h>
+#include <ryujin/interface/parabolic_module.h>
+#include <ryujin/interface/parabolic_system.h>
+
 #include "convenience_macros.h"
-#include "hyperbolic_module.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"
-#include "parabolic_module.h"
 #include "patterns_conversion.h"
 
 #include <numbers>
@@ -249,24 +251,10 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            int dim,
-            typename Number = double>
+  template <int dim, typename Number = double>
   class TimeIntegrator final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Typedefs and constexpr constants
-     */
-    //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-    using ParabolicSystem = typename ParabolicDescription::ParabolicSystem;
-
-    using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    //@}
     /**
      * @name Constructor and setup
      */
@@ -275,15 +263,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    TimeIntegrator(const MPIEnsemble &mpi_ensemble,
-                   const OfflineData<dim, Number> &offline_data,
-                   const HyperbolicModule<HyperbolicDescription, dim, Number>
-                       &hyperbolic_module,
-                   const ParabolicModule<HyperbolicDescription,
-                                         ParabolicDescription,
-                                         dim,
-                                         Number> &parabolic_module,
-                   const std::string &subsection = "/TimeIntegrator");
+    TimeIntegrator(
+        const MPIEnsemble &mpi_ensemble,
+        const OfflineData<dim, Number> &offline_data,
+        const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
+        const Interface::ParabolicModule<dim, Number> &parabolic_module,
+        const Interface::ParabolicSystem &parabolic_system,
+        const std::string &subsection = "/TimeIntegrator");
 
     /**
      * Prepare time integration. A call to prepare() allocates temporary
@@ -377,14 +363,11 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::ObserverPointer<
-        const HyperbolicModule<HyperbolicDescription, dim, Number>>
+    dealii::ObserverPointer<const Interface::HyperbolicModule<dim, Number>>
         hyperbolic_module_;
-    dealii::ObserverPointer<const ParabolicModule<HyperbolicDescription,
-                                                  ParabolicDescription,
-                                                  dim,
-                                                  Number>>
+    dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>
         parabolic_module_;
+    dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 
     std::vector<StateVector<Number>> temp_;
 

@@ -37,11 +37,6 @@ namespace ryujin
        */
       ParabolicSystem(const std::string &subsection = "/B - Equation");
 
-      /**
-       * Whether the parabolic system is the identity.
-       */
-      static constexpr bool is_identity = false;
-
       ACCESSOR_READ_ONLY(mu)
       ACCESSOR_READ_ONLY(lambda)
       ACCESSOR_READ_ONLY(cv_inverse_kappa)

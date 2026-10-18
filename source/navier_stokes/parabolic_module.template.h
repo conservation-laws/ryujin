@@ -37,87 +37,86 @@ namespace ryujin
         const ParabolicSystem &parabolic_system,
         const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
         const std::string &subsection /*= "ParabolicModule"*/)
-        : ParameterAcceptor(subsection)
+        : Interface::ParabolicModule<dim, Number>(subsection)
         , mpi_ensemble_(mpi_ensemble)
         , hyperbolic_system_(&hyperbolic_system)
         , parabolic_system_(&parabolic_system)
         , offline_data_(&offline_data)
         , initial_values_(&initial_values)
-        , id_violation_strategy_(IDViolationStrategy::warn)
         , cycle_(0)
-        , n_restarts_(0)
-        , n_corrections_(0)
-        , n_warnings_(0)
         , n_iterations_velocity_(0.)
         , n_iterations_internal_energy_(0.)
     {
       use_gmg_velocity_ = false;
-      add_parameter("multigrid velocity",
-                    use_gmg_velocity_,
-                    "Use geometric multigrid for velocity component");
+      this->add_parameter("multigrid velocity",
+                          use_gmg_velocity_,
+                          "Use geometric multigrid for velocity component");
 
       gmg_max_iter_vel_ = 12;
-      add_parameter("multigrid velocity - max iter",
-                    gmg_max_iter_vel_,
-                    "Maximal number of CG iterations with GMG smoother");
+      this->add_parameter("multigrid velocity - max iter",
+                          gmg_max_iter_vel_,
+                          "Maximal number of CG iterations with GMG smoother");
 
       gmg_smoother_range_vel_ = 8.;
-      add_parameter("multigrid velocity - chebyshev range",
-                    gmg_smoother_range_vel_,
-                    "Chebyshev smoother: eigenvalue range parameter");
+      this->add_parameter("multigrid velocity - chebyshev range",
+                          gmg_smoother_range_vel_,
+                          "Chebyshev smoother: eigenvalue range parameter");
 
       gmg_smoother_max_eig_vel_ = 2.0;
-      add_parameter("multigrid velocity - chebyshev max eig",
-                    gmg_smoother_max_eig_vel_,
-                    "Chebyshev smoother: maximal eigenvalue");
+      this->add_parameter("multigrid velocity - chebyshev max eig",
+                          gmg_smoother_max_eig_vel_,
+                          "Chebyshev smoother: maximal eigenvalue");
 
       use_gmg_internal_energy_ = false;
-      add_parameter("multigrid energy",
-                    use_gmg_internal_energy_,
-                    "Use geometric multigrid for internal energy component");
+      this->add_parameter(
+          "multigrid energy",
+          use_gmg_internal_energy_,
+          "Use geometric multigrid for internal energy component");
 
       gmg_max_iter_en_ = 15;
-      add_parameter("multigrid energy - max iter",
-                    gmg_max_iter_en_,
-                    "Maximal number of CG iterations with GMG smoother");
+      this->add_parameter("multigrid energy - max iter",
+                          gmg_max_iter_en_,
+                          "Maximal number of CG iterations with GMG smoother");
 
       gmg_smoother_range_en_ = 15.;
-      add_parameter("multigrid energy - chebyshev range",
-                    gmg_smoother_range_en_,
-                    "Chebyshev smoother: eigenvalue range parameter");
+      this->add_parameter("multigrid energy - chebyshev range",
+                          gmg_smoother_range_en_,
+                          "Chebyshev smoother: eigenvalue range parameter");
 
       gmg_smoother_max_eig_en_ = 2.0;
-      add_parameter("multigrid energy - chebyshev max eig",
-                    gmg_smoother_max_eig_en_,
-                    "Chebyshev smoother: maximal eigenvalue");
+      this->add_parameter("multigrid energy - chebyshev max eig",
+                          gmg_smoother_max_eig_en_,
+                          "Chebyshev smoother: maximal eigenvalue");
 
       gmg_smoother_degree_ = 3;
-      add_parameter("multigrid - chebyshev degree",
-                    gmg_smoother_degree_,
-                    "Chebyshev smoother: degree");
+      this->add_parameter("multigrid - chebyshev degree",
+                          gmg_smoother_degree_,
+                          "Chebyshev smoother: degree");
 
       gmg_smoother_n_cg_iter_ = 10;
-      add_parameter(
+      this->add_parameter(
           "multigrid - chebyshev cg iter",
           gmg_smoother_n_cg_iter_,
           "Chebyshev smoother: number of CG iterations to approximate "
           "eigenvalue");
 
       gmg_min_level_ = 0;
-      add_parameter(
+      this->add_parameter(
           "multigrid - min level",
           gmg_min_level_,
           "Minimal mesh level to be visited in the geometric multigrid "
           "cycle where the coarse grid solver (Chebyshev) is called");
 
       tolerance_ = Number(1.0e-12);
-      add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
+      this->add_parameter(
+          "tolerance", tolerance_, "Tolerance for linear solvers");
 
       tolerance_linfty_norm_ = false;
-      add_parameter("tolerance linfty norm",
-                    tolerance_linfty_norm_,
-                    "Use the l_infty norm instead of the l_2 norm for the "
-                    "stopping criterion");
+      this->add_parameter(
+          "tolerance linfty norm",
+          tolerance_linfty_norm_,
+          "Use the l_infty norm instead of the l_2 norm for the "
+          "stopping criterion");
     }
 
 
@@ -232,13 +231,68 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::backward_euler_step(
+        const StateVector<Number> &old_state_vector,
+        const Number old_t,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights,
+        StateVector<Number> &new_state_vector,
+        Number tau) const
+    {
+      switch (stage_state_vectors.size()) {
+      case 0:
+        backward_euler_step<0>(old_state_vector,
+                               old_t,
+                               stage_state_vectors,
+                               stage_weights,
+                               new_state_vector,
+                               tau);
+        break;
+      case 1:
+        backward_euler_step<1>(old_state_vector,
+                               old_t,
+                               stage_state_vectors,
+                               stage_weights,
+                               new_state_vector,
+                               tau);
+        break;
+      case 2:
+        backward_euler_step<2>(old_state_vector,
+                               old_t,
+                               stage_state_vectors,
+                               stage_weights,
+                               new_state_vector,
+                               tau);
+        break;
+      case 3:
+        backward_euler_step<3>(old_state_vector,
+                               old_t,
+                               stage_state_vectors,
+                               stage_weights,
+                               new_state_vector,
+                               tau);
+        break;
+      case 4:
+        backward_euler_step<4>(old_state_vector,
+                               old_t,
+                               stage_state_vectors,
+                               stage_weights,
+                               new_state_vector,
+                               tau);
+        break;
+      default:
+        AssertThrow(false, dealii::ExcMessage("Unsupported number of stages."));
+      }
+    }
+
+
+    template <int dim, typename Number>
     template <int stages>
     void ParabolicModule<dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
         const Number old_t,
-        std::array<std::reference_wrapper<const StateVector<Number>>,
-                   stages> /*stage_state_vectors*/,
-        const std::array<Number, stages> /*stage_weights*/,
+        StageVectors /*stage_state_vectors*/,
+        StageWeights /*stage_weights*/,
         StateVector<Number> &new_state_vector,
         Number tau) const
     {
@@ -962,23 +1016,24 @@ namespace ryujin
 
       if (correction_needed) {
         /* If we can do a restart try that first: */
-        if (id_violation_strategy_ == IDViolationStrategy::raise_exception) {
-          n_restarts_++;
+        if (this->id_violation_strategy_ ==
+            IDViolationStrategy::raise_exception) {
+          this->n_restarts_++;
           /* Half step size is a good heuristic: */
           throw Restart{Number(0.5) * tau};
         } else {
-          n_corrections_++;
+          this->n_corrections_++;
           throw Correction();
         }
       }
 
       if (restart_needed) {
-        switch (id_violation_strategy_) {
+        switch (this->id_violation_strategy_) {
         case IDViolationStrategy::warn:
-          n_warnings_++;
+          this->n_warnings_++;
           break;
         case IDViolationStrategy::raise_exception:
-          n_restarts_++;
+          this->n_restarts_++;
           /* Half step size is a good heuristic: */
           throw Restart{Number(0.5) * tau};
         }

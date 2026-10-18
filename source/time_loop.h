@@ -7,11 +7,11 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/typed/hyperbolic_module.h>
 #include <ryujin/typed/postprocessor.h>
 
 #include "discretization.h"
 #include "error_evaluation.h"
-#include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
@@ -126,8 +126,7 @@ namespace ryujin
     HyperbolicModule<HyperbolicDescription, dim, Number> hyperbolic_module_;
     ParabolicModule<HyperbolicDescription, ParabolicDescription, dim, Number>
         parabolic_module_;
-    TimeIntegrator<HyperbolicDescription, ParabolicDescription, dim, Number>
-        time_integrator_;
+    TimeIntegrator<dim, Number> time_integrator_;
     Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
     MeshAdaptor<dim, Number> mesh_adaptor_;
     SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;
