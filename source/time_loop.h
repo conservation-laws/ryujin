@@ -126,8 +126,7 @@ namespace ryujin
     HyperbolicModule<HyperbolicDescription, dim, Number> hyperbolic_module_;
     ParabolicModule<HyperbolicDescription, ParabolicDescription, dim, Number>
         parabolic_module_;
-    TimeIntegrator<HyperbolicDescription, ParabolicDescription, dim, Number>
-        time_integrator_;
+    TimeIntegrator<dim, Number> time_integrator_;
     Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
     MeshAdaptor<dim, Number> mesh_adaptor_;
     SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;

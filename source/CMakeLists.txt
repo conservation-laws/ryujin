@@ -23,6 +23,7 @@ set(COMMON_SOURCE_FILES
   quantities.cc
   simd.cc
   sparsity_pattern.cc
+  time_integrator.cc
   version_info.cc
   vtu_output.cc
   )
@@ -61,7 +62,6 @@ set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
 # description. They are compiled once per equation:
 #
 set(PAIRING_DEPENDENT_SOURCE_FILES
-  time_integrator.cc
   time_loop.cc
   )
 
