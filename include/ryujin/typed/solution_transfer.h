@@ -10,10 +10,11 @@
 #include <ryujin/interface/discretization.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
+#include <ryujin/interface/solution_transfer.h>
 
-#include "mpi_ensemble.h"
-#include "observer_pointer.h"
-#include "state_vector.h"
+#include <mpi_ensemble.h>
+#include <observer_pointer.h>
+#include <state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -39,7 +40,7 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
-  class SolutionTransfer final : public dealii::ParameterAcceptor
+  class SolutionTransfer final : public Interface::SolutionTransfer<dim, Number>
   {
   public:
     /**
@@ -106,7 +107,8 @@ namespace ryujin
      * all necessary data to the triangulation to perform a projection
      * after mesh adaptation, or a Triangulation::store()/load() operation.
      */
-    void prepare_projection(const StateVector<Number> &old_state_vector);
+    void
+    prepare_projection(const StateVector<Number> &old_state_vector) override;
 
     /**
      * Project the data stored in the triangulation into a new state vector
@@ -120,53 +122,7 @@ namespace ryujin
      * prepare() and the @p new_state_vector must be appropriately
      * initialized with the new Partitioner.
      */
-    void project(StateVector<Number> &new_state_vector);
-
-    //@}
-    /**
-     * @name Information and statistics
-     */
-    //@{
-
-    /**
-     * Return the handle associated with the call back that was set by
-     * prepare_projection() and the associated data attached to the
-     * triangulation.
-     */
-    unsigned int get_handle() const
-    {
-      Assert(
-          handle_ != dealii::numbers::invalid_unsigned_int,
-          dealii::ExcMessage("Invalid handle: Cannot retrieve a valid "
-                             "handle. get_handle() can only be called after a "
-                             "call to prepare_projection(), or set_handle()."));
-      return handle_;
-    }
-
-    /**
-     * Set the handle associated data attached to the triangulation. This
-     * function has to be called after a Triangulation::load() operation
-     * and prior to the SolutionTransfer::project().
-     */
-    void set_handle(unsigned int handle)
-    {
-      Assert(
-          handle_ == dealii::numbers::invalid_unsigned_int,
-          dealii::ExcMessage("Invalid state: Cannot set handle because we "
-                             "already have a valid handle due to a prior call "
-                             "to prepare_projection(), or set_handle()."));
-      handle_ = handle;
-    }
-
-    /**
-     * Invalidate the currently stored handle. After a call to this function
-     * a new handle can be registered with prepare_projection(), or
-     * set_handle().
-     */
-    void reset_handle()
-    {
-      handle_ = dealii::numbers::invalid_unsigned_int;
-    }
+    void project(StateVector<Number> &new_state_vector) override;
 
   private:
     //@}
@@ -190,8 +146,6 @@ namespace ryujin
         offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
-
-    unsigned int handle_;
 
     //@}
     /**

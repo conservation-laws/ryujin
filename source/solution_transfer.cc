@@ -3,9 +3,9 @@
 // Copyright (C) 2024 by the ryujin authors
 //
 
-#include "solution_transfer.template.h"
-
 #include <instantiate.h>
+
+#include <ryujin/typed/solution_transfer.template.h>
 
 namespace ryujin
 {

@@ -10,6 +10,7 @@
 #include <ryujin/typed/hyperbolic_module.h>
 #include <ryujin/typed/initial_values.h>
 #include <ryujin/typed/postprocessor.h>
+#include <ryujin/typed/solution_transfer.h>
 
 #include "discretization.h"
 #include "error_evaluation.h"
@@ -19,7 +20,6 @@
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "quantities.h"
-#include "solution_transfer.h"
 #include "time_integrator.h"
 #include "vtu_output.h"
 

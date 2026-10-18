@@ -5,9 +5,10 @@
 
 #pragma once
 
-#include "computing_timer.h"
-#include "solution_transfer.h"
-#include "tensor_product_point_kernels.h"
+#include <ryujin/typed/solution_transfer.h>
+
+#include <computing_timer.h>
+#include <tensor_product_point_kernels.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/distributed/tria.h>
@@ -32,14 +33,13 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
-      : ParameterAcceptor(subsection)
+      : Interface::SolutionTransfer<dim, Number>(subsection)
       , limiter_(hyperbolic_system, subsection + "/mass transfer limiter")
       , mpi_ensemble_(mpi_ensemble)
       , discretization_(&discretization)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
-      , handle_(dealii::numbers::invalid_unsigned_int)
   {
   }
 
@@ -120,7 +120,7 @@ namespace ryujin
 
     auto &triangulation = discretization_->triangulation();
 
-    Assert(handle_ == dealii::numbers::invalid_unsigned_int,
+    Assert(this->handle_ == dealii::numbers::invalid_unsigned_int,
            dealii::ExcMessage(
                "You can only add one solution per SolutionTransfer object."));
 
@@ -133,7 +133,7 @@ namespace ryujin
      * -----------------------------------------------------------------------
      */
 
-    handle_ = triangulation.register_data_attach(
+    this->handle_ = triangulation.register_data_attach(
         [this, &old_state_vector](const auto cell,
                                   const dealii::CellStatus status) {
           const auto &dof_handler = offline_data_->dof_handler();
@@ -463,7 +463,7 @@ namespace ryujin
     auto &triangulation = discretization_->triangulation();
 
     Assert(
-        handle_ != dealii::numbers::invalid_unsigned_int,
+        this->handle_ != dealii::numbers::invalid_unsigned_int,
         dealii::ExcMessage(
             "Cannot project() a state vector without valid handle. "
             "prepare_projection() or set_handle() have to be called first."));
@@ -507,7 +507,7 @@ namespace ryujin
       U_dynamic_k.deal_ii_vector().zero_out_ghost_values();
 
     triangulation.notify_ready_to_unpack( //
-        handle_,
+        this->handle_,
         [this, &projected_mass, &projected_state, &U_dynamic](
             const auto &cell,
             const dealii::CellStatus status,
