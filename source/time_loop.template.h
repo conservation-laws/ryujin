@@ -64,6 +64,7 @@ namespace ryujin
                          offline_data_,
                          hyperbolic_module_,
                          parabolic_module_,
+                         parabolic_system_,
                          "/H - TimeIntegrator")
       , postprocessor_(offline_data_,
                        hyperbolic_system_,
@@ -1053,7 +1054,7 @@ namespace ryujin
     }();
 
     stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name();
-    if constexpr (!ParabolicSystem::is_identity) {
+    if (!parabolic_system_.get().is_identity()) {
       stream << "\n             (PAR) "
              << parabolic_system_.get().problem_name();
     }
@@ -1400,7 +1401,7 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << parabolic_module_.n_corrections()
            << " corr) ]" << std::endl;
 
-    if constexpr (!ParabolicSystem::is_identity)
+    if (!parabolic_system_.get().is_identity())
       parabolic_module_.print_solver_statistics(output);
 
     output << "        [ dt = "

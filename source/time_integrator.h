@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/parabolic_system.h>
+
 #include "convenience_macros.h"
 #include "hyperbolic_module.h"
 #include "mpi_ensemble.h"
@@ -283,6 +285,7 @@ namespace ryujin
                                          ParabolicDescription,
                                          dim,
                                          Number> &parabolic_module,
+                   const Interface::ParabolicSystem &parabolic_system,
                    const std::string &subsection = "/TimeIntegrator");
 
     /**
@@ -385,6 +388,7 @@ namespace ryujin
                                                   dim,
                                                   Number>>
         parabolic_module_;
+    dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 
     std::vector<StateVector<Number>> temp_;
 

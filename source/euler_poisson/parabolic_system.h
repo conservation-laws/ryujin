@@ -31,11 +31,6 @@ namespace ryujin
     public:
       ParabolicSystem(const std::string &subsection = "/ParabolicSystem");
 
-      /**
-       * Whether the parabolic system is the identity.
-       */
-      static constexpr bool is_identity = false;
-
       ACCESSOR_READ_ONLY(alpha)
 
       ACCESSOR_READ_ONLY(magnetic_drift_limit);

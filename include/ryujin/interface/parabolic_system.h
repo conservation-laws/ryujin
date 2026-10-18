@@ -39,6 +39,12 @@ namespace ryujin
       ACCESSOR_READ_ONLY(problem_name)
 
       /**
+       * Whether the parabolic system is the identity, i.e., whether the
+       * equation is purely hyperbolic.
+       */
+      ACCESSOR_READ_ONLY(is_identity)
+
+      /**
        * A list of component names for every dimension:
        */
       using Names = std::array<std::vector<std::string>, 3>;
@@ -82,6 +88,7 @@ namespace ryujin
                       const std::string &subsection)
           : ParameterAcceptor(subsection)
           , problem_name_(problem_name)
+          , is_identity_(false)
           , state_names_(state_names)
           , precomputed_names_(precomputed_names)
       {
@@ -94,6 +101,14 @@ namespace ryujin
        * are known.
        */
       std::string problem_name_;
+
+      /**
+       * Whether the parabolic system is the identity.
+       *
+       * @note A derived class that models the identity sets it in its
+       * constructor.
+       */
+      bool is_identity_;
 
       /**
        * The names of the state components for every dimension.

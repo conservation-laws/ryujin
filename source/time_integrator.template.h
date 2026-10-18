@@ -19,12 +19,14 @@ namespace ryujin
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicModule<HD, dim, Number> &hyperbolic_module,
       const ParabolicModule<HD, PD, dim, Number> &parabolic_module,
+      const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , hyperbolic_module_(&hyperbolic_module)
       , parabolic_module_(&parabolic_module)
+      , parabolic_system_(&parabolic_system)
   {
     cfl_min_ = Number(0.45);
     add_parameter(
@@ -56,7 +58,7 @@ namespace ryujin
     tau_max_ = std::numeric_limits<Number>::max();
     add_parameter("tau_max", tau_max_, "Largest time step size allowed.");
 
-    if (ParabolicSystem::is_identity)
+    if (parabolic_system_->is_identity())
       time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     else
       time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
@@ -174,7 +176,7 @@ namespace ryujin
         [[fallthrough]];
       case TimeSteppingScheme::erk_54: {
         AssertThrow(
-            ParabolicSystem::is_identity,
+            parabolic_system_->is_identity(),
             dealii::ExcMessage(
                 "The selected equation consists of a hyperbolic and nontrivial "
                 "parabolic subsystem and requires an IMEX timestepping "
@@ -193,7 +195,7 @@ namespace ryujin
         [[fallthrough]];
       case TimeSteppingScheme::strang_erk_43_cn: {
         AssertThrow(
-            !ParabolicSystem::is_identity,
+            !parabolic_system_->is_identity(),
             dealii::ExcMessage(
                 "The selected equation has a trivial parabolic subsystem and "
                 "should not be run with an IMEX timestepping scheme."));
@@ -219,7 +221,7 @@ namespace ryujin
   void TimeIntegrator<HD, PD, dim, Number>::prepare_state_vector(
       StateVector<Number> &state_vector, Number t) const
   {
-    if (!ParabolicSystem::is_identity)
+    if (!parabolic_system_->is_identity())
       parabolic_module_->prepare_state_vector(state_vector, t);
     hyperbolic_module_->prepare_state_vector(state_vector, t);
   }
