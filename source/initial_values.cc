@@ -3,8 +3,9 @@
 // Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
-#include "initial_values.template.h"
 #include <instantiate.h>
+
+#include <ryujin/typed/initial_values.template.h>
 
 namespace ryujin
 {

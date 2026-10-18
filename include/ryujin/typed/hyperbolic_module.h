@@ -9,9 +9,9 @@
 
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/offline_data.h>
+#include <ryujin/typed/initial_values.h>
 
 #include <convenience_macros.h>
-#include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <observer_pointer.h>
 #include <sparse_matrix.h>

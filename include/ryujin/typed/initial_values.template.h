@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "initial_values.h"
+#include <ryujin/typed/initial_values.h>
 
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
@@ -23,40 +23,42 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection)
-      : ParameterAcceptor(subsection)
+      : Interface::InitialValues<dim, Number>(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
   {
-    ParameterAcceptor::parse_parameters_call_back.connect(
+    this->parse_parameters_call_back.connect(
         std::bind(&InitialValues<HyperbolicDescription, dim, Number>::
                       parse_parameters_callback,
                   this));
 
     configuration_ = "uniform";
-    add_parameter("configuration",
-                  configuration_,
-                  "The initial state configuration. Valid names are given by "
-                  "any of the subsections defined below.");
+    this->add_parameter(
+        "configuration",
+        configuration_,
+        "The initial state configuration. Valid names are given by "
+        "any of the subsections defined below.");
 
     initial_direction_[0] = 1.;
-    add_parameter(
+    this->add_parameter(
         "direction",
         initial_direction_,
         "Initial direction of initial configuration (Galilei transform)");
 
     initial_position_[0] = 1.;
-    add_parameter(
+    this->add_parameter(
         "position",
         initial_position_,
         "Initial position of initial configuration (Galilei transform)");
 
     perturbation_ = 0.;
-    add_parameter("perturbation",
-                  perturbation_,
-                  "Add a random perturbation of the specified magnitude to the "
-                  "initial state.");
+    this->add_parameter(
+        "perturbation",
+        perturbation_,
+        "Add a random perturbation of the specified magnitude to the "
+        "initial state.");
 
     /*
      * And finally populate the initial state list with all initial state

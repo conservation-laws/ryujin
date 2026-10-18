@@ -8,11 +8,11 @@
 #include <compile_time_options.h>
 
 #include <ryujin/typed/hyperbolic_module.h>
+#include <ryujin/typed/initial_values.h>
 #include <ryujin/typed/postprocessor.h>
 
 #include "discretization.h"
 #include "error_evaluation.h"
-#include "initial_values.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
 #include "mpi_ensemble_container.h"

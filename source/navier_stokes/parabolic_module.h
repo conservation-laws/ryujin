@@ -9,10 +9,10 @@
 
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
+#include <ryujin/typed/initial_values.h>
 
 #include "observer_pointer.h"
 #include <convenience_macros.h>
-#include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <simd.h>
 
