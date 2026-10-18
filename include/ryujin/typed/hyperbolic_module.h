@@ -130,6 +130,9 @@ namespace ryujin
     void prepare_state_vector(StateVector<Number> &state_vector,
                               Number t) const override;
 
+    void
+    fill_precomputed_values(StateVector<Number> &state_vector) const override;
+
     /**
      * Given a reference to a previous state vector @p old_state_vector
      * perform an explicit euler step (and store the result in @p

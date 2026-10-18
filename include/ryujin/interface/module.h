@@ -87,9 +87,6 @@ namespace ryujin
    * some short cuts in the parabolic update that under rare circumstances
    * require limiting.
    *
-   * This exception is currently only used internally in the NavierStokes
-   * solver.
-   *
    * @ingroup TimeLoop
    */
   class Correction final
@@ -141,6 +138,8 @@ namespace ryujin
        * Prepare time stepping. A call to @p prepare() allocates temporary
        * storage and is necessary before any of the step functions can be
        * called.
+       *
+       * @note This function operates on the selected memory space.
        */
       virtual void prepare() = 0;
 
@@ -151,6 +150,8 @@ namespace ryujin
        *
        * @note This routine does not modify the parts owned by the other
        * system.
+       *
+       * @note This function operates on the selected memory space.
        */
       virtual void
       reinit_state_vector(StateVector<Number> &state_vector) const = 0;
@@ -158,6 +159,8 @@ namespace ryujin
       /**
        * Preprocess a given state vector for the time @p t in preparation
        * for a step of the module, an output, or a mesh transfer.
+       *
+       * @note This function operates on the selected memory space.
        */
       virtual void prepare_state_vector(StateVector<Number> &state_vector,
                                         Number t) const = 0;

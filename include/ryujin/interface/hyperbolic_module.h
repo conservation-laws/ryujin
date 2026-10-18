@@ -51,6 +51,17 @@ namespace ryujin
       //@{
 
       /**
+       * Populate the precomputed values of the state vector @p state_vector
+       * from its hyperbolic state and update the ghost values. In contrast
+       * to prepare_state_vector() no boundary conditions are applied and
+       * constrained degrees of freedom are not skipped.
+       *
+       * @note This function operates on the selected memory space.
+       */
+      virtual void
+      fill_precomputed_values(StateVector<Number> &state_vector) const = 0;
+
+      /**
        * Given a reference to a previous state vector @p old_state_vector
        * perform an explicit Euler step (and store the result in @p
        * new_state_vector). The function returns the chosen time step size
@@ -67,6 +78,8 @@ namespace ryujin
        *
        * @note The state vector @p old_state_vector has to be prepared
        * with prepare_state_vector() prior to calling the step function.
+       *
+       * @note This function operates on the selected memory space.
        */
       virtual Number
       step(const StateVector<Number> &old_state_vector,

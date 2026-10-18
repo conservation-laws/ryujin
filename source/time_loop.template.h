@@ -736,10 +736,7 @@ namespace ryujin
     analytic.state = initial_values_.get().interpolate_hyperbolic_vector(t);
 
     /* Populate precomputed values (without applying boundary conditions): */
-    hyperbolic_system_.get().fill_precomputed_values(
-        offline_data_, analytic, /*skip_constrained_dofs*/ false);
-    analytic.precomputed.template view<n_precomputed_values>()
-        .update_ghost_values();
+    hyperbolic_module_.fill_precomputed_values(analytic);
   }
 
 

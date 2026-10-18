@@ -52,6 +52,8 @@ namespace ryujin
        * The stage state vectors @p stage_state_vectors together with the
        * weights @p stage_weights are used to construct a modified high
        * order right-hand side / flux.
+       *
+       * @todo This function should always operate on the selected memory space.
        */
       virtual void
       backward_euler_step(const StateVector<Number> &old_state_vector,
@@ -68,6 +70,8 @@ namespace ryujin
        *
        * This variant is used in the TimeIntegrator class for the Strang
        * split variants.
+       *
+       * @todo This function should always operate on the selected memory space.
        */
       virtual void
       crank_nicolson_step(const StateVector<Number> &old_state_vector,
