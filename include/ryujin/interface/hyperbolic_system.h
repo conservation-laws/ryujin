@@ -26,10 +26,10 @@ namespace ryujin
      *
      * The first View<dim>::problem_dimension state names and the first
      * View<dim>::n_precomputed_values precomputed names are static: they
-     * are stored interleaved in StateVector::U and
+     * are stored interleaved in StateVector::state and
      * StateVector::precomputed. All remaining names are dynamic: they are
-     * stored as scalar vectors in StateVector::V (state) and
-     * StateVector::W (precomputed values).
+     * stored as scalar vectors in StateVector::dynamic_state and
+     * StateVector::dynamic_precomputed.
      *
      * The primitive names (View<dim>::problem_dimension entries) name the
      * primitive state returned by View::to_primitive_state(), and the
@@ -54,8 +54,9 @@ namespace ryujin
       /**
        * The names of the hyperbolic state components for dimension @p dim.
        *
-       * Hyperbolic state components are stored in $U$ (static) and $V$
-       * (dynamic) and evolved by the time integrator.
+       * Hyperbolic state components are stored in StateVector::state
+       * (static) and StateVector::dynamic_state (dynamic) and evolved by
+       * the time integrator.
        *
        * @note Valid once the run time parameters are parsed.
        */
@@ -82,7 +83,8 @@ namespace ryujin
        * @p dim.
        *
        * Precomputed values are stored in StateVector::precomputed (static)
-       * and $W$ (dynamic) and are derived from the state.
+       * and StateVector::dynamic_precomputed (dynamic) and are derived
+       * from the state.
        *
        * @note Valid once the run time parameters are parsed.
        */

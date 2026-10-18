@@ -25,8 +25,8 @@ namespace ryujin
      * names of its components.
      *
      * All components of a parabolic system are dynamic: they are stored as
-     * scalar vectors in StateVector::V (state) and StateVector::W
-     * (precomputed values).
+     * scalar vectors in StateVector::dynamic_state and
+     * StateVector::dynamic_precomputed.
      *
      * @ingroup ParabolicModule
      */
@@ -46,8 +46,8 @@ namespace ryujin
       /**
        * The names of the parabolic state components for dimension @p dim.
        *
-       * Parabolic state components are stored in $V$ and evolved by the
-       * time integrator.
+       * Parabolic state components are stored in
+       * StateVector::dynamic_state and evolved by the time integrator.
        *
        * @note Valid once the run time parameters are parsed.
        */
@@ -60,8 +60,8 @@ namespace ryujin
       /**
        * The names of the parabolic precomputed values for dimension @p dim.
        *
-       * Precomputed values are stored in $W$ and are derived from the
-       * state.
+       * Precomputed values are stored in StateVector::dynamic_precomputed
+       * and are derived from the state.
        *
        * @note Valid once the run time parameters are parsed.
        */

@@ -68,9 +68,7 @@ namespace ryujin
       , postprocessor_(offline_data_,
                        hyperbolic_system_,
                        parabolic_system_,
-                       hyperbolic_module_.initial_precomputed(),
-                       {"alpha"},
-                       {hyperbolic_module_.alpha()})
+                       hyperbolic_module_.initial_precomputed())
       , mesh_adaptor_(
             mpi_ensemble_, offline_data_, postprocessor_, "/I - MeshAdaptor")
       , solution_transfer_(mpi_ensemble_,
@@ -327,7 +325,7 @@ namespace ryujin
         {
           ComputingTimer::Scope scope(
               "time step [X]   - interpolate data vectors");
-          state_vector.U =
+          state_vector.state =
               initial_values_.get().interpolate_hyperbolic_vector();
         }
         debug_poison_invalid_values(state_vector, offline_data_);
@@ -733,7 +731,7 @@ namespace ryujin
 
     hyperbolic_module_.reinit_state_vector(analytic);
     parabolic_module_.reinit_state_vector(analytic);
-    analytic.U = initial_values_.get().interpolate_hyperbolic_vector(t);
+    analytic.state = initial_values_.get().interpolate_hyperbolic_vector(t);
 
     /* Populate precomputed values (without applying boundary conditions): */
     hyperbolic_system_.get().fill_precomputed_values(

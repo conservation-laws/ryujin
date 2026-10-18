@@ -607,7 +607,7 @@ namespace ryujin
 
       using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
 
-      auto &U = state_vector.U;
+      auto &U = state_vector.state;
       auto &precomputed = state_vector.precomputed;
 
       /*

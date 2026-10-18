@@ -3,8 +3,7 @@
 #include <discretization.h>
 #include <mpi_ensemble.h>
 #include <offline_data.h>
-#include <stub_parabolic_system.h>
-
+#include <ryujin/interface/parabolic_system.h>
 #include <ryujin/typed/postprocessor.h>
 
 #include <deal.II/base/mpi.h>
@@ -19,10 +18,10 @@
 //
 // Test the Postprocessor: We set up a small rectangular domain, populate
 // a state vector with synthetic data and extract a selection of
-// conserved, primitive, precomputed, and additional components. All components
-// are extracted on the host with extract(), and at all locally owned degrees of
-// freedom with the gather variant of extract() on the selected memory space.
-// Both results are printed.
+// conserved, primitive, precomputed, and dynamic state components. All
+// components are extracted on the host with extract(), and at all locally owned
+// degrees of freedom with the gather variant of extract() on the selected
+// memory space. Both results are printed.
 //
 
 using namespace ryujin;
@@ -34,8 +33,20 @@ constexpr int dim = 2;
 using Number = NUMBER;
 
 using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-using ParabolicSystem = StubParabolicSystem;
 using SystemView = typename HyperbolicSystem::template View<dim, Number>;
+
+/*
+ * A parabolic system with a single dynamic state component "phi":
+ */
+class ParabolicSystem final : public Interface::ParabolicSystem
+{
+public:
+  ParabolicSystem()
+      : Interface::ParabolicSystem(
+            "Test", {{{"phi"}, {"phi"}, {"phi"}}}, {}, "/ParabolicSystem")
+  {
+  }
+};
 
 
 /*
@@ -112,20 +123,19 @@ int main(int argc, char *argv[])
   const unsigned int n_owned = offline_data.n_locally_owned();
 
   /*
-   * Set up and populate a state vector, an additional scalar vector, and
-   * an (empty) initial precomputed vector. We use an implicit transfer
-   * policy so that we can create views on both memory spaces.
+   * Set up and populate a state vector with a single dynamic state
+   * component, and an (empty) initial precomputed vector. We use an implicit
+   * transfer policy so that we can create views on both memory spaces.
    */
 
   StateVector<Number> state_vector;
-  auto &[U, precomputed, parabolic] = state_vector;
+  auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
                                    SystemView::problem_dimension,
                                    TransferPolicy::implicit_transfers);
-  precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner,
-      SystemView::n_precomputed_values,
-      TransferPolicy::implicit_transfers);
+  Q.reinit_with_scalar_partitioner(scalar_partitioner,
+                                   SystemView::n_precomputed_values,
+                                   TransferPolicy::implicit_transfers);
 
   MultiComponentVector<Number> initial_precomputed;
   initial_precomputed.reinit_with_scalar_partitioner(
@@ -133,15 +143,15 @@ int main(int argc, char *argv[])
       SystemView::n_initial_precomputed_values,
       TransferPolicy::implicit_transfers);
 
-  ScalarVector<Number> alpha;
-  alpha.reinit_with_scalar_partitioner(
+  U_dynamic.resize(1);
+  auto &phi = U_dynamic[0];
+  phi.reinit_with_scalar_partitioner(
       scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 
   {
     const auto U_view = U.view<SystemView::problem_dimension>();
-    const auto precomputed_view =
-        precomputed.view<SystemView::n_precomputed_values>();
-    const auto alpha_view = alpha.view<1>();
+    const auto precomputed_view = Q.view<SystemView::n_precomputed_values>();
+    const auto phi_view = phi.view<1>();
 
     for (unsigned int i = 0; i < n_owned; ++i) {
       /* Use the global dof index so that the values are rank independent: */
@@ -159,26 +169,21 @@ int main(int argc, char *argv[])
         precomputed_i[d] = 100. * (d + 1) + index;
       precomputed_view.write_tensor(precomputed_i, i);
 
-      alpha_view.write_entry(0.5 * index, i);
+      phi_view.write_entry(0.5 * index, i);
     }
 
     U_view.update_ghost_values();
     precomputed_view.update_ghost_values();
-    alpha_view.update_ghost_values();
+    phi_view.update_ghost_values();
   }
 
   /* Set up the postprocessor: */
 
   Postprocessor<HyperbolicDescription, dim, Number> postprocessor(
-      offline_data,
-      hyperbolic_system,
-      parabolic_system,
-      initial_precomputed,
-      {"alpha"},
-      {alpha});
+      offline_data, hyperbolic_system, parabolic_system, initial_precomputed);
 
   const std::vector<std::string> selected{
-      "rho", "m_1", "E", "v_1", "p", "s", "eta_h", "alpha"};
+      "rho", "m_1", "E", "v_1", "p", "s", "eta_h", "phi"};
   const auto selection = postprocessor.prepare(selected);
 
   /* Extract on the host and gather on the selected memory space: */

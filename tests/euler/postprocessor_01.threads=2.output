@@ -77,7 +77,7 @@ component "eta_h":
   i = 7  host: 2.0700000000e+02  device: 2.0700000000e+02
   i = 8  host: 2.0800000000e+02  device: 2.0800000000e+02
 
-component "alpha":
+component "phi":
   i = 0  host: 0.0000000000e+00  device: 0.0000000000e+00
   i = 1  host: 5.0000000000e-01  device: 5.0000000000e-01
   i = 2  host: 1.0000000000e+00  device: 1.0000000000e+00

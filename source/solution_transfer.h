@@ -17,6 +17,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 
 #include <utility>
+#include <vector>
 
 namespace ryujin
 {
@@ -26,7 +27,13 @@ namespace ryujin
    * in deal.II. This class is, in contrast to the deal.II version,
    * specifically tailored to our needs:
    *  - it uses the MultiComponentVector directly,
-   *  - it implements a local mass matrix projection with convex limiting.
+   *  - it implements a local mass matrix projection with convex limiting
+   *    for the hyperbolic state,
+   *  - it interpolates the dynamic state, without limiting, on the
+   *    continuous finite element space of OfflineData::dof_handler_cg().
+   *
+   * @fixme generalize the transfer of the dynamic state to support
+   * OfflineData::dof_handler_cg() and OfflineData::dof_handler_dg()
    *
    * @ingroup Mesh
    */

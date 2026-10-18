@@ -59,10 +59,9 @@ void populate(StateVector<Number> &state_vector,
   const auto &scalar_partitioner = offline_data.scalar_partitioner();
   const unsigned int n_owned = offline_data.n_locally_owned();
 
-  auto &[U, precomputed, parabolic] = state_vector;
+  auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
   const auto U_view = U.view<SystemView::problem_dimension>();
-  const auto precomputed_view =
-      precomputed.view<SystemView::n_precomputed_values>();
+  const auto precomputed_view = Q.view<SystemView::n_precomputed_values>();
 
   for (unsigned int i = 0; i < n_owned; ++i) {
     const auto &position = positions.at(scalar_partitioner->local_to_global(i));
@@ -144,14 +143,13 @@ int main(int argc, char *argv[])
    */
 
   StateVector<Number> state_vector;
-  auto &[U, precomputed, parabolic] = state_vector;
+  auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
                                    SystemView::problem_dimension,
                                    TransferPolicy::implicit_transfers);
-  precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner,
-      SystemView::n_precomputed_values,
-      TransferPolicy::implicit_transfers);
+  Q.reinit_with_scalar_partitioner(scalar_partitioner,
+                                   SystemView::n_precomputed_values,
+                                   TransferPolicy::implicit_transfers);
   initial_precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner,
       SystemView::n_initial_precomputed_values,

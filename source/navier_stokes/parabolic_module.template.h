@@ -313,15 +313,13 @@ namespace ryujin
 
       using HostSpace = dealii::MemorySpace::Host;
 
-      copy_to_memory_space<HostSpace>(old_state_vector,
-                                      StateVectorPart::hyperbolic);
-      move_to_memory_space<HostSpace>(new_state_vector,
-                                      StateVectorPart::hyperbolic);
+      copy_to_memory_space<HostSpace>(old_state_vector, StateVectorPart::state);
+      move_to_memory_space<HostSpace>(new_state_vector, StateVectorPart::state);
 
       const auto old_U_view =
-          old_state_vector.U.template view<problem_dimension>();
+          old_state_vector.state.template view<problem_dimension>();
       const auto new_U_view =
-          new_state_vector.U.template view<problem_dimension>();
+          new_state_vector.state.template view<problem_dimension>();
 
       const auto lumped_mass_matrix_view =
           offline_data_->lumped_mass_matrix().template view<1>();
