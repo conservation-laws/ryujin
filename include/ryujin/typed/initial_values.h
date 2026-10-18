@@ -7,12 +7,13 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/initial_values.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 
-#include "initial_state_library.h"
-#include "mpi_ensemble.h"
-#include "observer_pointer.h"
-#include "offline_data.h"
+#include <initial_state_library.h>
+#include <mpi_ensemble.h>
+#include <observer_pointer.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -38,7 +39,7 @@ namespace ryujin
    * @ingroup InitialValues
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
-  class InitialValues final : public dealii::ParameterAcceptor
+  class InitialValues final : public Interface::InitialValues<dim, Number>
   {
   public:
     /**
@@ -69,7 +70,7 @@ namespace ryujin
      * Constructor.
      */
     InitialValues(const MPIEnsemble &mpi_ensemble,
-                  const OfflineData<dim, Number> &offline_data,
+                  const Interface::OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
                   const Interface::ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/InitialValues");
@@ -119,7 +120,7 @@ namespace ryujin
      * populated with initial values for a specified time @p t.
      */
     MultiComponentVector<Number>
-    interpolate_hyperbolic_vector(Number t = 0) const;
+    interpolate_hyperbolic_vector(Number t = 0) const override;
 
     /**
      * This routine computes and returns a vector populated with the
@@ -150,7 +151,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 

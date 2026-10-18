@@ -7,13 +7,13 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/postprocessor.h>
 
 #include <gpu.h>
 #include <loop.h>
 #include <observer_pointer.h>
-#include <offline_data.h>
 #include <simd.h>
 #include <state_vector.h>
 
@@ -60,7 +60,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Postprocessor(const OfflineData<dim, Number> &offline_data,
+    Postprocessor(const Interface::OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
                   const Interface::ParabolicSystem &parabolic_system,
                   const MultiComponentVector<Number> &initial_precomputed);
@@ -113,7 +113,8 @@ namespace ryujin
     auto reader(const Selection &selection,
                 const StateVector<Number> &state_vector) const;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
     const MultiComponentVector<Number> &initial_precomputed_;
@@ -130,7 +131,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Postprocessor<Description, dim, Number>::Postprocessor(
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const MultiComponentVector<Number> &initial_precomputed)

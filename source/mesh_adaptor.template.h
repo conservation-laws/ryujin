@@ -21,49 +21,51 @@ namespace ryujin
   template <int dim, typename Number>
   MeshAdaptor<dim, Number>::MeshAdaptor(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "MeshAdaptor"*/)
-      : ParameterAcceptor(subsection)
+      : Interface::MeshAdaptor<dim, Number>(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , postprocessor_(postprocessor)
-      , need_mesh_adaptation_(false)
   {
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
-    add_parameter("adaptation strategy",
-                  adaptation_strategy_,
-                  "The chosen adaptation strategy. Possible values are: global "
-                  "refinement, random adaptation, smoothness indicators");
+    this->add_parameter(
+        "adaptation strategy",
+        adaptation_strategy_,
+        "The chosen adaptation strategy. Possible values are: global "
+        "refinement, random adaptation, smoothness indicators");
 
     marking_strategy_ = MarkingStrategy::fixed_threshold;
-    add_parameter(
+    this->add_parameter(
         "marking strategy",
         marking_strategy_,
         "The chosen marking strategy. Possible values are: fixed threshold.");
 
     time_point_selection_strategy_ =
         TimePointSelectionStrategy::simulation_cycle;
-    add_parameter("time point selection strategy",
-                  time_point_selection_strategy_,
-                  "The chosen time point selection strategy. Possible values "
-                  "are: fixed time points, simulation cycle");
+    this->add_parameter(
+        "time point selection strategy",
+        time_point_selection_strategy_,
+        "The chosen time point selection strategy. Possible values "
+        "are: fixed time points, simulation cycle");
 
     /* Options for various adaptation strategies: */
-    enter_subsection("adaptation strategies");
+    this->enter_subsection("adaptation strategies");
     random_adaptation_mersenne_twister_seed_ = 42u;
-    add_parameter("random adaptation: mersenne_twister_seed",
-                  random_adaptation_mersenne_twister_seed_,
-                  "Seed for 64bit Mersenne Twister used for random refinement");
+    this->add_parameter(
+        "random adaptation: mersenne_twister_seed",
+        random_adaptation_mersenne_twister_seed_,
+        "Seed for 64bit Mersenne Twister used for random refinement");
 
-    add_parameter(
+    this->add_parameter(
         "smoothness indicators: quantities",
         smoothness_selected_quantities_,
         "List of conserved, primitive or precomputed quantities that will be "
         "used for constructing the smoothness indicator.");
 
     smoothness_local_global_ratio_ = 0.5;
-    add_parameter(
+    this->add_parameter(
         "smoothness indicators: local global ratio",
         smoothness_local_global_ratio_,
         "Ratio between local and global denominator value used for normalizing "
@@ -71,80 +73,86 @@ namespace ryujin
         "normalization, a value of 0 indicates pure local normalization.");
 
     smoothness_min_cutoff_ = 0.0;
-    add_parameter("smoothness indicators: min cutoff",
-                  smoothness_min_cutoff_,
-                  "minimal cutoff for the smoothness indicator: values below "
-                  "this threshold will be set to the cutoff value.");
+    this->add_parameter(
+        "smoothness indicators: min cutoff",
+        smoothness_min_cutoff_,
+        "minimal cutoff for the smoothness indicator: values below "
+        "this threshold will be set to the cutoff value.");
 
     smoothness_max_cutoff_ = 1.0e16;
-    add_parameter("smoothness indicators: max cutoff",
-                  smoothness_max_cutoff_,
-                  "minimal cutoff for the smoothness indicator: values above "
-                  "this threshold will be set to the cutoff value.");
+    this->add_parameter(
+        "smoothness indicators: max cutoff",
+        smoothness_max_cutoff_,
+        "minimal cutoff for the smoothness indicator: values above "
+        "this threshold will be set to the cutoff value.");
 
     smoothness_widen_stencil_ = 15;
-    add_parameter(
+    this->add_parameter(
         "smoothness indicators: stencil size",
         smoothness_widen_stencil_,
         "Number of layers to widen the smoothness indicator stencil.");
-    leave_subsection();
+    this->leave_subsection();
 
     /* Options for various marking strategies: */
 
-    enter_subsection("marking strategies");
+    this->enter_subsection("marking strategies");
 
     coarsening_threshold_ = 0.25;
-    add_parameter(
+    this->add_parameter(
         "coarsening threshold",
         coarsening_threshold_,
         "Marking: normalized or absolute threshold for selecting cells for "
         "coarsening (used in \"fixed threshhold\" marking strategy).");
 
     refinement_threshold_ = 0.75;
-    add_parameter(
+    this->add_parameter(
         "refinement threshold",
         refinement_threshold_,
         "Marking: normalized or absolute threshold for selecting cells for "
         "refinement (used in \"fixed threshold\" marking strategy).");
 
     absolute_threshold_ = false;
-    add_parameter("absolute threshold",
-                  absolute_threshold_,
-                  "Marking: if set to true use an absolute threshold for the "
-                  "\"refinement threshold\" and \"coarsening threshold\" "
-                  "values instead of a relative one. If this parameter is set "
-                  "to false then the smoothness indicator is normalized into "
-                  "the number range of [0., 1] and the threshold parameters "
-                  "are also expected to be a value in this interval.");
+    this->add_parameter(
+        "absolute threshold",
+        absolute_threshold_,
+        "Marking: if set to true use an absolute threshold for the "
+        "\"refinement threshold\" and \"coarsening threshold\" "
+        "values instead of a relative one. If this parameter is set "
+        "to false then the smoothness indicator is normalized into "
+        "the number range of [0., 1] and the threshold parameters "
+        "are also expected to be a value in this interval.");
 
     min_refinement_level_ = 0;
-    add_parameter("minimal refinement level",
-                  min_refinement_level_,
-                  "Marking: minimal refinement level of cells that will be "
-                  "maintained while coarsening cells.");
+    this->add_parameter(
+        "minimal refinement level",
+        min_refinement_level_,
+        "Marking: minimal refinement level of cells that will be "
+        "maintained while coarsening cells.");
 
     max_refinement_level_ = 1000;
-    add_parameter("maximal refinement level",
-                  max_refinement_level_,
-                  "Marking: maximal refinement level of cells that will be "
-                  "maintained while refininig cells.");
-    leave_subsection();
+    this->add_parameter(
+        "maximal refinement level",
+        max_refinement_level_,
+        "Marking: maximal refinement level of cells that will be "
+        "maintained while refininig cells.");
+    this->leave_subsection();
 
     /* Options for various time point selection strategies: */
 
-    enter_subsection("time point selection strategies");
+    this->enter_subsection("time point selection strategies");
     adaptation_time_points_ = {};
-    add_parameter("fixed time points",
-                  adaptation_time_points_,
-                  "List of time points in (simulation) time at which we will "
-                  "perform a mesh adaptation cycle.");
+    this->add_parameter(
+        "fixed time points",
+        adaptation_time_points_,
+        "List of time points in (simulation) time at which we will "
+        "perform a mesh adaptation cycle.");
 
     adaptation_cycle_interval_ = 10;
-    add_parameter("simulation cycle: interval",
-                  adaptation_cycle_interval_,
-                  "The nth simulation cycle at which we will "
-                  "perform mesh adapation.");
-    leave_subsection();
+    this->add_parameter("simulation cycle: interval",
+                        adaptation_cycle_interval_,
+                        "The nth simulation cycle at which we will "
+                        "perform mesh adapation.");
+    this->leave_subsection();
 
     const auto call_back = [this] {
       /* Initialize Mersenne Twister with configured seed: */
@@ -152,7 +160,7 @@ namespace ryujin
     };
 
     call_back();
-    ParameterAcceptor::parse_parameters_call_back.connect(call_back);
+    this->parse_parameters_call_back.connect(call_back);
   }
 
 
@@ -176,7 +184,7 @@ namespace ryujin
     selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
-    need_mesh_adaptation_ = false;
+    this->need_mesh_adaptation_ = false;
   }
 
 
@@ -204,7 +212,7 @@ namespace ryujin
           [&](const Number &t_refinement) {
             if (t < t_refinement)
               return false;
-            need_mesh_adaptation_ = true;
+            this->need_mesh_adaptation_ = true;
             return true;
           });
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
@@ -213,7 +221,7 @@ namespace ryujin
     case TimePointSelectionStrategy::simulation_cycle: {
       /* check whether we reached a cycle interval: */
       if (cycle % adaptation_cycle_interval_ == 0)
-        need_mesh_adaptation_ = true;
+        this->need_mesh_adaptation_ = true;
     } break;
 
     default:
@@ -221,7 +229,7 @@ namespace ryujin
       __builtin_trap();
     }
 
-    if (!need_mesh_adaptation_)
+    if (!this->need_mesh_adaptation_)
       return;
 
     /*

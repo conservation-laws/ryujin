@@ -7,11 +7,11 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
+#include <ryujin/typed/initial_values.h>
 
-#include <initial_values.h>
 #include <mpi_ensemble.h>
-#include <offline_data.h>
 #include <stub_parabolic_system.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -53,13 +53,14 @@ namespace ryujin
     /**
      * Constructor.
      */
-    StubParabolicModule(const MPIEnsemble & /*mpi_ensemble*/,
-                        const OfflineData<dim, Number> & /*offline_data*/,
-                        const HyperbolicSystem & /*hyperbolic_system*/,
-                        const ParabolicSystem & /*parabolic_system*/,
-                        const InitialValues<HyperbolicDescription, dim, Number>
-                            & /*initial_values*/,
-                        const std::string &subsection = "StubParabolicModule")
+    StubParabolicModule(
+        const MPIEnsemble & /*mpi_ensemble*/,
+        const Interface::OfflineData<dim, Number> & /*offline_data*/,
+        const HyperbolicSystem & /*hyperbolic_system*/,
+        const ParabolicSystem & /*parabolic_system*/,
+        const InitialValues<HyperbolicDescription, dim, Number>
+            & /*initial_values*/,
+        const std::string &subsection = "StubParabolicModule")
         : Interface::ParabolicModule<dim, Number>(subsection)
     {
     }

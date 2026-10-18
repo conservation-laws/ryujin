@@ -8,18 +8,18 @@
 #include <compile_time_options.h>
 
 #include <ryujin/typed/hyperbolic_module.h>
+#include <ryujin/typed/initial_values.h>
 #include <ryujin/typed/postprocessor.h>
+#include <ryujin/typed/solution_transfer.h>
 
 #include "discretization.h"
 #include "error_evaluation.h"
-#include "initial_values.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
 #include "mpi_ensemble_container.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "quantities.h"
-#include "solution_transfer.h"
 #include "time_integrator.h"
 #include "vtu_output.h"
 

@@ -132,10 +132,10 @@ namespace ryujin
       }
 
 
-      Geometry<dim>::HP_Collection
-      populate_hp_collections(const unsigned int fe_degree,
-                              typename ryujin::Discretization<dim>::Collection
-                                  &collection) const final
+      Geometry<dim>::HP_Collection populate_hp_collections(
+          const unsigned int fe_degree,
+          typename ryujin::Interface::Discretization<dim>::Collection
+              &collection) const final
       {
         using namespace dealii;
 
