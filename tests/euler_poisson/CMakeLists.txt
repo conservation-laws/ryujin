@@ -12,7 +12,7 @@ include_directories(
   )
 
 set(TEST_LIBRARIES
-  obj_common obj_${EQUATION} obj_${EQUATION}_dependent
+  obj_common obj_${EQUATION}
   obj_euler obj_euler_dependent
   )
 set(TEST_TARGET ryujin)

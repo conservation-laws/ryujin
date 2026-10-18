@@ -7,7 +7,6 @@
 
 #include "computing_timer.h"
 #include "gpu.h"
-#include "mpi_ensemble_container.h"
 #include "state_vector.h"
 #include "time_loop.h"
 #include "version_info.h"
@@ -29,70 +28,11 @@ using namespace dealii;
 
 namespace ryujin
 {
-  template <typename HD, typename PD, int dim, typename Number>
-  TimeLoop<HD, PD, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
+  template <int dim, typename Number>
+  TimeLoop<dim, Number>::TimeLoop(
+      Interface::Simulation<dim, Number> &simulation)
       : ParameterAcceptor("/A - TimeLoop")
-      , mpi_ensemble_(mpi_comm,
-                      [] {
-                        if constexpr (has_n_mpi_ensembles_v<HD>)
-                          return HD::n_mpi_ensembles();
-                        else
-                          return 1;
-                      }())
-      , hyperbolic_system_(mpi_ensemble_, "/B - Equation")
-      , parabolic_system_(mpi_ensemble_, "/B - Equation")
-      , discretization_(mpi_ensemble_, "/C - Discretization")
-      , offline_data_(mpi_ensemble_, discretization_, "/D - OfflineData")
-      , initial_values_(mpi_ensemble_,
-                        "/E - InitialValues",
-                        mpi_ensemble_,
-                        offline_data_,
-                        hyperbolic_system_,
-                        parabolic_system_)
-      , hyperbolic_module_(mpi_ensemble_,
-                           offline_data_,
-                           hyperbolic_system_,
-                           initial_values_,
-                           "/F - HyperbolicModule")
-      , parabolic_module_(mpi_ensemble_,
-                          offline_data_,
-                          hyperbolic_system_,
-                          parabolic_system_,
-                          initial_values_,
-                          "/G - ParabolicModule")
-      , time_integrator_(mpi_ensemble_,
-                         hyperbolic_system_,
-                         parabolic_system_,
-                         hyperbolic_module_,
-                         parabolic_module_,
-                         "/H - TimeIntegrator")
-      , postprocessor_(offline_data_,
-                       hyperbolic_system_,
-                       parabolic_system_,
-                       hyperbolic_module_.initial_precomputed())
-      , mesh_adaptor_(
-            mpi_ensemble_, offline_data_, postprocessor_, "/I - MeshAdaptor")
-      , solution_transfer_(mpi_ensemble_,
-                           discretization_,
-                           offline_data_,
-                           hyperbolic_system_,
-                           parabolic_system_,
-                           "/I - MeshAdaptor")
-      , vtu_output_(mpi_ensemble_,
-                    offline_data_,
-                    hyperbolic_system_,
-                    postprocessor_,
-                    "/J - VTUOutput")
-      , quantities_(mpi_ensemble_,
-                    offline_data_,
-                    hyperbolic_system_,
-                    postprocessor_,
-                    "/K - Quantities")
-      , error_evaluation_(mpi_ensemble_,
-                          offline_data_,
-                          hyperbolic_system_,
-                          postprocessor_,
-                          "/L - ErrorEvaluation")
+      , simulation_(simulation)
       , n_global_dofs_(0)
       , n_devices_(0)
   {
@@ -235,37 +175,49 @@ namespace ryujin
    */
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::run()
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::run()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
+
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    auto &discretization = simulation_.discretization();
+    auto &offline_data = simulation_.offline_data();
+    const auto &initial_values = simulation_.initial_values();
+    auto &hyperbolic_module = simulation_.hyperbolic_module();
+    auto &parabolic_module = simulation_.parabolic_module();
+    auto &time_integrator = simulation_.time_integrator();
+    auto &mesh_adaptor = simulation_.mesh_adaptor();
+    auto &vtu_output = simulation_.vtu_output();
+    auto &quantities = simulation_.quantities();
+    auto &error_evaluation = simulation_.error_evaluation();
 
     DeviceTimer::reinit();
     ComputingTimer::reinit();
 
     {
       base_name_ensemble_ = base_name_;
-      if (mpi_ensemble_.n_ensembles() > 1) {
+      if (mpi_ensemble.n_ensembles() > 1) {
         print_info("setting up MPI ensemble");
         unsigned int digits =
-            dealii::Utilities::needed_digits(mpi_ensemble_.n_ensembles() - 1);
+            dealii::Utilities::needed_digits(mpi_ensemble.n_ensembles() - 1);
         base_name_ensemble_ +=
             "-ensemble_" +
-            dealii::Utilities::int_to_string(mpi_ensemble_.ensemble(), digits);
+            dealii::Utilities::int_to_string(mpi_ensemble.ensemble(), digits);
       }
     }
 
     /* Attach log file and record runtime parameters: */
 
-    if (mpi_ensemble_.world_rank() == 0)
+    if (mpi_ensemble.world_rank() == 0)
       logfile_.open(base_name_ + ".log");
 
     print_parameters(logfile_);
 
     if (enable_compute_error_)
-      error_evaluation_.prepare(base_name_);
+      error_evaluation.prepare(base_name_);
 
     /*
      * Prepare data structures:
@@ -279,21 +231,22 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       print_info("preparing compute kernels");
 
-      discretization_.update_mapping();
-      offline_data_.prepare(problem_dimension, n_precomputed_values);
+      discretization.update_mapping();
+      offline_data.prepare(hyperbolic_module.problem_dimension(),
+                           hyperbolic_module.n_precomputed_values());
 
-      hyperbolic_module_.prepare();
-      parabolic_module_.prepare();
-      time_integrator_.prepare();
-      mesh_adaptor_.prepare(/*needs current timepoint*/ t);
-      vtu_output_.prepare();
-      quantities_.prepare(base_name_ensemble_);
+      hyperbolic_module.prepare();
+      parabolic_module.prepare();
+      time_integrator.prepare();
+      mesh_adaptor.prepare(/*needs current timepoint*/ t);
+      vtu_output.prepare();
+      quantities.prepare(base_name_ensemble_);
       print_mpi_partition(logfile_);
 
-      if (mpi_ensemble_.ensemble_rank() == 0)
+      if (mpi_ensemble.ensemble_rank() == 0)
         n_global_dofs_ = dealii::Utilities::MPI::sum(
-            offline_data_.dof_handler().n_dofs(),
-            mpi_ensemble_.ensemble_leader_communicator());
+            offline_data.dof_handler().n_dofs(),
+            mpi_ensemble.ensemble_leader_communicator());
     };
 
     {
@@ -318,26 +271,25 @@ namespace ryujin
       } else {
         print_info("creating mesh and interpolating initial values");
 
-        discretization_.prepare(base_name_ensemble_);
+        discretization.prepare(base_name_ensemble_);
 
         prepare_compute_kernels();
 
-        hyperbolic_module_.reinit_state_vector(state_vector);
-        parabolic_module_.reinit_state_vector(state_vector);
+        hyperbolic_module.reinit_state_vector(state_vector);
+        parabolic_module.reinit_state_vector(state_vector);
         {
           ComputingTimer::Scope scope(
               "time step [X]   - interpolate data vectors");
-          state_vector.state =
-              initial_values_.get().interpolate_hyperbolic_vector();
+          state_vector.state = initial_values.interpolate_hyperbolic_vector();
         }
-        debug_poison_invalid_values(state_vector, offline_data_);
+        debug_poison_invalid_values(state_vector, offline_data);
       }
     }
 
     print_device_information(logfile_);
 
     /* Prepare the state vector for time stepping. */
-    time_integrator_.prepare_state_vector(state_vector, t);
+    time_integrator.prepare_state_vector(state_vector, t);
 
     /*
      * The honorable main loop:
@@ -378,7 +330,7 @@ namespace ryujin
 
       if (enable_compute_quantities_) {
         ComputingTimer::Scope scope("time step [X]   - accumulate quantities");
-        quantities_.accumulate(state_vector, t);
+        quantities.accumulate(state_vector, t);
       }
 
       /* Perform output tasks whenever we reach a timer tick: */
@@ -396,12 +348,12 @@ namespace ryujin
 
           if (do_compute_error) {
             ComputingTimer::Scope scope("time step [X]   - compute error");
-            error_evaluation_.write_out(state_vector, analytic, t);
+            error_evaluation.write_out(state_vector, analytic, t);
           }
 
           if (do_output_analytic) {
             /* Apply boundary conditions and precompute values for output: */
-            time_integrator_.prepare_state_vector(analytic, t);
+            time_integrator.prepare_state_vector(analytic, t);
 
             output(analytic,
                    base_name_ensemble_ + "-analytic_solution",
@@ -415,7 +367,7 @@ namespace ryujin
         if (enable_compute_quantities_ &&
             (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
           ComputingTimer::Scope scope("time step [X]   - write out quantities");
-          quantities_.write_out(state_vector, t, timer_cycle);
+          quantities.write_out(state_vector, t, timer_cycle);
         }
 
         ++timer_cycle;
@@ -433,10 +385,10 @@ namespace ryujin
           ComputingTimer::Scope scope(
               "time step [X]   - analyze for mesh adaptation");
 
-          mesh_adaptor_.analyze(state_vector, t, cycle);
+          mesh_adaptor.analyze(state_vector, t, cycle);
         }
 
-        if (mesh_adaptor_.need_mesh_adaptation()) {
+        if (mesh_adaptor.need_mesh_adaptation()) {
           ComputingTimer::Scope scope_1("(re)initialize data structures");
           ComputingTimer::Scope scope_2(
               "time step [X]   - perform mesh adaptation");
@@ -446,13 +398,13 @@ namespace ryujin
                                                prepare_compute_kernels);
 
           /* Prepare the state vector for time stepping. */
-          time_integrator_.prepare_state_vector(state_vector, t);
+          time_integrator.prepare_state_vector(state_vector, t);
         }
       }
 
       /* Perform a time step: */
 
-      const auto tau = time_integrator_.step(
+      const auto tau = time_integrator.step(
           state_vector,
           t,
           enforce_t_final_
@@ -461,7 +413,7 @@ namespace ryujin
 
       t += tau;
 
-      time_integrator_.prepare_state_vector(state_vector, t);
+      time_integrator.prepare_state_vector(state_vector, t);
 
       /* Synchronize wall time: */
 
@@ -470,7 +422,7 @@ namespace ryujin
         ComputingTimer::Scope scope(
             "time step [X] _ - synchronization barriers");
         wall_time =
-            Utilities::MPI::max(wall_time, mpi_ensemble_.world_communicator());
+            Utilities::MPI::max(wall_time, mpi_ensemble.world_communicator());
       }
 
       /* Print and record cycle statistics: */
@@ -534,16 +486,16 @@ namespace ryujin
       /* Output final error: */
       StateVector<Number> analytic;
       interpolate_analytic_solution(analytic, t);
-      const auto norms = error_evaluation_.compute(state_vector, analytic);
+      const auto norms = error_evaluation.compute(state_vector, analytic);
 
       logfile_ << std::endl << "Computed errors:" << std::endl << std::endl;
-      error_evaluation_.print_summary(logfile_, t, n_global_dofs_, norms);
-      error_evaluation_.print_summary(std::cout, t, n_global_dofs_, norms);
+      error_evaluation.print_summary(logfile_, t, n_global_dofs_, norms);
+      error_evaluation.print_summary(std::cout, t, n_global_dofs_, norms);
     }
 
     /* Print debug file to screen on rank 0: */
 
-    if (mpi_ensemble_.world_rank() == 0) {
+    if (mpi_ensemble.world_rank() == 0) {
       if (debug_command_ != "") {
         auto result [[maybe_unused]] = std::system(debug_command_.c_str());
       }
@@ -564,9 +516,9 @@ namespace ryujin
    */
 
 
-  template <typename HD, typename PD, int dim, typename Number>
+  template <int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<HD, PD, dim, Number>::read_checkpoint(
+  void TimeLoop<dim, Number>::read_checkpoint(
       StateVector<Number> &state_vector,
       const std::string &base_name,
       Number &t,
@@ -577,13 +529,21 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::read_checkpoint()" << std::endl;
 #endif
 
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    auto &discretization = simulation_.discretization();
+    const auto &offline_data = simulation_.offline_data();
+    const auto &hyperbolic_module = simulation_.hyperbolic_module();
+    const auto &parabolic_module = simulation_.parabolic_module();
+    const auto &time_integrator = simulation_.time_integrator();
+    auto &solution_transfer = simulation_.solution_transfer();
+
     /*
      * Initialize discretization, read in the mesh, and initialize everything:
      */
 
-    discretization_.refinement() = 0; /* do not refine */
-    discretization_.prepare(base_name);
-    discretization_.triangulation().load(base_name + "-checkpoint.mesh");
+    discretization.refinement() = 0; /* do not refine */
+    discretization.prepare(base_name);
+    discretization.triangulation().load(base_name + "-checkpoint.mesh");
 
     prepare_compute_kernels();
 
@@ -594,7 +554,7 @@ namespace ryujin
     std::string name = base_name + "-checkpoint";
 
     unsigned int transfer_handle;
-    if (mpi_ensemble_.ensemble_rank() == 0) {
+    if (mpi_ensemble.ensemble_rank() == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
@@ -604,43 +564,40 @@ namespace ryujin
 
     int ierr;
     if constexpr (std::is_same_v<Number, double>)
-      ierr = MPI_Bcast(
-          &t, 1, MPI_DOUBLE, 0, mpi_ensemble_.ensemble_communicator());
+      ierr =
+          MPI_Bcast(&t, 1, MPI_DOUBLE, 0, mpi_ensemble.ensemble_communicator());
     else
       ierr =
-          MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_ensemble_.ensemble_communicator());
+          MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_ensemble.ensemble_communicator());
     AssertThrowMPI(ierr);
 
-    ierr = MPI_Bcast(&timer_cycle,
-                     1,
-                     MPI_UNSIGNED,
-                     0,
-                     mpi_ensemble_.ensemble_communicator());
+    ierr = MPI_Bcast(
+        &timer_cycle, 1, MPI_UNSIGNED, 0, mpi_ensemble.ensemble_communicator());
     AssertThrowMPI(ierr);
 
     ierr = MPI_Bcast(&transfer_handle,
                      1,
                      MPI_UNSIGNED,
                      0,
-                     mpi_ensemble_.ensemble_communicator());
+                     mpi_ensemble.ensemble_communicator());
     AssertThrowMPI(ierr);
 
     /* Now read in the state vector: */
 
-    hyperbolic_module_.reinit_state_vector(state_vector);
-    parabolic_module_.reinit_state_vector(state_vector);
+    hyperbolic_module.reinit_state_vector(state_vector);
+    parabolic_module.reinit_state_vector(state_vector);
 
-    solution_transfer_.set_handle(transfer_handle);
-    solution_transfer_.project(state_vector);
-    solution_transfer_.reset_handle();
-    debug_poison_invalid_values(state_vector, offline_data_);
+    solution_transfer.set_handle(transfer_handle);
+    solution_transfer.project(state_vector);
+    solution_transfer.reset_handle();
+    debug_poison_invalid_values(state_vector, offline_data);
 
-    time_integrator_.prepare_state_vector(state_vector, t);
+    time_integrator.prepare_state_vector(state_vector, t);
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::write_checkpoint(
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::write_checkpoint(
       const StateVector<Number> &state_vector,
       const std::string &base_name,
       const Number &t,
@@ -650,41 +607,45 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
 #endif
 
-    solution_transfer_.prepare_projection(state_vector);
-    const auto transfer_handle = solution_transfer_.get_handle();
-    solution_transfer_.reset_handle();
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    const auto &discretization = simulation_.discretization();
+    auto &solution_transfer = simulation_.solution_transfer();
+
+    solution_transfer.prepare_projection(state_vector);
+    const auto transfer_handle = solution_transfer.get_handle();
+    solution_transfer.reset_handle();
 
     std::string name = base_name + "-checkpoint";
 
-    if (mpi_ensemble_.ensemble_rank() == 0) {
+    if (mpi_ensemble.ensemble_rank() == 0) {
       for (const std::string suffix :
            {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
         if (std::filesystem::exists(name + suffix))
           std::filesystem::rename(name + suffix, name + suffix + "~");
     }
 
-    const auto &triangulation = discretization_.triangulation();
+    const auto &triangulation = discretization.triangulation();
     triangulation.save(name + ".mesh");
 
     /*
      * Now, write out metadata on rank 0:
      */
 
-    if (mpi_ensemble_.ensemble_rank() == 0) {
+    if (mpi_ensemble.ensemble_rank() == 0) {
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
       oa << t << timer_cycle << transfer_handle;
     }
 
-    const int ierr = MPI_Barrier(mpi_ensemble_.ensemble_communicator());
+    const int ierr = MPI_Barrier(mpi_ensemble.ensemble_communicator());
     AssertThrowMPI(ierr);
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
+  template <int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<HD, PD, dim, Number>::adapt_mesh_and_transfer_state_vector(
+  void TimeLoop<dim, Number>::adapt_mesh_and_transfer_state_vector(
       StateVector<Number> &state_vector,
       const Callable &prepare_compute_kernels)
   {
@@ -693,35 +654,43 @@ namespace ryujin
               << std::endl;
 #endif
 
-    AssertThrow(mpi_ensemble_.n_ensembles() == 1, dealii::ExcNotImplemented());
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    auto &discretization = simulation_.discretization();
+    const auto &offline_data = simulation_.offline_data();
+    const auto &hyperbolic_module = simulation_.hyperbolic_module();
+    const auto &parabolic_module = simulation_.parabolic_module();
+    const auto &mesh_adaptor = simulation_.mesh_adaptor();
+    auto &solution_transfer = simulation_.solution_transfer();
+
+    AssertThrow(mpi_ensemble.n_ensembles() == 1, dealii::ExcNotImplemented());
 
     /*
      * Mark cells for coarsening and refinement and set up triangulation:
      */
 
-    auto &triangulation = discretization_.triangulation();
-    mesh_adaptor_.mark_cells_for_coarsening_and_refinement(triangulation);
+    auto &triangulation = discretization.triangulation();
+    mesh_adaptor.mark_cells_for_coarsening_and_refinement(triangulation);
 
     triangulation.prepare_coarsening_and_refinement();
 
-    solution_transfer_.prepare_projection(state_vector);
+    solution_transfer.prepare_projection(state_vector);
 
     /* Execute mesh adaptation and project old state to new state vector: */
 
     triangulation.execute_coarsening_and_refinement();
     prepare_compute_kernels();
 
-    hyperbolic_module_.reinit_state_vector(state_vector);
-    parabolic_module_.reinit_state_vector(state_vector);
+    hyperbolic_module.reinit_state_vector(state_vector);
+    parabolic_module.reinit_state_vector(state_vector);
 
-    solution_transfer_.project(state_vector);
-    solution_transfer_.reset_handle();
-    debug_poison_invalid_values(state_vector, offline_data_);
+    solution_transfer.project(state_vector);
+    solution_transfer.reset_handle();
+    debug_poison_invalid_values(state_vector, offline_data);
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::interpolate_analytic_solution(
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::interpolate_analytic_solution(
       StateVector<Number> &analytic, const Number t)
   {
 #ifdef DEBUG_OUTPUT
@@ -729,27 +698,32 @@ namespace ryujin
               << std::endl;
 #endif
 
+    const auto &initial_values = simulation_.initial_values();
+    const auto &hyperbolic_module = simulation_.hyperbolic_module();
+    const auto &parabolic_module = simulation_.parabolic_module();
+
     ComputingTimer::Scope scope("time step [X]   - interpolate data vectors");
 
-    hyperbolic_module_.reinit_state_vector(analytic);
-    parabolic_module_.reinit_state_vector(analytic);
-    analytic.state = initial_values_.get().interpolate_hyperbolic_vector(t);
+    hyperbolic_module.reinit_state_vector(analytic);
+    parabolic_module.reinit_state_vector(analytic);
+    analytic.state = initial_values.interpolate_hyperbolic_vector(t);
 
     /* Populate precomputed values (without applying boundary conditions): */
-    hyperbolic_module_.fill_precomputed_values(analytic);
+    hyperbolic_module.fill_precomputed_values(analytic);
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void
-  TimeLoop<HD, PD, dim, Number>::output(const StateVector<Number> &state_vector,
-                                        const std::string &name,
-                                        const Number t,
-                                        const unsigned int cycle)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::output(const StateVector<Number> &state_vector,
+                                     const std::string &name,
+                                     const Number t,
+                                     const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
 #endif
+
+    auto &vtu_output = simulation_.vtu_output();
 
     const bool do_full_output =
         (cycle % timer_output_full_multiplier_ == 0) && enable_output_full_;
@@ -766,7 +740,7 @@ namespace ryujin
     ComputingTimer::Scope scope("time step [X]   - perform vtu output");
     print_info("scheduling output");
 
-    vtu_output_.schedule_output(
+    vtu_output.schedule_output(
         state_vector, name, t, cycle, do_full_output, do_levelsets);
 
     /*
@@ -775,7 +749,7 @@ namespace ryujin
      * normailization:
      */
     if (cycle == 0)
-      vtu_output_.reset_bounds();
+      vtu_output.reset_bounds();
   }
 
 
@@ -786,10 +760,12 @@ namespace ryujin
    */
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_parameters(std::ostream &stream)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_parameters(std::ostream &stream)
   {
-    if (mpi_ensemble_.world_rank() != 0)
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     /* Output commit and library information: */
@@ -810,9 +786,12 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_mpi_partition(std::ostream &stream)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_mpi_partition(std::ostream &stream)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    const auto &offline_data = simulation_.offline_data();
+
     /*
      * Fixme: this conversion to double is really not elegant. We should
      * improve the Utilities::MPI::min_max_avg function in deal.II to
@@ -821,28 +800,28 @@ namespace ryujin
 
     // NOLINTBEGIN
     std::vector<double> values = {
-        (double)offline_data_.n_export_indices(),
-        (double)offline_data_.n_locally_internal(),
-        (double)offline_data_.n_locally_owned(),
-        (double)offline_data_.n_locally_relevant(),
-        (double)offline_data_.n_export_indices() /
-            (double)offline_data_.n_locally_relevant(),
-        (double)offline_data_.n_locally_internal() /
-            (double)offline_data_.n_locally_relevant(),
-        (double)offline_data_.n_locally_owned() /
-            (double)offline_data_.n_locally_relevant()};
+        (double)offline_data.n_export_indices(),
+        (double)offline_data.n_locally_internal(),
+        (double)offline_data.n_locally_owned(),
+        (double)offline_data.n_locally_relevant(),
+        (double)offline_data.n_export_indices() /
+            (double)offline_data.n_locally_relevant(),
+        (double)offline_data.n_locally_internal() /
+            (double)offline_data.n_locally_relevant(),
+        (double)offline_data.n_locally_owned() /
+            (double)offline_data.n_locally_relevant()};
     // NOLINTEND
 
     const auto data =
-        Utilities::MPI::min_max_avg(values, mpi_ensemble_.world_communicator());
+        Utilities::MPI::min_max_avg(values, mpi_ensemble.world_communicator());
 
-    if (mpi_ensemble_.world_rank() != 0)
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     std::ostringstream output;
 
     unsigned int n =
-        dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
+        dealii::Utilities::needed_digits(mpi_ensemble.n_world_ranks());
 
     const auto print_snippet = [&output, n](const std::string &name,
                                             const auto &values) {
@@ -888,10 +867,11 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void
-  TimeLoop<HD, PD, dim, Number>::print_device_information(std::ostream &stream)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_device_information(std::ostream &stream)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
     /* Device information is only meaningful for a device build: */
     if constexpr (!have_separate_memory_spaces)
       return;
@@ -908,12 +888,12 @@ namespace ryujin
       const Device local{dealii::Utilities::System::get_hostname(),
                          Kokkos::device_id()};
       const auto all = dealii::Utilities::MPI::all_gather(
-          mpi_ensemble_.world_communicator(), local);
+          mpi_ensemble.world_communicator(), local);
       n_devices_ = std::set<Device>(all.begin(), all.end()).size();
     }
 #endif
 
-    if (mpi_ensemble_.world_rank() != 0)
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     std::ostringstream output;
@@ -943,7 +923,7 @@ namespace ryujin
     entry("device id") << Kokkos::device_id() << " of "
                        << Kokkos::num_devices();
     entry("devices in use")
-        << n_devices_ << " on " << mpi_ensemble_.n_world_ranks() << " ranks";
+        << n_devices_ << " on " << mpi_ensemble.n_world_ranks() << " ranks";
     entry("multiprocessors") << prop.multiProcessorCount;
     entry("warp size") << prop.warpSize << " (hardware), " << warp_size
                        << " (ryujin::warp_size)";
@@ -966,7 +946,7 @@ namespace ryujin
     entry("device id") << Kokkos::device_id() << " of "
                        << Kokkos::num_devices();
     entry("devices in use")
-        << n_devices_ << " on " << mpi_ensemble_.n_world_ranks() << " ranks";
+        << n_devices_ << " on " << mpi_ensemble.n_world_ranks() << " ranks";
     entry("compute units") << prop.multiProcessorCount;
     entry("warp size") << prop.warpSize << " (hardware), " << warp_size
                        << " (ryujin::warp_size)";
@@ -985,22 +965,26 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_info(const std::string &header)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_info(const std::string &header)
   {
-    if (mpi_ensemble_.world_rank() != 0)
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     std::cout << "[INFO] " << header << std::endl;
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_head(const std::string &header,
-                                                 const std::string &secondary,
-                                                 std::ostream &stream)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_head(const std::string &header,
+                                         const std::string &secondary,
+                                         std::ostream &stream)
   {
-    if (mpi_ensemble_.world_rank() != 0)
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     const int header_size = header.size();
@@ -1024,13 +1008,16 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void
-  TimeLoop<HD, PD, dim, Number>::print_information(unsigned int timer_cycle,
-                                                   Number last_checkpoint,
-                                                   std::ostream &stream,
-                                                   bool final_time)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_information(unsigned int timer_cycle,
+                                                Number last_checkpoint,
+                                                std::ostream &stream,
+                                                bool final_time)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    const auto &hyperbolic_system = simulation_.hyperbolic_system();
+    const auto &parabolic_system = simulation_.parabolic_system();
+
     static const std::string backend_name = [] {
       const auto precision = [] {
         if constexpr (std::is_same_v<Number, double>)
@@ -1051,17 +1038,16 @@ namespace ryujin
         return "SIMD, " + precision + ", width " + std::to_string(simd_size);
     }();
 
-    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name();
-    if (!parabolic_system_.get().is_identity()) {
-      stream << "\n             (PAR) "
-             << parabolic_system_.get().problem_name();
+    stream << "Information: (HYP) " << hyperbolic_system.problem_name();
+    if (!parabolic_system.is_identity()) {
+      stream << "\n             (PAR) " << parabolic_system.problem_name();
     }
     stream << "\n             [" << base_name_ << "] ";
-    if (mpi_ensemble_.n_ensembles() > 1) {
-      stream << mpi_ensemble_.n_ensembles() << " ensembles ";
+    if (mpi_ensemble.n_ensembles() > 1) {
+      stream << mpi_ensemble.n_ensembles() << " ensembles ";
     }
     stream << "with " << n_global_dofs_ << " Qdofs on "
-           << mpi_ensemble_.n_world_ranks() << " ranks "
+           << mpi_ensemble.n_world_ranks() << " ranks "
 #if defined(WITH_OPENMP)
            << "/ " << omp_get_max_threads() << " threads "
 #ifndef WITH_DEAL_II_THREADS
@@ -1091,7 +1077,7 @@ namespace ryujin
     if (checkpoint_update_interval_ != Number(0.)) {
       const auto wall_time = Utilities::MPI::min_max_avg(
           ComputingTimer::timer("time loop").wall_time(),
-          mpi_ensemble_.world_communicator());
+          mpi_ensemble.world_communicator());
 
       if (final_time) {
         stream << "             Last checkpoint at FINAL TIME\n";
@@ -1106,23 +1092,24 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void
-  TimeLoop<HD, PD, dim, Number>::print_memory_statistics(std::ostream &stream)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_memory_statistics(std::ostream &stream)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
 
     Utilities::MPI::MinMaxAvg data = Utilities::MPI::min_max_avg(
-        stats.VmRSS / 1024., mpi_ensemble_.world_communicator());
+        stats.VmRSS / 1024., mpi_ensemble.world_communicator());
 
-    if (mpi_ensemble_.world_rank() != 0)
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     std::ostringstream output;
 
     unsigned int n =
-        dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
+        dealii::Utilities::needed_digits(mpi_ensemble.n_world_ranks());
 
     output << "\nMemory:      [MiB]"                          //
            << std::setw(8) << data.min                        //
@@ -1135,9 +1122,11 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_timers(std::ostream &stream)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_timers(std::ostream &stream)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
     std::vector<std::ostringstream> output(ComputingTimer::timers().size());
 
     const auto equalize = [&]() {
@@ -1154,7 +1143,7 @@ namespace ryujin
 
     const auto print_wall_time = [&](auto &timer, auto &stream) {
       const auto wall_time = Utilities::MPI::min_max_avg(
-          timer.wall_time(), mpi_ensemble_.world_communicator());
+          timer.wall_time(), mpi_ensemble.world_communicator());
 
       constexpr auto eps = std::numeric_limits<double>::epsilon();
       /*
@@ -1171,20 +1160,20 @@ namespace ryujin
              << std::setw(5) << std::fixed << skew_negative << "%/"
              << std::setw(4) << std::fixed << skew_positive << "%]";
       unsigned int n =
-          dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
+          dealii::Utilities::needed_digits(mpi_ensemble.n_world_ranks());
       stream << " [p" << std::setw(n) << wall_time.min_index << "/"
              << wall_time.max_index << "]";
     };
 
     const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
         ComputingTimer::timer("time loop").cpu_time(),
-        mpi_ensemble_.world_communicator());
+        mpi_ensemble.world_communicator());
     const double total_cpu_time = cpu_time_statistics.sum;
 
     const auto print_cpu_time =
         [&](auto &timer, auto &stream, bool percentage) {
           const auto cpu_time = Utilities::MPI::min_max_avg(
-              timer.cpu_time(), mpi_ensemble_.world_communicator());
+              timer.cpu_time(), mpi_ensemble.world_communicator());
 
           stream << std::setprecision(2) << std::fixed << std::setw(12)
                  << cpu_time.sum << "s ";
@@ -1213,7 +1202,7 @@ namespace ryujin
     }
     equalize();
 
-    if (mpi_ensemble_.world_rank() != 0)
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     stream << std::endl << "Timer statistics:\n";
@@ -1222,12 +1211,18 @@ namespace ryujin
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_throughput(unsigned int cycle,
-                                                       Number t,
-                                                       std::ostream &stream,
-                                                       bool final_time)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
+                                               Number t,
+                                               std::ostream &stream,
+                                               bool final_time)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+    const auto &parabolic_system = simulation_.parabolic_system();
+    const auto &hyperbolic_module = simulation_.hyperbolic_module();
+    const auto &parabolic_module = simulation_.parabolic_module();
+    const auto &time_integrator = simulation_.time_integrator();
+
     /*
      * Fixme: The global state kept in this function should be refactored
      * into its own class object.
@@ -1255,12 +1250,12 @@ namespace ryujin
 
       const auto wall_time_statistics = Utilities::MPI::min_max_avg(
           ComputingTimer::timer("time loop").wall_time(),
-          mpi_ensemble_.world_communicator());
+          mpi_ensemble.world_communicator());
       current.wall_time = wall_time_statistics.max;
 
       const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
           ComputingTimer::timer("time loop").cpu_time(),
-          mpi_ensemble_.world_communicator());
+          mpi_ensemble.world_communicator());
       current.cpu_time_sum = cpu_time_statistics.sum;
       current.cpu_time_avg = cpu_time_statistics.avg;
       current.cpu_time_min = cpu_time_statistics.min;
@@ -1268,7 +1263,7 @@ namespace ryujin
 
       if constexpr (have_separate_memory_spaces) {
         const auto device_time_statistics = Utilities::MPI::min_max_avg(
-            DeviceTimer::seconds(), mpi_ensemble_.world_communicator());
+            DeviceTimer::seconds(), mpi_ensemble.world_communicator());
         current.device_time_sum = device_time_statistics.sum;
       }
     }
@@ -1282,7 +1277,7 @@ namespace ryujin
     const double cycles_per_second =
         delta_cycles / (current.wall_time - previous.wall_time);
 
-    const auto efficiency = time_integrator_.efficiency();
+    const auto efficiency = time_integrator.efficiency();
     const auto n_dofs = static_cast<double>(n_global_dofs_);
 
     double wall_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
@@ -1381,25 +1376,25 @@ namespace ryujin
            << " cycles/s)" << std::endl;
 
     output << "        [ "
-           << time_integrator_.time_stepping_scheme_name()
+           << time_integrator.time_stepping_scheme_name()
            << " with CFL = "
-           << std::setprecision(2) << std::fixed << hyperbolic_module_.cfl()
+           << std::setprecision(2) << std::fixed << hyperbolic_module.cfl()
            << " ("
-           << std::setprecision(0) << std::fixed << hyperbolic_module_.n_restarts()
+           << std::setprecision(0) << std::fixed << hyperbolic_module.n_restarts()
            << "/"
-           << std::setprecision(0) << std::fixed << parabolic_module_.n_restarts()
+           << std::setprecision(0) << std::fixed << parabolic_module.n_restarts()
            << " rsts) ("
-           << std::setprecision(0) << std::fixed << hyperbolic_module_.n_warnings()
+           << std::setprecision(0) << std::fixed << hyperbolic_module.n_warnings()
            << "/"
-           << std::setprecision(0) << std::fixed << parabolic_module_.n_warnings()
+           << std::setprecision(0) << std::fixed << parabolic_module.n_warnings()
            << " warn) ("
-           << std::setprecision(0) << std::fixed << hyperbolic_module_.n_corrections()
+           << std::setprecision(0) << std::fixed << hyperbolic_module.n_corrections()
            << "/"
-           << std::setprecision(0) << std::fixed << parabolic_module_.n_corrections()
+           << std::setprecision(0) << std::fixed << parabolic_module.n_corrections()
            << " corr) ]" << std::endl;
 
-    if (!parabolic_system_.get().is_identity())
-      parabolic_module_.print_solver_statistics(output);
+    if (!parabolic_system.is_identity())
+      parabolic_module.print_solver_statistics(output);
 
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
@@ -1435,22 +1430,23 @@ namespace ryujin
            << std::setprecision(2) << std::fixed << terminal_update_interval_
            << "s)";
 
-    if (mpi_ensemble_.world_rank() != 0)
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
     stream << output.str() << std::endl;
   }
 
 
-  template <typename HD, typename PD, int dim, typename Number>
-  void TimeLoop<HD, PD, dim, Number>::print_cycle_statistics(
-      unsigned int cycle,
-      Number t,
-      unsigned int timer_cycle,
-      Number last_checkpoint,
-      bool write_to_logfile,
-      bool final_time)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
+                                                     Number t,
+                                                     unsigned int timer_cycle,
+                                                     Number last_checkpoint,
+                                                     bool write_to_logfile,
+                                                     bool final_time)
   {
+    const auto &mpi_ensemble = simulation_.mpi_ensemble();
+
     std::ostringstream output;
 
     /* Print header: */
@@ -1477,7 +1473,7 @@ namespace ryujin
     print_throughput(cycle, t, output, final_time);
 
     /* Only output on rank 0: */
-    if (mpi_ensemble_.world_rank() != 0)
+    if (mpi_ensemble.world_rank() != 0)
       return;
 
 #ifndef DEBUG_OUTPUT

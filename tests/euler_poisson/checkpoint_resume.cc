@@ -3,6 +3,8 @@
 
 #include <time_loop.h>
 
+#include <ryujin/typed/simulation.h>
+
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -88,8 +90,9 @@ void run(const std::string &time_loop_parameters)
              << "end\n";
 
   {
-    TimeLoop<HyperbolicDescription, ParabolicDescription, dim, Number>
-        time_loop(MPI_COMM_WORLD);
+    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+        simulation(MPI_COMM_WORLD);
+    TimeLoop<dim, Number> time_loop(simulation);
     ParameterAcceptor::initialize(parameters);
     time_loop.run();
   }
