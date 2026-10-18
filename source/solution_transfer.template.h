@@ -45,33 +45,57 @@ namespace ryujin
   namespace
   {
     /**
-     * Pack a vector of local state values into a char vector.
+     * Pack a vector of local state values followed by a vector of local
+     * dynamic state values into a char vector.
      */
-    template <typename state_type>
+    template <typename state_type, typename Number>
     std::vector<char>
-    pack_state_values(const std::vector<state_type> &state_values)
+    pack_state_values(const std::vector<state_type> &state_values,
+                      const std::vector<Number> &dynamic_values)
     {
-      std::vector<char> buffer(sizeof(state_type) * state_values.size());
-      std::memcpy(buffer.data(), state_values.data(), buffer.size());
+      const auto n_state_bytes = sizeof(state_type) * state_values.size();
+      const auto n_dynamic_bytes = sizeof(Number) * dynamic_values.size();
+      std::vector<char> buffer(n_state_bytes + n_dynamic_bytes);
+      std::memcpy(buffer.data(), state_values.data(), n_state_bytes);
+
+      if (n_dynamic_bytes > 0)
+        std::memcpy(buffer.data() + n_state_bytes,
+                    dynamic_values.data(),
+                    n_dynamic_bytes);
+
       return buffer;
     }
 
 
     /**
-     * Unpack a char vector into a vector of local state values.
+     * Unpack a char vector into a vector of @p n_state_values local state
+     * values and a vector of local dynamic state values holding the
+     * remaining bytes.
      */
-    template <typename state_type>
-    std::vector<state_type> unpack_state_values(
+    template <typename state_type, typename Number>
+    std::pair<std::vector<state_type>, std::vector<Number>> unpack_state_values(
         const boost::iterator_range<std::vector<char>::const_iterator>
-            &data_range)
+            &data_range,
+        const unsigned int n_state_values)
     {
       const std::size_t n_bytes = data_range.size();
-      Assert(n_bytes % sizeof(state_type) == 0, dealii::ExcInternalError());
-      std::vector<state_type> state_values(n_bytes / sizeof(state_type));
-      std::memcpy(state_values.data(),
-                  &data_range[0],
-                  state_values.size() * sizeof(state_type));
-      return state_values;
+      const std::size_t n_state_bytes = sizeof(state_type) * n_state_values;
+      Assert(n_bytes >= n_state_bytes, dealii::ExcInternalError());
+      Assert((n_bytes - n_state_bytes) % sizeof(Number) == 0,
+             dealii::ExcInternalError());
+
+      std::vector<state_type> state_values(n_state_values);
+      std::memcpy(state_values.data(), &data_range[0], n_state_bytes);
+
+      std::vector<Number> dynamic_values((n_bytes - n_state_bytes) /
+                                         sizeof(Number));
+
+      if (!dynamic_values.empty())
+        std::memcpy(dynamic_values.data(),
+                    &data_range[0] + n_state_bytes,
+                    dynamic_values.size() * sizeof(Number));
+
+      return {std::move(state_values), std::move(dynamic_values)};
     }
   } // namespace
 
@@ -87,7 +111,10 @@ namespace ryujin
 #endif
 
     copy_to_memory_space<dealii::MemorySpace::Host>(
-        old_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
+        old_state_vector,
+        StateVectorPart::state,
+        StateVectorPart::precomputed,
+        StateVectorPart::dynamic_state);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -95,6 +122,9 @@ namespace ryujin
     Assert(handle_ == dealii::numbers::invalid_unsigned_int,
            dealii::ExcMessage(
                "You can only add one solution per SolutionTransfer object."));
+
+    for (const auto &U_dynamic_k : old_state_vector.dynamic_state)
+      U_dynamic_k.deal_ii_vector().update_ghost_values();
 
     /*
      * -----------------------------------------------------------------------
@@ -115,6 +145,7 @@ namespace ryujin
           const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
           const auto &U = old_state_vector.state;
+          const auto &U_dynamic = old_state_vector.dynamic_state;
           /* precomputed needs to be valid for bounds computation */
           const auto precomputed_view =
               old_state_vector.precomputed
@@ -378,7 +409,35 @@ namespace ryujin
             break;
           }
 
-          return pack_state_values(state_values);
+          /*
+           * Collect dynamic state values for packing. We perform a plain
+           * Lagrange interpolation (without limiting):
+           */
+
+          std::vector<Number> dynamic_values;
+
+          if (!U_dynamic.empty()) {
+            const auto dof_cell_cg =
+                typename dealii::DoFHandler<dim>::cell_iterator(
+                    &cell->get_triangulation(),
+                    cell->level(),
+                    cell->index(),
+                    &offline_data_->dof_handler_cg());
+
+            const auto n_dofs_per_cell_cg =
+                dof_cell_cg->get_fe().n_dofs_per_cell();
+            dealii::Vector<Number> local_values(n_dofs_per_cell_cg);
+
+            for (const auto &U_k : U_dynamic) {
+              dof_cell_cg->get_interpolated_dof_values(U_k.deal_ii_vector(),
+                                                       local_values);
+              dynamic_values.insert(std::end(dynamic_values),
+                                    std::begin(local_values),
+                                    std::end(local_values));
+            }
+          }
+
+          return pack_state_values(state_values, dynamic_values);
         },
         /* returns_variable_size_data =*/false);
   }
@@ -395,7 +454,10 @@ namespace ryujin
 #endif
 
     move_to_memory_space<dealii::MemorySpace::Host>(
-        new_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
+        new_state_vector,
+        StateVectorPart::state,
+        StateVectorPart::precomputed,
+        StateVectorPart::dynamic_state);
 
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
@@ -435,9 +497,18 @@ namespace ryujin
      * -----------------------------------------------------------------------
      */
 
+    /*
+     * The interpolation of the dynamic state writes into the ghost range.
+     * Make sure that the vectors are not in ghosted state:
+     */
+
+    auto &U_dynamic = new_state_vector.dynamic_state;
+    for (auto &U_dynamic_k : U_dynamic)
+      U_dynamic_k.deal_ii_vector().zero_out_ghost_values();
+
     triangulation.notify_ready_to_unpack( //
         handle_,
-        [this, &projected_mass, &projected_state](
+        [this, &projected_mass, &projected_state, &U_dynamic](
             const auto &cell,
             const dealii::CellStatus status,
             const auto &data_range) {
@@ -456,7 +527,53 @@ namespace ryujin
           std::vector<dealii::types::global_dof_index> dof_indices(
               n_dofs_per_cell);
 
-          const auto state_values = unpack_state_values<state_type>(data_range);
+          const auto [state_values, dynamic_values] =
+              unpack_state_values<state_type, Number>(data_range,
+                                                      n_dofs_per_cell);
+
+          Assert(dynamic_values.empty() == U_dynamic.empty(),
+                 dealii::ExcMessage("The attached data does not match the "
+                                    "dynamic state of the state vector."));
+
+          /*
+           * Interpolate the dynamic state: set_dof_values_by_interpolation()
+           * sets the values of an active cell, or prolongs the values onto
+           * the children of a cell that has been refined.
+           */
+
+          if (!U_dynamic.empty()) {
+            const auto dof_cell_cg =
+                typename dealii::DoFHandler<dim>::cell_iterator(
+                    &cell->get_triangulation(),
+                    cell->level(),
+                    cell->index(),
+                    &offline_data_->dof_handler_cg());
+
+            const auto n_dofs_per_cell_cg =
+                dof_cell_cg->get_fe().n_dofs_per_cell();
+
+            Assert(dynamic_values.size() ==
+                       U_dynamic.size() * n_dofs_per_cell_cg,
+                   dealii::ExcMessage(
+                       "The attached data has " +
+                       std::to_string(dynamic_values.size()) +
+                       " dynamic state values for this cell, but " +
+                       std::to_string(U_dynamic.size()) +
+                       " dynamic state components with " +
+                       std::to_string(n_dofs_per_cell_cg) +
+                       " degrees of freedom per cell require " +
+                       std::to_string(U_dynamic.size() * n_dofs_per_cell_cg) +
+                       "."));
+
+            dealii::Vector<Number> local_values(n_dofs_per_cell_cg);
+            for (std::size_t k = 0; k < U_dynamic.size(); ++k) {
+              std::copy_n(std::begin(dynamic_values) + k * n_dofs_per_cell_cg,
+                          n_dofs_per_cell_cg,
+                          std::begin(local_values));
+              dof_cell_cg->set_dof_values_by_interpolation(
+                  local_values, U_dynamic[k].deal_ii_vector());
+            }
+          }
 
           switch (status) {
           case dealii::CellStatus::cell_will_persist:
@@ -631,6 +748,18 @@ namespace ryujin
             break;
           }
         });
+
+    /*
+     * Discard the values written into the ghost range, distribute the
+     * interpolated dynamic state to constrained degrees of freedom and
+     * update the ghost range:
+     */
+    for (auto &U_dynamic_k : U_dynamic) {
+      auto &vector = U_dynamic_k.deal_ii_vector();
+      vector.compress(dealii::VectorOperation::insert);
+      offline_data_->affine_constraints_cg().distribute(vector);
+      vector.update_ghost_values();
+    }
 
     const auto projected_state_view =
         projected_state.template view<problem_dimension>();
