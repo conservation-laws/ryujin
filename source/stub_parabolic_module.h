@@ -7,7 +7,8 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_module.h>
+#include <ryujin/interface/parabolic_module.h>
+
 #include <initial_values.h>
 #include <mpi_ensemble.h>
 #include <offline_data.h>
@@ -23,13 +24,20 @@ namespace ryujin
    * @ingroup ParabolicModule
    */
   template <typename HyperbolicDescription, int dim, typename Number>
-  class StubParabolicModule final : public dealii::ParameterAcceptor
+  class StubParabolicModule final
+      : public Interface::ParabolicModule<dim, Number>
   {
   public:
     /**
      * @name Typedefs and constexpr constants
      */
     //@{
+
+    using StageVectors =
+        typename Interface::ParabolicModule<dim, Number>::StageVectors;
+
+    using StageWeights =
+        typename Interface::ParabolicModule<dim, Number>::StageWeights;
 
     using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
     using ParabolicSystem = StubParabolicSystem;
@@ -52,7 +60,7 @@ namespace ryujin
                         const InitialValues<HyperbolicDescription, dim, Number>
                             & /*initial_values*/,
                         const std::string &subsection = "StubParabolicModule")
-        : ParameterAcceptor(subsection)
+        : Interface::ParabolicModule<dim, Number>(subsection)
     {
     }
 
@@ -61,7 +69,7 @@ namespace ryujin
      * storage and is necessary before any of the following time-stepping
      * functions can be called.
      */
-    void prepare()
+    void prepare() override
     {
       // do nothing
     }
@@ -79,7 +87,8 @@ namespace ryujin
      * @note This routine does not modify the hyperbolic state vector or
      * the precomputed vector component.
      */
-    void reinit_state_vector(StateVector<Number> & /*state_vector*/) const
+    void
+    reinit_state_vector(StateVector<Number> & /*state_vector*/) const override
     {
       // do nothing
     }
@@ -92,7 +101,7 @@ namespace ryujin
      * we perform a mesh transfer or output operation.
      */
     void prepare_state_vector(StateVector<Number> & /*state_vector*/,
-                              Number /*t*/) const
+                              Number /*t*/) const override
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
@@ -100,23 +109,16 @@ namespace ryujin
     }
 
     /**
-     * Given a reference to a previous state vector @p old_U at time
-     * @p old_t and a time-step size @p tau perform an implicit backward
-     * euler step (and store the result in @p new_U).
-     *
-     * The function takes an optional array of states @p stage_U together
-     * with a an array of weights @p stage_weights to construct a modified
-     * high-order right-hand side / flux.
+     * Given a reference to a previous state vector @p old_state_vector at
+     * time @p old_t and a time-step size @p tau perform an implicit
+     * backward euler step (and store the result in @p new_state_vector).
      */
-    template <int stages>
-    void backward_euler_step(
-        const StateVector<Number> &old_state_vector,
-        const Number /*old_t*/,
-        std::array<std::reference_wrapper<const StateVector<Number>>,
-                   stages> /*stage_state_vectors*/,
-        const std::array<Number, stages> /*stage_weights*/,
-        StateVector<Number> &new_state_vector,
-        Number /*tau*/) const
+    void backward_euler_step(const StateVector<Number> &old_state_vector,
+                             const Number /*old_t*/,
+                             StageVectors /*stage_state_vectors*/,
+                             StageWeights /*stage_weights*/,
+                             StateVector<Number> &new_state_vector,
+                             Number /*tau*/) const override
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
@@ -136,22 +138,13 @@ namespace ryujin
     void crank_nicolson_step(const StateVector<Number> &old_state_vector,
                              const Number /*old_t*/,
                              StateVector<Number> &new_state_vector,
-                             Number /*tau*/) const
+                             Number /*tau*/) const override
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
                                 "function should have never been called."));
 
       new_state_vector = old_state_vector;
-    }
-
-    /**
-     * Sets the invariant domain violation strategy.
-     */
-    void set_id_violation_strategy(
-        const IDViolationStrategy & /*new_strategy*/) const
-    {
-      // do nothing
     }
 
     //@}
@@ -165,36 +158,9 @@ namespace ryujin
      * for constructing the status message displayed periodically in the
      * TimeLoop.
      */
-    void print_solver_statistics(std::ostream & /*output*/) const
+    void print_solver_statistics(std::ostream & /*output*/) const override
     {
       // do nothing
-    }
-
-    /**
-     * The number of restarts signalled by the step() function.
-     */
-    unsigned int n_restarts() const
-    {
-      return 0;
-    }
-
-    /**
-     * The number of corrections performed by the step() function. This
-     * function exists to mirror the ParabolicModule interface and will
-     * always return 0.
-     */
-    unsigned int n_corrections() const
-    {
-      return 0;
-    }
-
-    /**
-     * The number of ID violation warnings encountered in the step()
-     * function.
-     */
-    unsigned int n_warnings() const
-    {
-      return 0;
     }
 
     //@}

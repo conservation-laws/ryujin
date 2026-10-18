@@ -8,9 +8,9 @@
 #include <compile_time_options.h>
 
 #include <ryujin/interface/parabolic_system.h>
+#include <ryujin/typed/hyperbolic_module.h>
 
 #include "convenience_macros.h"
-#include "hyperbolic_module.h"
 #include "mpi_ensemble.h"
 #include "observer_pointer.h"
 #include "offline_data.h"

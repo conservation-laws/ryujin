@@ -7,100 +7,26 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
-#include "initial_values.h"
-#include "mpi_ensemble.h"
-#include "observer_pointer.h"
-#include "offline_data.h"
-#include "sparse_matrix.h"
-#include "state_vector.h"
+#include <ryujin/interface/hyperbolic_module.h>
+
+#include <convenience_macros.h>
+#include <initial_values.h>
+#include <mpi_ensemble.h>
+#include <observer_pointer.h>
+#include <offline_data.h>
+#include <sparse_matrix.h>
+#include <state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
-#include <functional>
+#include <limits>
+#include <ostream>
 #include <utility>
 
 namespace ryujin
 {
-  /**
-   * An enum controlling the behavior on detection of an invariant domain
-   * or CFL violation. Such a case might occur for either aggressive CFL
-   * numbers > 1, and/or later stages in the Runge Kutta scheme when the
-   * time step tau is prescribed.
-   *
-   * The invariant domain violation is detected in the limiter and implies
-   * that the low-order update itself lies outside the invariant domain.
-   *
-   * A "CFL violation" occurs if the computed tau_max of a substep is
-   * significantly larger than the previously computed time step size tau
-   * with which we perform the update.
-   *
-   * @note Data structures in HyperbolicModule are initialized with the
-   * ensemble subrange communicator stored in MPIEnsemble. However, the
-   * time step size constraint (i.e. tau_max) is synchronized over the
-   * entire global communicator.
-   *
-   * @ingroup HyperbolicModule
-   */
-  enum class IDViolationStrategy : std::uint8_t {
-    /**
-     * Warn about an invariant domain violation but take no further
-     * action.
-     */
-    warn,
-
-    /**
-     * Raise a Restart exception on domain violation. This exception can be
-     * caught in TimeIntegrator and various different actions (adapt CFL
-     * and retry) can be taken depending on chosen strategy.
-     */
-    raise_exception,
-  };
-
-
-  /**
-   * A class signalling a restart, thrown in HyperbolicModule::single_step
-   * and caught in the TimeIntegrator when performing a time step. We
-   * currently signal a restart whenever we encounter an invariant domain
-   * violation of the low-order update.
-   *
-   * This might happen, for example, in subsequent invocations of step() in
-   * high-order time stepping algorithms when the time step size has to be
-   * kept constant. A standard strategy implemented in TimeIntegrator is to
-   * simply fall back to a smaller relative CFL number and try again.
-   *
-   * The field @p suggested_tau_max is set to a tau_max value with which
-   * the entire update step should be restarted.
-   *
-   * @ingroup TimeLoop
-   */
-  class Restart final
-  {
-  public:
-    double suggested_tau_max;
-  };
-
-
-  /**
-   * A class signalling that a correction step is required for the update.
-   * This is meant to be a truly exceptional situation, for example where
-   * the high-order update violates an admissibility condition. With our
-   * limiting approach this must never happen, ... but we might have taken
-   * some short cuts in the parabolic update that under rare circumstances
-   * require limiting.
-   *
-   * This exception is currently only used internally in the NavierStokes
-   * solver.
-   *
-   * @ingroup TimeLoop
-   */
-  class Correction final
-  {
-  };
-
-
   /**
    * Explicit forward Euler time-stepping for hyperbolic systems with
    * convex limiting.
@@ -110,13 +36,19 @@ namespace ryujin
    * @ingroup HyperbolicModule
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
-  class HyperbolicModule final : public dealii::ParameterAcceptor
+  class HyperbolicModule final : public Interface::HyperbolicModule<dim, Number>
   {
   public:
     /**
      * @name Typedefs and constexpr constants
      */
     //@{
+
+    using StageVectors =
+        typename Interface::HyperbolicModule<dim, Number>::StageVectors;
+
+    using StageWeights =
+        typename Interface::HyperbolicModule<dim, Number>::StageWeights;
 
     using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
@@ -164,7 +96,7 @@ namespace ryujin
      * storage and is necessary before any of the following time-stepping
      * functions can be called.
      */
-    void prepare();
+    void prepare() override;
 
     //@}
     /**
@@ -178,7 +110,7 @@ namespace ryujin
      *
      * @note This routine does not modify the parabolic state vector component.
      */
-    void reinit_state_vector(StateVector<Number> &state_vector) const;
+    void reinit_state_vector(StateVector<Number> &state_vector) const override;
 
     /**
      * This function preprocesses a given state vector @p U in preparation
@@ -196,11 +128,12 @@ namespace ryujin
      *    ranges of the precomputed values vector.
      */
     void prepare_state_vector(StateVector<Number> &state_vector,
-                              Number t) const;
+                              Number t) const override;
 
     /**
-     * Given a reference to a previous state vector @p old_U perform an
-     * explicit euler step (and store the result in @p new_U). The
+     * Given a reference to a previous state vector @p old_state_vector
+     * perform an explicit euler step (and store the result in @p
+     * new_state_vector). The
      * function returns the chosen time step size tau with which the update
      * was performed.
      *
@@ -210,8 +143,9 @@ namespace ryujin
      * step size according to the CFL condition. @p tau is the last
      * parameter of the function.
      *
-     * The function takes an optional array of states @p stage_U together
-     * with a an array of weights @p stage_weights to construct a
+     * The function takes an optional list of states @p
+     * stage_state_vectors together with a list of weights @p
+     * stage_weights to construct a
      * modified high-order flux. The standard high-order flux reads
      * (cf @cite ryujin-2021-1, Eq. 12):
      * \f{align}
@@ -260,48 +194,13 @@ namespace ryujin
      * HyperbolicModule::prepare_state_vector() on @p old_state_vector
      * prior to calling the step function.
      */
-    template <int stages>
-    Number step(const StateVector<Number> &old_state_vector,
-                std::array<std::reference_wrapper<const StateVector<Number>>,
-                           stages> stage_state_vectors,
-                const std::array<Number, stages> stage_weights,
-                StateVector<Number> &new_state_vector,
-                Number tau = Number(0.),
-                Number tau_max = std::numeric_limits<Number>::max()) const;
-
-    /**
-     * Sets the relative CFL number used for computing an appropriate
-     * time-step size to the given value. The CFL number must be a positive
-     * value. If chosen to be within the interval \f$(0,1)\f$ then the
-     * low-order update and limiting stages guarantee invariant domain
-     * preservation.
-     */
-    void set_cfl(Number new_cfl) const
-    {
-      Assert(cfl_ > Number(0.), dealii::ExcInternalError());
-      cfl_ = new_cfl;
-    }
-
-    /**
-     * Sets the relative maximal acceptable tau_max ratio. If the ratio of
-     * the enforced time-step size tau and our computed tau_max for the
-     * hyperbolic (sub) step is above this limit we throw a Restart
-     * exception.
-     */
-    void set_acceptable_tau_max_ratio(Number new_acceptable_tau_max_ratio) const
-    {
-      Assert(new_acceptable_tau_max_ratio >= Number(1.),
-             dealii::ExcInternalError());
-      acceptable_tau_max_ratio_ = new_acceptable_tau_max_ratio;
-    }
-
-    /**
-     * Sets the invariant domain violation strategy.
-     */
-    void set_id_violation_strategy(const IDViolationStrategy &strategy) const
-    {
-      id_violation_strategy_ = strategy;
-    }
+    Number
+    step(const StateVector<Number> &old_state_vector,
+         StageVectors stage_state_vectors,
+         StageWeights stage_weights,
+         StateVector<Number> &new_state_vector,
+         Number tau = Number(0.),
+         Number tau_max = std::numeric_limits<Number>::max()) const override;
 
     //@}
     /**
@@ -310,18 +209,13 @@ namespace ryujin
     //@{
 
     /**
-     * Returns the relative CFL number used for computing an appropriate
-     * time-step size.
+     * Print a status line with solver statistics. The explicit update
+     * has no solver statistics to report.
      */
-    ACCESSOR_READ_ONLY(cfl)
-
-    /**
-     * Returns the relative maximal acceptable tau_max ratio. If the ratio
-     * of the enforced time-step size tau and our computed tau_max for the
-     * hyperbolic (sub) step is above this limit we throw a Restart
-     * exception.
-     */
-    ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
+    void print_solver_statistics(std::ostream & /*output*/) const override
+    {
+      // do nothing
+    }
 
     /**
      * Return a reference to the OfflineData object
@@ -345,33 +239,25 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(alpha)
 
-    /**
-     * The number of restarts signalled by the step() function. We signal a
-     * restart whenever we encounter an ID violation in the low order
-     * update.
-     */
-    ACCESSOR_READ_ONLY(n_restarts)
-
-    /**
-     * The number of corrections performed by the step() function. This
-     * function exists to mirror the ParabolicModule interface and will
-     * always return 0.
-     */
-    ACCESSOR_READ_ONLY(n_corrections)
-
-    /**
-     * The number of ID violation warnings encountered in the step()
-     * function. We issue a warning whenever we encounter an ID violation
-     * in the low order update (and throwing a restart is disabled).
-     */
-    ACCESSOR_READ_ONLY(n_warnings)
-
   private:
     //@}
     /**
      * @name Internal methods
      */
     //@{
+
+    /**
+     * The implementation of the step() function for a fixed number of
+     * stages @p stages. The step() function dispatches to it with the
+     * number of supplied stage state vectors.
+     */
+    template <int stages>
+    Number step(const StateVector<Number> &old_state_vector,
+                StageVectors stage_state_vectors,
+                StageWeights stage_weights,
+                StateVector<Number> &new_state_vector,
+                Number tau,
+                Number tau_max) const;
 
     /**
      * Update all boundary values of the hyperbolic state vector component
@@ -415,15 +301,6 @@ namespace ryujin
         const InitialValues<HyperbolicDescription, dim, Number>>
         initial_values_;
 
-    mutable Number cfl_;
-    mutable Number acceptable_tau_max_ratio_;
-
-    mutable IDViolationStrategy id_violation_strategy_;
-
-    mutable unsigned int n_restarts_;
-    mutable unsigned int n_corrections_;
-    mutable unsigned int n_warnings_;
-
     MultiComponentVector<Number> initial_precomputed_;
 
     mutable ScalarVector<Number> alpha_;
@@ -435,10 +312,7 @@ namespace ryujin
 
     mutable MultiComponentVector<Number> r_;
 
-    /*
-     * A compact buffer holding all boundary states of the hyperbolic state
-     * vector, see apply_boundary_conditions().
-     */
+    /* A buffer holding all boundary states of the hyperbolic state vector. */
     mutable Mirrored<Number *> boundary_states_{
         "hyperbolic_module_boundary_states"};
 
