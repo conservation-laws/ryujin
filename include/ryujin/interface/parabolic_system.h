@@ -7,14 +7,11 @@
 
 #include <compile_time_options.h>
 
+#include <ryujin/interface/system.h>
+
 #include <convenience_macros.h>
 
-#include <deal.II/base/exceptions.h>
-#include <deal.II/base/parameter_acceptor.h>
-
-#include <array>
 #include <string>
-#include <vector>
 
 namespace ryujin
 {
@@ -30,53 +27,14 @@ namespace ryujin
      *
      * @ingroup ParabolicModule
      */
-    class ParabolicSystem : public dealii::ParameterAcceptor
+    class ParabolicSystem : public System
     {
     public:
-      /**
-       * The name of the parabolic system as a string.
-       */
-      ACCESSOR_READ_ONLY(problem_name)
-
       /**
        * Whether the parabolic system is the identity, i.e., whether the
        * equation is purely hyperbolic.
        */
       ACCESSOR_READ_ONLY(is_identity)
-
-      /**
-       * A list of component names for every dimension:
-       */
-      using Names = std::array<std::vector<std::string>, 3>;
-
-      /**
-       * The names of the parabolic state components for dimension @p dim.
-       *
-       * Parabolic state components are stored in
-       * StateVector::dynamic_state and evolved by the time integrator.
-       *
-       * @note Valid once the run time parameters are parsed.
-       */
-      const std::vector<std::string> &state_names(const unsigned int dim) const
-      {
-        AssertIndexRange(dim - 1, 3);
-        return state_names_[dim - 1];
-      }
-
-      /**
-       * The names of the parabolic precomputed values for dimension @p dim.
-       *
-       * Precomputed values are stored in StateVector::dynamic_precomputed
-       * and are derived from the state.
-       *
-       * @note Valid once the run time parameters are parsed.
-       */
-      const std::vector<std::string> &
-      precomputed_names(const unsigned int dim) const
-      {
-        AssertIndexRange(dim - 1, 3);
-        return precomputed_names_[dim - 1];
-      }
 
     protected:
       /**
@@ -86,21 +44,10 @@ namespace ryujin
                       const Names &state_names,
                       const Names &precomputed_names,
                       const std::string &subsection)
-          : ParameterAcceptor(subsection)
-          , problem_name_(problem_name)
+          : System(problem_name, state_names, precomputed_names, subsection)
           , is_identity_(false)
-          , state_names_(state_names)
-          , precomputed_names_(precomputed_names)
       {
       }
-
-      /**
-       * The name of the parabolic system.
-       *
-       * @note A derived class may update it once the run time parameters
-       * are known.
-       */
-      std::string problem_name_;
 
       /**
        * Whether the parabolic system is the identity.
@@ -109,22 +56,6 @@ namespace ryujin
        * constructor.
        */
       bool is_identity_;
-
-      /**
-       * The names of the state components for every dimension.
-       *
-       * @note A derived class may update them once the run time
-       * parameters are known.
-       */
-      Names state_names_;
-
-      /**
-       * The names of the precomputed values for every dimension.
-       *
-       * @note A derived class may update them once the run time
-       * parameters are known.
-       */
-      Names precomputed_names_;
     };
   } // namespace Interface
 } // namespace ryujin
