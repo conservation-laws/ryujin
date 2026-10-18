@@ -147,20 +147,6 @@ namespace ryujin
     }
 
     /**
-     * Return a writable reference to the dof handler.
-     */
-    dealii::DoFHandler<dim> &dof_handler()
-    {
-      if (discretization_->have_discontinuous_ansatz()) {
-        Assert(dof_handler_dg_, dealii::ExcInternalError());
-        return *dof_handler_dg_;
-      } else {
-        Assert(dof_handler_cg_, dealii::ExcInternalError());
-        return *dof_handler_cg_;
-      }
-    }
-
-    /**
      * An AffineConstraints object storing constraints for the continuous
      * ("cG") variant of the selected finite element space in (deal.II
      * typical) global numbering.
@@ -199,9 +185,9 @@ namespace ryujin
     const dealii::AffineConstraints<Number> &affine_constraints() const
     {
       if (discretization_->have_discontinuous_ansatz()) {
-        return affine_constraints_dg_;
+        return *affine_constraints_dg_;
       } else {
-        return affine_constraints_cg_;
+        return *affine_constraints_cg_;
       }
     }
 
@@ -406,8 +392,8 @@ namespace ryujin
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
 
-    dealii::AffineConstraints<Number> affine_constraints_cg_;
-    dealii::AffineConstraints<Number> affine_constraints_dg_;
+    std::unique_ptr<dealii::AffineConstraints<Number>> affine_constraints_cg_;
+    std::unique_ptr<dealii::AffineConstraints<Number>> affine_constraints_dg_;
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
         scalar_partitioner_;
@@ -427,28 +413,27 @@ namespace ryujin
     BoundaryMap boundary_map_;
     std::vector<BoundaryMap> level_boundary_map_;
 
-    Mirrored<unsigned int *> boundary_indices_{"offline_data_boundary_indices"};
+    std::unique_ptr<Mirrored<unsigned int *>> boundary_indices_;
     std::vector<unsigned int> boundary_slots_;
 
     using CouplingBoundaryPairs = std::vector<CouplingDescription>;
-    Mirrored<CouplingDescription *> coupling_boundary_pairs_{
-        "offline_data_coupling_boundary_pairs"};
+    std::unique_ptr<Mirrored<CouplingDescription *>> coupling_boundary_pairs_;
 
-    dealii::DynamicSparsityPattern sparsity_pattern_;
+    std::unique_ptr<dealii::DynamicSparsityPattern> sparsity_pattern_;
 
-    SparsityPattern<warp_size> sparsity_pattern_simd_;
+    std::unique_ptr<SparsityPattern<warp_size>> sparsity_pattern_simd_;
 
-    SparseMatrix<Number> mass_matrix_;
-    SparseMatrix<Number> mass_matrix_inverse_;
+    std::unique_ptr<SparseMatrix<Number>> mass_matrix_;
+    std::unique_ptr<SparseMatrix<Number>> mass_matrix_inverse_;
 
-    ScalarVector<Number> lumped_mass_matrix_;
-    ScalarVector<Number> lumped_mass_matrix_inverse_;
+    std::unique_ptr<ScalarVector<Number>> lumped_mass_matrix_;
+    std::unique_ptr<ScalarVector<Number>> lumped_mass_matrix_inverse_;
 
     std::vector<ScalarHostVector<float>> level_lumped_mass_matrix_;
 
-    SparseMatrix<Number> betaij_matrix_;
-    SparseMatrix<Number, dim> cij_matrix_;
-    SparseMatrix<Number> incidence_matrix_;
+    std::unique_ptr<SparseMatrix<Number>> betaij_matrix_;
+    std::unique_ptr<SparseMatrix<Number, dim>> cij_matrix_;
+    std::unique_ptr<SparseMatrix<Number>> incidence_matrix_;
 
     Number measure_of_omega_;
 
@@ -457,6 +442,20 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
+
+    /**
+     * Return a writable reference to the dof handler.
+     */
+    dealii::DoFHandler<dim> &writable_dof_handler()
+    {
+      if (discretization_->have_discontinuous_ansatz()) {
+        Assert(dof_handler_dg_, dealii::ExcInternalError());
+        return *dof_handler_dg_;
+      } else {
+        Assert(dof_handler_cg_, dealii::ExcInternalError());
+        return *dof_handler_cg_;
+      }
+    }
 
     /**
      * Set up DoFHandlers. Internally used in prepare().
