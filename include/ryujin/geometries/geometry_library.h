@@ -6,52 +6,38 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/geometries/geometry_airfoil.h>
-#include <ryujin/geometries/geometry_annulus.h>
-#include <ryujin/geometries/geometry_cylinder.h>
-#include <ryujin/geometries/geometry_disk.h>
-#include <ryujin/geometries/geometry_geotiff_profile.h>
-#include <ryujin/geometries/geometry_reader.h>
-#include <ryujin/geometries/geometry_rectangular_domain.h>
-#include <ryujin/geometries/geometry_step.h>
-#include <ryujin/geometries/geometry_tank.h>
-#include <ryujin/geometries/geometry_two_tanks.h>
-#include <ryujin/geometries/geometry_wall.h>
+#include <ryujin/base/library.h>
+#include <ryujin/geometries/geometry.h>
+
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
   /**
-   * A namespace for a number of benchmark geometries and dealii::GridIn
-   * wrappers.
+   * The library of geometries: a registry of all geometries that the
+   * Discretization can select by name. The built-in geometries of the
+   * namespace Geometries are registered by default. A client adds a
+   * geometry of its own with
+   * @code
+   * GeometryLibrary<dim>::add<MyGeometry<dim>>();
+   * @endcode
    *
    * @ingroup Mesh
    */
-  namespace Geometries
-  {
-    /**
-     * Populate a given container with all initial state defined in this
-     * namespace
-     *
-     * @ingroup Mesh
-     */
-    template <int dim, typename T>
-    void populate_geometry_list(T &geometry_list, const std::string &subsection)
-    {
-      auto add = [&](auto &&object) {
-        geometry_list.emplace(std::move(object));
-      };
+  template <int dim>
+  using GeometryLibrary = Library<Geometry<dim>, const std::string &>;
 
-      add(std::make_shared<Airfoil<dim>>(subsection));
-      add(std::make_shared<Annulus<dim>>(subsection));
-      add(std::make_shared<Cylinder<dim>>(subsection));
-      add(std::make_shared<Disk<dim>>(subsection));
-      add(std::make_shared<GeoTIFFProfile<dim>>(subsection));
-      add(std::make_shared<Reader<dim>>(subsection));
-      add(std::make_shared<RectangularDomain<dim>>(subsection));
-      add(std::make_shared<Step<dim>>(subsection));
-      add(std::make_shared<TwoTanks<dim>>(subsection));
-      add(std::make_shared<Wall<dim>>(subsection));
-      add(std::make_shared<WaveTank<dim>>(subsection));
-    }
-  } // namespace Geometries
+#ifndef DOXYGEN
+  template <>
+  auto GeometryLibrary<1>::defaults() -> std::vector<Creator>;
+  template <>
+  auto GeometryLibrary<2>::defaults() -> std::vector<Creator>;
+  template <>
+  auto GeometryLibrary<3>::defaults() -> std::vector<Creator>;
+
+  extern template class Library<Geometry<1>, const std::string &>;
+  extern template class Library<Geometry<2>, const std::string &>;
+  extern template class Library<Geometry<3>, const std::string &>;
+#endif
 } // namespace ryujin

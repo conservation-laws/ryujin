@@ -574,7 +574,7 @@ namespace ryujin
        *
        * @note This function is used to conveniently convert (user
        * provided) primitive initial states to a conserved state in the
-       * ShallowWaterInitialStateLibrary.
+       * initial states of the shallow water equations.
        */
       template <typename ST>
       DEAL_II_HOST_DEVICE state_type

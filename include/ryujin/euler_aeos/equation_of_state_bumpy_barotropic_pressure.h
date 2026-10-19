@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * A composite equation of state of the form
@@ -395,5 +395,5 @@ namespace ryujin
       double eps_;
       double e_0_;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

@@ -4,6 +4,7 @@
 //
 
 #include <ryujin/scalar_conservation/hyperbolic_description.h>
+#include <ryujin/scalar_conservation/initial_state_library.h>
 #include <ryujin/typed/initial_values.template.h>
 
 namespace ryujin

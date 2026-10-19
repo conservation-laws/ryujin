@@ -1,0 +1,6 @@
+/S/circle /S/square /S/triangle
+/S/circle /S/square /S/triangle /S/hexagon
+[Selection /S/circle|/S/square|/S/triangle|/S/hexagon ]
+/S/square
+    No entry of the library has the name »/S/pentagon«
+    Two entries of a library share the name »/S/square«

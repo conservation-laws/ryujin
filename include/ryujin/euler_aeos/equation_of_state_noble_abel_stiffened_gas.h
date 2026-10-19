@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * The Noble-Abel-Stiffened gas equation of state
@@ -166,5 +166,5 @@ namespace ryujin
       double pinf_;
       double s0_;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

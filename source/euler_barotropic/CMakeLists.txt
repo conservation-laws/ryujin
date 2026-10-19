@@ -5,7 +5,7 @@
 
 add_library(obj_euler_barotropic OBJECT
   barotropic_equation_of_state_library.cc
-  equation_dispatch.cc
+  equation.cc
   hyperbolic_module.cc
   initial_state_library.cc
   initial_values.cc

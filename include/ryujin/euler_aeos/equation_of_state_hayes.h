@@ -11,7 +11,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * The Hayes equation of state
@@ -238,5 +238,5 @@ namespace ryujin
         return f_c;
       }
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

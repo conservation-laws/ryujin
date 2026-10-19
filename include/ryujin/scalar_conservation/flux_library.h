@@ -6,22 +6,27 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/library.h>
 #include <ryujin/scalar_conservation/flux.h>
+
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
-  namespace FluxLibrary
-  {
-    using flux_list_type = std::set<std::shared_ptr<Flux>>;
+  /**
+   * The library of fluxes: a registry of all fluxes that the
+   * ScalarConservation::HyperbolicSystem can select by name. The built-in
+   * fluxes of the namespace Fluxes are registered by default.
+   *
+   * @ingroup ScalarConservationEquations
+   */
+  using FluxLibrary = Library<Flux, const std::string &>;
 
-    /**
-     * Populate a given container with all fluxes defined in this
-     * namespace.
-     *
-     * @ingroup ScalarConservationEquations
-     */
-    void populate_flux_list(flux_list_type &flux_list,
-                            const std::string &subsection);
+#ifndef DOXYGEN
+  template <>
+  auto FluxLibrary::defaults() -> std::vector<Creator>;
 
-  } // namespace FluxLibrary
+  extern template class Library<Flux, const std::string &>;
+#endif
 } // namespace ryujin

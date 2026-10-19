@@ -23,6 +23,7 @@
 #endif
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/grid/grid_tools.h>
 
 #include <random>
 
@@ -59,11 +60,16 @@ namespace ryujin
     } else {
       geometry_ = "cylinder";
     }
+
+    geometry_list_ = GeometryLibrary<dim>::create(subsection);
+
     this->add_parameter(
         "geometry",
         geometry_,
         "Name of the geometry used to create the mesh. Valid names "
-        "are given by any of the subsections defined below.");
+        "are given by any of the subsections defined below.",
+        this->prm,
+        GeometryLibrary<dim>::selection(geometry_list_));
 
     this->refinement_ = 5;
     this->add_parameter("mesh refinement",
@@ -78,8 +84,6 @@ namespace ryujin
     mesh_distortion_ = 0.;
     this->add_parameter(
         "mesh distortion", mesh_distortion_, "Strength of mesh distortion");
-
-    Geometries::populate_geometry_list<dim>(geometry_list_, subsection);
   }
 
 
@@ -99,20 +103,8 @@ namespace ryujin
 
     /* Select geometry: */
 
-    {
-      bool initialized = false;
-      for (auto &it : geometry_list_)
-        if (it->name() == geometry_) {
-          this->selected_geometry_ = it;
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(
-          initialized,
-          ExcMessage("Could not find a geometry description with name \"" +
-                     geometry_ + "\""));
-    }
+    this->selected_geometry_ =
+        &GeometryLibrary<dim>::select(geometry_list_, geometry_);
 
     /* Set up Triangulation object: */
 

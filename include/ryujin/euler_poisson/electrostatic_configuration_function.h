@@ -12,7 +12,7 @@
 
 namespace ryujin
 {
-  namespace ElectrostaticConfigurationLibrary
+  namespace ElectrostaticConfigurations
   {
     /**
      * A user-specified equation of state
@@ -133,5 +133,5 @@ namespace ryujin
       std::unique_ptr<dealii::FunctionParser<dim>> magnetic_field_y_;
       std::unique_ptr<dealii::FunctionParser<dim>> magnetic_field_z_;
     };
-  } // namespace ElectrostaticConfigurationLibrary
+  } // namespace ElectrostaticConfigurations
 } // namespace ryujin

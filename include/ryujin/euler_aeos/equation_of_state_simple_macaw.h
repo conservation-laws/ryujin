@@ -13,7 +13,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * The simple MACAW equation of state. See:
@@ -217,5 +217,5 @@ namespace ryujin
         return cold_curve;
       }
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

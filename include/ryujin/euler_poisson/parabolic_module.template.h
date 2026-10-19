@@ -101,27 +101,15 @@ namespace ryujin
           "Use the l_infty norm instead of the l_2 norm for the "
           "stopping criterion");
 
-      ElectrostaticConfigurationLibrary::
-          populate_electrostatic_configuration_list<dim, Number>(
-              electrostatic_configuration_list_,
+      electrostatic_configuration_list_ =
+          ElectrostaticConfigurationLibrary<dim, Number>::create(
               parabolic_system_->subsection());
 
       const auto populate = [this]() {
-        bool initialized = false;
-        for (auto &it : electrostatic_configuration_list_)
-
-          if (it->name() == parabolic_system_->electrostatic_configuration()) {
-            selected_electrostatic_configuration_ = it;
-            initialized = true;
-            break;
-          }
-
-        AssertThrow(initialized,
-                    dealii::ExcMessage(
-                        "Could not find an electrostatic configuration "
-                        "description with name \"" +
-                        parabolic_system_->electrostatic_configuration() +
-                        "\""));
+        selected_electrostatic_configuration_ =
+            &ElectrostaticConfigurationLibrary<dim, Number>::select(
+                electrostatic_configuration_list_,
+                parabolic_system_->electrostatic_configuration());
       };
 
       this->parse_parameters_call_back.connect(populate);

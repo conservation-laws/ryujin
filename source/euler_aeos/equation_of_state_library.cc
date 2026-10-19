@@ -17,33 +17,25 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  template <>
+  auto EquationOfStateLibrary::defaults() -> std::vector<Creator>
   {
-    /**
-     * Populate a given container with all equation of states defined in
-     * this namespace.
-     *
-     * @ingroup EulerEquations
-     */
+    using namespace EquationsOfState;
+    return {
+        creator<BumpyBarotropicPressure>(),
+        creator<Function>(),
+        creator<Hayes>(),
+        creator<JonesWilkinsLee>(),
+        creator<NobleAbelStiffenedGas>(),
+        creator<PolytropicGas>(),
+        creator<Sesame>(),
+        creator<SimpleMacaw>(),
+        creator<VanDerWaals>(),
+        creator<Pressureless>(),
+    };
+  }
 
-    void populate_equation_of_state_list(
-        equation_of_state_list_type &equation_of_state_list,
-        const std::string &subsection)
-    {
-      auto add = [&](auto &&object) {
-        equation_of_state_list.emplace(std::move(object));
-      };
+  /* instantiations */
 
-      add(std::make_shared<BumpyBarotropicPressure>(subsection));
-      add(std::make_shared<Function>(subsection));
-      add(std::make_shared<Hayes>(subsection));
-      add(std::make_shared<JonesWilkinsLee>(subsection));
-      add(std::make_shared<NobleAbelStiffenedGas>(subsection));
-      add(std::make_shared<PolytropicGas>(subsection));
-      add(std::make_shared<Sesame>(subsection));
-      add(std::make_shared<SimpleMacaw>(subsection));
-      add(std::make_shared<VanDerWaals>(subsection));
-      add(std::make_shared<Pressureless>(subsection));
-    }
-  } // namespace EquationOfStateLibrary
+  template class Library<EquationOfState, const std::string &>;
 } // namespace ryujin

@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * Trivial equation of state for pressureless Euler
@@ -104,5 +104,5 @@ namespace ryujin
     private:
       double gamma_;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

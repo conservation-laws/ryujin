@@ -18,7 +18,7 @@
 #include <deal.II/distributed/tria.h>
 
 #include <memory>
-#include <set>
+#include <vector>
 
 namespace ryujin
 {
@@ -119,7 +119,7 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    std::set<std::shared_ptr<Geometry<dim>>> geometry_list_;
+    std::vector<std::unique_ptr<Geometry<dim>>> geometry_list_;
 
     //@}
   };

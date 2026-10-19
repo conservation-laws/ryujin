@@ -461,7 +461,7 @@ namespace ryujin
       Collection collection_;
       std::shared_ptr<dealii::MappingQCache<dim>> mapping_cache_;
 
-      std::shared_ptr<Geometry<dim>> selected_geometry_;
+      Geometry<dim> *selected_geometry_ = nullptr;
 
       //@}
     };

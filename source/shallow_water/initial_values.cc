@@ -4,6 +4,7 @@
 //
 
 #include <ryujin/shallow_water/hyperbolic_description.h>
+#include <ryujin/shallow_water/initial_state_library.h>
 #include <ryujin/typed/initial_values.template.h>
 
 namespace ryujin

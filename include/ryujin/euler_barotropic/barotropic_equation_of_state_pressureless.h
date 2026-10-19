@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace BarotropicEquationOfStateLibrary
+  namespace BarotropicEquationsOfState
   {
     /**
      * Trivial equation of state for pressureless Euler
@@ -40,5 +40,5 @@ namespace ryujin
         return 0.;
       }
     };
-  } // namespace BarotropicEquationOfStateLibrary
+  } // namespace BarotropicEquationsOfState
 } // namespace ryujin

@@ -207,7 +207,7 @@ namespace ryujin
   } // namespace eospac
 #endif
 
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * A tabulated equation of state based on the EOSPAC6/Sesame
@@ -510,5 +510,5 @@ namespace ryujin
       }
 #endif
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

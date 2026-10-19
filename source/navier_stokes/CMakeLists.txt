@@ -9,7 +9,7 @@ if(NOT EQUATION_EULER)
 endif()
 
 add_library(obj_navier_stokes OBJECT
-  equation_dispatch.cc
+  equation.cc
   parabolic_module.cc
   )
 set_target_properties(obj_navier_stokes PROPERTIES LINKER_LANGUAGE CXX)

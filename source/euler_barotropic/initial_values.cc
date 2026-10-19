@@ -4,6 +4,7 @@
 //
 
 #include <ryujin/euler_barotropic/hyperbolic_description.h>
+#include <ryujin/euler_barotropic/initial_state_library.h>
 #include <ryujin/typed/initial_values.template.h>
 
 namespace ryujin

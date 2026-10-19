@@ -18,13 +18,11 @@
  * Test the barotropic EOS library:
  */
 
-using namespace ryujin::BarotropicEquationOfStateLibrary;
+using namespace ryujin::BarotropicEquationsOfState;
 using namespace ryujin;
 using namespace dealii;
 
-void test(
-    const ryujin::BarotropicEquationOfStateLibrary::BarotropicEquationOfState
-        &eos)
+void test(const ryujin::BarotropicEquationOfState &eos)
 {
   const auto print_array =
       [](const std::string &name, const auto array, auto &ostream) {

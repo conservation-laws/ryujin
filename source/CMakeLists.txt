@@ -20,8 +20,8 @@ set(COMMON_SOURCE_FILES
   discretization/mesh_adaptor.cc
   discretization/offline_data.cc
   discretization/time_integrator.cc
-  driver/equation_dispatch.cc
   driver/time_loop.cc
+  geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc
   linear_algebra/sparsity_pattern.cc
   output/error_evaluation.cc
@@ -49,6 +49,7 @@ target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 #
 
 set(OBJECT_TARGETS)
+set(EQUATION_DEFINITIONS)
 macro(setup_equation EQUATION)
   #
   # obj_${EQUATION} object library: equation specific code:
@@ -68,8 +69,22 @@ foreach(_file ${_files})
 
   if(EQUATION_${_directory_upper})
     setup_equation("${_directory}")
+    list(APPEND EQUATION_DEFINITIONS RYUJIN_WITH_EQUATION_${_directory_upper})
   endif()
 endforeach()
+
+#
+# The library of all enabled equations and the entry point of the
+# executable:
+#
+
+add_library(obj_dispatch OBJECT
+  driver/equation_library.cc
+  driver/run.cc
+  )
+target_compile_definitions(obj_dispatch PRIVATE ${EQUATION_DEFINITIONS})
+deal_ii_setup_target(obj_dispatch)
+target_link_libraries(obj_dispatch obj_common ${EXTERNAL_TARGETS})
 
 #
 # The executable
@@ -77,7 +92,7 @@ endforeach()
 
 add_executable(ryujin main.cc)
 deal_ii_setup_target(ryujin)
-target_link_libraries(ryujin obj_common ${OBJECT_TARGETS} ${EXTERNAL_TARGETS})
+target_link_libraries(ryujin obj_common obj_dispatch ${OBJECT_TARGETS} ${EXTERNAL_TARGETS})
 
 set_target_properties(ryujin PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/run"

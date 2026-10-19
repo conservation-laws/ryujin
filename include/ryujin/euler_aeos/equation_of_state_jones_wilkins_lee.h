@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * The Jones-Wilkins-Lee equation of state. See (16a) in:
@@ -200,5 +200,5 @@ namespace ryujin
       double T_0;
       double s_0;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

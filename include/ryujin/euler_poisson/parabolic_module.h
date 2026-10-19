@@ -19,6 +19,9 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/matrix_free/matrix_free.h>
 
+#include <memory>
+#include <vector>
+
 namespace ryujin
 {
   namespace EulerPoisson
@@ -289,13 +292,11 @@ namespace ryujin
           const ryujin::InitialValues<HyperbolicDescription, dim, Number>>
           initial_values_;
 
-      ElectrostaticConfigurationLibrary::
-          electrostatic_configuration_list_type<dim, Number>
-              electrostatic_configuration_list_;
+      std::vector<std::unique_ptr<ElectrostaticConfiguration<dim, Number>>>
+          electrostatic_configuration_list_;
 
-      std::shared_ptr<ElectrostaticConfigurationLibrary::
-                          ElectrostaticConfiguration<dim, Number>>
-          selected_electrostatic_configuration_;
+      ElectrostaticConfiguration<dim, Number>
+          *selected_electrostatic_configuration_ = nullptr;
 
       mutable unsigned int cycle_;
       mutable double n_iterations_gauss_;

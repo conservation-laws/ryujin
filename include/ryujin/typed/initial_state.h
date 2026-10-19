@@ -7,12 +7,11 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/convenience_macros.h>
-#include <ryujin/interface/parabolic_system.h>
+#include <ryujin/base/library.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
-#include <set>
 #include <string>
 
 namespace ryujin
@@ -86,39 +85,15 @@ namespace ryujin
 
 
   /**
-   * A "factory" class that is used to populate a list of all possible
-   * initial states for a given @p HyperbolicDescription.
-   *
-   * This works by specializing the static member function
-   * populate_initial_state_list for every @p HyperbolicDescription.
+   * The library of initial states: a registry of all initial states that
+   * InitialValues can select by name, for a given @p HyperbolicDescription,
+   * dimension @p dim, and number type @p Number.
    *
    * @ingroup InitialValues
    */
-  template <typename HyperbolicDescription, int dim, typename Number>
-  class InitialStateLibrary
-  {
-  public:
-    /**
-     * @copydoc HyperbolicSystem
-     */
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-
-    /**
-     * The type of the initial state list
-     */
-    using initial_state_list_type = std::set<
-        std::unique_ptr<InitialState<HyperbolicDescription, dim, Number>>>;
-
-    /**
-     * Populate a given container with all initial states defined for the
-     * given @p HyperbolicDescription and dimension @p dim.
-     *
-     * @ingroup InitialValues
-     */
-    static void
-    populate_initial_state_list(initial_state_list_type &initial_state_list,
-                                const HyperbolicSystem &h,
-                                const Interface::ParabolicSystem &p,
-                                const std::string &s);
-  };
+  template <typename HyperbolicDescription, int dim, typename Number = double>
+  using InitialStateLibrary =
+      Library<InitialState<HyperbolicDescription, dim, Number>,
+              const typename HyperbolicDescription::HyperbolicSystem &,
+              const std::string &>;
 } // namespace ryujin

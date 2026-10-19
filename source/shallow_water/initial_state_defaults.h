@@ -21,37 +21,38 @@
 #include <ryujin/shallow_water/initial_state_three_bumps_dam_break.h>
 #include <ryujin/shallow_water/initial_state_transient.h>
 #include <ryujin/shallow_water/initial_state_uniform.h>
-#include <ryujin/typed/initial_state_library.h>
+#include <ryujin/typed/initial_state.h>
+
+#include <vector>
 
 
 namespace ryujin
 {
   namespace ShallowWaterInitialStates
   {
+    /**
+     * The built-in initial states.
+     */
     template <typename HyperbolicDescription, int dim, typename Number>
-    void populate_initial_state_list(
-        typename InitialStateLibrary<HyperbolicDescription, dim, Number>::
-            initial_state_list_type &initial_state_list,
-        const typename HyperbolicDescription::HyperbolicSystem &h,
-        const std::string &s)
+    auto defaults()
     {
       using HD = HyperbolicDescription;
-      auto add = [&](auto &&object) {
-        initial_state_list.emplace(std::move(object));
+      using L = InitialStateLibrary<HD, dim, Number>;
+      return std::vector<typename L::Creator>{
+          L::template creator<Contrast<HD, dim, Number>>(),
+          L::template creator<FlowOverBump<HD, dim, Number>>(),
+          L::template creator<Function<HD, dim, Number>>(),
+          L::template creator<GeoTIFF<HD, dim, Number>>(),
+          L::template creator<HouTest<HD, dim, Number>>(),
+          L::template creator<Paraboloid<HD, dim, Number>>(),
+          L::template creator<RitterDamBreak<HD, dim, Number>>(),
+          L::template creator<SlopingFriction<HD, dim, Number>>(),
+          L::template creator<SmoothVortex<HD, dim, Number>>(),
+          L::template creator<ThreeBumpsDamBreak<HD, dim, Number>>(),
+          L::template creator<Uniform<HD, dim, Number>>(),
+          L::template creator<TankExperiments<HD, dim, Number>>(),
+          L::template creator<Soliton<HD, dim, Number>>(),
       };
-      add(std::make_unique<Contrast<HD, dim, Number>>(h, s));
-      add(std::make_unique<FlowOverBump<HD, dim, Number>>(h, s));
-      add(std::make_unique<Function<HD, dim, Number>>(h, s));
-      add(std::make_unique<GeoTIFF<HD, dim, Number>>(h, s));
-      add(std::make_unique<HouTest<HD, dim, Number>>(h, s));
-      add(std::make_unique<Paraboloid<HD, dim, Number>>(h, s));
-      add(std::make_unique<RitterDamBreak<HD, dim, Number>>(h, s));
-      add(std::make_unique<SlopingFriction<HD, dim, Number>>(h, s));
-      add(std::make_unique<SmoothVortex<HD, dim, Number>>(h, s));
-      add(std::make_unique<ThreeBumpsDamBreak<HD, dim, Number>>(h, s));
-      add(std::make_unique<Uniform<HD, dim, Number>>(h, s));
-      add(std::make_unique<TankExperiments<HD, dim, Number>>(h, s));
-      add(std::make_unique<Soliton<HD, dim, Number>>(h, s));
     }
   } // namespace ShallowWaterInitialStates
 } // namespace ryujin

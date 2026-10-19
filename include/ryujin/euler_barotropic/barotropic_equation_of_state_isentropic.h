@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace BarotropicEquationOfStateLibrary
+  namespace BarotropicEquationsOfState
   {
     /**
      * Isentropic equation of state for the barotropic Euler equations. The
@@ -56,5 +56,5 @@ namespace ryujin
       double k_;
       double gamma_;
     };
-  } // namespace BarotropicEquationOfStateLibrary
+  } // namespace BarotropicEquationsOfState
 } // namespace ryujin

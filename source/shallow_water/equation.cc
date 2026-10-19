@@ -3,17 +3,15 @@
 // Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
-#include <ryujin/base/compile_time_options.h>
 #include <ryujin/shallow_water/hyperbolic_description.h>
 #include <ryujin/stub/parabolic_module.h>
-
-#include <driver/equation_dispatch.h>
+#include <ryujin/typed/equation.template.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
-  {
-    Dispatch<HyperbolicDescription, StubParabolicDescription, NUMBER>
-        dispatch_instance("shallow water");
-  } // namespace ShallowWater
+  /* instantiations */
+
+  template class Equation<ShallowWater::HyperbolicDescription,
+                          StubParabolicDescription,
+                          NUMBER>;
 } // namespace ryujin

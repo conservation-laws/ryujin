@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace ElectrostaticConfigurationLibrary
+  namespace ElectrostaticConfigurations
   {
     /**
      * A user-specified equation of state
@@ -53,5 +53,5 @@ namespace ryujin
       double background_density_;
       curl_type magnetic_field_;
     };
-  } // namespace ElectrostaticConfigurationLibrary
+  } // namespace ElectrostaticConfigurations
 } // namespace ryujin

@@ -23,7 +23,7 @@
  * Test the EOS library:
  */
 
-using namespace ryujin::EquationOfStateLibrary;
+using namespace ryujin::EquationsOfState;
 using namespace ryujin;
 using namespace dealii;
 
@@ -39,7 +39,7 @@ struct testValues {
   std::array<double, 5> e_array{{0.3, 0.2, 0.1, 0.05, 0.025}};
 };
 
-void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos,
+void test(const ryujin::EquationOfState &eos,
           const testValues &tv = testValues())
 {
   const auto print_array =
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
   /* function */
 
   std::cout << "\nFunction (polytropic gas with gamma=1.4)" << std::endl;
-  EquationOfStateLibrary::Function function("");
+  EquationsOfState::Function function("");
   test(function);
 
   /* noble Abel stiffened gas */

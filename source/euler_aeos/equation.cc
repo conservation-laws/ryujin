@@ -3,17 +3,15 @@
 // Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
-#include <ryujin/base/compile_time_options.h>
 #include <ryujin/euler_aeos/hyperbolic_description.h>
 #include <ryujin/stub/parabolic_module.h>
-
-#include <driver/equation_dispatch.h>
+#include <ryujin/typed/equation.template.h>
 
 namespace ryujin
 {
-  namespace EulerAEOS
-  {
-    Dispatch<HyperbolicDescription, StubParabolicDescription, NUMBER>
-        dispatch_instance("euler aeos");
-  } // namespace EulerAEOS
+  /* instantiations */
+
+  template class Equation<EulerAEOS::HyperbolicDescription,
+                          StubParabolicDescription,
+                          NUMBER>;
 } // namespace ryujin
