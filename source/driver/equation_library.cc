@@ -57,12 +57,14 @@ namespace ryujin
         equation<Euler::HyperbolicDescription,
                  EulerPoisson::ParabolicDescription>("euler poisson"));
 #endif
-#if defined(RYUJIN_WITH_EQUATION_EULER_POISSON_AEOS)
+#if defined(RYUJIN_WITH_EQUATION_EULER_POISSON) &&                             \
+    defined(RYUJIN_WITH_EQUATION_EULER_AEOS)
     creators.push_back(
         equation<EulerAEOS::HyperbolicDescription,
                  EulerPoisson::ParabolicDescription>("euler poisson aeos"));
 #endif
-#if defined(RYUJIN_WITH_EQUATION_EULER_POISSON_BAROTROPIC)
+#if defined(RYUJIN_WITH_EQUATION_EULER_POISSON) &&                             \
+    defined(RYUJIN_WITH_EQUATION_EULER_BAROTROPIC)
     creators.push_back(equation<EulerBarotropic::HyperbolicDescription,
                                 EulerPoisson::ParabolicDescription>(
         "euler poisson barotropic"));
