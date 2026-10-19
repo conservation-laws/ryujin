@@ -74,10 +74,14 @@ foreach(_file ${_files})
 endforeach()
 
 #
-# The library of all enabled equations:
+# The library of all enabled equations and the entry point of the
+# executable:
 #
 
-add_library(obj_dispatch OBJECT driver/equation_library.cc)
+add_library(obj_dispatch OBJECT
+  driver/equation_library.cc
+  driver/run.cc
+  )
 target_compile_definitions(obj_dispatch PRIVATE ${EQUATION_DEFINITIONS})
 deal_ii_setup_target(obj_dispatch)
 target_link_libraries(obj_dispatch obj_common ${EXTERNAL_TARGETS})
