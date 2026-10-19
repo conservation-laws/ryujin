@@ -78,6 +78,18 @@ namespace ryujin
                 dealii::ExcMessage(
                     "The number of limiter iterations must be between [0,2]"));
 
+    /* Ensure dimensions match: */
+
+    [[maybe_unused]] const auto &hyperbolic_system = *hyperbolic_system_;
+    AssertDimension(hyperbolic_system.state_names(dim).size(),
+                    problem_dimension);
+    AssertDimension(hyperbolic_system.primitive_names(dim).size(),
+                    problem_dimension);
+    AssertDimension(hyperbolic_system.precomputed_names(dim).size(),
+                    n_precomputed_values);
+    AssertDimension(hyperbolic_system.initial_precomputed_names(dim).size(),
+                    n_initial_precomputed_values);
+
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
