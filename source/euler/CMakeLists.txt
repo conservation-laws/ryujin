@@ -3,13 +3,13 @@
 ## Copyright (C) 2022 - 2026 by the ryujin authors
 ##
 
-add_library(obj_euler OBJECT
+add_library(object_euler OBJECT
   equation.cc
   hyperbolic_module.cc
   initial_state_library.cc
   initial_values.cc
   solution_transfer.cc
   )
-set_target_properties(obj_euler PROPERTIES LINKER_LANGUAGE CXX)
-deal_ii_setup_target(obj_euler)
-target_link_libraries(obj_euler obj_common ${EXTERNAL_TARGETS})
+set_target_properties(object_euler PROPERTIES LINKER_LANGUAGE CXX)
+deal_ii_setup_target(object_euler)
+target_link_libraries(object_euler object_core ${EXTERNAL_TARGETS})

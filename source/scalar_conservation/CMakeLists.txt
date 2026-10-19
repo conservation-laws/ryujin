@@ -3,7 +3,7 @@
 ## Copyright (C) 2023 - 2026 by the ryujin authors
 ##
 
-add_library(obj_scalar_conservation OBJECT
+add_library(object_scalar_conservation OBJECT
   equation.cc
   flux_library.cc
   hyperbolic_module.cc
@@ -11,6 +11,6 @@ add_library(obj_scalar_conservation OBJECT
   initial_values.cc
   solution_transfer.cc
   )
-set_target_properties(obj_scalar_conservation PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(obj_scalar_conservation obj_common)
-deal_ii_setup_target(obj_scalar_conservation)
+set_target_properties(object_scalar_conservation PROPERTIES LINKER_LANGUAGE CXX)
+target_link_libraries(object_scalar_conservation object_core)
+deal_ii_setup_target(object_scalar_conservation)

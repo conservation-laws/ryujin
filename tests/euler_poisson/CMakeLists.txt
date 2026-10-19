@@ -5,12 +5,13 @@
 
 set(EQUATION euler_poisson)
 
-set(TEST_LIBRARIES
-  obj_common obj_${EQUATION}
-  obj_euler
-  )
+set(TEST_LIBRARIES libryujin)
 set(TEST_TARGET ryujin)
 
-if(TARGET obj_${EQUATION})
+# Tests of the Euler-Poisson equations for the barotropic Euler equations
+# are marked with ".with_equation_euler_barotropic=on":
+set(DEAL_II_WITH_EQUATION_EULER_BAROTROPIC ${EQUATION_EULER_BAROTROPIC})
+
+if(TARGET object_${EQUATION})
   deal_ii_pickup_tests()
 endif()

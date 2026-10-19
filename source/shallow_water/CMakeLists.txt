@@ -3,13 +3,13 @@
 ## Copyright (C) 2022 - 2026 by the ryujin authors
 ##
 
-add_library(obj_shallow_water OBJECT
+add_library(object_shallow_water OBJECT
   equation.cc
   hyperbolic_module.cc
   initial_state_library.cc
   initial_values.cc
   solution_transfer.cc
   )
-set_target_properties(obj_shallow_water PROPERTIES LINKER_LANGUAGE CXX)
-deal_ii_setup_target(obj_shallow_water)
-target_link_libraries(obj_shallow_water obj_common ${EXTERNAL_TARGETS})
+set_target_properties(object_shallow_water PROPERTIES LINKER_LANGUAGE CXX)
+deal_ii_setup_target(object_shallow_water)
+target_link_libraries(object_shallow_water object_core ${EXTERNAL_TARGETS})

@@ -4,15 +4,26 @@
 ##
 
 configure_file(
-  ${CMAKE_SOURCE_DIR}/include/ryujin/base/compile_time_options.h.in
-  ${CMAKE_BINARY_DIR}/include/ryujin/base/compile_time_options.h
+  ${PROJECT_SOURCE_DIR}/include/ryujin/base/compile_time_options.h.in
+  ${PROJECT_BINARY_DIR}/include/ryujin/base/compile_time_options.h
   )
 
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/ryujin
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  FILES_MATCHING PATTERN "*.h"
+  )
+install(FILES ${PROJECT_BINARY_DIR}/include/ryujin/base/compile_time_options.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ryujin/base
+  )
+
+# All object files end up in the shared library libryujin.so:
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 #
-# Common and equation-independent source files and target:
+# Equation-independent core source files and target:
 #
 
-set(COMMON_SOURCE_FILES
+set(CORE_SOURCE_FILES
   base/mpi_ensemble.cc
   base/simd.cc
   base/version_info.cc
@@ -20,6 +31,8 @@ set(COMMON_SOURCE_FILES
   discretization/mesh_adaptor.cc
   discretization/offline_data.cc
   discretization/time_integrator.cc
+  driver/equation_library.cc
+  driver/run.cc
   driver/time_loop.cc
   geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc
@@ -35,14 +48,14 @@ set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
-add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
-target_include_directories(obj_common PUBLIC
-  ${CMAKE_BINARY_DIR}/include/
-  ${CMAKE_SOURCE_DIR}/include/
+add_library(object_core OBJECT ${CORE_SOURCE_FILES})
+target_include_directories(object_core PUBLIC
+  ${PROJECT_BINARY_DIR}/include/
+  ${PROJECT_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
-deal_ii_setup_target(obj_common)
-target_link_libraries(obj_common ${EXTERNAL_TARGETS})
+deal_ii_setup_target(object_core)
+target_link_libraries(object_core ${EXTERNAL_TARGETS})
 
 #
 # Equation-specific source files and compilation targets:
@@ -52,12 +65,12 @@ set(OBJECT_TARGETS)
 set(EQUATION_DEFINITIONS)
 macro(setup_equation EQUATION)
   #
-  # obj_${EQUATION} object library: equation specific code:
+  # object_${EQUATION} object library: equation specific code:
   #
 
   add_subdirectory(${EQUATION})
 
-  list(APPEND OBJECT_TARGETS obj_${EQUATION})
+  list(APPEND OBJECT_TARGETS object_${EQUATION})
 endmacro()
 
 file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)
@@ -73,18 +86,45 @@ foreach(_file ${_files})
   endif()
 endforeach()
 
+set_property(SOURCE driver/equation_library.cc APPEND PROPERTY COMPILE_DEFINITIONS
+  ${EQUATION_DEFINITIONS}
+  )
+
 #
-# The library of all enabled equations and the entry point of the
-# executable:
+# The shared library libryujin.so:
 #
 
-add_library(obj_dispatch OBJECT
-  driver/equation_library.cc
-  driver/run.cc
+set(_objects)
+foreach(_target object_core ${OBJECT_TARGETS})
+  list(APPEND _objects $<TARGET_OBJECTS:${_target}>)
+endforeach()
+
+add_library(libryujin SHARED ${_objects})
+deal_ii_setup_target(libryujin)
+target_link_libraries(libryujin ${EXTERNAL_TARGETS})
+target_compile_features(libryujin PUBLIC cxx_std_20)
+target_include_directories(libryujin PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
-target_compile_definitions(obj_dispatch PRIVATE ${EQUATION_DEFINITIONS})
-deal_ii_setup_target(obj_dispatch)
-target_link_libraries(obj_dispatch obj_common ${EXTERNAL_TARGETS})
+
+set_target_properties(libryujin PROPERTIES
+  OUTPUT_NAME ryujin
+  EXPORT_NAME ryujin
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+  )
+
+# The name of the target for projects that include ryujin with
+# add_subdirectory(), identical to the imported target of
+# find_package(ryujin):
+add_library(ryujin::ryujin ALIAS libryujin)
+
+install(TARGETS libryujin
+  EXPORT ryujinTargets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
 
 #
 # The executable
@@ -92,10 +132,18 @@ target_link_libraries(obj_dispatch obj_common ${EXTERNAL_TARGETS})
 
 add_executable(ryujin main.cc)
 deal_ii_setup_target(ryujin)
-target_link_libraries(ryujin obj_common obj_dispatch ${OBJECT_TARGETS} ${EXTERNAL_TARGETS})
+target_link_libraries(ryujin libryujin)
 
 set_target_properties(ryujin PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/run"
+  RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/run"
   )
 
-install(TARGETS ryujin DESTINATION ${CMAKE_INSTALL_BINDIR})
+# Locate the installed libryujin.so unless it lands in a system directory:
+if(NOT "${CMAKE_INSTALL_FULL_LIBDIR}" IN_LIST CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES)
+  file(RELATIVE_PATH _libdir
+    ${CMAKE_INSTALL_FULL_BINDIR} ${CMAKE_INSTALL_FULL_LIBDIR}
+    )
+  set_target_properties(ryujin PROPERTIES INSTALL_RPATH "$ORIGIN/${_libdir}")
+endif()
+
+install(TARGETS ryujin RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

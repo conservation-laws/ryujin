@@ -3,7 +3,7 @@
 ## Copyright (C) 2025 - 2026 by the ryujin authors
 ##
 
-add_library(obj_euler_barotropic OBJECT
+add_library(object_euler_barotropic OBJECT
   barotropic_equation_of_state_library.cc
   equation.cc
   hyperbolic_module.cc
@@ -11,6 +11,6 @@ add_library(obj_euler_barotropic OBJECT
   initial_values.cc
   solution_transfer.cc
   )
-set_target_properties(obj_euler_barotropic PROPERTIES LINKER_LANGUAGE CXX)
-deal_ii_setup_target(obj_euler_barotropic)
-target_link_libraries(obj_euler_barotropic obj_common ${EXTERNAL_TARGETS})
+set_target_properties(object_euler_barotropic PROPERTIES LINKER_LANGUAGE CXX)
+deal_ii_setup_target(object_euler_barotropic)
+target_link_libraries(object_euler_barotropic object_core ${EXTERNAL_TARGETS})
