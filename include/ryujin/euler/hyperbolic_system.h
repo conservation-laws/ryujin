@@ -623,9 +623,9 @@ namespace ryujin
        *
        * @note This function is used to conveniently convert (user
        * provided) primitive initial states with pressure values to a
-       * conserved state in the EulerInitialStateLibrary. As such, this
-       * function is implemented in the Euler::HyperbolicSystem and
-       * EulerAEOS::HyperbolicSystem classes.
+       * conserved state in the initial states of the Euler equations. As
+       * such, this function is implemented in the Euler::HyperbolicSystem
+       * and EulerAEOS::HyperbolicSystem classes.
        */
       template <typename ST>
       DEAL_II_HOST_DEVICE state_type

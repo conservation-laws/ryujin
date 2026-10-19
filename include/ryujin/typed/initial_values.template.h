@@ -38,11 +38,6 @@ namespace ryujin
         InitialStateLibrary<HyperbolicDescription, dim, Number>::create(
             *hyperbolic_system_, subsection);
 
-    std::string initial_state_names;
-    for (const auto &initial_state : initial_state_list_)
-      initial_state_names +=
-          (initial_state_names.empty() ? "" : "|") + initial_state->name();
-
     configuration_ = "uniform";
     this->add_parameter(
         "configuration",
@@ -50,7 +45,8 @@ namespace ryujin
         "The initial state configuration. Valid names are given by "
         "any of the subsections defined below.",
         this->prm,
-        Patterns::Selection(initial_state_names));
+        InitialStateLibrary<HyperbolicDescription, dim, Number>::selection(
+            initial_state_list_));
 
     initial_direction_[0] = 1.;
     this->add_parameter(
@@ -193,37 +189,28 @@ namespace ryujin
     /* Populate std::function object: */
 
     {
-      bool initialized = false;
-      for (auto &it : initial_state_list_)
-        if (it->name() == configuration_) {
-          initial_state_ = [this, &it](const dealii::Point<dim> &point,
-                                       Number t) {
-            const auto transformed_point =
-                affine_transform(initial_direction_, initial_position_, point);
-            auto state = it->compute(transformed_point, t);
-            const auto view = hyperbolic_system_->template view<dim, Number>();
-            state =
-                view.apply_galilei_transform(state, [&](const auto &momentum) {
-                  return affine_transform_vector(initial_direction_, momentum);
-                });
-            return state;
-          };
+      auto &initial_state =
+          InitialStateLibrary<HyperbolicDescription, dim, Number>::select(
+              initial_state_list_, configuration_);
 
-          initial_precomputed_ = [this, &it](const dealii::Point<dim> &point) {
-            const auto transformed_point =
-                affine_transform(initial_direction_, initial_position_, point);
-            return it->initial_precomputations(transformed_point);
-          };
+      initial_state_ = [this, &initial_state](const dealii::Point<dim> &point,
+                                              Number t) {
+        const auto transformed_point =
+            affine_transform(initial_direction_, initial_position_, point);
+        auto state = initial_state.compute(transformed_point, t);
+        const auto view = hyperbolic_system_->template view<dim, Number>();
+        state = view.apply_galilei_transform(state, [&](const auto &momentum) {
+          return affine_transform_vector(initial_direction_, momentum);
+        });
+        return state;
+      };
 
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(
-          initialized,
-          ExcMessage(
-              "Could not find an initial state description with name \"" +
-              configuration_ + "\""));
+      initial_precomputed_ = [this,
+                              &initial_state](const dealii::Point<dim> &point) {
+        const auto transformed_point =
+            affine_transform(initial_direction_, initial_position_, point);
+        return initial_state.initial_precomputations(transformed_point);
+      };
     }
 
     /* Add a random perturbation to the original function object: */

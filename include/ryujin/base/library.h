@@ -8,7 +8,9 @@
 #include <ryujin/base/compile_time_options.h>
 
 #include <deal.II/base/exceptions.h>
+#include <deal.II/base/patterns.h>
 
+#include <algorithm>
 #include <concepts>
 #include <functional>
 #include <memory>
@@ -84,6 +86,21 @@ namespace ryujin
      * order.
      */
     static std::vector<std::string> names(Args... args);
+
+    /**
+     * Return a dealii::Patterns::Selection of the names of the given
+     * @p objects, as returned by create(). It is the pattern of the run time
+     * parameter that selects one of the objects by name.
+     */
+    static dealii::Patterns::Selection
+    selection(const std::vector<std::unique_ptr<Base>> &objects);
+
+    /**
+     * Return the object of the given @p objects, as returned by create(),
+     * whose name() is @p name. Throws if there is none.
+     */
+    static Base &select(const std::vector<std::unique_ptr<Base>> &objects,
+                        const std::string &name);
 
   private:
     /**
@@ -169,5 +186,34 @@ namespace ryujin
     for (const auto &object : create(args...))
       names.push_back(object->name());
     return names;
+  }
+
+
+  template <typename Base, typename... Args>
+  dealii::Patterns::Selection Library<Base, Args...>::selection(
+      const std::vector<std::unique_ptr<Base>> &objects)
+  {
+    std::string names;
+    for (const auto &object : objects)
+      names += (names.empty() ? "" : "|") + object->name();
+    return dealii::Patterns::Selection(names);
+  }
+
+
+  template <typename Base, typename... Args>
+  Base &Library<Base, Args...>::select(
+      const std::vector<std::unique_ptr<Base>> &objects,
+      const std::string &name)
+  {
+    const auto it =
+        std::find_if(objects.begin(), objects.end(), [&](const auto &object) {
+          return object->name() == name;
+        });
+
+    AssertThrow(it != objects.end(),
+                dealii::ExcMessage("No entry of the library has the name »" +
+                                   name + "«"));
+
+    return **it;
   }
 } // namespace ryujin

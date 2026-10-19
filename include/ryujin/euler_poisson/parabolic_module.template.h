@@ -106,21 +106,10 @@ namespace ryujin
               parabolic_system_->subsection());
 
       const auto populate = [this]() {
-        bool initialized = false;
-        for (auto &it : electrostatic_configuration_list_)
-
-          if (it->name() == parabolic_system_->electrostatic_configuration()) {
-            selected_electrostatic_configuration_ = it.get();
-            initialized = true;
-            break;
-          }
-
-        AssertThrow(initialized,
-                    dealii::ExcMessage(
-                        "Could not find an electrostatic configuration "
-                        "description with name \"" +
-                        parabolic_system_->electrostatic_configuration() +
-                        "\""));
+        selected_electrostatic_configuration_ =
+            &ElectrostaticConfigurationLibrary<dim, Number>::select(
+                electrostatic_configuration_list_,
+                parabolic_system_->electrostatic_configuration());
       };
 
       this->parse_parameters_call_back.connect(populate);

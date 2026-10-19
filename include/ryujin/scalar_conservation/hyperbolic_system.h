@@ -542,17 +542,13 @@ namespace ryujin
     {
       flux_list_ = FluxLibrary::create(subsection);
 
-      std::string flux_names;
-      for (const auto &flux : flux_list_)
-        flux_names += (flux_names.empty() ? "" : "|") + flux->name();
-
       flux_ = "burgers";
       add_parameter("flux",
                     flux_,
                     "The scalar flux. Valid names are given by any of the "
                     "subsections defined below",
                     this->prm,
-                    dealii::Patterns::Selection(flux_names));
+                    FluxLibrary::selection(flux_list_));
 
       /*
        * The flux classes update their parameters in their own
@@ -570,22 +566,10 @@ namespace ryujin
 
     inline void HyperbolicSystem::update_parameters()
     {
-      bool initialized = false;
-      for (auto &it : flux_list_)
-
-        /* Populate flux functions: */
-        if (it->name() == flux_) {
-          selected_flux_ = it.get();
-          problem_name_ = "Scalar conservation equation (" + it->name() + ": " +
-                          it->flux_formula() + ")";
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(
-          initialized,
-          dealii::ExcMessage("Could not find a flux description with name \"" +
-                             flux_ + "\""));
+      selected_flux_ = &FluxLibrary::select(flux_list_, flux_);
+      problem_name_ = "Scalar conservation equation (" +
+                      selected_flux_->name() + ": " +
+                      selected_flux_->flux_formula() + ")";
 
       /* invalidates view on default memory space */
       auto &parameters = *parameters_.view();

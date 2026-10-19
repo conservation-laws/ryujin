@@ -597,9 +597,9 @@ namespace ryujin
        *
        * @note This function is used to conveniently convert (user
        * provided) primitive initial states with pressure values to a
-       * conserved state in the EulerInitialStateLibrary. As such, this
-       * function is implemented in the Euler::HyperbolicSystem and
-       * EulerBarotropic::HyperbolicSystem classes.
+       * conserved state in the initial states of the Euler equations. As
+       * such, this function is implemented in the Euler::HyperbolicSystem
+       * and EulerBarotropic::HyperbolicSystem classes.
        */
       template <typename ST>
       DEAL_II_HOST_DEVICE state_type
@@ -672,20 +672,14 @@ namespace ryujin
       barotropic_equation_of_state_list_ =
           BarotropicEquationOfStateLibrary::create(subsection);
 
-      std::string barotropic_equation_of_state_names;
-      for (const auto &equation_of_state : barotropic_equation_of_state_list_)
-        barotropic_equation_of_state_names +=
-            (barotropic_equation_of_state_names.empty() ? "" : "|") +
-            equation_of_state->name();
-
       barotropic_equation_of_state_ = "isothermal";
-      add_parameter(
-          "barotropic equation of state",
-          barotropic_equation_of_state_,
-          "The barotropic equation of state. Valid names are given "
-          "by any of the subsections defined below",
-          this->prm,
-          dealii::Patterns::Selection(barotropic_equation_of_state_names));
+      add_parameter("barotropic equation of state",
+                    barotropic_equation_of_state_,
+                    "The barotropic equation of state. Valid names are given "
+                    "by any of the subsections defined below",
+                    this->prm,
+                    BarotropicEquationOfStateLibrary::selection(
+                        barotropic_equation_of_state_list_));
 
       parameters.reference_density = 1.;
       add_parameter("reference density",
@@ -711,22 +705,13 @@ namespace ryujin
 
     inline void HyperbolicSystem::update_parameters()
     {
-      bool initialized = false;
-      for (auto &it : barotropic_equation_of_state_list_)
-
-        /* Populate EOS-specific quantities and functions */
-        if (it->name() == barotropic_equation_of_state_) {
-          selected_barotropic_equation_of_state_ = it.get();
-          problem_name_ = "Compressible Euler equations (" + it->name() +
-                          " EOS, optimized barotropic)";
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(initialized,
-                  dealii::ExcMessage("Could not find a barotropic equation "
-                                     "of state description with name \"" +
-                                     barotropic_equation_of_state_ + "\""));
+      selected_barotropic_equation_of_state_ =
+          &BarotropicEquationOfStateLibrary::select(
+              barotropic_equation_of_state_list_,
+              barotropic_equation_of_state_);
+      problem_name_ = "Compressible Euler equations (" +
+                      selected_barotropic_equation_of_state_->name() +
+                      " EOS, optimized barotropic)";
 
       /* invalidates view on default memory space */
       parameters_.view();

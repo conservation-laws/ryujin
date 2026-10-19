@@ -11,7 +11,8 @@
 //
 // Test the class template Library: built-in entries from defaults(), an
 // entry added during static initialization, entries added after a first
-// create(), and the detection of a duplicate name.
+// create(), selection() and select(), and the detection of a duplicate
+// name.
 //
 
 using namespace ryujin;
@@ -111,6 +112,15 @@ int main()
     return std::make_unique<Shape>("hexagon", subsection);
   });
   print_names();
+
+  const auto objects = ShapeLibrary::create("/S");
+  std::cout << ShapeLibrary::selection(objects).description() << std::endl;
+  std::cout << ShapeLibrary::select(objects, "/S/square").name() << std::endl;
+  try {
+    ShapeLibrary::select(objects, "/S/pentagon");
+  } catch (const dealii::ExceptionBase &exception) {
+    exception.print_info(std::cout);
+  }
 
   ShapeLibrary::add<Square>();
   try {

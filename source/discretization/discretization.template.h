@@ -63,17 +63,13 @@ namespace ryujin
 
     geometry_list_ = GeometryLibrary<dim>::create(subsection);
 
-    std::string geometry_names;
-    for (const auto &geometry : geometry_list_)
-      geometry_names += (geometry_names.empty() ? "" : "|") + geometry->name();
-
     this->add_parameter(
         "geometry",
         geometry_,
         "Name of the geometry used to create the mesh. Valid names "
         "are given by any of the subsections defined below.",
         this->prm,
-        Patterns::Selection(geometry_names));
+        GeometryLibrary<dim>::selection(geometry_list_));
 
     this->refinement_ = 5;
     this->add_parameter("mesh refinement",
@@ -107,20 +103,8 @@ namespace ryujin
 
     /* Select geometry: */
 
-    {
-      bool initialized = false;
-      for (auto &it : geometry_list_)
-        if (it->name() == geometry_) {
-          this->selected_geometry_ = it.get();
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(
-          initialized,
-          ExcMessage("Could not find a geometry description with name \"" +
-                     geometry_ + "\""));
-    }
+    this->selected_geometry_ =
+        &GeometryLibrary<dim>::select(geometry_list_, geometry_);
 
     /* Set up Triangulation object: */
 
