@@ -148,7 +148,7 @@ namespace ryujin
      * stage_state_vectors together with a list of weights @p
      * stage_weights to construct a
      * modified high-order flux. The standard high-order flux reads
-     * (cf @cite ryujin-2021-1, Eq. 12):
+     * (cf. @cite ryujin-2021-1, Eq. 12):
      * \f{align}
      *   \newcommand{\bF}{{\boldsymbol F}}
      *   \newcommand{\bU}{{\boldsymbol U}}
@@ -167,7 +167,8 @@ namespace ryujin
      *   \bF^n_i\;:=\;
      *   \sum_{j\in\Ii}\Big(-(\polf(\bUni)+\polf(\bUnj)) \cdot\bc_{ij}\Big).
      * \f}
-     * Instead, the function assembles the modified high-order flux:
+     * Instead, the function replaces \f$\bF^n_i\f$ in the right-hand side
+     * by the modified high-order flux:
      * \f{align}
      *   \newcommand{\bF}{{\boldsymbol F}}
      *   \newcommand{\bU}{{\boldsymbol U}}
@@ -177,15 +178,18 @@ namespace ryujin
      *   \newcommand\Ii{\mathcal{I}(i)}
      *   \newcommand{\bc}{{\boldsymbol c}}
      *   \tilde{\bF}^n_i\;:=\;
-     *   \big(1-\sum_{s=\{1:\text{stages}\}}\omega_s\big)\bF^n_i
+     *   \big(1-\sum_{s=1}^{\text{stages}}\omega_s\big)\bF^n_i
      *   \;+\;
-     *   \sum_{s=\{1:stages\}}\omega_s \bF^{s,n}_i
+     *   \sum_{s=1}^{\text{stages}}\omega_s \bF^{s,n}_i
      *   \qquad\text{with}\quad
      *   \bF^{s,n}_i\;:=\;
      *   \sum_{j\in\Ii}\Big(-(\polf(\bUnis)+\polf(\bUnjs)) \cdot\bc_{ij}\Big).
      * \f}
      * where \f$\omega_s\f$ denotes the weights for the given stages
-     * \f$\bU^{s,n}\f$.
+     * \f$\bU^{s,n}\f$. The high-order viscosity term
+     * \f$d_{ij}^{H,n}(\bU^n_j-\bU^n_i)\f$ is always evaluated with the
+     * old state. Source terms, if present, are combined with the same
+     * weights.
      *
      * @note The routine only performs an explicit update step on the
      * locally owned dof index range. It neither updates the precomputed
