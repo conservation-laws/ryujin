@@ -7,7 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/scalar_conservation/hyperbolic_system.h>
-#include <ryujin/typed/initial_state_library.h>
+#include <ryujin/typed/initial_state.h>
 
 namespace ryujin
 {

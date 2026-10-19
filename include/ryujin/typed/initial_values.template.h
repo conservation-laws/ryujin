@@ -34,12 +34,23 @@ namespace ryujin
                       parse_parameters_callback,
                   this));
 
+    initial_state_list_ =
+        InitialStateLibrary<HyperbolicDescription, dim, Number>::create(
+            *hyperbolic_system_, subsection);
+
+    std::string initial_state_names;
+    for (const auto &initial_state : initial_state_list_)
+      initial_state_names +=
+          (initial_state_names.empty() ? "" : "|") + initial_state->name();
+
     configuration_ = "uniform";
     this->add_parameter(
         "configuration",
         configuration_,
         "The initial state configuration. Valid names are given by "
-        "any of the subsections defined below.");
+        "any of the subsections defined below.",
+        this->prm,
+        Patterns::Selection(initial_state_names));
 
     initial_direction_[0] = 1.;
     this->add_parameter(
@@ -59,16 +70,6 @@ namespace ryujin
         perturbation_,
         "Add a random perturbation of the specified magnitude to the "
         "initial state.");
-
-    /*
-     * And finally populate the initial state list with all initial state
-     * configurations defined in the InitialStateLibrary namespace:
-     */
-    InitialStateLibrary<HyperbolicDescription, dim, Number>::
-        populate_initial_state_list(initial_state_list_,
-                                    *hyperbolic_system_,
-                                    *parabolic_system_,
-                                    subsection);
   }
 
   namespace
