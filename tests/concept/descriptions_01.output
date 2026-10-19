@@ -1,0 +1,11 @@
+Euler::HyperbolicDescription + StubParabolicDescription: true true
+EulerAEOS::HyperbolicDescription + StubParabolicDescription: true true
+EulerBarotropic::HyperbolicDescription + StubParabolicDescription: true true
+ScalarConservation::HyperbolicDescription + StubParabolicDescription: true true
+ShallowWater::HyperbolicDescription + StubParabolicDescription: true true
+Euler::HyperbolicDescription + EulerPoisson::ParabolicDescription: true true
+EulerAEOS::HyperbolicDescription + EulerPoisson::ParabolicDescription: true true
+EulerBarotropic::HyperbolicDescription + EulerPoisson::ParabolicDescription: true true
+Euler::HyperbolicDescription + NavierStokes::ParabolicDescription: true true
+EulerAEOS::HyperbolicDescription + NavierStokes::ParabolicDescription: false false
+ShallowWater::HyperbolicDescription + NavierStokes::ParabolicDescription: false false

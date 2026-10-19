@@ -7,6 +7,8 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble_container.h>
+#include <ryujin/concept/hyperbolic_description.h>
+#include <ryujin/concept/parabolic_description.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/discretization/mesh_adaptor.h>
 #include <ryujin/discretization/offline_data.h>
@@ -33,10 +35,9 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            int dim,
-            typename Number = double>
+  template <typename HD, typename PD, int dim, typename Number = double>
+    requires Concept::HyperbolicDescription<HD, dim, Number> &&
+             Concept::ParabolicDescription<PD, HD, dim, Number>
   class Simulation final : public Interface::Simulation<dim, Number>
   {
   public:
@@ -44,9 +45,6 @@ namespace ryujin
      * @name Typedefs
      */
     //@{
-
-    using HD = HyperbolicDescription;
-    using PD = ParabolicDescription;
 
     using HyperbolicSystem = typename HD::HyperbolicSystem;
     using ParabolicSystem = typename PD::ParabolicSystem;

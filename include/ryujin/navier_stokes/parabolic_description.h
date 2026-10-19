@@ -6,8 +6,11 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/navier_stokes/parabolic_module.h>
 #include <ryujin/navier_stokes/parabolic_system.h>
+
+#include <concepts>
 
 namespace ryujin
 {
@@ -28,6 +31,8 @@ namespace ryujin
       using ParabolicSystem = NavierStokes::ParabolicSystem;
 
       template <typename HyperbolicDescription, int dim, typename Number>
+        requires std::same_as<HyperbolicDescription,
+                              Euler::HyperbolicDescription>
       using ParabolicModule = NavierStokes::ParabolicModule<dim, Number>;
     };
   } // namespace NavierStokes
