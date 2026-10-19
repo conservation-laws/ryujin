@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * The polytropic gas equation of state
@@ -128,5 +128,5 @@ namespace ryujin
       double cv_;
       double s0_;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

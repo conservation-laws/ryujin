@@ -12,7 +12,7 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EquationsOfState
   {
     /**
      * A user-specified equation of state
@@ -167,5 +167,5 @@ namespace ryujin
       std::unique_ptr<dealii::FunctionParser<2>> temperature_function_;
       std::unique_ptr<dealii::FunctionParser<2>> sos_function_;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace EquationsOfState
 } // namespace ryujin

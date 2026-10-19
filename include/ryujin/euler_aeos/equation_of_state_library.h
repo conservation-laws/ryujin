@@ -6,24 +6,28 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/library.h>
 #include <ryujin/euler_aeos/equation_of_state.h>
+
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
-  {
-    using equation_of_state_list_type =
-        std::set<std::shared_ptr<EquationOfState>>;
+  /**
+   * The library of equations of state: a registry of all equations of
+   * state that the EulerAEOS::HyperbolicSystem can select by name. The
+   * built-in equations of state of the namespace EquationsOfState are
+   * registered by default.
+   *
+   * @ingroup EulerEquations
+   */
+  using EquationOfStateLibrary = Library<EquationOfState, const std::string &>;
 
-    /**
-     * Populate a given container with all equation of states defined in
-     * this namespace.
-     *
-     * @ingroup EulerEquations
-     */
-    void populate_equation_of_state_list(
-        equation_of_state_list_type &equation_of_state_list,
-        const std::string &subsection);
+#ifndef DOXYGEN
+  template <>
+  auto EquationOfStateLibrary::defaults() -> std::vector<Creator>;
 
-  } // namespace EquationOfStateLibrary
+  extern template class Library<EquationOfState, const std::string &>;
+#endif
 } // namespace ryujin

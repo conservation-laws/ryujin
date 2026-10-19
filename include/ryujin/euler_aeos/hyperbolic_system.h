@@ -22,6 +22,9 @@
 #include <deal.II/base/tensor.h>
 
 #include <array>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
@@ -148,11 +151,9 @@ namespace ryujin
 
       std::string equation_of_state_;
 
-      EquationOfStateLibrary::equation_of_state_list_type
-          equation_of_state_list_;
+      std::vector<std::unique_ptr<EquationOfState>> equation_of_state_list_;
 
-      using EquationOfState = EquationOfStateLibrary::EquationOfState;
-      std::shared_ptr<EquationOfState> selected_equation_of_state_;
+      const EquationOfState *selected_equation_of_state_ = nullptr;
 
       template <int, typename, typename>
       friend class HyperbolicSystemView;
@@ -273,8 +274,7 @@ namespace ryujin
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
           : parameters_(
                 hyperbolic_system.parameters_.template view<MemorySpace>())
-          , equation_of_state_(
-                hyperbolic_system.selected_equation_of_state_.get())
+          , equation_of_state_(hyperbolic_system.selected_equation_of_state_)
       {
       }
 
@@ -843,7 +843,7 @@ namespace ryujin
       const HyperbolicSystem::Parameters *const parameters_;
 
       /* Only valid (and dereferenced) on the host: */
-      const EquationOfStateLibrary::EquationOfState *const equation_of_state_;
+      const EquationOfState *const equation_of_state_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -885,12 +885,22 @@ namespace ryujin
       /* reference remains valid due to implicit_transfers_host_resident */
       auto &parameters = *parameters_.view();
 
+      equation_of_state_list_ = EquationOfStateLibrary::create(subsection);
+
+      std::string equation_of_state_names;
+      for (const auto &equation_of_state : equation_of_state_list_)
+        equation_of_state_names +=
+            (equation_of_state_names.empty() ? "" : "|") +
+            equation_of_state->name();
+
       equation_of_state_ = "polytropic gas";
       add_parameter(
           "equation of state",
           equation_of_state_,
           "The equation of state. Valid names are given by any of the "
-          "subsections defined below");
+          "subsections defined below",
+          this->prm,
+          dealii::Patterns::Selection(equation_of_state_names));
 
       parameters.compute_strict_bounds = true;
       add_parameter(
@@ -920,13 +930,6 @@ namespace ryujin
                     "Problem specific vacuum relaxation parameter");
 
       /*
-       * And finally populate the equation of state list with all equation of
-       * state configurations defined in the EquationOfState namespace:
-       */
-      EquationOfStateLibrary::populate_equation_of_state_list(
-          equation_of_state_list_, subsection);
-
-      /*
        * The equation of state classes update their interpolatory NASG
        * parameters in their own parse_parameters_call_back signal, which
        * is invoked after ours. Thus, also connect to theirs:
@@ -947,7 +950,7 @@ namespace ryujin
 
         /* Populate EOS-specific quantities and functions */
         if (it->name() == equation_of_state_) {
-          selected_equation_of_state_ = it;
+          selected_equation_of_state_ = it.get();
           problem_name_ =
               "Compressible Euler equations (" + it->name() + " EOS)";
           initialized = true;
