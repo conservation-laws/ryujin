@@ -1,5 +1,5 @@
+#include <linear_algebra/sparsity_pattern.template.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
-#include <sparsity_pattern.template.h>
 
 int main(int argc, char *argv[])
 {

@@ -13,23 +13,23 @@ configure_file(
 #
 
 set(COMMON_SOURCE_FILES
-  discretization.cc
-  equation_dispatch.cc
-  error_evaluation.cc
-  mesh_adaptor.cc
-  mpi_ensemble.cc
-  multicomponent_vector.cc
-  offline_data.cc
-  quantities.cc
-  simd.cc
-  sparsity_pattern.cc
-  time_integrator.cc
-  time_loop.cc
-  version_info.cc
-  vtu_output.cc
+  base/mpi_ensemble.cc
+  base/simd.cc
+  base/version_info.cc
+  discretization/discretization.cc
+  discretization/mesh_adaptor.cc
+  discretization/offline_data.cc
+  discretization/time_integrator.cc
+  driver/equation_dispatch.cc
+  driver/time_loop.cc
+  linear_algebra/multicomponent_vector.cc
+  linear_algebra/sparsity_pattern.cc
+  output/error_evaluation.cc
+  output/quantities.cc
+  output/vtu_output.cc
   )
 
-set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
+set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
@@ -53,9 +53,9 @@ target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 # compiled once per hyperbolic description:
 #
 set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
-  hyperbolic_module.cc
-  initial_values.cc
-  solution_transfer.cc
+  typed/hyperbolic_module.cc
+  typed/initial_values.cc
+  typed/solution_transfer.cc
   )
 
 #

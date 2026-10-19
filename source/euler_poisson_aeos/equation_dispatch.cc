@@ -6,7 +6,7 @@
 #include <ryujin/euler_aeos/hyperbolic_description.h>
 #include <ryujin/euler_poisson/parabolic_description.h>
 
-#include <equation_dispatch.h>
+#include <driver/equation_dispatch.h>
 #include <ryujin/base/compile_time_options.h>
 
 namespace ryujin

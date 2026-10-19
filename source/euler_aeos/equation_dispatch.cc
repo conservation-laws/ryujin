@@ -7,7 +7,7 @@
 
 #include <ryujin/stub/parabolic_module.h>
 
-#include <equation_dispatch.h>
+#include <driver/equation_dispatch.h>
 #include <ryujin/base/compile_time_options.h>
 
 namespace ryujin

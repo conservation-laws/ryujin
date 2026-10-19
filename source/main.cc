@@ -5,7 +5,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 
-#include "equation_dispatch.h"
+#include "driver/equation_dispatch.h"
 #include <ryujin/base/instrumentation.h>
 
 #include <deal.II/base/mpi.h>

@@ -14,8 +14,8 @@
 // Import the vectorlib library prefixed in the vcl namespace
 #define VCL_NAMESPACE vcl
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
-#include "../simd-math/vectorclass.h"
-#include "../simd-math/vectormath_exp.h"
+#include "../../simd-math/vectorclass.h"
+#include "../../simd-math/vectormath_exp.h"
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #undef VCL_NAMESPACE
 #else
