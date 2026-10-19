@@ -16,7 +16,7 @@ if("${NUMDIFF_EXECUTABLE}" MATCHES "NUMDIFF_EXECUTABLE-NOTFOUND")
 else()
 
   # Some tests instantiate templates of the library from source/:
-  include_directories(${CMAKE_SOURCE_DIR}/source)
+  include_directories(${PROJECT_SOURCE_DIR}/source)
 
   file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)
   foreach(_file ${_files})

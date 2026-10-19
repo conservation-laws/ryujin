@@ -7,11 +7,11 @@
 # The project configuration ryujinConfig.cmake: it is configured twice,
 # for the build directory and for the installation, and determines the
 # location of the project relative to its own location. The build
-# directory mirrors the installation layout under ${CMAKE_BINARY_DIR}.
+# directory mirrors the installation layout under ${PROJECT_BINARY_DIR}.
 #
 
 set(RYUJIN_PROJECT_CONFIG_RELDIR ${CMAKE_INSTALL_LIBDIR}/cmake/ryujin)
-set(_build_config_dir ${CMAKE_BINARY_DIR}/${RYUJIN_PROJECT_CONFIG_RELDIR})
+set(_build_config_dir ${PROJECT_BINARY_DIR}/${RYUJIN_PROJECT_CONFIG_RELDIR})
 
 #
 # Targets:
@@ -31,12 +31,20 @@ install(EXPORT ryujinTargets
 #
 
 set(_modules
-  ${CMAKE_SOURCE_DIR}/cmake/FindEOSPAC.cmake
-  ${CMAKE_SOURCE_DIR}/cmake/FindLIKWID.cmake
-  ${CMAKE_SOURCE_DIR}/cmake/FindNVTX.cmake
+  ${PROJECT_SOURCE_DIR}/cmake/FindEOSPAC.cmake
+  ${PROJECT_SOURCE_DIR}/cmake/FindLIKWID.cmake
+  ${PROJECT_SOURCE_DIR}/cmake/FindNVTX.cmake
   )
 file(COPY ${_modules} DESTINATION ${_build_config_dir}/modules)
 install(FILES ${_modules} DESTINATION ${RYUJIN_PROJECT_CONFIG_RELDIR}/modules)
+
+#
+# Convenience macros:
+#
+
+set(_macros ${PROJECT_SOURCE_DIR}/cmake/macros/macro_ryujin_setup_target.cmake)
+file(COPY ${_macros} DESTINATION ${_build_config_dir}/macros)
+install(FILES ${_macros} DESTINATION ${RYUJIN_PROJECT_CONFIG_RELDIR}/macros)
 
 #
 # Feature configuration:
@@ -56,8 +64,8 @@ foreach(_feature
     )
 endforeach()
 
-file(GLOB _files RELATIVE ${CMAKE_SOURCE_DIR}/source CONFIGURE_DEPENDS
-  ${CMAKE_SOURCE_DIR}/source/*/CMakeLists.txt
+file(GLOB _files RELATIVE ${PROJECT_SOURCE_DIR}/source CONFIGURE_DEPENDS
+  ${PROJECT_SOURCE_DIR}/source/*/CMakeLists.txt
   )
 foreach(_file ${_files})
   get_filename_component(_directory "${_file}" DIRECTORY)

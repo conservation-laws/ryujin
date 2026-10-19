@@ -4,15 +4,15 @@
 ##
 
 configure_file(
-  ${CMAKE_SOURCE_DIR}/include/ryujin/base/compile_time_options.h.in
-  ${CMAKE_BINARY_DIR}/include/ryujin/base/compile_time_options.h
+  ${PROJECT_SOURCE_DIR}/include/ryujin/base/compile_time_options.h.in
+  ${PROJECT_BINARY_DIR}/include/ryujin/base/compile_time_options.h
   )
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ryujin
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/ryujin
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FILES_MATCHING PATTERN "*.h"
   )
-install(FILES ${CMAKE_BINARY_DIR}/include/ryujin/base/compile_time_options.h
+install(FILES ${PROJECT_BINARY_DIR}/include/ryujin/base/compile_time_options.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ryujin/base
   )
 
@@ -50,8 +50,8 @@ set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
 
 add_library(object_core OBJECT ${CORE_SOURCE_FILES})
 target_include_directories(object_core PUBLIC
-  ${CMAKE_BINARY_DIR}/include/
-  ${CMAKE_SOURCE_DIR}/include/
+  ${PROJECT_BINARY_DIR}/include/
+  ${PROJECT_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 deal_ii_setup_target(object_core)
@@ -104,8 +104,8 @@ deal_ii_setup_target(libryujin)
 target_link_libraries(libryujin ${EXTERNAL_TARGETS})
 target_compile_features(libryujin PUBLIC cxx_std_20)
 target_include_directories(libryujin PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
-  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
 
@@ -115,6 +115,11 @@ set_target_properties(libryujin PROPERTIES
   VERSION ${PROJECT_VERSION}
   SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
   )
+
+# The name of the target for projects that include ryujin with
+# add_subdirectory(), identical to the imported target of
+# find_package(ryujin):
+add_library(ryujin::ryujin ALIAS libryujin)
 
 install(TARGETS libryujin
   EXPORT ryujinTargets
@@ -130,7 +135,7 @@ deal_ii_setup_target(ryujin)
 target_link_libraries(ryujin libryujin)
 
 set_target_properties(ryujin PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/run"
+  RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/run"
   )
 
 # Locate the installed libryujin.so unless it lands in a system directory:

@@ -7,8 +7,8 @@
 # Sanity check:
 #
 
-get_filename_component(_source "${CMAKE_SOURCE_DIR}" REALPATH)
-get_filename_component(_build  "${CMAKE_BINARY_DIR}" REALPATH)
+get_filename_component(_source "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
+get_filename_component(_build  "${CMAKE_CURRENT_BINARY_DIR}" REALPATH)
 if("${_source}" STREQUAL "${_build}")
   message(FATAL_ERROR
     "\nRefusing to configure the project in the source directory. This "
@@ -29,7 +29,7 @@ set(RYUJIN_VERSION 2.5.0)
 
 cmake_minimum_required(VERSION 3.15)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 find_package(deal.II 9.6 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
@@ -37,7 +37,9 @@ set(CMAKE_BUILD_TYPE "Release" CACHE STRING
   "Choose the type of build, options are: Debug, Release"
   )
 deal_ii_initialize_cached_variables()
-deal_ii_query_git_information()
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/macros/macro_ryujin_query_git_information.cmake)
+ryujin_query_git_information()
 
 # Work around a typo in the deal.II CMake configuration:
 if(EXISTS ${DEAL_II_GIT_CONFIG})
@@ -203,6 +205,9 @@ endif()
 
 include(GNUInstallDirs)
 
+set_property(GLOBAL PROPERTY RYUJIN_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/macros/macro_ryujin_setup_target.cmake)
+
 add_subdirectory(source)
 add_subdirectory(cmake/config)
 
@@ -210,8 +215,8 @@ install(FILES COPYING.md README.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR}
   )
 
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/run/")
-file(CREATE_LINK "${CMAKE_SOURCE_DIR}/prm" "${CMAKE_BINARY_DIR}/run/prm" SYMBOLIC)
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/run/")
+file(CREATE_LINK "${PROJECT_SOURCE_DIR}/prm" "${PROJECT_BINARY_DIR}/run/prm" SYMBOLIC)
 install(DIRECTORY prm DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 enable_testing()

@@ -135,13 +135,12 @@ if(DEFINED CMAKE_CXX_COMPILER_ABI)
 endif()
 
 #
-# Set up a target of the project: compile and link with the deal.II
-# configuration that ryujin was built with, and link against ryujin.
+# Convenience macros:
 #
 
-macro(ryujin_setup_target _target)
-  ryujin_include_target_config()
-  string(TOUPPER "${RYUJIN_BUILD_TYPE}" _ryujin_build)
-  deal_ii_setup_target(${_target} ${_ryujin_build})
-  target_link_libraries(${_target} ${RYUJIN_TARGET})
-endmacro()
+set_property(GLOBAL PROPERTY RYUJIN_BUILD_TYPE "${RYUJIN_BUILD_TYPE}")
+
+file(GLOB _macro_files "${CMAKE_CURRENT_LIST_DIR}/macros/*.cmake")
+foreach(_file ${_macro_files})
+  include(${_file})
+endforeach()
