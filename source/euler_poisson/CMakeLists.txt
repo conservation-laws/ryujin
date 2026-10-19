@@ -10,7 +10,7 @@ endif()
 
 add_library(obj_euler_poisson OBJECT
   electrostatic_configuration_library.cc
-  equation_dispatch.cc
+  equation.cc
   parabolic_module.cc
   )
 set_target_properties(obj_euler_poisson PROPERTIES LINKER_LANGUAGE CXX)

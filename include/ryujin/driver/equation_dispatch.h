@@ -6,16 +6,15 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/driver/simulation.h>
-#include <ryujin/driver/time_loop.h>
+#include <ryujin/driver/equation_library.h>
+#include <ryujin/interface/equation.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 
-#include <algorithm>
-#include <boost/signals2.hpp>
-
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace ryujin
 {
@@ -26,12 +25,12 @@ namespace ryujin
       "\nDave, this conversation can serve no purpose anymore. Goodbye.\n\n";
 
   /**
-   * Dispatcher class that calls into the right TimeLoop depending on what
-   * has been set in the parameter file.
+   * Dispatcher class that runs the equation selected in the parameter
+   * file.
    *
    * When starting up the ryujin executable we are faced with the following
    * difficulties:
-   *  - The TimeLoop class is templated in the HyperbolicDescription, the
+   *  - The Simulation class is templated in the HyperbolicDescription, the
    *    ParabolicDescription, and the dimension that have to be read from the
    *    `ryujin.prm` parameter file.
    *  - The final set of valid parameters that can be configured in the
@@ -45,64 +44,55 @@ namespace ryujin
    *   set equation            = ...
    * end
    * ```
-   * and then create an instance of the correct TimeLoop class, that takes
-   * the dimension and equation as template parameters.
+   * and then run the equation of the EquationLibrary with the given name
+   * for the given dimension.
    *
    * @ingroup TimeLoop
    */
-  class EquationDispatch : dealii::ParameterAcceptor
+  class EquationDispatch final : dealii::ParameterAcceptor
   {
   public:
     EquationDispatch()
         : ParameterAcceptor("B - Equation")
+        , equations_(EquationLibrary::create())
     {
-      dimension_ = 0;
-      add_parameter("dimension", dimension_, "The spatial dimension");
-      add_parameter("equation", equation_, "The PDE system");
-
-      time_loop_executed_ = false;
-    }
-
-
-    ~EquationDispatch() override
-    {
-      if (signals) {
-        delete signals;
-        signals = nullptr;
-      }
-    }
-
-
-    /**
-     * Call create_parameter_files() for all registered equations.
-     */
-    static void create_parameter_files()
-    {
-      AssertThrow(signals != nullptr,
+      AssertThrow(!equations_.empty(),
                   dealii::ExcMessage(
                       dave + "No equation has been registered. Consequently, "
                              "there is nothing for us to do.\n"));
 
-      if (signals != nullptr)
-        signals->create_parameter_files();
+      dimension_ = 0;
+      add_parameter("dimension", dimension_, "The spatial dimension");
+
+      equation_ = equations_.front()->name();
+      add_parameter("equation",
+                    equation_,
+                    "The PDE system",
+                    this->prm,
+                    EquationLibrary::selection(equations_));
     }
 
 
     /**
-     * Register a create_parameter_files() callback.
+     * Write the default parameter files of all registered equations.
      */
-    template <typename Callable>
-    static void register_create_parameter_files(const Callable &callable)
+    static void create_parameter_files()
     {
-      if (signals == nullptr)
-        signals = new Signals;
+      const auto equations = EquationLibrary::create();
 
-      signals->create_parameter_files.connect(callable);
+      AssertThrow(!equations.empty(),
+                  dealii::ExcMessage(
+                      dave + "No equation has been registered. Consequently, "
+                             "there is nothing for us to do.\n"));
+
+      for (const auto &equation : equations)
+        equation->create_parameter_files();
     }
 
 
     /**
-     * Call dispatch() for all registered equations.
+     * Read the parameters "dimension" and "equation" from @p
+     * parameter_file and run the selected equation.
      */
     void dispatch(const std::string &parameter_file, const MPI_Comm &mpi_comm)
     {
@@ -117,68 +107,11 @@ namespace ryujin
                                      "either 1, 2, or 3, but we encountered »" +
                                      std::to_string(dimension_) + "«\n"));
 
-      AssertThrow(signals != nullptr,
-                  dealii::ExcMessage(
-                      dave + "No equation has been registered. Consequently, "
-                             "there is nothing for us to do.\n"));
-
-      if (signals != nullptr)
-        signals->dispatch(dimension_,
-                          equation_,
-                          parameter_file,
-                          mpi_comm,
-                          time_loop_executed_);
-
-      AssertThrow(time_loop_executed_ == true,
-                  dealii::ExcMessage(dave +
-                                     "No equation was dispatched "
-                                     "with the chosen equation parameter »" +
-                                     equation_ + "«.\n"));
+      const auto &equation = EquationLibrary::select(equations_, equation_);
+      equation.run(dimension_, parameter_file, mpi_comm);
     }
-
-
-    /**
-     * Register a dispatch() callback.
-     */
-    template <typename Callable>
-    static void register_dispatch(const Callable &callable)
-    {
-      if (signals == nullptr)
-        signals = new Signals;
-
-      signals->dispatch.connect(callable);
-    }
-
-  protected:
-    /**
-     * @name Internal data
-     */
-    //@{
-
-    /**
-     * A structure that holds two Signals for equations:
-     *  - one for creating and running the appropriate timeloop
-     *  - the other signal is used for creating default parameter files.
-     */
-    struct Signals {
-      boost::signals2::signal<void()> create_parameter_files;
-
-      boost::signals2::signal<void(int /*dimension*/,
-                                   const std::string & /*equation*/,
-                                   const std::string & /*parameter file*/,
-                                   const MPI_Comm & /*MPI communicator*/,
-                                   bool & /*time loop executed*/)>
-          dispatch;
-    };
-
-    /*
-     * Note: as a static field the pointer is zero initialized before any
-     * static/global constructor is run.
-     */
-    static Signals *signals;
 
   private:
-    //@}
     /**
      * @name Run time options
      */
@@ -193,155 +126,8 @@ namespace ryujin
      */
     //@{
 
-    bool time_loop_executed_;
+    const std::vector<std::unique_ptr<Interface::Equation>> equations_;
 
     //@}
   };
-
-
-  /**
-   * Create default parameter files for the specified HyperbolicDescription,
-   * ParabolicDescription, dimension and number type. This function is called
-   * from the respective equation driver.
-   */
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            int dim,
-            typename Number>
-  void create_prm_files(const std::string &name,
-                        bool write_detailed_description)
-  {
-    {
-      /*
-       * Workaround: Add an entry to the "A - TimeLoop" section so that is
-       * shows up first.
-       */
-      auto &prm = dealii::ParameterAcceptor::prm;
-      prm.enter_subsection("A - TimeLoop");
-      prm.declare_entry("basename", "test");
-      prm.leave_subsection();
-
-      /*
-       * Create temporary objects for the sole purpose of populating the
-       * ParameterAcceptor::prm object.
-       */
-
-      ryujin::EquationDispatch equation_dispatch;
-      ryujin::
-          Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
-              simulation(MPI_COMM_SELF);
-      ryujin::TimeLoop<dim, Number> time_loop(simulation);
-
-      /*
-       * Fix up "equation" entry:
-       */
-      prm.enter_subsection("B - Equation");
-      prm.declare_entry("dimension",
-                        std::to_string(dim),
-                        dealii::Patterns::Integer(),
-                        "The spatial dimension");
-      prm.declare_entry(
-          "equation", name, dealii::Patterns::Anything(), "The PDE system");
-      prm.set("dimension", std::to_string(dim));
-      prm.set("equation", name);
-      prm.leave_subsection();
-
-      std::string base_name = name;
-      std::ranges::replace(base_name, ' ', '_');
-      base_name += "-" + std::to_string(dim) + "d";
-
-      if (dealii::Utilities::MPI::this_mpi_process(MPI_COMM_SELF) == 0) {
-        const auto full_name =
-            "default_parameters-" + base_name + "-description.prm";
-        if (write_detailed_description)
-          prm.print_parameters(
-              full_name,
-              dealii::ParameterHandler::OutputStyle::KeepDeclarationOrder);
-
-        const auto short_name = "default_parameters-" + base_name + ".prm";
-        prm.print_parameters(
-            short_name,
-            dealii::ParameterHandler::OutputStyle::Short |
-                dealii::ParameterHandler::OutputStyle::KeepDeclarationOrder
-
-        );
-      }
-      // all objects have to go out of scope, see
-      // https://github.com/dealii/dealii/issues/15111
-    }
-
-    dealii::ParameterAcceptor::clear();
-  }
-
-
-  /**
-   * A small Dispatch struct templated in a HyperbolicDescription and a
-   * ParabolicDescription that registers the callbacks.
-   *
-   * @ingroup TimeLoop
-   */
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            typename Number>
-  struct Dispatch {
-    Dispatch(const std::string &name)
-    {
-      using HD = HyperbolicDescription;
-      using PD = ParabolicDescription;
-
-#ifdef DEBUG_OUTPUT
-      std::cout << "Dispatch<HD, PD, Number>::Dispatch() for »" << name << "«"
-                << std::endl;
-#endif
-
-      EquationDispatch::register_create_parameter_files([name]() {
-        create_prm_files<HD, PD, 1, Number>(name, false);
-        create_prm_files<HD, PD, 2, Number>(name, true);
-        create_prm_files<HD, PD, 3, Number>(name, false);
-      });
-
-      EquationDispatch::register_dispatch(
-          [name](const int dimension,
-                 const std::string &equation,
-                 const std::string &parameter_file,
-                 const MPI_Comm &mpi_comm,
-                 bool &time_loop_executed) {
-            if (equation != name)
-              return;
-
-            if (dealii::Utilities::MPI::this_mpi_process(mpi_comm) == 0) {
-              std::cout << "[INFO] dispatching to driver »" << equation
-                        << "« with dim=" << dimension << std::endl;
-            }
-
-            AssertThrow(time_loop_executed == false,
-                        dealii::ExcMessage(
-                            dave +
-                            "Trying to execute more than one TimeLoop object "
-                            "with the given equation parameter »" +
-                            equation + "«"));
-
-            if (dimension == 1) {
-              Simulation<HD, PD, 1, Number> simulation(mpi_comm);
-              TimeLoop<1, Number> time_loop(simulation);
-              dealii::ParameterAcceptor::initialize(parameter_file);
-              time_loop.run();
-              time_loop_executed = true;
-            } else if (dimension == 2) {
-              Simulation<HD, PD, 2, Number> simulation(mpi_comm);
-              TimeLoop<2, Number> time_loop(simulation);
-              dealii::ParameterAcceptor::initialize(parameter_file);
-              time_loop.run();
-              time_loop_executed = true;
-            } else if (dimension == 3) {
-              Simulation<HD, PD, 3, Number> simulation(mpi_comm);
-              TimeLoop<3, Number> time_loop(simulation);
-              dealii::ParameterAcceptor::initialize(parameter_file);
-              time_loop.run();
-              time_loop_executed = true;
-            }
-          });
-    }
-  };
-
 } // namespace ryujin

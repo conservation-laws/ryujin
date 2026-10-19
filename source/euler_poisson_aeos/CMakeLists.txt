@@ -14,7 +14,7 @@ if(NOT EQUATION_EULER_POISSON)
 endif()
 
 add_library(obj_euler_poisson_aeos OBJECT
-  equation_dispatch.cc
+  equation.cc
   parabolic_module.cc
   )
 set_target_properties(obj_euler_poisson_aeos PROPERTIES LINKER_LANGUAGE CXX)
