@@ -204,6 +204,7 @@ endif()
 include(GNUInstallDirs)
 
 add_subdirectory(source)
+add_subdirectory(cmake/config)
 
 install(FILES COPYING.md README.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR}

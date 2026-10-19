@@ -1,0 +1,147 @@
+##
+## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+## Copyright (C) 2026 by the ryujin authors
+##
+
+########################################################################
+##                                                                    ##
+##                The ryujin project configuration file               ##
+##                                                                    ##
+########################################################################
+
+#
+# General information
+#
+
+set(RYUJIN_PACKAGE_NAME "ryujin")
+
+set(RYUJIN_VERSION_MAJOR "@PROJECT_VERSION_MAJOR@")
+set(RYUJIN_VERSION_MINOR "@PROJECT_VERSION_MINOR@")
+set(RYUJIN_VERSION_SUBMINOR "@PROJECT_VERSION_PATCH@")
+set(RYUJIN_VERSION "@PROJECT_VERSION@")
+
+set(RYUJIN_BUILD_TYPE "@CMAKE_BUILD_TYPE@")
+
+# The principal floating point type:
+set(RYUJIN_NUMBER "@NUMBER@")
+
+#
+# Information about the project location
+#
+
+set(RYUJIN_DOC_RELDIR "@CMAKE_INSTALL_DOCDIR@")
+set(RYUJIN_EXECUTABLE_RELDIR "@CMAKE_INSTALL_BINDIR@")
+set(RYUJIN_INCLUDE_RELDIR "@CMAKE_INSTALL_INCLUDEDIR@")
+set(RYUJIN_LIBRARY_RELDIR "@CMAKE_INSTALL_LIBDIR@")
+set(RYUJIN_PROJECT_CONFIG_RELDIR "@RYUJIN_PROJECT_CONFIG_RELDIR@")
+
+#
+# Determine RYUJIN_PATH from CMAKE_CURRENT_LIST_DIR:
+#
+
+set(RYUJIN_PATH "${CMAKE_CURRENT_LIST_DIR}")
+set(_path "${RYUJIN_PROJECT_CONFIG_RELDIR}")
+while(NOT "${_path}" STREQUAL "")
+  get_filename_component(RYUJIN_PATH "${RYUJIN_PATH}" PATH)
+  get_filename_component(_path "${_path}" PATH)
+endwhile()
+
+#
+# Print a message after inclusion of this file:
+#
+
+set(RYUJIN_PROJECT_CONFIG_INCLUDED TRUE)
+
+set(RYUJIN_BUILD_DIR @CONFIG_BUILD_DIR@)
+
+if(NOT ${RYUJIN_PACKAGE_NAME}_FIND_QUIETLY)
+  if(RYUJIN_BUILD_DIR)
+    message(STATUS
+      "Using the ${RYUJIN_PACKAGE_NAME}-${RYUJIN_VERSION} build directory found at ${RYUJIN_PATH}"
+      )
+  else()
+    message(STATUS
+      "Using the ${RYUJIN_PACKAGE_NAME}-${RYUJIN_VERSION} installation found at ${RYUJIN_PATH}"
+      )
+  endif()
+endif()
+
+#
+# ryujin is built against a specific deal.II library. Pick it up unless
+# the project has done so already:
+#
+
+set(RYUJIN_DEAL_II_DIR "@deal.II_DIR@")
+
+if(NOT DEAL_II_PROJECT_CONFIG_INCLUDED)
+  find_package(deal.II "@DEAL_II_PACKAGE_VERSION@" REQUIRED
+    HINTS ${RYUJIN_DEAL_II_DIR}
+    )
+endif()
+
+#
+# Feature configuration:
+#
+@FEATURE_CONFIGURATION_STRING@
+#
+# Information about the library target
+#
+
+set(RYUJIN_TARGET_CONFIG "${CMAKE_CURRENT_LIST_DIR}/ryujinTargets.cmake")
+set(RYUJIN_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/modules")
+set(RYUJIN_TARGET "ryujin::ryujin")
+
+#
+# Import the library target together with the targets of the external
+# libraries it links against. This requires an enabled C++ toolchain,
+# i.e., a prior call to project(). As for deal.II we support calling
+# find_package(ryujin) before project(); the target is then imported by
+# ryujin_setup_target().
+#
+
+macro(ryujin_include_target_config)
+  if(NOT RYUJIN_TARGET_CONFIG_INCLUDED)
+    if(NOT DEAL_II_TARGET_CONFIG_INCLUDED)
+      include(${DEAL_II_TARGET_CONFIG})
+      set(DEAL_II_TARGET_CONFIG_INCLUDED TRUE)
+    endif()
+
+    set(_ryujin_module_path ${CMAKE_MODULE_PATH})
+    list(APPEND CMAKE_MODULE_PATH ${RYUJIN_MODULE_PATH})
+    if(RYUJIN_WITH_EOSPAC)
+      find_package(EOSPAC REQUIRED)
+    endif()
+    if(RYUJIN_WITH_GDAL)
+      find_package(GDAL REQUIRED)
+    endif()
+    if(RYUJIN_WITH_LIKWID)
+      find_package(LIKWID REQUIRED)
+    endif()
+    if(RYUJIN_WITH_NVTX)
+      find_package(NVTX REQUIRED)
+    endif()
+    if(RYUJIN_WITH_OPENMP)
+      find_package(OpenMP REQUIRED)
+    endif()
+    set(CMAKE_MODULE_PATH ${_ryujin_module_path})
+
+    include(${RYUJIN_TARGET_CONFIG})
+    set(RYUJIN_TARGET_CONFIG_INCLUDED TRUE)
+  endif()
+endmacro()
+
+if(DEFINED CMAKE_CXX_COMPILER_ABI)
+  ryujin_include_target_config()
+endif()
+
+#
+# Set up a target of the project: compile and link with the deal.II
+# configuration that ryujin was built with, and link against ryujin.
+#
+
+macro(ryujin_setup_target _target)
+  ryujin_include_target_config()
+  string(TOUPPER "${RYUJIN_BUILD_TYPE}" _ryujin_build)
+  deal_ii_setup_target(${_target} ${_ryujin_build})
+  target_link_libraries(${_target} ${RYUJIN_TARGET})
+endmacro()

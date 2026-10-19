@@ -94,17 +94,32 @@ set_property(SOURCE driver/equation_library.cc APPEND PROPERTY COMPILE_DEFINITIO
 # The shared library libryujin.so:
 #
 
-add_library(libryujin SHARED)
+set(_objects)
+foreach(_target object_core ${OBJECT_TARGETS})
+  list(APPEND _objects $<TARGET_OBJECTS:${_target}>)
+endforeach()
+
+add_library(libryujin SHARED ${_objects})
 deal_ii_setup_target(libryujin)
-target_link_libraries(libryujin object_core ${OBJECT_TARGETS} ${EXTERNAL_TARGETS})
+target_link_libraries(libryujin ${EXTERNAL_TARGETS})
+target_compile_features(libryujin PUBLIC cxx_std_20)
+target_include_directories(libryujin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  )
 
 set_target_properties(libryujin PROPERTIES
   OUTPUT_NAME ryujin
+  EXPORT_NAME ryujin
   VERSION ${PROJECT_VERSION}
   SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
   )
 
-install(TARGETS libryujin LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS libryujin
+  EXPORT ryujinTargets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
 
 #
 # The executable
