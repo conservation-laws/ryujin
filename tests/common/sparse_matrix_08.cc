@@ -3,9 +3,8 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <ryujin/linear_algebra/sparse_matrix.h>
-
 #include <linear_algebra/sparsity_pattern.template.h>
+#include <ryujin/linear_algebra/sparse_matrix.h>
 
 int main(int argc, char *argv[])
 {

@@ -3,10 +3,9 @@
 // Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
+#include <driver/equation_dispatch.h>
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/instrumentation.h>
-
-#include "driver/equation_dispatch.h"
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/multithread_info.h>
