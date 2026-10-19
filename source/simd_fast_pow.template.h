@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "simd.h"
+#include <ryujin/base/simd.h>
 
 #include <cmath>
 

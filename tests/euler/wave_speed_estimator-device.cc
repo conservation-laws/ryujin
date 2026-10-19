@@ -1,5 +1,5 @@
-#include <multicomponent_vector.h>
-#include <wave_speed_estimator.h>
+#include <ryujin/euler/wave_speed_estimator.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <array>
 #include <iomanip>

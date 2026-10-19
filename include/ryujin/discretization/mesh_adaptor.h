@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/mesh_adaptor.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 
-#include "mpi_ensemble.h"
-#include "observer_pointer.h"
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/observer_pointer.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 

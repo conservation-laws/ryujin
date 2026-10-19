@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/simulation.h>
 #include <ryujin/typed/hyperbolic_module.h>
@@ -13,11 +13,11 @@
 #include <ryujin/typed/postprocessor.h>
 #include <ryujin/typed/solution_transfer.h>
 
-#include <discretization.h>
-#include <mesh_adaptor.h>
-#include <mpi_ensemble_container.h>
-#include <offline_data.h>
-#include <time_integrator.h>
+#include <ryujin/base/mpi_ensemble_container.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/discretization/mesh_adaptor.h>
+#include <ryujin/discretization/offline_data.h>
+#include <ryujin/discretization/time_integrator.h>
 
 #include <memory>
 

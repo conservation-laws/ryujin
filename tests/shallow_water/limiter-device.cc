@@ -1,5 +1,5 @@
-#include <limiter.h>
-#include <multicomponent_vector.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
+#include <ryujin/shallow_water/limiter.h>
 
 #include <array>
 #include <iomanip>

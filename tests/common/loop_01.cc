@@ -1,5 +1,5 @@
-#include <loop.h>
-#include <multicomponent_vector.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <array>
 #include <iomanip>

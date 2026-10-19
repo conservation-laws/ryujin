@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "parabolic_module.h"
-#include "parabolic_system.h"
+#include <ryujin/navier_stokes/parabolic_module.h>
+#include <ryujin/navier_stokes/parabolic_system.h>
 
 namespace ryujin
 {

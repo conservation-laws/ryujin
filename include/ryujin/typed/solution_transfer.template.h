@@ -7,8 +7,8 @@
 
 #include <ryujin/typed/solution_transfer.h>
 
-#include <computing_timer.h>
-#include <tensor_product_point_kernels.h>
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/discretization/tensor_product_point_kernels.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/distributed/tria.h>

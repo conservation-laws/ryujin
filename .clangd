@@ -1,7 +1,7 @@
 # Work around our crazy compilation setup:
 CompileFlags:
   Add: [
-    -I../source/euler,
+    -I../include,
     -DRYUJIN_VERSION="",
     -DRYUJIN_GIT_REVISION=""
     -DRYUJIN_GIT_SHORTREV=""

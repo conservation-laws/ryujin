@@ -1,5 +1,5 @@
-#include <hyperbolic_system.h>
-#include <simd.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/euler/hyperbolic_system.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/vectorization.h>

@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "mpi_ensemble.h"
+#include <ryujin/base/mpi_ensemble.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/utilities.h>

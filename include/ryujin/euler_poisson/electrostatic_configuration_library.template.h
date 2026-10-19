@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "electrostatic_configuration_constant.h"
-#include "electrostatic_configuration_function.h"
-#include "electrostatic_configuration_library.h"
+#include <ryujin/euler_poisson/electrostatic_configuration_constant.h>
+#include <ryujin/euler_poisson/electrostatic_configuration_function.h>
+#include <ryujin/euler_poisson/electrostatic_configuration_library.h>
 
 namespace ryujin
 {

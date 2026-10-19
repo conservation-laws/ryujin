@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "hyperbolic_system.h"
-#include "indicator.h"
-#include "limiter.h"
-#include "wave_speed_estimator.h"
+#include <ryujin/shallow_water/hyperbolic_system.h>
+#include <ryujin/shallow_water/indicator.h>
+#include <ryujin/shallow_water/limiter.h>
+#include <ryujin/shallow_water/wave_speed_estimator.h>
 
 namespace ryujin
 {

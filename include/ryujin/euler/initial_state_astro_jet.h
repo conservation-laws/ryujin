@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <initial_state_library.h>
+#include <ryujin/typed/initial_state_library.h>
 
 namespace ryujin
 {

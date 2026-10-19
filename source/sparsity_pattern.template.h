@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "gpu.h"
-#include "simd.h"
-#include "sparsity_pattern.h"
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/linear_algebra/sparsity_pattern.h>
 
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>

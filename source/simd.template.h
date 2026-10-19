@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "simd.h"
 #include "simd_fast_pow.template.h"
+#include <ryujin/base/simd.h>
 
 #include <cmath>
 

@@ -1,5 +1,5 @@
-#include <sparse_matrix.h>
-#include <sparsity_pattern.h>
+#include <ryujin/linear_algebra/sparse_matrix.h>
+#include <ryujin/linear_algebra/sparsity_pattern.h>
 
 #include <deal.II/distributed/tria.h>
 #include <deal.II/dofs/dof_handler.h>

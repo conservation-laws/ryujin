@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "transfinite_interpolation.h"
+#include <ryujin/discretization/transfinite_interpolation.h>
 
 #include <boost/container/small_vector.hpp>
 

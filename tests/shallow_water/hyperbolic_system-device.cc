@@ -1,5 +1,5 @@
-#include <hyperbolic_system.h>
-#include <multicomponent_vector.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
+#include <ryujin/shallow_water/hyperbolic_system.h>
 
 #include <array>
 #include <iomanip>

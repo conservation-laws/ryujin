@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #ifdef DEAL_II_WITH_GSL
 #include <gsl/gsl_spline.h>

@@ -5,7 +5,7 @@
 // Copyright (C) 2023 - 2024 by Triad National Security, LLC
 //
 
-#include "initial_state_library.template.h"
+#include <ryujin/shallow_water/initial_state_library.template.h>
 
 namespace ryujin
 {

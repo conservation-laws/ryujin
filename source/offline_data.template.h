@@ -5,13 +5,13 @@
 
 #pragma once
 
-#include "discretization.h"
-#include "local_index_handling.h"
-#include "loop.h"
-#include "multicomponent_vector.h"
-#include "offline_data.h"
-#include "scratch_data.h"
-#include "simd.h"
+#include <ryujin/base/loop.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/discretization/local_index_handling.h>
+#include <ryujin/discretization/offline_data.h>
+#include <ryujin/discretization/scratch_data.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>

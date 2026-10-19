@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/discretization.h>
 
-#include "convenience_macros.h"
-#include "geometries/geometry.h"
-#include "mpi_ensemble.h"
-#include "patterns_conversion.h"
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/patterns_conversion.h>
+#include <ryujin/geometries/geometry.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/distributed/fully_distributed_tria.h>

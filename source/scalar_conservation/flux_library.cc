@@ -3,11 +3,11 @@
 // Copyright (C) 2023 by the ryujin authors
 //
 
-#include "flux_library.h"
+#include <ryujin/scalar_conservation/flux_library.h>
 
-#include "flux_burgers.h"
-#include "flux_function.h"
-#include "flux_kpp.h"
+#include <ryujin/scalar_conservation/flux_burgers.h>
+#include <ryujin/scalar_conservation/flux_function.h>
+#include <ryujin/scalar_conservation/flux_kpp.h>
 
 namespace ryujin
 {

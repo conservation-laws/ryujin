@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <convenience_macros.h>
-#include <geometries/geometry.h>
-#include <patterns_conversion.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/patterns_conversion.h>
+#include <ryujin/geometries/geometry.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>

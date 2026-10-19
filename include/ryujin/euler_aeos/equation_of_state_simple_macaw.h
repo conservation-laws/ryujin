@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "equation_of_state.h"
 #include <cmath>
+#include <ryujin/euler_aeos/equation_of_state.h>
 
 namespace ryujin
 {

@@ -5,19 +5,19 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "geometry_airfoil.h"
-#include "geometry_annulus.h"
-#include "geometry_cylinder.h"
-#include "geometry_disk.h"
-#include "geometry_geotiff_profile.h"
-#include "geometry_reader.h"
-#include "geometry_rectangular_domain.h"
-#include "geometry_step.h"
-#include "geometry_tank.h"
-#include "geometry_two_tanks.h"
-#include "geometry_wall.h"
+#include <ryujin/geometries/geometry_airfoil.h>
+#include <ryujin/geometries/geometry_annulus.h>
+#include <ryujin/geometries/geometry_cylinder.h>
+#include <ryujin/geometries/geometry_disk.h>
+#include <ryujin/geometries/geometry_geotiff_profile.h>
+#include <ryujin/geometries/geometry_reader.h>
+#include <ryujin/geometries/geometry_rectangular_domain.h>
+#include <ryujin/geometries/geometry_step.h>
+#include <ryujin/geometries/geometry_tank.h>
+#include <ryujin/geometries/geometry_two_tanks.h>
+#include <ryujin/geometries/geometry_wall.h>
 
 namespace ryujin
 {

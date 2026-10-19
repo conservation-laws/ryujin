@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/typed/initial_values.h>
 
-#include <mpi_ensemble.h>
-#include <stub_parabolic_system.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/stub/parabolic_system.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 

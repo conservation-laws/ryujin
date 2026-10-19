@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include "computing_timer.h"
-#include "loop.h"
-#include "mesh_adaptor.h"
-#include "mpi_ensemble.h"
-#include "simd.h"
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/discretization/mesh_adaptor.h>
 
 #include <deal.II/base/array_view.h>
 #include <deal.II/distributed/grid_refinement.h>

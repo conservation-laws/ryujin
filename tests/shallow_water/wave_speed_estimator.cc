@@ -1,11 +1,11 @@
 // force distinct symbols in test
 #define ShallowWater ShallowWaterTest
 
-#include <hyperbolic_system.h>
-#include <multicomponent_vector.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
+#include <ryujin/shallow_water/hyperbolic_system.h>
 #define DEBUG_WAVE_SPEED_ESTIMATOR
-#include <simd.h>
-#include <wave_speed_estimator.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/shallow_water/wave_speed_estimator.h>
 
 using namespace ryujin::ShallowWater;
 using namespace ryujin;

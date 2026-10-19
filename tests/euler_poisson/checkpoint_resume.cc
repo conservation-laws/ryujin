@@ -1,9 +1,9 @@
-#include <euler/hyperbolic_description.h>
-#include <parabolic_description.h>
+#include <ryujin/euler/hyperbolic_description.h>
+#include <ryujin/euler_poisson/parabolic_description.h>
 
-#include <time_loop.h>
+#include <ryujin/driver/time_loop.h>
 
-#include <ryujin/typed/simulation.h>
+#include <ryujin/driver/simulation.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>

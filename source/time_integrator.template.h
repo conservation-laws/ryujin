@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "time_integrator.h"
+#include <ryujin/discretization/time_integrator.h>
 
 #include <utility>
 

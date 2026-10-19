@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "equation_of_state.h"
+#include <ryujin/euler_aeos/equation_of_state.h>
 
 namespace ryujin
 {

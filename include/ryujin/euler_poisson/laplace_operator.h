@@ -6,10 +6,10 @@
 #pragma once
 
 #include <deal.II/base/config.h>
-#include <loop.h>
-#include <observer_pointer.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/simd.h>
 #include <ryujin/interface/offline_data.h>
-#include <simd.h>
 
 #include <deal.II/base/vectorization.h>
 #include <deal.II/dofs/dof_tools.h>

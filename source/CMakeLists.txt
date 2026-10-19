@@ -4,8 +4,8 @@
 ##
 
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/compile_time_options.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/compile_time_options.h
+  ${CMAKE_SOURCE_DIR}/include/ryujin/base/compile_time_options.h.in
+  ${CMAKE_BINARY_DIR}/include/ryujin/base/compile_time_options.h
   )
 
 #
@@ -37,7 +37,7 @@ set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
 
 add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
 target_include_directories(obj_common PUBLIC
-  ${CMAKE_BINARY_DIR}/source/
+  ${CMAKE_BINARY_DIR}/include/
   ${CMAKE_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
@@ -79,7 +79,7 @@ macro(setup_equation EQUATION)
 
   list(APPEND OBJECT_TARGETS obj_${EQUATION})
 
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}/hyperbolic_description.h)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/include/ryujin/${EQUATION}/hyperbolic_description.h)
     add_library(obj_${EQUATION}_dependent OBJECT
       ${HYPERBOLIC_DEPENDENT_SOURCE_FILES}
       )

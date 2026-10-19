@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include "electrostatic_configuration_library.template.h"
+#include <ryujin/euler_poisson/electrostatic_configuration_library.template.h>
 
 namespace ryujin
 {

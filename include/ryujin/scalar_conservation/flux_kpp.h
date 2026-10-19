@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "flux.h"
+#include <ryujin/scalar_conservation/flux.h>
 
 namespace ryujin
 {

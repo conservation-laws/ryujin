@@ -1,4 +1,4 @@
-#include <gpu.h>
+#include <ryujin/base/gpu.h>
 
 #include <deal.II/base/mpi.h>
 

@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <initial_state_library.h>
+#include <ryujin/typed/initial_state_library.h>
 
-#include "hyperbolic_description.h"
-#include "initial_state_function.h"
-#include "initial_state_uniform.h"
+#include <ryujin/scalar_conservation/hyperbolic_description.h>
+#include <ryujin/scalar_conservation/initial_state_function.h>
+#include <ryujin/scalar_conservation/initial_state_uniform.h>
 
 namespace ryujin
 {

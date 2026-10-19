@@ -3,11 +3,11 @@
 // Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
-#include "../euler_aeos/hyperbolic_description.h"
-#include "../euler_poisson/parabolic_description.h"
+#include <ryujin/euler_aeos/hyperbolic_description.h>
+#include <ryujin/euler_poisson/parabolic_description.h>
 
-#include <compile_time_options.h>
 #include <equation_dispatch.h>
+#include <ryujin/base/compile_time_options.h>
 
 namespace ryujin
 {

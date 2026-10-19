@@ -3,7 +3,7 @@
 // Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include "sparsity_pattern.template.h"
 

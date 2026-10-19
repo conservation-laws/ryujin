@@ -5,15 +5,15 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/initial_values.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 
-#include <initial_state_library.h>
-#include <mpi_ensemble.h>
-#include <observer_pointer.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/typed/initial_state_library.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>

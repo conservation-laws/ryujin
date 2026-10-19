@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "time_loop.h"
+#include <ryujin/driver/time_loop.h>
 
-#include <ryujin/typed/simulation.h>
+#include <ryujin/driver/simulation.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>

@@ -1,5 +1,5 @@
-#include <indicator.h>
-#include <multicomponent_vector.h>
+#include <ryujin/euler_barotropic/indicator.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <array>
 #include <iomanip>

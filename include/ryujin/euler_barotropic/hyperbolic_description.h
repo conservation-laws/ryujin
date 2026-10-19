@@ -5,12 +5,12 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "hyperbolic_system.h"
-#include "indicator.h"
-#include "limiter.h"
-#include "wave_speed_estimator.h"
+#include <ryujin/euler_barotropic/hyperbolic_system.h>
+#include <ryujin/euler_barotropic/indicator.h>
+#include <ryujin/euler_barotropic/limiter.h>
+#include <ryujin/euler_barotropic/wave_speed_estimator.h>
 
 namespace ryujin
 {

@@ -5,12 +5,12 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "discretization.h"
-#include "geometry.h"
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/geometries/geometry.h>
 
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/grid/grid_generator.h>

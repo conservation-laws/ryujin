@@ -5,16 +5,16 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/discretization.h>
 
-#include <convenience_macros.h>
-#include <gpu.h>
-#include <observer_pointer.h>
-#include <sparse_matrix.h>
-#include <sparsity_pattern.h>
-#include <state_vector.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/linear_algebra/sparse_matrix.h>
+#include <ryujin/linear_algebra/sparsity_pattern.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/partitioner.h>

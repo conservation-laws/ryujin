@@ -6,10 +6,10 @@
 #pragma once
 
 #include <boost/random/detail/polynomial.hpp>
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "discretization.h"
-#include "geometries/geometry_library.h"
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/geometries/geometry_library.h>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_dgq.h>

@@ -5,17 +5,17 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "electrostatic_configuration_library.h"
-#include "laplace_operator.h"
-#include "parabolic_system.h"
+#include <ryujin/euler_poisson/electrostatic_configuration_library.h>
+#include <ryujin/euler_poisson/laplace_operator.h>
+#include <ryujin/euler_poisson/parabolic_system.h>
 
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/typed/initial_values.h>
 
-#include <mpi_ensemble.h>
+#include <ryujin/base/mpi_ensemble.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/lac/la_parallel_block_vector.h>

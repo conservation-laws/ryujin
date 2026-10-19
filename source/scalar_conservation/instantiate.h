@@ -9,9 +9,9 @@
 #error Instantiation files can only be included once.
 #endif
 
-#include "hyperbolic_description.h"
+#include <ryujin/scalar_conservation/hyperbolic_description.h>
 
-#include "../stub_parabolic_module.h"
+#include <ryujin/stub/parabolic_module.h>
 
 namespace ryujin
 {

@@ -3,8 +3,8 @@
 // Copyright (C) 2024 by the ryujin authors
 //
 
-#include "version_info.h"
-#include "compile_time_options.h"
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/version_info.h>
 
 #include <deal.II/base/revision.h>
 #include <deal.II/base/vectorization.h>

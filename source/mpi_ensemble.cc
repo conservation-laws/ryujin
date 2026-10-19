@@ -3,7 +3,7 @@
 // Copyright (C) 2024 - 2025 by the ryujin authors
 //
 
-#include "mpi_ensemble.h"
+#include <ryujin/base/mpi_ensemble.h>
 
 #ifdef DEBUG_OUTPUT
 #include <iostream>

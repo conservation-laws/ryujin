@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "loop.h"
-#include "quantities.h"
+#include <ryujin/base/loop.h>
+#include <ryujin/output/quantities.h>
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/mpi.templates.h>

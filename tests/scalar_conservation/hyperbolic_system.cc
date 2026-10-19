@@ -1,5 +1,5 @@
-#include <hyperbolic_system.h>
-#include <simd.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/scalar_conservation/hyperbolic_system.h>
 
 #include <iomanip>
 #include <iostream>

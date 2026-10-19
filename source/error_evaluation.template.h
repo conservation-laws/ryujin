@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "computing_timer.h"
-#include "error_evaluation.h"
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/output/error_evaluation.h>
 
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>

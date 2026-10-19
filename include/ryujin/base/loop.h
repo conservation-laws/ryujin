@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-#include <computing_timer.h>
-#include <convenience_macros.h>
-#include <instrumentation.h>
-#include <simd.h>
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/instrumentation.h>
+#include <ryujin/base/simd.h>
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/memory_space.h>

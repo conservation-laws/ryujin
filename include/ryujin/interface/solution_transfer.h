@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <state_vector.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>

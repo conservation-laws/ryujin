@@ -1,14 +1,14 @@
 // force distinct symbols in test
 #define Euler EulerTest
 
-#include <hyperbolic_system.h>
-#include <multicomponent_vector.h>
-#include <simd.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/euler/hyperbolic_system.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <deal.II/base/mpi.h>
 
-#include <hyperbolic_description.h>
-#include <initial_state_exact_riemann_solution.h>
+#include <ryujin/euler/hyperbolic_description.h>
+#include <ryujin/euler/initial_state_exact_riemann_solution.h>
 
 using namespace ryujin::EulerInitialStates;
 using namespace ryujin::Euler;

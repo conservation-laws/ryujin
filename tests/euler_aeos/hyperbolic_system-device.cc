@@ -1,5 +1,5 @@
-#include <hyperbolic_system.h>
-#include <multicomponent_vector.h>
+#include <ryujin/euler_aeos/hyperbolic_system.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <array>
 #include <iomanip>

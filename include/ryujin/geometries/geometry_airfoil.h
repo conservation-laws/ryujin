@@ -5,12 +5,12 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "geometry_common_includes.h"
+#include <ryujin/geometries/geometry_common_includes.h>
 
-#include "cubic_spline.h"
-#include "transfinite_interpolation.template.h"
+#include <ryujin/discretization/transfinite_interpolation.template.h>
+#include <ryujin/geometries/cubic_spline.h>
 
 namespace ryujin
 {

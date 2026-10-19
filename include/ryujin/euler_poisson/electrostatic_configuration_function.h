@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "electrostatic_configuration.h"
+#include <ryujin/euler_poisson/electrostatic_configuration.h>
 
 #include <deal.II/base/function_parser.h>
 

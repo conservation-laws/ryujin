@@ -17,14 +17,14 @@ endif()
 message(STATUS "Using MathJax path: »${MATHJAX_PATH}«")
 
 file(GLOB_RECURSE DOXYGEN_INPUT
-  ${CMAKE_SOURCE_DIR}/source/*.h
+  ${CMAKE_SOURCE_DIR}/include/ryujin/*.h
   ${CMAKE_SOURCE_DIR}/doc/headers/*.h
   )
 string(REPLACE ";" " " DOXYGEN_INPUT "${DOXYGEN_INPUT}")
 
 file(GLOB_RECURSE DOXYGEN_DEPEND
   ${CMAKE_CURRENT_SOURCE_DIR}/options.dox.in
-  ${CMAKE_SOURCE_DIR}/source/*.h
+  ${CMAKE_SOURCE_DIR}/include/ryujin/*.h
   ${CMAKE_SOURCE_DIR}/doc/headers/*.h
   )
 

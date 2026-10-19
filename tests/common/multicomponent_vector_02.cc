@@ -1,4 +1,4 @@
-#include <multicomponent_vector.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 int main(int argc, char *argv[])
 {

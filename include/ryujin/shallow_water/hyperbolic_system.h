@@ -7,18 +7,18 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/hyperbolic_system.h>
 
-#include <convenience_macros.h>
-#include <discretization.h>
-#include <gpu.h>
-#include <loop.h>
-#include <multicomponent_vector.h>
-#include <patterns_conversion.h>
-#include <simd.h>
-#include <state_vector.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/patterns_conversion.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/memory_space.h>
 #include <deal.II/base/parameter_acceptor.h>

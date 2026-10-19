@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <geotiff_reader.h>
-#include <initial_state_library.h>
-#include <lazy.h>
+#include <ryujin/base/geotiff_reader.h>
+#include <ryujin/base/lazy.h>
+#include <ryujin/typed/initial_state_library.h>
 
 #include <deal.II/base/function_parser.h>
 

@@ -5,15 +5,15 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <loop.h>
-#include <observer_pointer.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/simd.h>
 #include <ryujin/interface/offline_data.h>
-#include <simd.h>
 
-#include "../euler/hyperbolic_system.h"
-#include "parabolic_system.h"
+#include <ryujin/euler/hyperbolic_system.h>
+#include <ryujin/navier_stokes/parabolic_system.h>
 
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/diagonal_matrix.h>

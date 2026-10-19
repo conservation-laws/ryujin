@@ -9,8 +9,8 @@
 #error Instantiation files can only be included once.
 #endif
 
-#include "../euler/hyperbolic_description.h"
-#include "parabolic_description.h"
+#include <ryujin/euler/hyperbolic_description.h>
+#include <ryujin/euler_poisson/parabolic_description.h>
 
 namespace ryujin
 {

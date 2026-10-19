@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "computing_timer.h"
-#include "vtu_output.h"
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/output/vtu_output.h>
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/numerics/data_out.h>

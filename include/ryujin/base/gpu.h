@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-#include <convenience_macros.h>
-#include <simd.h>
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/simd.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/memory_space.h>

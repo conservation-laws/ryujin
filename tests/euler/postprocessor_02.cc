@@ -1,9 +1,9 @@
-#include <hyperbolic_description.h>
+#include <ryujin/euler/hyperbolic_description.h>
 
-#include <discretization.h>
-#include <gpu.h>
-#include <mpi_ensemble.h>
-#include <offline_data.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/typed/postprocessor.h>
 

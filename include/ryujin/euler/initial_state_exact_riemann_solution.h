@@ -6,11 +6,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <initial_state_library.h>
+#include <ryujin/typed/initial_state_library.h>
 
-#include "../euler_aeos/nasg_riemann_solver.h"
+#include <ryujin/euler_aeos/nasg_riemann_solver.h>
 
 #include <deal.II/base/tensor.h>
 

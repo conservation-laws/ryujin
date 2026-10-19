@@ -5,18 +5,18 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/typed/initial_values.h>
 
-#include "observer_pointer.h"
-#include <convenience_macros.h>
-#include <mpi_ensemble.h>
-#include <simd.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/simd.h>
 
-#include "parabolic_module_gmg_operators.h"
+#include <ryujin/navier_stokes/parabolic_module_gmg_operators.h>
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>

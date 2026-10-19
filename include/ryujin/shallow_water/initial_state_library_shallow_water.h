@@ -7,23 +7,23 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <initial_state_library.h>
+#include <ryujin/typed/initial_state_library.h>
 
-#include "initial_state_contrast.h"
-#include "initial_state_flow_over_bump.h"
-#include "initial_state_function.h"
-#include "initial_state_geotiff.h"
-#include "initial_state_hou_test.h"
-#include "initial_state_paraboloid.h"
-#include "initial_state_ritter_dam_break.h"
-#include "initial_state_sloping_friction.h"
-#include "initial_state_smooth_vortex.h"
-#include "initial_state_soliton.h"
-#include "initial_state_three_bumps_dam_break.h"
-#include "initial_state_transient.h"
-#include "initial_state_uniform.h"
+#include <ryujin/shallow_water/initial_state_contrast.h>
+#include <ryujin/shallow_water/initial_state_flow_over_bump.h>
+#include <ryujin/shallow_water/initial_state_function.h>
+#include <ryujin/shallow_water/initial_state_geotiff.h>
+#include <ryujin/shallow_water/initial_state_hou_test.h>
+#include <ryujin/shallow_water/initial_state_paraboloid.h>
+#include <ryujin/shallow_water/initial_state_ritter_dam_break.h>
+#include <ryujin/shallow_water/initial_state_sloping_friction.h>
+#include <ryujin/shallow_water/initial_state_smooth_vortex.h>
+#include <ryujin/shallow_water/initial_state_soliton.h>
+#include <ryujin/shallow_water/initial_state_three_bumps_dam_break.h>
+#include <ryujin/shallow_water/initial_state_transient.h>
+#include <ryujin/shallow_water/initial_state_uniform.h>
 
 
 namespace ryujin

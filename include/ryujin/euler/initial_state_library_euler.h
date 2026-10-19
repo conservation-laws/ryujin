@@ -5,27 +5,27 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include <initial_state_library.h>
+#include <ryujin/typed/initial_state_library.h>
 
-#include "initial_state_astro_jet.h"
-#include "initial_state_becker_solution.h"
-#include "initial_state_contrast.h"
-#include "initial_state_exact_riemann_solution.h"
-#include "initial_state_four_state_contrast.h"
-#include "initial_state_function.h"
-#include "initial_state_icf_like.h"
-#include "initial_state_isentropic_vortex.h"
-#include "initial_state_leblanc.h"
-#include "initial_state_noh.h"
-#include "initial_state_radial_contrast.h"
-#include "initial_state_ramp_up.h"
-#include "initial_state_rarefaction.h"
-#include "initial_state_shock_front.h"
-#include "initial_state_smooth_wave.h"
-#include "initial_state_three_state_contrast.h"
-#include "initial_state_uniform.h"
+#include <ryujin/euler/initial_state_astro_jet.h>
+#include <ryujin/euler/initial_state_becker_solution.h>
+#include <ryujin/euler/initial_state_contrast.h>
+#include <ryujin/euler/initial_state_exact_riemann_solution.h>
+#include <ryujin/euler/initial_state_four_state_contrast.h>
+#include <ryujin/euler/initial_state_function.h>
+#include <ryujin/euler/initial_state_icf_like.h>
+#include <ryujin/euler/initial_state_isentropic_vortex.h>
+#include <ryujin/euler/initial_state_leblanc.h>
+#include <ryujin/euler/initial_state_noh.h>
+#include <ryujin/euler/initial_state_radial_contrast.h>
+#include <ryujin/euler/initial_state_ramp_up.h>
+#include <ryujin/euler/initial_state_rarefaction.h>
+#include <ryujin/euler/initial_state_shock_front.h>
+#include <ryujin/euler/initial_state_smooth_wave.h>
+#include <ryujin/euler/initial_state_three_state_contrast.h>
+#include <ryujin/euler/initial_state_uniform.h>
 
 namespace ryujin
 {

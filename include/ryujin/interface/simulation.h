@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
 #include <ryujin/interface/discretization.h>
 #include <ryujin/interface/hyperbolic_module.h>
@@ -18,11 +18,11 @@
 #include <ryujin/interface/solution_transfer.h>
 #include <ryujin/interface/time_integrator.h>
 
-#include <convenience_macros.h>
-#include <error_evaluation.h>
-#include <mpi_ensemble.h>
-#include <quantities.h>
-#include <vtu_output.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/output/error_evaluation.h>
+#include <ryujin/output/quantities.h>
+#include <ryujin/output/vtu_output.h>
 
 #include <memory>
 

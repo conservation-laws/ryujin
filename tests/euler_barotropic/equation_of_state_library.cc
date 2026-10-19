@@ -1,6 +1,6 @@
-#include <barotropic_equation_of_state_isentropic.h>
-#include <barotropic_equation_of_state_isothermal.h>
-#include <barotropic_equation_of_state_library.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_isentropic.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_isothermal.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_library.h>
 
 #include <deal.II/base/array_view.h>
 #include <deal.II/lac/vector.h>

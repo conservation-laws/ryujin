@@ -3,8 +3,8 @@
 // Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
-#include "../euler_aeos/hyperbolic_description.h"
-#include "../euler_poisson/parabolic_module.template.h"
+#include <ryujin/euler_aeos/hyperbolic_description.h>
+#include <ryujin/euler_poisson/parabolic_module.template.h>
 
 namespace ryujin
 {

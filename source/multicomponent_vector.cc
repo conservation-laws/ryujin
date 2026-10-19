@@ -3,7 +3,7 @@
 // Copyright (C) 2022 - 2024 by the ryujin authors
 //
 
-#include "multicomponent_vector.h"
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 namespace ryujin
 {

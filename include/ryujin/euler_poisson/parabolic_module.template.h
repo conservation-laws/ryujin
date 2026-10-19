@@ -5,13 +5,13 @@
 
 #pragma once
 
-#include "laplace_operator.h"
-#include "parabolic_module.h"
+#include <ryujin/euler_poisson/laplace_operator.h>
+#include <ryujin/euler_poisson/parabolic_module.h>
 
-#include <computing_timer.h>
-#include <convenience_macros.h>
-#include <loop.h>
-#include <simd.h>
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/simd.h>
 
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/linear_operator.h>

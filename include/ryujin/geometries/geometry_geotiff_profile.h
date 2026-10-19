@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "cut_cell_primitives.h"
-#include "geometry_rectangular_domain.h"
-#include "geotiff_reader.h"
+#include <ryujin/base/geotiff_reader.h>
+#include <ryujin/geometries/cut_cell_primitives.h>
+#include <ryujin/geometries/geometry_rectangular_domain.h>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/distributed/fully_distributed_tria.h>

@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "geometry_common_includes.h"
+#include <ryujin/geometries/geometry_common_includes.h>
 
 namespace ryujin
 {

@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "hyperbolic_system.h"
-#include "nasg_riemann_solver.h"
+#include <ryujin/euler_aeos/hyperbolic_system.h>
+#include <ryujin/euler_aeos/nasg_riemann_solver.h>
 
-#include <gpu.h>
-#include <observer_pointer.h>
-#include <simd.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/simd.h>
 
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>

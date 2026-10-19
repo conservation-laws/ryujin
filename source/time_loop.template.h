@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include "computing_timer.h"
-#include "gpu.h"
-#include "state_vector.h"
-#include "time_loop.h"
-#include "version_info.h"
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/version_info.h>
+#include <ryujin/driver/time_loop.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/work_stream.h>

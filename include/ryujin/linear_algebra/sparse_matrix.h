@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include <ryujin/base/compile_time_options.h>
 
-#include "gpu.h"
-#include "sparsity_pattern.h"
+#include <ryujin/base/gpu.h>
+#include <ryujin/linear_algebra/sparsity_pattern.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/partitioner.h>

@@ -3,11 +3,11 @@
 // Copyright (C) 2024 by the ryujin authors
 //
 
-#include "../euler/hyperbolic_description.h"
-#include "parabolic_description.h"
+#include <ryujin/euler/hyperbolic_description.h>
+#include <ryujin/navier_stokes/parabolic_description.h>
 
-#include <compile_time_options.h>
 #include <equation_dispatch.h>
+#include <ryujin/base/compile_time_options.h>
 
 namespace ryujin
 {
