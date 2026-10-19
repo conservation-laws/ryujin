@@ -5,15 +5,9 @@
 
 set(EQUATION euler_poisson_barotropic)
 
-include_directories(
-  ${CMAKE_BINARY_DIR}/source/
-  ${CMAKE_SOURCE_DIR}/source/${EQUATION}
-  ${CMAKE_SOURCE_DIR}/source/
-  )
-
 set(TEST_LIBRARIES
   obj_common obj_${EQUATION}
-  obj_euler_barotropic obj_euler_barotropic_dependent
+  obj_euler_barotropic
   )
 set(TEST_TARGET ryujin)
 

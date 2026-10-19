@@ -1,0 +1,945 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2022 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/discretization/time_integrator.h>
+
+#include <utility>
+
+namespace ryujin
+{
+  using namespace dealii;
+
+  template <int dim, typename Number>
+  TimeIntegrator<dim, Number>::TimeIntegrator(
+      const MPIEnsemble &mpi_ensemble,
+      const Interface::HyperbolicSystem &hyperbolic_system,
+      const Interface::ParabolicSystem &parabolic_system,
+      const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
+      const Interface::ParabolicModule<dim, Number> &parabolic_module,
+      const std::string &subsection /*= "TimeIntegrator"*/)
+      : Interface::TimeIntegrator<dim, Number>(subsection)
+      , mpi_ensemble_(mpi_ensemble)
+      , hyperbolic_system_(&hyperbolic_system)
+      , parabolic_system_(&parabolic_system)
+      , hyperbolic_module_(&hyperbolic_module)
+      , parabolic_module_(&parabolic_module)
+  {
+    cfl_min_ = Number(0.45);
+    this->add_parameter(
+        "cfl min",
+        cfl_min_,
+        "Minimal admissible relative CFL constant. How this parameter is used "
+        "depends on the chosen CFL recovery strategy");
+
+    cfl_max_ = Number(0.90);
+    this->add_parameter(
+        "cfl max",
+        cfl_max_,
+        "Maximal admissible relative CFL constant. How this parameter is used "
+        "depends on the chosen CFL recovery strategy");
+
+    cfl_recovery_strategy_ = CFLRecoveryStrategy::cruise_control;
+    this->add_parameter(
+        "cfl recovery strategy",
+        cfl_recovery_strategy_,
+        "CFL/invariant domain violation recovery strategy: none, "
+        "bang bang control, cruise control");
+
+    acceptable_tau_max_ratio_ = Number(2.0);
+    this->add_parameter(
+        "acceptable tau_max ratio",
+        acceptable_tau_max_ratio_,
+        "Maximal acceptable discrepancy between computed tau_max of "
+        "a (sub)step and enforced time-step size tau. If the ratio "
+        "is violated then a restart will be singnalled.");
+
+    tau_max_ = std::numeric_limits<Number>::max();
+    this->add_parameter("tau_max", tau_max_, "Largest time step size allowed.");
+
+    if (parabolic_system_->is_identity())
+      time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    else
+      time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
+    this->add_parameter(
+        "time stepping scheme",
+        time_stepping_scheme_,
+        "Time stepping scheme: ssprk 22, ssprk 33, erk 11, erk 22, "
+        "erk 33, erk 43, erk "
+        "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn, "
+        "imex 11, imex 22, imex 33");
+  }
+
+
+  template <int dim, typename Number>
+  void TimeIntegrator<dim, Number>::prepare()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
+#endif
+
+    this->time_stepping_scheme_name_ =
+        Patterns::Tools::Convert<TimeSteppingScheme>::to_string(
+            time_stepping_scheme_);
+
+    /* Resize temporary storage to appropriate sizes: */
+
+    switch (time_stepping_scheme_) {
+    case TimeSteppingScheme::ssprk_22:
+      temp_.resize(2);
+      this->efficiency_ = 1.;
+      break;
+    case TimeSteppingScheme::ssprk_33:
+      temp_.resize(2);
+      this->efficiency_ = 1.;
+      break;
+    case TimeSteppingScheme::erk_11:
+      temp_.resize(1);
+      this->efficiency_ = 1.;
+      break;
+    case TimeSteppingScheme::erk_22:
+      temp_.resize(2);
+      this->efficiency_ = 2.;
+      break;
+    case TimeSteppingScheme::erk_33:
+      temp_.resize(3);
+      this->efficiency_ = 3.;
+      break;
+    case TimeSteppingScheme::erk_43:
+      temp_.resize(4);
+      this->efficiency_ = 4.;
+      break;
+    case TimeSteppingScheme::erk_54:
+      temp_.resize(5);
+      this->efficiency_ = 5.;
+      break;
+    case TimeSteppingScheme::strang_ssprk_33_cn:
+      temp_.resize(3);
+      this->efficiency_ = 2.;
+      break;
+    case TimeSteppingScheme::strang_erk_33_cn:
+      temp_.resize(4);
+      this->efficiency_ = 6.;
+      break;
+    case TimeSteppingScheme::strang_erk_43_cn:
+      temp_.resize(4);
+      this->efficiency_ = 8.;
+      break;
+    case TimeSteppingScheme::imex_11:
+      temp_.resize(2);
+      this->efficiency_ = 1.;
+      break;
+    case TimeSteppingScheme::imex_22:
+      temp_.resize(4);
+      this->efficiency_ = 2.;
+      break;
+    case TimeSteppingScheme::imex_33:
+      temp_.resize(6);
+      this->efficiency_ = 3.;
+      break;
+    }
+
+    /* Initialize temporary vectors: */
+
+    for (auto &it : temp_) {
+      hyperbolic_module_->reinit_state_vector(it);
+      parabolic_module_->reinit_state_vector(it);
+    }
+
+    /* Reset CFL to starting value, set maximal acceptable tau_max ratio: */
+
+    AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
+    AssertThrow(cfl_max_ >= cfl_min_,
+                ExcMessage("cfl max must be greater than or equal to cfl min"));
+
+    AssertThrow(
+        acceptable_tau_max_ratio_ >= 1.0,
+        ExcMessage(
+            "acceptable tau_max ratio must be greater than or equal to 1."));
+
+    hyperbolic_module_->set_cfl(cfl_max_);
+    hyperbolic_module_->set_acceptable_tau_max_ratio(acceptable_tau_max_ratio_);
+
+    const auto check_whether_timestepping_makes_sense = [&]() {
+      /*
+       * Make sure the user selects an appropriate time-stepping scheme.
+       */
+
+      switch (time_stepping_scheme_) {
+      case TimeSteppingScheme::ssprk_22:
+        [[fallthrough]];
+      case TimeSteppingScheme::ssprk_33:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_11:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_22:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_33:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_43:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_54: {
+        AssertThrow(
+            parabolic_system_->is_identity(),
+            dealii::ExcMessage(
+                "The selected equation consists of a hyperbolic and nontrivial "
+                "parabolic subsystem and requires an IMEX timestepping "
+                "scheme such as »strang erk 33 cn«."));
+        break;
+      }
+      case TimeSteppingScheme::imex_11:
+        [[fallthrough]];
+      case TimeSteppingScheme::imex_22:
+        [[fallthrough]];
+      case TimeSteppingScheme::imex_33:
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_ssprk_33_cn:
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_erk_33_cn:
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_erk_43_cn: {
+        AssertThrow(
+            !parabolic_system_->is_identity(),
+            dealii::ExcMessage(
+                "The selected equation has a trivial parabolic subsystem and "
+                "should not be run with an IMEX timestepping scheme."));
+        break;
+      }
+      }
+    };
+
+    check_whether_timestepping_makes_sense();
+    this->parse_parameters_call_back.connect(
+        check_whether_timestepping_makes_sense);
+  }
+
+
+  /*
+   * -------------------------------------------------------------------------
+   * Prepare state vector:
+   * -------------------------------------------------------------------------
+   */
+
+
+  template <int dim, typename Number>
+  void TimeIntegrator<dim, Number>::prepare_state_vector(
+      StateVector<Number> &state_vector, Number t) const
+  {
+    if (!parabolic_system_->is_identity())
+      parabolic_module_->prepare_state_vector(state_vector, t);
+    hyperbolic_module_->prepare_state_vector(state_vector, t);
+  }
+
+
+  /*
+   * -------------------------------------------------------------------------
+   * High level step function implementing various CFLRecoveryStrategy
+   * -------------------------------------------------------------------------
+   */
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step(
+      StateVector<Number> &state_vector,
+      Number t,
+      Number t_final /*=std::numeric_limits<Number>::max()*/)
+  {
+    Number tau_max =
+        std::min(tau_max_, t_final - t); /* enforces t <= t_final */
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
+    std::cout << "        enforcing tau_max <= " << tau_max << std::endl;
+#endif
+
+    const auto single_step = [&]() {
+      switch (time_stepping_scheme_) {
+      case TimeSteppingScheme::ssprk_22:
+        return step_ssprk_22(state_vector, t, tau_max);
+      case TimeSteppingScheme::ssprk_33:
+        return step_ssprk_33(state_vector, t, tau_max);
+      case TimeSteppingScheme::erk_11:
+        return step_erk_11(state_vector, t, tau_max);
+      case TimeSteppingScheme::erk_22:
+        return step_erk_22(state_vector, t, tau_max);
+      case TimeSteppingScheme::erk_33:
+        return step_erk_33(state_vector, t, tau_max);
+      case TimeSteppingScheme::erk_43:
+        return step_erk_43(state_vector, t, tau_max);
+      case TimeSteppingScheme::erk_54:
+        return step_erk_54(state_vector, t, tau_max);
+      case TimeSteppingScheme::strang_ssprk_33_cn:
+        return step_strang_ssprk_33_cn(state_vector, t, tau_max);
+      case TimeSteppingScheme::strang_erk_33_cn:
+        return step_strang_erk_33_cn(state_vector, t, tau_max);
+      case TimeSteppingScheme::strang_erk_43_cn:
+        return step_strang_erk_43_cn(state_vector, t, tau_max);
+      case TimeSteppingScheme::imex_11:
+        return step_imex_11(state_vector, t, tau_max);
+      case TimeSteppingScheme::imex_22:
+        return step_imex_22(state_vector, t, tau_max);
+      case TimeSteppingScheme::imex_33:
+        return step_imex_33(state_vector, t, tau_max);
+      default:
+        __builtin_unreachable();
+      }
+    };
+
+    if (cfl_recovery_strategy_ != CFLRecoveryStrategy::none) {
+      hyperbolic_module_->set_id_violation_strategy(
+          IDViolationStrategy::raise_exception);
+      parabolic_module_->set_id_violation_strategy(
+          IDViolationStrategy::raise_exception);
+      hyperbolic_module_->set_cfl(cfl_max_);
+    }
+
+    try {
+      return single_step();
+
+    } catch (const Restart &restart) {
+
+      AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
+                  dealii::ExcInternalError());
+
+      hyperbolic_module_->set_id_violation_strategy(IDViolationStrategy::warn);
+      parabolic_module_->set_id_violation_strategy(IDViolationStrategy::warn);
+
+      if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
+        /* Retry with cfl_min instead of cfl_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout
+            << "        restart with bang bang control: setting cfl to cfl_min"
+            << std::endl;
+#endif
+        hyperbolic_module_->set_cfl(cfl_min_);
+      }
+
+      if (cfl_recovery_strategy_ == CFLRecoveryStrategy::cruise_control) {
+        /* Retry with the suggested tau_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout
+            << "        restart with cruise control: using suggested_tau_max"
+            << std::endl;
+#endif
+        //
+        // Multiply the suggested tau_max value with the efficiency.
+        //
+        // We have to account for the fact that the e Restart exception is
+        // thrown within a substep of the hyperbolic or parabolic module.
+        // This implies that the suggested_tau_max is computed for that
+        // particular substep and not for the full combined method (where
+        // tau_max can be larger). We thus multiply tau_max with the
+        // efficiency factor.
+        //
+        tau_max = std::min(
+            tau_max, this->efficiency_ * Number(restart.suggested_tau_max));
+      }
+
+      return single_step();
+    }
+  }
+
+
+  /*
+   * -------------------------------------------------------------------------
+   * Concrete implementation of ERK / IMEX time stepping strategies.
+   * -------------------------------------------------------------------------
+   */
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_ssprk_22(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+    /* SSP-RK2, see @cite Shu1988, Eq. 2.15. */
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_ssprk_22()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+
+    /* Step 1: T0 = U_old + tau * L(U_old) at t -> t + tau */
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
+
+    /* Step 2: T1 = T0 + tau L(T0) at time t + tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(temp_[0], {}, {}, temp_[1], tau);
+
+    /* Step 2: convex combination: T1 = 1/2 U_old + 1/2 T1 at time t + tau */
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 2.0), Number(1.0 / 2.0), state_vector);
+
+    std::swap(state_vector, temp_[1]);
+    return tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_ssprk_33(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+    /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_ssprk_33()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+
+    /* Step 1: T0 = U_old + tau * L(U_old) at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
+
+    /* Step 2: T1 = T0 + tau L(T0) at time t + tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(temp_[0], {}, {}, temp_[1], tau);
+
+    /* Step 2: convex combination T1 = 3/4 U_old + 1/4 T1 at time t + 0.5*tau */
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), state_vector);
+
+    /* Step 3: T0 = T1 + tau L(T1) at time t + 0.5*tau -> t + 1.5*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
+    hyperbolic_module_->step(temp_[1], {}, {}, temp_[0], tau);
+
+    /* Step 3: convex combination: T0 = 1/3 U_old + 2/3 T0 at time t + tau */
+    sadd<selected_memory_space_t>(
+        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), state_vector);
+
+    std::swap(state_vector, temp_[0]);
+    return tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_11(
+      StateVector<Number> &state_vector, Number /*t*/, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+
+    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
+
+    std::swap(state_vector, temp_[0]);
+    return tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_22(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+
+    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(.0),
+                                          tau_max / this->efficiency_);
+
+    /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {state_vector}, {Number(-1.)}, temp_[1], tau);
+
+    std::swap(state_vector, temp_[1]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_33(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 3., dealii::ExcInternalError());
+
+    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {state_vector}, {Number(-1.)}, temp_[1], tau);
+
+    /*
+     * Step 3: T2 <- {T1, 9/4} and {T0, -2} and {U_old, 3/4}
+     * at time t + 2*tau -> t + 3*tau
+     */
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
+    hyperbolic_module_->step(temp_[1],
+                             {state_vector, temp_[0]},
+                             {Number(0.75), Number(-2.)},
+                             temp_[2],
+                             tau);
+
+    std::swap(state_vector, temp_[2]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_43(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 4., dealii::ExcInternalError());
+
+    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {state_vector}, {Number(-1.)}, temp_[1], tau);
+
+    /* Step 3: T2 <- {T1, 2} and {T0, -1} at time t + 2*tau -> t + 3*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
+    hyperbolic_module_->step(
+        temp_[1], {temp_[0]}, {Number(-1.)}, temp_[2], tau);
+
+    /*
+     * Step 4: T3 <- {T2, 8/3} and {T1,-10/3} and {T0, 5/3}
+     * at time t + 3*tau -> t + 4*tau
+     */
+    hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
+    hyperbolic_module_->step(temp_[2],
+                             {temp_[0], temp_[1]},
+                             {Number(5. / 3.), Number(-10. / 3.)},
+                             temp_[3],
+                             tau);
+
+    std::swap(state_vector, temp_[3]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_54(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_54()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 5., dealii::ExcInternalError());
+
+    constexpr Number c = 0.2; /* equidistant c_i */
+    constexpr Number a_21 = +0.2;
+    constexpr Number a_31 = +0.26075582269554909;
+    constexpr Number a_32 = +0.13924417730445096;
+    constexpr Number a_41 = -0.25856517872570289;
+    constexpr Number a_42 = +0.91136274166280729;
+    constexpr Number a_43 = -0.05279756293710430;
+    constexpr Number a_51 = +0.21623276431503774;
+    constexpr Number a_52 = +0.51534223099602405;
+    constexpr Number a_53 = -0.81662794199265554;
+    constexpr Number a_54 = +0.88505294668159373;
+    constexpr Number a_61 = -0.10511678454691901;                  /* aka b_1 */
+    constexpr Number a_62 = +0.87880047152100838;                  /* aka b_2 */
+    constexpr Number a_63 = -0.58903404061484477;                  /* aka b_3 */
+    constexpr Number a_64 = +0.46213380485434047;                  /* aka b_4 */
+    constexpr Number a_65 [[maybe_unused]] = +0.35321654878641495; /* aka b_5 */
+
+    /* Step 1: at time t -> t + 1*tau */
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    /* Step 2: at time t + 1*tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {state_vector}, {(a_31 - a_21) / c}, temp_[1], tau);
+
+    /* Step 3: at time t + 2*tau -> t + 3*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
+    hyperbolic_module_->step(temp_[1],
+                             {state_vector, temp_[0]},
+                             {(a_41 - a_31) / c, (a_42 - a_32) / c},
+                             temp_[2],
+                             tau);
+
+    /* Step 4: at time t + 3*tau -> t + 4*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
+    hyperbolic_module_->step(
+        temp_[2],
+        {state_vector, temp_[0], temp_[1]},
+        {(a_51 - a_41) / c, (a_52 - a_42) / c, (a_53 - a_43) / c},
+        temp_[3],
+        tau);
+
+    /* Step 5: at time t + 4*tau -> t + 5*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[3], t + 4.0 * tau);
+    hyperbolic_module_->step(temp_[3],
+                             {state_vector, temp_[0], temp_[1], temp_[2]},
+                             {(a_61 - a_51) / c,
+                              (a_62 - a_52) / c,
+                              (a_63 - a_53) / c,
+                              (a_64 - a_54) / c},
+                             temp_[4],
+                             tau);
+
+    std::swap(state_vector, temp_[4]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_strang_ssprk_33_cn(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+    // FIXME: avoid code duplication with step_ssprk_33
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_strang_ssprk_33_cn()"
+              << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+
+    /* First explicit SSPRK 3 step with final result in temp_[0]: */
+
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.0),
+                                          tau_max / this->efficiency_);
+
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(temp_[0], {}, {}, temp_[1], tau);
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ state_vector);
+
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
+    hyperbolic_module_->step(temp_[1], {}, {}, temp_[0], tau);
+    sadd<selected_memory_space_t>(
+        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ state_vector);
+
+    /* Implicit Crank-Nicolson step with final result in temp_[2]: */
+
+    try {
+      parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
+    } catch (Restart &restart) {
+      /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
+      restart.suggested_tau_max /= this->efficiency_;
+      throw;
+    }
+
+    /* Second SSPRK 3 step with final result in temp_[0]: */
+
+    hyperbolic_module_->prepare_state_vector(/*!*/ temp_[2], t + 1.0 * tau);
+    hyperbolic_module_->step(/*!*/ temp_[2], {}, {}, temp_[0], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 2.0 * tau);
+    hyperbolic_module_->step(temp_[0], {}, {}, temp_[1], tau);
+    sadd<selected_memory_space_t>(
+        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ temp_[2]);
+
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.5 * tau);
+    hyperbolic_module_->step(temp_[1], {}, {}, temp_[0], tau);
+    sadd<selected_memory_space_t>(
+        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
+
+    std::swap(state_vector, temp_[0]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_strang_erk_33_cn(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+    // FIXME: refactor to avoid code duplication with step_erk_33
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_strang_erk_33_cn()"
+              << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 6., dealii::ExcInternalError());
+
+    /* First explicit ERK(3,3,1) step with final result in temp_[2]: */
+
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {state_vector}, {Number(-1.)}, temp_[1], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
+    hyperbolic_module_->step(temp_[1],
+                             {state_vector, temp_[0]},
+                             {Number(0.75), Number(-2.)},
+                             temp_[2],
+                             tau);
+
+    /* Implicit Crank-Nicolson step with final result in temp_[3]: */
+
+    try {
+      parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
+    } catch (Restart &restart) {
+      /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
+      restart.suggested_tau_max /= this->efficiency_;
+      throw;
+    }
+
+    /* Second explicit ERK(3,3,1) 3 step with final result in temp_[2]: */
+
+    hyperbolic_module_->prepare_state_vector(temp_[3], t + 3.0 * tau);
+    hyperbolic_module_->step(
+        /*!*/ temp_[3], {}, {}, temp_[0], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 4.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {/*!*/ temp_[3]}, {Number(-1.)}, temp_[1], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 5.0 * tau);
+    hyperbolic_module_->step(temp_[1],
+                             {/*!*/ temp_[3], temp_[0]},
+                             {Number(0.75), Number(-2.)},
+                             temp_[2],
+                             tau);
+
+    std::swap(state_vector, temp_[2]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_strang_erk_43_cn(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+    // FIXME: refactor to avoid code duplication with step_erk_43
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_strang_erk_43_cn()"
+              << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 8., dealii::ExcInternalError());
+
+    /* First explicit ERK(4,3,1) step with final result in temp_[3]: */
+
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {state_vector}, {Number(-1.)}, temp_[1], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
+    hyperbolic_module_->step(
+        temp_[1], {temp_[0]}, {Number(-1.)}, temp_[2], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
+    hyperbolic_module_->step(temp_[2],
+                             {temp_[0], temp_[1]},
+                             {Number(5. / 3.), Number(-10. / 3.)},
+                             temp_[3],
+                             tau);
+
+    /* Implicit Crank-Nicolson step with final result in temp_[2]: */
+
+    try {
+      parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
+    } catch (Restart &restart) {
+      /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
+      restart.suggested_tau_max /= this->efficiency_;
+      throw;
+    }
+
+    /* Second explicit ERK(4,3,1) step with final result in temp_[3]: */
+
+    hyperbolic_module_->prepare_state_vector(temp_[2], t + 4.0 * tau);
+    hyperbolic_module_->step(
+        /*!*/ temp_[2], {}, {}, temp_[0], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 5.0 * tau);
+    hyperbolic_module_->step(
+        temp_[0], {/*!*/ temp_[2]}, {Number(-1.)}, temp_[1], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 6.0 * tau);
+    hyperbolic_module_->step(
+        temp_[1], {temp_[0]}, {Number(-1.)}, temp_[2], tau);
+
+    hyperbolic_module_->prepare_state_vector(temp_[2], t + 7.0 * tau);
+    hyperbolic_module_->step(temp_[2],
+                             {temp_[0], temp_[1]},
+                             {Number(5. / 3.), Number(-10. / 3.)},
+                             temp_[3],
+                             tau);
+
+    std::swap(state_vector, temp_[3]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_imex_11(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_imex_11()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+
+    /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
+
+    /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
+    parabolic_module_->backward_euler_step(
+        temp_[0], t, {}, {}, temp_[1], 1.0 * tau);
+
+    std::swap(state_vector, temp_[1]);
+    return tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_imex_22(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_imex_22()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+
+    /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
+    parabolic_module_->backward_euler_step(temp_[0], t, {}, {}, temp_[1], tau);
+
+    /* Explicit step 2: T2 <- {T1, 2} and {U_old, -1} at t + tau -> t + 2 tau */
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[1], {state_vector}, {Number(-1.)}, temp_[2], tau);
+
+    /* Implicit step 2: T3 <- {T2, 0} and {U_old, 1} at t + tau -> t + 2 tau */
+    parabolic_module_->backward_euler_step(
+        temp_[2], t + 1.0 * tau, {state_vector}, {Number(1.)}, temp_[3], tau);
+
+    std::swap(state_vector, temp_[3]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_imex_33(
+      StateVector<Number> &state_vector, Number t, Number tau_max)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_imex_33()" << std::endl;
+#endif
+
+    Assert(this->efficiency_ == 3., dealii::ExcInternalError());
+
+    /* IMEX(3, 3; 1), see @cite ErnGuermond2023, Sec. 4.3. */
+
+    const Number gamma = Number(0.5) + std::sqrt(Number(3.0)) / Number(6.0);
+
+    /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
+    Number tau = hyperbolic_module_->step(state_vector,
+                                          {},
+                                          {},
+                                          temp_[0],
+                                          Number(0.),
+                                          tau_max / this->efficiency_);
+
+    /* Implicit step 1: T1 <- {U_old, 1 - 3*gamma} at time t -> t + tau */
+    parabolic_module_->backward_euler_step(
+        temp_[0], t, {state_vector}, {Number(1. - 3. * gamma)}, temp_[1], tau);
+
+    /* Explicit step 2: T2 <- {U_old, -1} and {T1, 2} at time t -> t + 2 tau */
+    hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
+    hyperbolic_module_->step(
+        temp_[1], {state_vector}, {Number(-1.)}, temp_[2], tau);
+
+    /*
+     * Implicit step 2:
+     * T3 <- {U_old, 6*gamma-1} and {T1, 2-9*gamma} at t -> t + * 2 tau
+     */
+    parabolic_module_->backward_euler_step(
+        temp_[2],
+        t + tau,
+        {state_vector, temp_[1]},
+        {Number(6. * gamma - 1.), Number(2. - 9 * gamma)},
+        temp_[3],
+        tau);
+
+    /* Explicit step 3: T4 <- {U_old, 3 / 4} and {T1, -2} at t -> t + 3 tau */
+    hyperbolic_module_->prepare_state_vector(temp_[3], t + 2. * tau);
+    hyperbolic_module_->step(temp_[3],
+                             {state_vector, temp_[1]},
+                             {Number(0.75), Number(-2.)},
+                             temp_[4],
+                             tau);
+
+    /* Implicit step 3: */
+    parabolic_module_->backward_euler_step(temp_[4],
+                                           t + 2. * tau,
+                                           {state_vector, temp_[1], temp_[3]},
+                                           {Number(0.75 - 3. * gamma),
+                                            Number(6. * gamma - 2.),
+                                            Number(9. / 4. - 3. * gamma)},
+                                           temp_[5],
+                                           tau);
+
+    std::swap(state_vector, temp_[5]);
+    return this->efficiency_ * tau;
+  }
+
+} // namespace ryujin

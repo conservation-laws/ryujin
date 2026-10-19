@@ -1,11 +1,16 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2025 - 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define EulerBarotropic EulerBarotropicTest
 
-#include <hyperbolic_system.h>
-#include <multicomponent_vector.h>
+#include <ryujin/euler_barotropic/hyperbolic_system.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 #define DEBUG_WAVE_SPEED_ESTIMATOR
-#include <simd.h>
-#include <wave_speed_estimator.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/euler_barotropic/wave_speed_estimator.h>
 
 using namespace ryujin::EulerBarotropic;
 using namespace ryujin;

@@ -1,8 +1,13 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define EulerAEOS EulerAEOSTest
 
-#include <nasg_riemann_solver.h>
-#include <simd.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/euler_aeos/nasg_riemann_solver.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>

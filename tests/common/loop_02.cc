@@ -1,5 +1,10 @@
-#include <loop.h>
-#include <multicomponent_vector.h>
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
+#include <ryujin/base/loop.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <iomanip>
 #include <iostream>

@@ -5,11 +5,9 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/interface/system.h>
-
-#include <convenience_macros.h>
 
 #include <string>
 

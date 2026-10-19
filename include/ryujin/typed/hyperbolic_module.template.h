@@ -5,13 +5,12 @@
 
 #pragma once
 
+#include <ryujin/base/computing_timer.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/simd.h>
 #include <ryujin/typed/hyperbolic_module.h>
-
-#include <computing_timer.h>
-#include <gpu.h>
-#include <loop.h>
-#include <mpi_ensemble.h>
-#include <simd.h>
 
 #include <numeric>
 #include <utility>
@@ -21,7 +20,7 @@ namespace ryujin
   namespace ShallowWater
   {
     struct HyperbolicDescription;
-  }
+  } // namespace ShallowWater
 
   using namespace dealii;
 
@@ -1508,4 +1507,4 @@ namespace ryujin
     return tau;
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

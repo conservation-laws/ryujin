@@ -4,8 +4,8 @@
 ##
 
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/compile_time_options.h.in
-  ${CMAKE_CURRENT_BINARY_DIR}/compile_time_options.h
+  ${CMAKE_SOURCE_DIR}/include/ryujin/base/compile_time_options.h.in
+  ${CMAKE_BINARY_DIR}/include/ryujin/base/compile_time_options.h
   )
 
 #
@@ -13,23 +13,23 @@ configure_file(
 #
 
 set(COMMON_SOURCE_FILES
-  discretization.cc
-  equation_dispatch.cc
-  error_evaluation.cc
-  mesh_adaptor.cc
-  mpi_ensemble.cc
-  multicomponent_vector.cc
-  offline_data.cc
-  quantities.cc
-  simd.cc
-  sparsity_pattern.cc
-  time_integrator.cc
-  time_loop.cc
-  version_info.cc
-  vtu_output.cc
+  base/mpi_ensemble.cc
+  base/simd.cc
+  base/version_info.cc
+  discretization/discretization.cc
+  discretization/mesh_adaptor.cc
+  discretization/offline_data.cc
+  discretization/time_integrator.cc
+  driver/equation_dispatch.cc
+  driver/time_loop.cc
+  linear_algebra/multicomponent_vector.cc
+  linear_algebra/sparsity_pattern.cc
+  output/error_evaluation.cc
+  output/quantities.cc
+  output/vtu_output.cc
   )
 
-set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
+set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
@@ -37,26 +37,12 @@ set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
 
 add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
 target_include_directories(obj_common PUBLIC
-  ${CMAKE_BINARY_DIR}/source/
+  ${CMAKE_BINARY_DIR}/include/
   ${CMAKE_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 deal_ii_setup_target(obj_common)
 target_link_libraries(obj_common ${EXTERNAL_TARGETS})
-
-#
-# Common, equation-dependent source files:
-#
-
-#
-# Sources that depend on the hyperbolic description only. They are
-# compiled once per hyperbolic description:
-#
-set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
-  hyperbolic_module.cc
-  initial_values.cc
-  solution_transfer.cc
-  )
 
 #
 # Equation-specific source files and compilation targets:
@@ -70,27 +56,7 @@ macro(setup_equation EQUATION)
 
   add_subdirectory(${EQUATION})
 
-  #
-  # obj_${EQUATION}_dependent object library: equation dependent common
-  # code. Only an equation directory with a hyperbolic_description.h has
-  # one. All other equation directories pair a parabolic description with
-  # the hyperbolic description of another equation directory.
-  #
-
   list(APPEND OBJECT_TARGETS obj_${EQUATION})
-
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}/hyperbolic_description.h)
-    add_library(obj_${EQUATION}_dependent OBJECT
-      ${HYPERBOLIC_DEPENDENT_SOURCE_FILES}
-      )
-    deal_ii_setup_target(obj_${EQUATION}_dependent)
-
-    target_link_libraries(obj_${EQUATION}_dependent
-      obj_${EQUATION} ${EXTERNAL_TARGETS}
-      )
-
-    list(APPEND OBJECT_TARGETS obj_${EQUATION}_dependent)
-  endif()
 endmacro()
 
 file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)

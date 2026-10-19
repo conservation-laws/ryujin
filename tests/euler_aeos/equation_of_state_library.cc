@@ -1,12 +1,17 @@
-#include <equation_of_state_bumpy_barotropic_pressure.h>
-#include <equation_of_state_function.h>
-#include <equation_of_state_hayes.h>
-#include <equation_of_state_jones_wilkins_lee.h>
-#include <equation_of_state_noble_abel_stiffened_gas.h>
-#include <equation_of_state_polytropic_gas.h>
-#include <equation_of_state_pressureless.h>
-#include <equation_of_state_simple_macaw.h>
-#include <equation_of_state_van_der_waals.h>
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
+#include <ryujin/euler_aeos/equation_of_state_bumpy_barotropic_pressure.h>
+#include <ryujin/euler_aeos/equation_of_state_function.h>
+#include <ryujin/euler_aeos/equation_of_state_hayes.h>
+#include <ryujin/euler_aeos/equation_of_state_jones_wilkins_lee.h>
+#include <ryujin/euler_aeos/equation_of_state_noble_abel_stiffened_gas.h>
+#include <ryujin/euler_aeos/equation_of_state_polytropic_gas.h>
+#include <ryujin/euler_aeos/equation_of_state_pressureless.h>
+#include <ryujin/euler_aeos/equation_of_state_simple_macaw.h>
+#include <ryujin/euler_aeos/equation_of_state_van_der_waals.h>
 
 #include <deal.II/base/array_view.h>
 #include <deal.II/lac/vector.h>

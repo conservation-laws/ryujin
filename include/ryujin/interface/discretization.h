@@ -1,15 +1,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 #pragma once
 
-#include <compile_time_options.h>
-
-#include <convenience_macros.h>
-#include <geometries/geometry.h>
-#include <patterns_conversion.h>
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/patterns_conversion.h>
+#include <ryujin/geometries/geometry.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -467,4 +466,4 @@ namespace ryujin
       //@}
     };
   } // namespace Interface
-} /* namespace ryujin */
+} // namespace ryujin

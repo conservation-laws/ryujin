@@ -14,7 +14,7 @@ set -u
 #          modification recorded in the git logs
 #
 
-if test ! -d source -o ! -d scripts -o ! -d tests ; then
+if test ! -d include -o ! -d source -o ! -d scripts -o ! -d tests ; then
   echo "This script must be run from the top-level directory of the repository."
   exit
 fi
@@ -140,6 +140,6 @@ process()
   done
 }
 
-process "."  "CMakeLists.txt|CTestConfig.cmake" update_copyright
-process "cmake doc source scripts tests" ".*" update_copyright
+process "."  "\./(CMakeLists.txt|CTestConfig.cmake)" update_copyright
+process "cmake doc include source scripts tests" ".*" update_copyright
 

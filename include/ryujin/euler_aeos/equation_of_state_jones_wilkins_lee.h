@@ -1,0 +1,204 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/euler_aeos/equation_of_state.h>
+
+namespace ryujin
+{
+  namespace EquationOfStateLibrary
+  {
+    /**
+     * The Jones-Wilkins-Lee equation of state. See (16a) in:
+     * "JWL Equation of State" by Ralph Menikoff (LA-UR-15-29536). We are
+     * assuming that the reference temperature T_r is chosen such that E_r = 0.
+     * Default parameters taken from Table 1 in reference.
+     *
+     * @ingroup EulerEquations
+     */
+    class JonesWilkinsLee : public EquationOfState
+    {
+    public:
+      using EquationOfState::pressure;
+      using EquationOfState::specific_internal_energy;
+      using EquationOfState::speed_of_sound;
+      using EquationOfState::temperature;
+
+      JonesWilkinsLee(const std::string &subsection)
+          : EquationOfState("jones wilkins lee", subsection)
+      {
+        capA = 6.3207e13; // [Pa]
+        this->add_parameter("A", capA, "The A constant");
+
+        capB = -4.472e9; // [Pa]
+        this->add_parameter("B", capB, "The B constant");
+
+        R1 = 11.3; // [unitless]
+        this->add_parameter("R1", R1, "The R1 constant");
+
+        R2 = 1.13; // [unitless]
+        this->add_parameter("R2", R2, "The R2 constant");
+
+        omega = 0.8938; // [unitless]
+        this->add_parameter("omega", omega, "The Gruneisen coefficient");
+
+        rho_0 = 1895; // [Kg / m^3]
+        this->add_parameter("rho_0", rho_0, "The reference density");
+
+        q_0 = 0.0; // [J / Kg]
+        this->add_parameter("q_0", q_0, "The specific internal energy offset");
+
+        cv_ = 2487. / rho_0; // [J / (Kg * K)]
+        this->add_parameter(
+            "c_v", cv_, "The specific heat capacity at constant volume");
+
+        T_0 = 298.15; // [K]
+        this->add_parameter("T_0", T_0, "The reference temperature");
+
+        s_0 = 0; // [J / (Kg * K)]
+        this->add_parameter("s_0", s_0, "The reference specific entropy");
+      }
+
+      /**
+       * The pressure is given by
+       * \f{align}
+       *   p = A(1 - \omega / R_1 \rho / \rho_0) e^{(-R_1 \rho_0 / \rho)}
+       *     + B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
+       *     + \omega \rho (e + q_0)
+       * \f}
+       */
+      double pressure(double rho, double e) const final
+      {
+
+        const auto ratio = rho / rho_0;
+
+        const auto first_term =
+            capA * (1. - omega / R1 * ratio) * std::exp(-R1 * 1. / ratio);
+        const auto second_term =
+            capB * (1. - omega / R2 * ratio) * std::exp(-R2 * 1. / ratio);
+
+        return first_term + second_term + omega * rho * (e + q_0);
+      }
+
+      /**
+       * The specific internal energy is given by
+       * \f{align}
+       *   \omega \rho (e + q0) = p
+       *   - A(1 - \omega / R_1 \rho / \rho_0) e^{(-R_1 \rho_0 / \rho)}
+       *   - B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
+       * \f}
+       */
+      double specific_internal_energy(double rho, double p) const final
+      {
+        const auto ratio = rho / rho_0;
+
+        const auto first_term =
+            capA * (1. - omega / R1 * ratio) * std::exp(-R1 * 1. / ratio);
+        const auto second_term =
+            capB * (1. - omega / R2 * ratio) * std::exp(-R2 * 1. / ratio);
+
+        return (p - first_term - second_term) / (rho * omega) - q_0;
+      }
+
+      /**
+       * The temperature is given by
+       * \f{align}
+       *   c_v T = e + q_0 - 1 / \rho_0 * (A / R_1 * e^{(-R_1 \rho_0 / \rho)}
+       *         + B / R_2 * e^{(-R_2 \rho_0 / \rho)})
+       * \f}
+       */
+      double temperature(double rho, double e) const final
+      {
+        /* Using (16a) of LA-UR-15-29536 */
+        const auto ratio = rho / rho_0;
+
+        const auto first_term = capA / R1 * std::exp(-R1 * 1. / ratio);
+        const auto second_term = capB / R2 * std::exp(-R2 * 1. / ratio);
+
+        return (e + q_0 - 1. / rho_0 * (first_term + second_term)) / cv_;
+      }
+
+      /**
+       * The cold curve is given by
+       * \f{align}
+       *   e_cold = v_0 * (A / R1 * exp(-R1 \rho_0 / \rho) +
+                    B / R2 * exp(-R2 \rho_0 / \rho) - q0
+       * \f}
+       */
+      double cold_curve_bound(double rho) const final
+      {
+        /* Using (3b) of LA-UR-15-29536 */
+        const auto ratio = rho / rho_0;
+        const auto v_0 = 1. / rho_0;
+        auto e_cold = capA / R1 * std::exp(-R1 / ratio) +
+                      capB / R2 * std::exp(-R2 / ratio);
+        e_cold *= v_0;
+
+        return e_cold - q_0;
+      }
+
+      /**
+       * The specific entropy is given by
+       * \f{align}
+       *   s = cv * (\ln(T / T_0) + \omega \ln(rho_0 / \rho)) + s_0;
+       * \f}
+       */
+      double specific_entropy(double rho, double e) const final
+      {
+        /* Using (9) of LA-UR-15-29536 */
+        const auto ratio = rho / rho_0;
+        const auto first_term = capA / R1 * std::exp(-R1 * 1. / ratio);
+        const auto second_term = capB / R2 * std::exp(-R2 * 1. / ratio);
+        const auto temperature =
+            (e + q_0 - 1. / rho_0 * (first_term + second_term)) / cv_;
+        auto s = std::log(temperature / T_0) + omega * std::log(1. / ratio);
+        s *= cv_;
+
+        return s + s_0;
+      }
+
+      /**
+       * Let \f$v_r = \rho_0 / \rho\f$. The speed of sound is given by
+       * \f{align}
+       *   c^2 =
+       *   (A / \rho_0) * (R1 v_r^2 - \omega(\omega + 1) / R1) exp(-R1 * v_r) +
+       *   (B / \rho_0) * (R2 v_r^2 - \omega(\omega + 1) / R2) exp(-R2 * v_r) +
+       *   \omega(\omega + 1)(e + q0)
+       */
+      double speed_of_sound(double rho, double e) const final
+      {
+        /* FIXME: Need to cross reference with literature */
+
+        const auto t1 = omega * rho / (R1 * rho_0);
+        const auto factor1 = omega * (1. - t1) * (1. + 1. / t1) - t1;
+        const auto first_term =
+            capA / rho * factor1 * std::exp(-1. / (t1 / omega));
+
+        const auto t2 = omega * rho / (R2 * rho_0);
+        const auto factor2 = omega * (1. - t2) * (1. + 1. / t2) - t2;
+        const auto second_term =
+            capB / rho * factor2 * std::exp(-1. / (t2 / omega));
+
+        const auto third_term = omega * (omega + 1.) * (e + q_0);
+
+        return std::sqrt(first_term + second_term + third_term);
+      }
+
+    private:
+      double capA;
+      double capB;
+      double R1;
+      double R2;
+      double omega;
+      double rho_0;
+      double q_0;
+      double cv_;
+      double T_0;
+      double s_0;
+    };
+  } // namespace EquationOfStateLibrary
+} // namespace ryujin

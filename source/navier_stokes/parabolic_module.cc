@@ -1,11 +1,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2025 by the ryujin authors
+// Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
-#include "../euler/hyperbolic_description.h"
-#include "parabolic_description.h"
-#include "parabolic_module.template.h"
+#include <ryujin/euler/hyperbolic_description.h>
+#include <ryujin/navier_stokes/parabolic_description.h>
+#include <ryujin/navier_stokes/parabolic_module.template.h>
 
 namespace ryujin
 {

@@ -1,13 +1,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 #pragma once
 
-#include <compile_time_options.h>
-
-#include <multicomponent_vector.h>
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -44,4 +43,4 @@ namespace ryujin
       }
     };
   } // namespace Interface
-} /* namespace ryujin */
+} // namespace ryujin

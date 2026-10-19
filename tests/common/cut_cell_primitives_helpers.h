@@ -1,6 +1,11 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
 #pragma once
 
-#include <geometries/cut_cell_primitives.h>
+#include <ryujin/geometries/cut_cell_primitives.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>

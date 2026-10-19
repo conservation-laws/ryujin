@@ -1,21 +1,19 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2024 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 #pragma once
 
-#include <compile_time_options.h>
-
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/simd.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/postprocessor.h>
-
-#include <gpu.h>
-#include <loop.h>
-#include <observer_pointer.h>
-#include <simd.h>
-#include <state_vector.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/tensor.h>
@@ -168,7 +166,7 @@ namespace ryujin
             {Section::initial_precomputed,
              &hyperbolic_system.initial_precomputed_names(dim)},
             {Section::dynamic_state, &parabolic_system_->state_names(dim)},
-    };
+        };
 
     /*
      * Look up a component name and return its section, its index, and

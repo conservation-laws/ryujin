@@ -1,15 +1,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 #pragma once
 
-#include <compile_time_options.h>
-
+#include <ryujin/base/compile_time_options.h>
 #include <ryujin/interface/module.h>
-
-#include <state_vector.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <string>
 

@@ -1,0 +1,899 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
+#include <ryujin/base/patterns_conversion.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
+#include <ryujin/linear_algebra/state_vector.h>
+#include <ryujin/scalar_conservation/flux_library.h>
+
+#include <deal.II/base/memory_space.h>
+#include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/tensor.h>
+
+#include <array>
+
+namespace ryujin
+{
+  namespace ScalarConservation
+  {
+    template <int dim,
+              typename Number,
+              typename MemorySpace = dealii::MemorySpace::Host>
+    class HyperbolicSystemView;
+
+    /**
+     * A scalar conservation equation for a state \f$u\f$ with a user
+     * specified flux \f$f(u)\f$.
+     *
+     * @ingroup ScalarConservationEquations
+     */
+    class HyperbolicSystem final : public Interface::HyperbolicSystem
+    {
+    public:
+      /**
+       * A structure holding the cached parameters of the selected flux.
+       * These are recomputed in update_parameters().
+       */
+      struct Parameters {
+        double derivative_approximation_delta;
+      };
+
+      /**
+       * Constructor.
+       */
+      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
+
+      /**
+       * Alias for the view on the hyperbolic system for a given dimension @p
+       * dim, choice of number type @p Number, and memory space @p
+       * MemorySpace.
+       */
+      template <int dim,
+                typename Number = double,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      using View = HyperbolicSystemView<dim, Number, MemorySpace>;
+
+      /**
+       * Return a view on the Hyperbolic System for a given dimension @p
+       * dim and choice of number type @p Number (which can be a scalar
+       * float, or double, as well as a VectorizedArray holding packed
+       * scalars. The optional @p MemorySpace template parameter selects
+       * whether the view is intended for the host or device memory space.
+       */
+      template <int dim,
+                typename Number,
+                typename MemorySpace = dealii::MemorySpace::Host>
+      auto view() const
+      {
+        return View<dim, Number, MemorySpace>{*this};
+      }
+
+      /**
+       * Part of step 1 of the hyperbolic update step: Compute "precomputed
+       * values" and fill into the state vector.
+       *
+       * @note The method does not update the ghost range of the state
+       * vector. The precomputed part has to be synchronized by explicitly
+       * calling the update ghost values function.
+       *
+       * @note The flux and its gradient are computed with the selected
+       * flux on the host memory space. If @p MemorySpace is the default
+       * (device) memory space the state vector is thus temporarily
+       * transferred to the host memory space.
+       */
+      template <typename MemorySpace = dealii::MemorySpace::Host,
+                int dim,
+                typename ScalarNumber>
+      void fill_precomputed_values(
+          const Interface::OfflineData<dim, ScalarNumber> &offline_data,
+          StateVector<ScalarNumber> &state_vector,
+          const bool skip_constrained_dofs = true) const;
+
+    private:
+      /**
+       * @name Internal fields, methods, and friends
+       */
+      //@{
+
+      /**
+       * Select the flux, update the problem name, and copy the parameters
+       * of the selected flux into the Parameters structure.
+       */
+      void update_parameters();
+
+      Mirrored<Parameters> parameters_;
+
+      std::string flux_;
+
+      FluxLibrary::flux_list_type flux_list_;
+
+      using Flux = FluxLibrary::Flux;
+      std::shared_ptr<Flux> selected_flux_;
+
+      template <int, typename, typename>
+      friend class HyperbolicSystemView;
+
+      //@}
+    }; /* HyperbolicSystem */
+
+
+    /**
+     * A view on the HyperbolicSystem for a given dimension @p dim and
+     * choice of number type @p Number (which can be a scalar float, or
+     * double, as well as a VectorizedArray holding packed scalars.
+     *
+     * @note This class is designed to be copied by value into computation
+     * loops with access to either the host or device memory space.
+     *
+     * @ingroup ScalarConservationEquations
+     */
+    template <int dim, typename Number, typename MemorySpace>
+    class HyperbolicSystemView
+    {
+    public:
+      static_assert(
+          std::is_same_v<MemorySpace, dealii::MemorySpace::Host> ||
+              std::is_same_v<MemorySpace, dealii::MemorySpace::Default>,
+          "Unexpected memory space");
+
+      /**
+       * @name Typedefs and constexpr constants
+       */
+      //@{
+
+      /**
+       * The underlying scalar number type.
+       */
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      /**
+       * The dimension of the state space.
+       */
+      static constexpr unsigned int problem_dimension = 1;
+
+      /**
+       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
+       */
+      using state_type = dealii::Tensor<1, problem_dimension, Number>;
+
+      /**
+       * Storage type for the flux \f$\mathbf{f}\f$.
+       */
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = flux_type;
+
+      /**
+       * The number of precomputed values.
+       */
+      static constexpr unsigned int n_precomputed_values = 2 * dim;
+
+      /**
+       * Array type used for precomputed values.
+       */
+      using precomputed_type = std::array<Number, n_precomputed_values>;
+
+      /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_initial_precomputed_values = 0;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using initial_precomputed_type =
+          std::array<Number, n_initial_precomputed_values>;
+
+      template <int n_comp>
+      using VectorView =
+          MultiComponentVectorView<ScalarNumber, n_comp, MemorySpace, false>;
+
+      /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * states:
+       */
+      using PrecomputedVectorView = VectorView<n_precomputed_values>;
+
+      /**
+       * MulticomponentVectorView for accessing a vector of precomputed
+       * initial states:
+       */
+      using InitialPrecomputedVectorView =
+          VectorView<n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
+      /**
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : parameters_(
+                hyperbolic_system.parameters_.template view<MemorySpace>())
+          , flux_(hyperbolic_system.selected_flux_.get())
+      {
+      }
+
+      //@}
+      /**
+       * @name Access to runtime parameters
+       */
+      //@{
+
+      /**
+       * Return the name of the selected flux.
+       *
+       * @note This function is only available on the host.
+       */
+      DEAL_II_ALWAYS_INLINE inline const std::string &flux() const
+      {
+        return flux_->name();
+      }
+
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber
+      derivative_approximation_delta() const
+      {
+        return ScalarNumber(parameters_->derivative_approximation_delta);
+      }
+
+      //@}
+      /**
+       * @name Low-level access to the flux function parser
+       *
+       * @note The oracle functions flux_function() and
+       * flux_gradient_function() call into the selected flux and are thus
+       * only available on the host.
+       */
+      //@{
+
+      /**
+       * For a given state \f$u\f$ compute the flux \f$f(u)\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+      flux_function(const Number &u) const;
+
+      /**
+       * For a given state \f$u\f$ compute the flux gradient \f$f'(u)\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+      flux_gradient_function(const Number &u) const;
+
+      //@}
+      /**
+       * @name Computing derived physical quantities
+       */
+      //@{
+
+      /**
+       * Return the scalar value stored in the state "vector". Given the
+       * fact that a scalar conservation equation is indeed scalar this
+       * simply unwraps the Tensor from the state_type and returns the
+       * one and only entry.
+       */
+      static DEAL_II_HOST_DEVICE Number state(const state_type &U);
+
+      /**
+       * For a given state <code>U</code>, compute the square entropy
+       * \f[
+       *   \eta = 1/2 u^2.
+       * \f]
+       */
+      DEAL_II_HOST_DEVICE Number square_entropy(const Number &u) const;
+
+      /**
+       * For a given state <code>U</code>, compute the derivative of the
+       * square entropy
+       * \f[
+       *   \eta' = u.
+       * \f]
+       */
+      DEAL_II_HOST_DEVICE Number
+      square_entropy_derivative(const Number &u) const;
+
+      /**
+       * For a given state <code>U</code>, compute the Krŭzkov entropy
+       * \f[
+       *   \eta = |u-k|.
+       * \f]
+       */
+      DEAL_II_HOST_DEVICE Number kruzkov_entropy(const Number &k,
+                                                 const Number &u) const;
+
+      /**
+       * For a given state <code>U</code>, compute the derivative of the
+       * Krŭzkov entropy:
+       * \f[
+       *   \eta' = \text{sgn}(u-k).
+       * \f]
+       */
+      DEAL_II_HOST_DEVICE Number
+      kruzkov_entropy_derivative(const Number &k, const Number &u) const;
+
+      /**
+       * Returns whether the state @p U is admissible. If @p U is a
+       * vectorized state then @p U is admissible if all vectorized
+       * values are admissible.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool
+      is_admissible(const state_type & /*U*/) const
+      {
+        return true;
+      }
+
+      //@}
+      /**
+       * @name Special functions for boundary states
+       */
+      //@{
+
+      /**
+       * Apply boundary conditions.
+       */
+      template <typename Lambda>
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type
+      apply_boundary_conditions(const dealii::types::boundary_id id,
+                                const state_type &U,
+                                const dealii::Tensor<1, dim, Number> &normal,
+                                const Lambda &get_dirichlet_data) const;
+
+      //@}
+      /**
+       * @name Flux computations
+       */
+      //@{
+
+      /**
+       * Helper function that given a @p precomputed_state constructs a
+       * dealii::Tensor with the flux @f$f(u)@f$.
+       */
+      DEAL_II_HOST_DEVICE dealii::Tensor<1, dim, Number>
+      construct_flux_tensor(const precomputed_type &precomputed_state) const;
+
+      /**
+       * Helper function that given a @p precomputed_state constructs a
+       * dealii::Tensor with the gradient of the flux @f$f(u)@f$ with
+       * respect to the state @f$u@f$.
+       */
+      DEAL_II_HOST_DEVICE dealii::Tensor<1, dim, Number>
+      construct_flux_gradient_tensor(
+          const precomputed_type &precomputed_state) const;
+
+      /**
+       * Given a state @p U_i and an index @p i compute flux contributions.
+       *
+       * Intended usage:
+       * ```
+       * IndicatorView<dim, Number> indicator_view;
+       * for (unsigned int i = n_internal; i < n_owned; ++i) {
+       *   // ...
+       *   const auto flux_i = flux_contribution(precomputed..., i, U_i);
+       *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+       *     // ...
+       *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
+       *     const auto flux_ij = flux_divergence(flux_i, flux_j, c_ij);
+       *   }
+       * }
+       * ```
+       *
+       * For the Euler equations we simply compute <code>f(U_i)</code>.
+       */
+      DEAL_II_HOST_DEVICE
+      flux_contribution_type
+      flux_contribution(const PrecomputedVectorView &pv,
+                        const InitialPrecomputedVectorView & /*piv*/,
+                        const unsigned int i,
+                        const state_type & /*U_i*/) const;
+
+      DEAL_II_HOST_DEVICE
+      flux_contribution_type
+      flux_contribution(const PrecomputedVectorView &pv,
+                        const InitialPrecomputedVectorView & /*piv*/,
+                        const unsigned int *js,
+                        const state_type & /*U_j*/) const;
+
+      /**
+       * Given flux contributions @p flux_i and @p flux_j compute the flux
+       * <code>(-f(U_i) - f(U_j)</code>
+       */
+      DEAL_II_HOST_DEVICE
+      state_type
+      flux_divergence(const flux_contribution_type &flux_i,
+                      const flux_contribution_type &flux_j,
+                      const dealii::Tensor<1, dim, Number> &c_ij) const;
+
+      /** The low-order and high-order fluxes are the same */
+      static constexpr bool have_high_order_flux = false;
+
+      state_type high_order_flux_divergence(
+          const flux_contribution_type &,
+          const flux_contribution_type &,
+          const dealii::Tensor<1, dim, Number> &c_ij) const = delete;
+
+      //@}
+      /**
+       * @name Computing stencil source terms
+       */
+      //@{
+
+      /** We do not have source terms */
+      static constexpr bool have_source_terms = false;
+
+      state_type nodal_source(const PrecomputedVectorView &pv,
+                              const unsigned int i,
+                              const state_type &U_i,
+                              const ScalarNumber tau) const = delete;
+
+      state_type nodal_source(const PrecomputedVectorView &pv,
+                              const unsigned int *js,
+                              const state_type &U_j,
+                              const ScalarNumber tau) const = delete;
+
+      //@}
+      /**
+       * @name State transformations
+       */
+      //@{
+
+      /**
+       * Given a state vector associated with a different spatial
+       * dimensions than the current one, return an "expanded" version of
+       * the state vector associated with @a dim spatial dimensions where
+       * the momentum vector of the conserved state @p state is expaned
+       * with zeros to a total length of @a dim entries.
+       *
+       * @note @a dim has to be larger or equal than the dimension of the
+       * @a ST vector.
+       */
+      template <typename ST>
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type
+      expand_state(const ST &state) const
+      {
+        return state;
+      }
+
+      /**
+       * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
+       * state
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type
+      from_primitive_state(const state_type &primitive_state) const
+      {
+        return primitive_state;
+      }
+
+      /**
+       * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
+       * p]
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type
+      to_primitive_state(const state_type &state) const
+      {
+        return state;
+      }
+
+      /**
+       * Transform the current state according to a  given operator
+       * @p lambda acting on a @a dim dimensional momentum (or velocity)
+       * vector.
+       */
+      template <typename Lambda>
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type apply_galilei_transform(
+          const state_type &state, const Lambda & /*lambda*/) const
+      {
+        return state;
+      }
+
+    private:
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+      const HyperbolicSystem::Parameters *const parameters_;
+
+      /* Only valid (and dereferenced) on the host: */
+      const FluxLibrary::Flux *const flux_;
+
+      //@}
+    }; /* HyperbolicSystemView */
+
+
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
+
+
+    inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
+        : Interface::HyperbolicSystem(
+              "Scalar conservation equation",
+              {{{"u"}, {"u"}, {"u"}}},
+              {{{"u"}, {"u"}, {"u"}}},
+              {{{"f", "df"},
+                {"f_1", "f_2", "df_1", "df_2"},
+                {"f_1", "f_2", "f_3", "df_1", "df_2", "df_3"}}},
+              {},
+              subsection)
+        , parameters_("scalar_conservation_hyperbolic_system_parameters",
+                      TransferPolicy::implicit_transfers_host_resident)
+    {
+      flux_ = "burgers";
+      add_parameter("flux",
+                    flux_,
+                    "The scalar flux. Valid names are given by any of the "
+                    "subsections defined below");
+
+      /*
+       * And finally populate the flux list with all flux configurations
+       * defined in the FluxLibrary namespace:
+       */
+      FluxLibrary::populate_flux_list(flux_list_, subsection);
+
+      /*
+       * The flux classes update their parameters in their own
+       * parse_parameters_call_back signal, which is invoked after ours.
+       * Thus, also connect to theirs:
+       */
+      ParameterAcceptor::parse_parameters_call_back.connect(
+          [this] { update_parameters(); });
+      for (auto &it : flux_list_)
+        it->parse_parameters_call_back.connect([this] { update_parameters(); });
+
+      update_parameters();
+    }
+
+
+    inline void HyperbolicSystem::update_parameters()
+    {
+      bool initialized = false;
+      for (auto &it : flux_list_)
+
+        /* Populate flux functions: */
+        if (it->name() == flux_) {
+          selected_flux_ = it;
+          problem_name_ = "Scalar conservation equation (" + it->name() + ": " +
+                          it->flux_formula() + ")";
+          initialized = true;
+          break;
+        }
+
+      AssertThrow(
+          initialized,
+          dealii::ExcMessage("Could not find a flux description with name \"" +
+                             flux_ + "\""));
+
+      /* invalidates view on default memory space */
+      auto &parameters = *parameters_.view();
+
+      parameters.derivative_approximation_delta =
+          selected_flux_->derivative_approximation_delta();
+    }
+
+
+    template <typename MemorySpace, int dim, typename ScalarNumber>
+    inline void HyperbolicSystem::fill_precomputed_values(
+        const Interface::OfflineData<dim, ScalarNumber> &offline_data,
+        StateVector<ScalarNumber> &state_vector,
+        const bool skip_constrained_dofs) const
+    {
+      using HostSpace = dealii::MemorySpace::Host;
+
+      const unsigned int n_internal = offline_data.n_locally_internal();
+      const unsigned int n_owned = offline_data.n_locally_owned();
+
+      using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
+
+      auto &U = state_vector.state;
+      auto &precomputed = state_vector.precomputed;
+
+      /*
+       * Compute the flux and its gradient. This requires calling into the
+       * selected flux, which is only possible on the host memory space.
+       * Thus, temporarily transfer the state vector and the precomputed
+       * values to the host memory space:
+       */
+
+      constexpr bool transfer =
+          have_separate_memory_spaces &&
+          !std::is_same_v<MemorySpace, dealii::MemorySpace::Host>;
+
+      [[maybe_unused]] const bool host_resident =
+          U.template is_resident<HostSpace>();
+
+      if constexpr (transfer) {
+        U.template copy_to_memory_space<HostSpace>();
+        precomputed.template move_to_memory_space<HostSpace>();
+      }
+
+      {
+        const auto sparsity_simd_view =
+            offline_data.sparsity_pattern_simd().template view<HostSpace>();
+
+        /* We only read the hyperbolic state vector: */
+        const auto U_view =
+            std::as_const(U)
+                .template view<ScalarView::problem_dimension, HostSpace>();
+        const auto precomputed_view =
+            precomputed
+                .template view<ScalarView::n_precomputed_values, HostSpace>();
+
+        const auto hyperbolic_system_views =
+            make_select_view<dim, ScalarNumber, HostSpace>(*this);
+
+        const auto body = [=](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
+          using View = HyperbolicSystemView<dim, T, HostSpace>;
+          using precomputed_type = typename View::precomputed_type;
+
+          const unsigned int row_length = sparsity_simd_view.row_length(i);
+          if (skip_constrained_dofs && row_length == 1)
+            return;
+
+          const auto view = hyperbolic_system_views.template view<T>();
+
+          const auto U_i = U_view.template read_tensor<T>(i);
+          const auto u_i = view.state(U_i);
+
+          /* Calls into the selected flux: */
+          const auto f_i = view.flux_function(u_i);
+          const auto df_i = view.flux_gradient_function(u_i);
+
+          precomputed_type prec_i;
+          for (unsigned int k = 0; k < View::n_precomputed_values / 2; ++k) {
+            prec_i[k] = f_i[k];
+            prec_i[dim + k] = df_i[k];
+          }
+          precomputed_view.template write_tensor<T>(prec_i, i);
+        };
+
+        loop<HostSpace, ScalarNumber>(
+            "hyperbolic_kernel_01b", body, 0, n_internal, n_owned);
+      }
+
+      if constexpr (transfer) {
+        /* Drop the (now stale) host mirror unless it was resident before: */
+        if (!host_resident)
+          U.template move_to_memory_space<MemorySpace>();
+        precomputed.template move_to_memory_space<MemorySpace>();
+      }
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_function(
+        const Number &u) const
+    {
+      const auto &flux = flux_;
+      dealii::Tensor<1, dim, Number> result;
+
+      /* This access by calling into value() repeatedly is terrible: */
+      for (unsigned int k = 0; k < dim; ++k) {
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          result[k] = flux->value(u, k);
+        } else {
+          for (unsigned int s = 0; s < Number::size(); ++s) {
+            result[k][s] = flux->value(u[s], k);
+          }
+        }
+      }
+
+      return result;
+    }
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_gradient_function(
+        const Number &u) const
+    {
+      const auto &flux = flux_;
+      dealii::Tensor<1, dim, Number> result;
+
+      /* This access by calling into value() repeatedly is terrible: */
+      for (unsigned int k = 0; k < dim; ++k) {
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          result[k] = flux->gradient(u, k);
+        } else {
+          for (unsigned int s = 0; s < Number::size(); ++s) {
+            result[k][s] = flux->gradient(u[s], k);
+          }
+        }
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::state(const state_type &U)
+    {
+      return U[0];
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::square_entropy(
+        const Number &u) const
+    {
+      return ScalarNumber(0.5) * u * u;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::square_entropy_derivative(
+        const Number &u) const
+    {
+      return u;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::kruzkov_entropy(
+        const Number &k, const Number &u) const
+    {
+      return std::abs(k - u);
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+    HyperbolicSystemView<dim, Number, MemorySpace>::kruzkov_entropy_derivative(
+        const Number &k, const Number &u) const
+    {
+      constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
+      // return sgn(u-k):
+      return ryujin::compare_and_apply_mask<gte>(u, k, Number(1.), Number(-1.));
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    template <typename Lambda>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::apply_boundary_conditions(
+        dealii::types::boundary_id id,
+        const state_type &U,
+        const dealii::Tensor<1, dim, Number> & /*normal*/,
+        const Lambda &get_dirichlet_data) const -> state_type
+    {
+      state_type result = U;
+
+      if (id == Boundary::dirichlet) {
+        result = get_dirichlet_data();
+
+      } else if (id == Boundary::dirichlet_momentum) {
+        Assert(false,
+               dealii::ExcMessage(
+                   "Invalid boundary ID »Boundary::dirichlet_momentum«, "
+                   "enforcing Dirichlet boundary conditions on a momentum "
+                   "is not possible for scalar conservation equations."));
+
+      } else if (id == Boundary::dirichlet_velocity) {
+        Assert(false,
+               dealii::ExcMessage(
+                   "Invalid boundary ID »Boundary::dirichlet_velocity«, "
+                   "enforcing Dirichlet boundary conditions on a momentum "
+                   "is not possible for scalar conservation equations."));
+
+      } else if (id == Boundary::slip) {
+        Assert(
+            false,
+            dealii::ExcMessage("Invalid boundary ID »Boundary::slip«, slip "
+                               "boundary conditions are unavailable for scalar "
+                               "conservation equations."));
+        __builtin_trap();
+
+      } else if (id == Boundary::no_slip) {
+        Assert(false,
+               dealii::ExcMessage("Invalid boundary ID »Boundary::no_slip«, "
+                                  "no-slip boundary conditions are unavailable "
+                                  "for scalar conservation equations."));
+        __builtin_trap();
+
+      } else if (id == Boundary::dynamic) {
+        Assert(false,
+               dealii::ExcMessage("Invalid boundary ID »Boundary::dynamic«, "
+                                  "dynamic boundary conditions are unavailable "
+                                  "for scalar conservation equations."));
+        __builtin_trap();
+
+      } else {
+        Assert(false, dealii::ExcNotImplemented());
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::construct_flux_tensor(
+        const precomputed_type &precomputed) const
+    {
+      dealii::Tensor<1, dim, Number> result;
+      for (unsigned int k = 0; k < dim; ++k)
+        result[k] = precomputed[k];
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    HyperbolicSystemView<dim, Number, MemorySpace>::
+        construct_flux_gradient_tensor(
+            const precomputed_type &precomputed) const
+    {
+      dealii::Tensor<1, dim, Number> result;
+      for (unsigned int k = 0; k < dim; ++k)
+        result[k] = precomputed[dim + k];
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
+        const PrecomputedVectorView &pv,
+        const InitialPrecomputedVectorView & /*piv*/,
+        const unsigned int i,
+        const state_type & /*U_i*/) const -> flux_contribution_type
+    {
+      /* The flux contribution is a rank 2 tensor, thus a little dance: */
+      flux_contribution_type result;
+      result[0] = construct_flux_tensor(
+          pv.template read_tensor<Number, precomputed_type>(i));
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_contribution(
+        const PrecomputedVectorView &pv,
+        const InitialPrecomputedVectorView & /*piv*/,
+        const unsigned int *js,
+        const state_type & /*U_j*/) const -> flux_contribution_type
+    {
+      /* The flux contribution is a rank 2 tensor, thus a little dance: */
+      flux_contribution_type result;
+      result[0] = construct_flux_tensor(
+          pv.template read_tensor<Number, precomputed_type>(js));
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::flux_divergence(
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j,
+        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
+    {
+      return -contract(add(flux_i, flux_j), c_ij);
+    }
+  } // namespace ScalarConservation
+} // namespace ryujin

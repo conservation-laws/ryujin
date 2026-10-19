@@ -176,7 +176,7 @@ namespace ryujin
 
       return direction;
     }
-  } /* namespace */
+  } // namespace
 
 
   template <typename HyperbolicDescription, int dim, typename Number>
@@ -329,4 +329,4 @@ namespace ryujin
     return precomputed;
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

@@ -20,5 +20,3 @@ add_library(obj_euler_poisson_aeos OBJECT
 set_target_properties(obj_euler_poisson_aeos PROPERTIES LINKER_LANGUAGE CXX)
 deal_ii_setup_target(obj_euler_poisson_aeos)
 target_link_libraries(obj_euler_poisson_aeos obj_common ${EXTERNAL_TARGETS})
-# Propagate the current source directory with PUBLIC visibility
-target_include_directories(obj_euler_poisson_aeos PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

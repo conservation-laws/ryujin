@@ -1,4 +1,9 @@
-#include <simd.h>
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
+#include <ryujin/base/simd.h>
 
 #include <iomanip>
 #include <iostream>

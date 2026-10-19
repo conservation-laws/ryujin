@@ -1,10 +1,13 @@
-#include <hyperbolic_description.h>
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
 
-#include <discretization.h>
-#include <mpi_ensemble.h>
-#include <offline_data.h>
-#include <stub_parabolic_system.h>
-
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/discretization/offline_data.h>
+#include <ryujin/euler/hyperbolic_description.h>
+#include <ryujin/stub/parabolic_system.h>
 #include <ryujin/typed/postprocessor.h>
 
 #include <deal.II/base/mpi.h>

@@ -1,14 +1,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2025 by the ryujin authors
+// Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
-#include "barotropic_equation_of_state_library.h"
-
-#include "barotropic_equation_of_state_function.h"
-#include "barotropic_equation_of_state_isentropic.h"
-#include "barotropic_equation_of_state_isothermal.h"
-#include "barotropic_equation_of_state_pressureless.h"
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_function.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_isentropic.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_isothermal.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_library.h>
+#include <ryujin/euler_barotropic/barotropic_equation_of_state_pressureless.h>
 
 namespace ryujin
 {

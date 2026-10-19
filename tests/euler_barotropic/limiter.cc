@@ -1,14 +1,19 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define EulerBarotropic EulerBarotropicTest
 
-#include <hyperbolic_system.h>
-#include <multicomponent_vector.h>
-#include <simd.h>
+#include <ryujin/base/simd.h>
+#include <ryujin/euler_barotropic/hyperbolic_system.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #define DEBUG_EXPENSIVE_BOUNDS_CHECK
 #define DEBUG_OUTPUT
 #define DEBUG_OUTPUT_LIMITER
-#include <limiter.h>
+#include <ryujin/euler_barotropic/limiter.h>
 
 using namespace ryujin::EulerBarotropic;
 using namespace ryujin;

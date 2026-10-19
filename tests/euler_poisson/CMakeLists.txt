@@ -5,15 +5,9 @@
 
 set(EQUATION euler_poisson)
 
-include_directories(
-  ${CMAKE_BINARY_DIR}/source/
-  ${CMAKE_SOURCE_DIR}/source/${EQUATION}
-  ${CMAKE_SOURCE_DIR}/source/
-  )
-
 set(TEST_LIBRARIES
   obj_common obj_${EQUATION}
-  obj_euler obj_euler_dependent
+  obj_euler
   )
 set(TEST_TARGET ryujin)
 

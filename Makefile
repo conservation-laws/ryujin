@@ -60,7 +60,7 @@ Makefile:
 ##########################################################################
 
 indent:
-	@clang-format -i source/*.h source/*.cc source/**/*.h source/**/*.cc tests/**/*.cc
+	@clang-format -i $$(git ls-files 'include/*.h' 'source/*.h' 'source/*.cc' 'tests/*.h' 'tests/*.cc')
 
 .PHONY: indent
 

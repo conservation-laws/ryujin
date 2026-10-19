@@ -1,5 +1,10 @@
-#include <hyperbolic_system.h>
-#include <simd.h>
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2025 - 2026 by the ryujin authors
+//
+
+#include <ryujin/base/simd.h>
+#include <ryujin/euler_barotropic/hyperbolic_system.h>
 
 #include <deal.II/base/vectorization.h>
 

@@ -1,5 +1,10 @@
-#include <sparse_matrix.h>
-#include <sparsity_pattern.h>
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
+#include <ryujin/linear_algebra/sparse_matrix.h>
+#include <ryujin/linear_algebra/sparsity_pattern.h>
 
 int main(int argc, char *argv[])
 {
