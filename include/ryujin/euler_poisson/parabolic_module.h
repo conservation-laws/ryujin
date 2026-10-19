@@ -128,7 +128,7 @@ namespace ryujin
      * Implicit backward-Euler time stepping for the parabolic limiting
      * equation for the Euler-Poisson system
      *
-     * @ingroup ParabolicModule
+     * @ingroup EulerPoissonEquations
      */
     template <typename HyperbolicDescription, int dim, typename Number>
     class ParabolicModule final : public Interface::ParabolicModule<dim, Number>

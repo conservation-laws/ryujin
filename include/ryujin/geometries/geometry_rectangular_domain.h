@@ -30,7 +30,7 @@ namespace ryujin
      * The class allows to prescribe any of the supported boundary
      * condition on any of the 2, 4, or 6 faces.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class RectangularDomain : public Geometry<dim>

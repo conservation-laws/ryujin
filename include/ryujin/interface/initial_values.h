@@ -20,7 +20,7 @@ namespace ryujin
      * The interface of InitialValues: it interpolates the initial (or an
      * analytic) hyperbolic state at a given time.
      *
-     * @ingroup InitialValues
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class InitialValues : public dealii::ParameterAcceptor

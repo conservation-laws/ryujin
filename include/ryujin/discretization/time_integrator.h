@@ -23,7 +23,7 @@ namespace ryujin
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
    *
-   * @ingroup TimeLoop
+   * @ingroup MeshAndOfflineData
    */
   enum class CFLRecoveryStrategy {
     /**
@@ -54,7 +54,7 @@ namespace ryujin
   /**
    * Controls the chosen time-stepping scheme.
    *
-   * @ingroup TimeLoop
+   * @ingroup MeshAndOfflineData
    */
   enum class TimeSteppingScheme {
     /**
@@ -248,7 +248,7 @@ namespace ryujin
    * The TimeIntegrator class implements IMEX timestepping strategies based
    * on explicit and diagonally-implicit Runge Kutta schemes.
    *
-   * @ingroup TimeLoop
+   * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
   class TimeIntegrator final : public Interface::TimeIntegrator<dim, Number>

@@ -23,7 +23,7 @@ namespace ryujin
    * GeometryLibrary<dim>::add<MyGeometry<dim>>();
    * @endcode
    *
-   * @ingroup Mesh
+   * @ingroup Geometries
    */
   template <int dim>
   using GeometryLibrary = Library<Geometry<dim>, const std::string &>;

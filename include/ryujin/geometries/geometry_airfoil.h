@@ -38,7 +38,7 @@ namespace ryujin
     /**
      * @todo Documentation
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class AirfoilManifold : public dealii::ChartManifold<dim>
@@ -149,7 +149,7 @@ namespace ryujin
     /**
      * @todo Documentation
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class GradingManifold : public dealii::ChartManifold<dim>
@@ -237,7 +237,7 @@ namespace ryujin
     /**
      * @todo Documentation
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class ExtrudedManifold : public dealii::Manifold<dim>
@@ -823,7 +823,7 @@ namespace ryujin
      *
      * TODO
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Airfoil : public Geometry<dim>

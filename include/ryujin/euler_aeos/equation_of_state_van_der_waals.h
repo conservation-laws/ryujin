@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * The Van der Waals equation of state
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class VanDerWaals : public EquationOfState
     {

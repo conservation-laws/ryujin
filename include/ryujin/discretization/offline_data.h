@@ -41,7 +41,7 @@ namespace ryujin
    * @note Data structures in OfflineData are initialized with the ensemble
    * subrange communicator stored in MPIEnsemble.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
   class OfflineData final : public Interface::OfflineData<dim, Number>

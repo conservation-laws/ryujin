@@ -36,7 +36,7 @@ namespace ryujin
      * Simulation, which is the only class that sees the hyperbolic and
      * the parabolic description.
      *
-     * @ingroup TimeLoop
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class Simulation

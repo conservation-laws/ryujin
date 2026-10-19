@@ -54,7 +54,7 @@ namespace ryujin
      *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
      * U)-\phi_{\text{min}}\big). \f}
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
@@ -171,7 +171,7 @@ namespace ryujin
      * scalar float, or double, as well as a VectorizedArray holding packed
      * scalars).
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class LimiterView

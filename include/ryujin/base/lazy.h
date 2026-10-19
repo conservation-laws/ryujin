@@ -23,7 +23,7 @@ namespace ryujin
    * This is a slightly minimized variant of the Lazy<T> initialization class
    * shipped with the current development version of deal.II.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   template <typename T>
   class Lazy

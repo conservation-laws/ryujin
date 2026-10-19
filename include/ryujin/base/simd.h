@@ -29,7 +29,7 @@
  * `dealii::AssertThrow` macro is expanded for all components of the
  * @p variable.
  *
- * @ingroup Miscellaneous
+ * @ingroup SIMD
  */
 #define AssertThrowSIMD(variable, condition, exception)                        \
   if constexpr (std::is_same<                                                  \

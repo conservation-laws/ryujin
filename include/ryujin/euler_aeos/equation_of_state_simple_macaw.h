@@ -22,7 +22,7 @@ namespace ryujin
      * The default parameters are taken from Table 1 in reference and were used
      * in calibrating a model for copper.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class SimpleMacaw : public EquationOfState
     {

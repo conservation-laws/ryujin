@@ -22,7 +22,7 @@ namespace ryujin
    * After @p prepare() is called, all getter functions return valid
    * references.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   class MPIEnsemble final
   {

@@ -26,7 +26,7 @@ namespace ryujin
      * density. We use a specialied Riemann solver, entropy viscosity
      * commutator, and limiter for this class of equations.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     struct HyperbolicDescription {
       using HyperbolicSystem = EulerBarotropic::HyperbolicSystem;

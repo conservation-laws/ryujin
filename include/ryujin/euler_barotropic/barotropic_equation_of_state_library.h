@@ -21,7 +21,7 @@ namespace ryujin
    * equations of state of the namespace BarotropicEquationsOfState are
    * registered by default.
    *
-   * @ingroup EulerEquations
+   * @ingroup EulerBarotropicEquations
    */
   using BarotropicEquationOfStateLibrary =
       Library<BarotropicEquationOfState, const std::string &>;

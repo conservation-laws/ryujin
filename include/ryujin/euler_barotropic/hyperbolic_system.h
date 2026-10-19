@@ -46,7 +46,7 @@ namespace ryujin
      * where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
      * momentum.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
@@ -160,7 +160,7 @@ namespace ryujin
      * @note This class is designed to be copied by value into computation
      * loops with access to either the host or device memory space.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class HyperbolicSystemView

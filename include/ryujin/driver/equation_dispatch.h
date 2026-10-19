@@ -47,7 +47,7 @@ namespace ryujin
    * and then run the equation of the EquationLibrary with the given name
    * for the given dimension.
    *
-   * @ingroup TimeLoop
+   * @ingroup Driver
    */
   class EquationDispatch final : dealii::ParameterAcceptor
   {

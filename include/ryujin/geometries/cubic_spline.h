@@ -25,7 +25,7 @@ namespace ryujin
    * spline.eval(0.5);
    * @endcode
    *
-   * @ingroup Mesh
+   * @ingroup Geometries
    */
   class CubicSpline
   {

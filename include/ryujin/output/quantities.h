@@ -41,7 +41,7 @@ namespace ryujin
    * cancellation if the fluctuations of a quantity are small compared to
    * its mean.
    *
-   * @ingroup TimeLoop
+   * @ingroup Output
    */
   template <int dim, typename Number = double>
   class Quantities final : public dealii::ParameterAcceptor

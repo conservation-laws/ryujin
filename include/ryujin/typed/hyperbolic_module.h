@@ -31,7 +31,7 @@ namespace ryujin
    *
    * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
    *
-   * @ingroup HyperbolicModule
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
   class HyperbolicModule final : public Interface::HyperbolicModule<dim, Number>

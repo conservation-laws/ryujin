@@ -67,7 +67,7 @@ namespace ryujin
      *
      * The solver is based on @cite ClaytonGuermondPopov-2022.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <typename ScalarNumber = double,
               NASGRiemannSolverOptions options = NASGRiemannSolverOptions{}>
@@ -219,7 +219,7 @@ namespace ryujin
      * The class operates directly on Riemann data
      * \f$[\rho, u, p, \gamma, a]\f$.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <typename Number,
               NASGRiemannSolverOptions options,

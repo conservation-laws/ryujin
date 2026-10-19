@@ -86,7 +86,7 @@ namespace ryujin
    * A matrix-free operator that implements the action of the Laplace
    * operator.
    *
-   * @ingroup ParabolicModule
+   * @ingroup EulerPoissonEquations
    */
   template <int dim, typename Number>
   class LaplaceOperator : public dealii::EnableObserverPointer

@@ -23,7 +23,7 @@ namespace ryujin
      * scalar vectors in StateVector::dynamic_state and
      * StateVector::dynamic_precomputed.
      *
-     * @ingroup ParabolicModule
+     * @ingroup Interfaces
      */
     class ParabolicSystem : public System
     {

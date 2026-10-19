@@ -5,51 +5,88 @@
  * function documentation. A full usage guide can be found at
  * https://conservation-laws.org/ryujin/
  *
- * The program is organized into the following modules:
+ * The source code is organized in the following parts. An arrow points
+ * from a part of the code to a part it uses. Everything uses the base
+ * layer:
  *
  * @dot
  digraph G
 {
-  graph[rankdir="TB",bgcolor="transparent"];
+  graph[rankdir="TB",bgcolor="transparent",compound=true,nodesep=0.3];
 
-  node [fontname="FreeSans",fontsize=15,
+  node [fontname="FreeSans",fontsize=13,
         shape=record,height=0.2,width=0.4,
         color="black", fillcolor="white", style="filled"];
-  edge [color="black", weight=10];
+  edge [color="black",fontname="FreeSans",fontsize=11];
 
-  simd  [label="SIMD", URL="\ref SIMD"];
-  fe    [label="Finite element formulation", URL="\ref FiniteElement"];
-  misc  [label="Miscellaneous", URL="\ref Miscellaneous"];
-  mesh  [label="Discretization", URL="\ref Mesh"];
-  hyperbolic [label="Hyperbolic Module", URL="\ref HyperbolicModule"];
-  parabolic [label="Parabolic Module", URL="\ref ParabolicModule"];
-  loop  [label="Time Integration and Postprocessing", URL="\ref TimeLoop"];
+  subgraph cluster_driver {
+    label="Driver and Output"; URL="\ref DriverLayer";
+    fontname="FreeSans"; style="rounded"; color="gray";
+    driver [label="Driver", URL="\ref Driver"];
+    output [label="Output", URL="\ref Output"];
+  }
 
-  formulation [label="PDE formulation", URL="\ref Description"];
+  subgraph cluster_equations {
+    label="Equations"; URL="\ref EquationsLayer";
+    fontname="FreeSans"; style="rounded"; color="gray";
+    equations [label="{Euler | Euler AEOS | Euler barotropic | Euler-Poisson | Navier-Stokes | Scalar conservation | Shallow water}",
+               URL="\ref EquationsLayer"];
+  }
 
-  euler [label="Euler Equations", URL="\ref EulerEquations"];
-  shallow [label="Shallow Water Equations", URL="\ref ShallowWaterEquations"];
-  navier [label="Navier Stokes Equations", URL="\ref NavierStokesEquations"];
+  subgraph cluster_framework {
+    label="Framework"; URL="\ref FrameworkLayer";
+    fontname="FreeSans"; style="rounded"; color="gray";
+    typed      [label="Typed implementations", URL="\ref Typed"];
+    concepts   [label="Concepts", URL="\ref Concepts"];
+    interfaces [label="Interfaces", URL="\ref Interfaces"];
+  }
 
-  fe   -> mesh  [color="black",style="solid"];
-  simd -> hyperbolic [color="black",style="solid"];
-  fe   -> hyperbolic [color="black",style="solid"];
-  misc -> hyperbolic [color="black",style="solid"];
-  mesh -> hyperbolic [color="black",style="solid"];
-  simd -> parabolic [color="black",style="solid"];
-  fe   -> parabolic [color="black",style="solid"];
-  misc -> parabolic [color="black",style="solid"];
-  mesh -> parabolic [color="black",style="solid"];
-  misc -> loop  [color="black",style="solid"];
-  hyperbolic -> loop [color="black",style="solid"];
-  parabolic -> loop [color="black",style="solid"];
-  euler -> formulation [color="blak",style="solid"];
-  shallow -> formulation [color="black",style="solid"];
-  navier -> formulation [color="black",style="solid"];
-  formulation -> hyperbolic [color="black",style="solid"];
-  formulation -> parabolic [color="black",style="solid"];
+  subgraph cluster_discretization {
+    label="Discretization"; URL="\ref DiscretizationLayer";
+    fontname="FreeSans"; style="rounded"; color="gray";
+    mesh       [label="Mesh, offline data,\ntime integration", URL="\ref MeshAndOfflineData"];
+    fe         [label="Finite element helpers", URL="\ref FiniteElement"];
+    geometries [label="Geometries", URL="\ref Geometries"];
+  }
+
+  subgraph cluster_base {
+    label="Base"; URL="\ref BaseLayer";
+    fontname="FreeSans"; style="rounded"; color="gray";
+    linalg    [label="Linear algebra", URL="\ref LinearAlgebra"];
+    simd      [label="SIMD", URL="\ref SIMD"];
+    gpu       [label="GPU support", URL="\ref GPU"];
+    utilities [label="Utilities", URL="\ref Utilities"];
+  }
+
+  driver -> equations [label="selects"];
+  driver -> typed [label="instantiates"];
+  equations -> typed [label="initial states"];
+  equations -> concepts [label="satisfy", style="dashed"];
+  typed -> concepts [label="constrained by"];
+  typed -> interfaces [label="implements"];
+  mesh -> interfaces [label="implements"];
+  output -> interfaces;
+  mesh -> fe;
+  mesh -> geometries;
+  interfaces -> linalg [lhead=cluster_base];
 }
  * @enddot
+ *
+ * At the bottom, the @ref BaseLayer "base layer" provides SIMD
+ * vectorization, data that is mirrored between the host and device memory
+ * spaces, and distributed vectors and sparse matrices. The
+ * @ref DiscretizationLayer "discretization layer" builds the mesh, the
+ * finite element space, and the precomputed offline data on top of it.
+ * The @ref FrameworkLayer "framework" connects equations with the
+ * discretization: abstract @ref Interfaces "interfaces" hide all equation
+ * dependent types, @ref Concepts "concepts" specify what an equation has
+ * to provide, and @ref Typed "typed implementations" carry out the
+ * hyperbolic update, initial values, and postprocessing for a given
+ * hyperbolic and parabolic description. Each of the
+ * @ref EquationsLayer "equations" is such a pair of descriptions. Finally,
+ * the @ref Driver "driver" selects an equation at run time, sets up the
+ * simulation, and runs the time loop, and the @ref Output "output" classes
+ * write out results.
  *
  * ryujin is based on discretization approaches and algorithms that have
  * been developed in a number of publications

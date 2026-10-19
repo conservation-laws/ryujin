@@ -30,7 +30,7 @@ namespace ryujin
    *
    * Returns the exit code of the executable.
    *
-   * @ingroup TimeLoop
+   * @ingroup Driver
    */
   int run(int argc, char *argv[]);
 } // namespace ryujin

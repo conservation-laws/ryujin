@@ -25,7 +25,7 @@ namespace ryujin
      * cells for coarsening and refinement, and/or may replace the
      * transformation of the Discretization, i.e., change the geometry.
      *
-     * @ingroup Mesh
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class MeshAdaptor : public dealii::ParameterAcceptor

@@ -33,7 +33,7 @@ namespace ryujin
      * initial precomputed names (View<dim>::n_initial_precomputed_values
      * entries) name the time-independent initial precomputed values.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Interfaces
      */
     class HyperbolicSystem : public System
     {

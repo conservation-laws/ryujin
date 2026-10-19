@@ -18,17 +18,23 @@
 
 /**
  * Macro initializing likwid instrumentation. Used in main().
+ *
+ * @ingroup Utilities
  */
 #define LIKWID_MARKER_INIT
 
 
 /**
  * Macro initializing likwid instrumentation on a worker thread. Used in main().
+ *
+ * @ingroup Utilities
  */
 #define LIKWID_MARKER_THREADINIT
 
 /**
  * Macro finalizing likwid instrumentation. Used in main().
+ *
+ * @ingroup Utilities
  */
 #define LIKWID_MARKER_CLOSE
 
@@ -42,11 +48,15 @@
  * // critical compute kernel section
  * LIKWID_MARKER_STOP("string identifier")
  * @endcode
+ *
+ * @ingroup Utilities
  */
 #define LIKWID_MARKER_START(opt)
 
 /**
  * @copydoc LIKWID_MARKER_START
+ *
+ * @ingroup Utilities
  */
 #define LIKWID_MARKER_STOP(opt)
 
@@ -71,11 +81,15 @@
 
 /**
  * Macro starting the CUDA profiler. Used in main().
+ *
+ * @ingroup Utilities
  */
 #define NVTX_MARKER_INIT
 
 /**
  * Macro stopping the CUDA profiler. Used in main().
+ *
+ * @ingroup Utilities
  */
 #define NVTX_MARKER_CLOSE
 
@@ -92,11 +106,15 @@
  * // critical compute kernel section
  * NVTX_MARKER_STOP("string identifier")
  * @endcode
+ *
+ * @ingroup Utilities
  */
 #define NVTX_MARKER_START(opt)
 
 /**
  * @copydoc NVTX_MARKER_START
+ *
+ * @ingroup Utilities
  */
 #define NVTX_MARKER_STOP(opt)
 
@@ -117,11 +135,15 @@
  * // control...
  * LSAN_ENABLE
  * @endcode
+ *
+ * @ingroup Utilities
  */
 #define LSAN_DISABLE
 
 /**
  * @copydoc LSAN_DISABLE
+ *
+ * @ingroup Utilities
  */
 #define LSAN_ENABLE
 

@@ -22,7 +22,7 @@ namespace ryujin
      * All outer walls have "slip" boundary conditions except outer wall at the
      * end of the tank which has dynamic outflow conditions.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
 
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -127,7 +127,7 @@ namespace ryujin
     /**
      * A 2D wave tank configuration constructed with GridGenerator::wavetank().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class WaveTank : public Geometry<dim>

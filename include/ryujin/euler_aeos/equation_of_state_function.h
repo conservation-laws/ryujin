@@ -17,7 +17,7 @@ namespace ryujin
     /**
      * A user-specified equation of state
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class Function : public EquationOfState
     {

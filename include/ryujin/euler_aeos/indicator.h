@@ -61,7 +61,7 @@ namespace ryujin
      *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
      * \f}
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
@@ -155,7 +155,7 @@ namespace ryujin
      * be a scalar float, or double, as well as a VectorizedArray holding
      * packed scalars).
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class IndicatorView

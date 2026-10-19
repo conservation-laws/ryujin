@@ -18,7 +18,7 @@ namespace ryujin
      * assuming that the reference temperature T_r is chosen such that E_r = 0.
      * Default parameters taken from Table 1 in reference.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class JonesWilkinsLee : public EquationOfState
     {

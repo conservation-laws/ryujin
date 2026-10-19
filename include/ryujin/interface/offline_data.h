@@ -44,7 +44,7 @@ namespace ryujin
      * After prepare() is called, all getter functions return valid
      * references.
      *
-     * @ingroup Mesh
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class OfflineData : public dealii::ParameterAcceptor

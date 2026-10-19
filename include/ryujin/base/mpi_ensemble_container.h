@@ -30,7 +30,7 @@ namespace ryujin
    *  to only creating one instance - possibly by checking for and calling
    *  a modified constructor that takes an mpi_ensemble as an argument.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   template <typename T>
   class MPIEnsembleContainer

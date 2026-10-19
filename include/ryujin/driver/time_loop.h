@@ -17,7 +17,7 @@ namespace ryujin
   /**
    * The high-level time loop driving the computation.
    *
-   * @ingroup TimeLoop
+   * @ingroup Driver
    */
   template <int dim, typename Number = double>
   class TimeLoop final : public dealii::ParameterAcceptor

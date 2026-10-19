@@ -45,7 +45,7 @@ namespace ryujin
    * const auto components = postprocessor.extract(selection, state_vector);
    * ```
    *
-   * @ingroup TimeLoop
+   * @ingroup Typed
    */
   template <typename Description, int dim, typename Number>
   class Postprocessor final : public Interface::Postprocessor<dim, Number>

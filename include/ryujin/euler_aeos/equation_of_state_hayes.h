@@ -16,7 +16,7 @@ namespace ryujin
     /**
      * The Hayes equation of state
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class Hayes : public EquationOfState
     {

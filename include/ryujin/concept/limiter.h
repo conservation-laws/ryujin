@@ -23,7 +23,7 @@ namespace ryujin
      * The first form of LimiterView::accumulate(): it accumulates flux
      * contributions.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename V, int dim, typename Number>
     concept LimiterAccumulatesFluxes =
@@ -41,7 +41,7 @@ namespace ryujin
      * The second form of LimiterView::accumulate(): the form of the
      * shallow water equations, which pass equilibrated states.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename V, int dim, typename Number>
     concept LimiterAccumulatesEquilibratedStates =
@@ -56,7 +56,7 @@ namespace ryujin
     /**
      * The view of a limiter.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename V, int dim, typename Number>
     concept LimiterView =
@@ -104,7 +104,7 @@ namespace ryujin
      * A limiter: constructed from the hyperbolic system and the subsection
      * of its run time parameters, it hands out views.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename T, typename System, int dim, typename Number>
     concept Limiter =

@@ -52,7 +52,7 @@ namespace ryujin
      * values);
      * ```
      *
-     * @ingroup TimeLoop
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class Postprocessor

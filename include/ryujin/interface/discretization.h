@@ -50,7 +50,7 @@ namespace ryujin
    * @note Data structures in OfflineData are initialized with the ensemble
    * subrange communicator stored in MPIEnsemble.
    *
-   * @ingroup Mesh
+   * @ingroup Interfaces
    */
   enum Boundary : dealii::types::boundary_id {
     /**
@@ -144,7 +144,7 @@ namespace ryujin
   /**
    * An enum class for setting the finite element ansatz.
    *
-   * @ingroup Mesh
+   * @ingroup Interfaces
    */
   enum class Ansatz {
     /** cG Q1: continuous bi- (tri-) linear Lagrange elements */
@@ -204,7 +204,7 @@ namespace ryujin
      * non-virtual accessor each. A derived class fills the fields in
      * prepare() and update_mapping().
      *
-     * @ingroup Mesh
+     * @ingroup Interfaces
      */
     template <int dim>
     class Discretization : public dealii::ParameterAcceptor

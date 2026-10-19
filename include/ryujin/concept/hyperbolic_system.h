@@ -25,7 +25,7 @@ namespace ryujin
    * The concepts that a hyperbolic and a parabolic description, and their
    * members, have to satisfy.
    *
-   * @ingroup HyperbolicModule
+   * @ingroup Concepts
    */
   namespace Concept
   {
@@ -50,7 +50,7 @@ namespace ryujin
      * the kernels that the generic modules call. All names are stored in
      * Interface::HyperbolicSystem.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename V, int dim, typename Number>
     concept HyperbolicSystemView =
@@ -132,7 +132,7 @@ namespace ryujin
      * A hyperbolic system fills the precomputed values for the scalar
      * number type Number.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename T, int dim, typename Number>
     concept HyperbolicSystemFillsPrecomputedValues =
@@ -154,7 +154,7 @@ namespace ryujin
      * initial_precomputed_names(dim) exactly n_initial_precomputed_values
      * entries of the view. HyperbolicModule::prepare() asserts this.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename T, int dim, typename Number>
     concept HyperbolicSystem =

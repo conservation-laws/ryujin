@@ -26,7 +26,7 @@ namespace ryujin
      * The interface holds the handle of the data attached to the
      * triangulation.
      *
-     * @ingroup Mesh
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class SolutionTransfer : public dealii::ParameterAcceptor

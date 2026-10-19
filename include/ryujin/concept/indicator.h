@@ -20,7 +20,7 @@ namespace ryujin
     /**
      * The view of an indicator.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename V, int dim, typename Number>
     concept IndicatorView =
@@ -44,7 +44,7 @@ namespace ryujin
      * An indicator: constructed from the hyperbolic system and the
      * subsection of its run time parameters, it hands out views.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename T, typename System, int dim, typename Number>
     concept Indicator =

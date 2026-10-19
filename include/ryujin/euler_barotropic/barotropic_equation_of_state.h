@@ -21,7 +21,7 @@ namespace ryujin
    * A small abstract base class to group configuration options for a
    * barotropic equation of state.
    *
-   * @ingroup EulerEquations
+   * @ingroup EulerBarotropicEquations
    */
   class BarotropicEquationOfState : public dealii::ParameterAcceptor
   {

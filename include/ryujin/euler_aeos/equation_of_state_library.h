@@ -20,7 +20,7 @@ namespace ryujin
    * built-in equations of state of the namespace EquationsOfState are
    * registered by default.
    *
-   * @ingroup EulerEquations
+   * @ingroup EulerAEOSEquations
    */
   using EquationOfStateLibrary = Library<EquationOfState, const std::string &>;
 

@@ -21,7 +21,7 @@ namespace ryujin
      *
      * The interface holds the common state of Interface::Module.
      *
-     * @ingroup ParabolicModule
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class ParabolicModule : public Module<dim, Number>

@@ -27,7 +27,7 @@ namespace ryujin
    * });
    * @endcode
    *
-   * @ingroup TimeLoop
+   * @ingroup Driver
    */
   using EquationLibrary = Library<Interface::Equation>;
 

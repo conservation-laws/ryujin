@@ -66,7 +66,7 @@ namespace ryujin
    * @param k Index describing the component that is returned by the
    * function object.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   template <int dim, typename Number, typename Callable>
   ToFunction<dim, Number, Callable> to_function(const Callable &callable,
@@ -163,7 +163,7 @@ namespace
  * ```
  * depending on whether bar_ can be dereferenced, or not.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define ACCESSOR_READ_ONLY(member)                                             \
   inline const auto &member() const                                            \
@@ -175,7 +175,7 @@ namespace
 /**
  * Variant of the macro above that returns a mutable reference.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define ACCESSOR(member)                                                       \
   inline auto &member()                                                        \
@@ -188,7 +188,7 @@ namespace
  * Variant of the macro above that does not attempt to dereference the
  * underlying object.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define ACCESSOR_READ_ONLY_NO_DEREFERENCE(member)                              \
   inline const auto &member() const                                            \
@@ -206,7 +206,7 @@ namespace
  * The function will dereference container and member if they are of
  * pointer type.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define ACCESSOR_CONTAINER_READ_ONLY(container, member)                        \
   inline const auto &member() const                                            \
@@ -226,7 +226,7 @@ namespace
  * compiler (clang CUDA/HIP, SYCL), i.e., when the current translation unit
  * is compiled for the device and not for the host.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__) ||               \
     defined(__SYCL_DEVICE_ONLY__)
@@ -238,7 +238,7 @@ namespace
  * Macro expanding to a `#pragma` directive that looks nicer in indented
  * code and can be used in other preprocessor macro definitions.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define RYUJIN_PRAGMA(x) _Pragma(#x)
 
@@ -255,7 +255,7 @@ namespace
  *
  * @note The performance penalty of incorrectly marking a condition as
  * unlikely is severe. Use only if the condition is almost always false.
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 

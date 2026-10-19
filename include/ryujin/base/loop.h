@@ -43,6 +43,8 @@ namespace ryujin
    * `args` may be specified in the cpu_simd_loop() invocation that will be
    * forwarded to the loop body:
    * `body(Number(), std::forward<Args>(args)..., i);`
+   *
+   * @ingroup Utilities
    */
   template <typename ScalarNumber, typename Functor, typename... Args>
   inline void cpu_simd_loop(const std::string &region_name [[maybe_unused]],
@@ -153,6 +155,8 @@ namespace ryujin
    *
    * @note The function fences the execution space before returning. It
    * thus has the same (synchronous) semantics as cpu_simd_loop().
+   *
+   * @ingroup Utilities
    */
   template <typename ScalarNumber, typename Functor, typename... Args>
   inline void gpu_loop(const std::string &region_name,
@@ -204,6 +208,8 @@ namespace ryujin
    * first argument and the current index i as last argument. Additional
    * `args` may be specified in the loop() invocation that will be forwarded
    * to the loop body.
+   *
+   * @ingroup Utilities
    */
   template <typename MemorySpace,
             typename ScalarNumber,
@@ -254,6 +260,8 @@ namespace ryujin
    * The loop body itself has to return a callable object `j -> Number`
    * returning the j-th partial result that will be folded back into the
    * result.
+   *
+   * @ingroup Utilities
    */
   template <typename ElementReducer>
   struct ArrayReducer {

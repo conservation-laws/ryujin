@@ -26,7 +26,7 @@ namespace ryujin
    * affine translation to the coordinate system; so additional
    * configuration options for location and direction are not needed.
    *
-   * @ingroup InitialValues
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
   class InitialState : public dealii::ParameterAcceptor
@@ -89,7 +89,7 @@ namespace ryujin
    * InitialValues can select by name, for a given @p HyperbolicDescription,
    * dimension @p dim, and number type @p Number.
    *
-   * @ingroup InitialValues
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
   using InitialStateLibrary =

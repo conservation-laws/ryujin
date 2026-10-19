@@ -20,7 +20,7 @@ namespace ryujin
     /**
      * The view of a wave speed estimator.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename V, int dim, typename Number>
     concept WaveSpeedEstimatorView =
@@ -40,7 +40,7 @@ namespace ryujin
      * A wave speed estimator: constructed from the hyperbolic system and
      * the subsection of its run time parameters, it hands out views.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename T, typename System, int dim, typename Number>
     concept WaveSpeedEstimator =

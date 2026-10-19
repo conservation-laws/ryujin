@@ -35,7 +35,7 @@ namespace ryujin
    * @fixme generalize the transfer of the dynamic state to support
    * OfflineData::dof_handler_cg() and OfflineData::dof_handler_dg()
    *
-   * @ingroup Mesh
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
   class SolutionTransfer final : public Interface::SolutionTransfer<dim, Number>

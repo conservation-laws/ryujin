@@ -19,7 +19,7 @@ namespace ryujin
    * Internal scratch data for thread parallelized assembly. See the
    * deal.II Workstream documentation for details.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   template <int dim>
   class AssemblyScratchData
@@ -75,7 +75,7 @@ namespace ryujin
    * Internal copy data for thread parallelized assembly. See the deal.II
    * Workstream documentation for details.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
   class AssemblyCopyData
