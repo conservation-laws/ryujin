@@ -12,6 +12,7 @@
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/point.h>
 #include <deal.II/base/types.h>
 #include <deal.II/fe/mapping_q_cache.h>
 #include <deal.II/grid/tria.h>
@@ -19,6 +20,7 @@
 #include <deal.II/hp/mapping_collection.h>
 #include <deal.II/hp/q_collection.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -235,6 +237,14 @@ namespace ryujin
             face_nodal_quadrature;
       };
 
+      /**
+       * A forward transformation that maps points of the triangulation to
+       * the actual geometry, see Geometry::transformation().
+       */
+      using Transformation = std::function<dealii::Point<dim>(
+          const typename dealii::Triangulation<dim>::cell_iterator &,
+          const dealii::Point<dim> &)>;
+
       //@}
       /**
        * @name Setup
@@ -248,7 +258,8 @@ namespace ryujin
       virtual void prepare(const std::string &base_name) = 0;
 
       /**
-       * Recompute the cached mapping after the triangulation has changed.
+       * Recompute the cached mapping after the triangulation, or the
+       * transformation(), has changed.
        */
       virtual void update_mapping() = 0;
 
@@ -334,6 +345,25 @@ namespace ryujin
        * Return a read-only const reference to the triangulation.
        */
       ACCESSOR_READ_ONLY(triangulation)
+
+      /**
+       * Return a mutable reference to the transformation used for the
+       * MappingQCache object.
+       *
+       * @note The transformation will be set initially during the
+       * prepare() call provided the selected geometry sets
+       * Geometry::transformation(). An empty transformation is treated as
+       * the identity.
+       *
+       * @note After updating the transformation a call to update_mapping()
+       * is required to reinitialize the underlying MappingQCache.
+       */
+      ACCESSOR(transformation)
+
+      /**
+       * Return a read-only const reference to the transformation.
+       */
+      ACCESSOR_READ_ONLY(transformation)
 
       /**
        * Return a read-only const reference to the mapping.
@@ -460,6 +490,7 @@ namespace ryujin
 
       Collection collection_;
       std::shared_ptr<dealii::MappingQCache<dim>> mapping_cache_;
+      Transformation transformation_;
 
       Geometry<dim> *selected_geometry_ = nullptr;
 

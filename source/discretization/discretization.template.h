@@ -204,11 +204,12 @@ namespace ryujin
      * standard_simplices, however, we need to do the setup ourselves:
      */
 
-    const auto collection_type =
-        this->selected_geometry_->populate_hp_collections(fe_degree,
-                                                          this->collection_);
+    this->transformation_ = this->selected_geometry_->transformation();
 
-    switch (collection_type) {
+    collection_type_ = this->selected_geometry_->populate_hp_collections(
+        fe_degree, this->collection_);
+
+    switch (collection_type_) {
     case Geometry<dim>::HP_Collection::populated_by_geometry: {
       /*
        * The geometry already populated the hp::*Collections
@@ -242,16 +243,10 @@ namespace ryujin
       /*
        * If the geometry describes the mesh via a forward transformation of
        * the undeformed triangulation we use a MappingQCache that is filled
-       * in update_mapping(). The cache is stored by pointer (and not
-       * cloned) so that the collection always refers to the current cache:
+       * in update_mapping():
        */
-      if (this->selected_geometry_->transformation()) {
-        this->mapping_cache_ =
-            std::make_shared<MappingQCache<dim>>(mapping_degree);
-        auto mapping = std::make_unique<hp::MappingCollection<dim>>();
-        hp::Collection<Mapping<dim>> &base = *mapping;
-        base.push_back(this->mapping_cache_);
-        this->collection_.mapping = std::move(mapping);
+      if (this->transformation_) {
+        create_mapping_cache();
       } else {
         this->collection_.mapping =
             std::make_unique<dealii::hp::MappingCollection<dim>>(
@@ -355,15 +350,45 @@ namespace ryujin
   template <int dim>
   void Discretization<dim>::update_mapping()
   {
-    if (!this->mapping_cache_)
-      return;
+    if (!this->mapping_cache_) {
+      if (!this->transformation_)
+        return;
 
-    this->mapping_cache_->initialize(
-        MappingQ<dim>(this->mapping_cache_->get_degree()),
-        *this->triangulation_,
-        this->selected_geometry_->transformation(),
-        /*function_describes_relative_displacement*/
-        false);
+      /* A MeshAdaptor has set a transformation: */
+      AssertThrow(
+          collection_type_ ==
+              Geometry<dim>::HP_Collection::standard_quadrilaterals,
+          ExcMessage("A transformation can only be set for a geometry that "
+                     "does not populate the hp collections itself."));
+      create_mapping_cache();
+    }
+
+    const MappingQ<dim> mapping(this->mapping_cache_->get_degree());
+    if (this->transformation_)
+      this->mapping_cache_->initialize(
+          mapping,
+          *this->triangulation_,
+          this->transformation_,
+          /*function_describes_relative_displacement*/
+          false);
+    else
+      this->mapping_cache_->initialize(mapping, *this->triangulation_);
+  }
+
+
+  template <int dim>
+  void Discretization<dim>::create_mapping_cache()
+  {
+    /*
+     * The cache is stored by pointer (and not cloned) so that the
+     * collection always refers to the current cache:
+     */
+    this->mapping_cache_ =
+        std::make_shared<MappingQCache<dim>>(this->polynomial_degree());
+    auto mapping = std::make_unique<hp::MappingCollection<dim>>();
+    hp::Collection<Mapping<dim>> &base = *mapping;
+    base.push_back(this->mapping_cache_);
+    this->collection_.mapping = std::move(mapping);
   }
 
 } // namespace ryujin
