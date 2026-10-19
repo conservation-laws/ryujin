@@ -9,6 +9,8 @@
 
 #include "time_loop.h"
 
+#include <ryujin/typed/simulation.h>
+
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -227,8 +229,10 @@ namespace ryujin
        */
 
       ryujin::EquationDispatch equation_dispatch;
-      ryujin::TimeLoop<HyperbolicDescription, ParabolicDescription, dim, Number>
-          time_loop(MPI_COMM_SELF);
+      ryujin::
+          Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+              simulation(MPI_COMM_SELF);
+      ryujin::TimeLoop<dim, Number> time_loop(simulation);
 
       /*
        * Fix up "equation" entry:
@@ -320,17 +324,20 @@ namespace ryujin
                             equation + "«"));
 
             if (dimension == 1) {
-              TimeLoop<HD, PD, 1, Number> time_loop(mpi_comm);
+              Simulation<HD, PD, 1, Number> simulation(mpi_comm);
+              TimeLoop<1, Number> time_loop(simulation);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
               time_loop_executed = true;
             } else if (dimension == 2) {
-              TimeLoop<HD, PD, 2, Number> time_loop(mpi_comm);
+              Simulation<HD, PD, 2, Number> simulation(mpi_comm);
+              TimeLoop<2, Number> time_loop(simulation);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
               time_loop_executed = true;
             } else if (dimension == 3) {
-              TimeLoop<HD, PD, 3, Number> time_loop(mpi_comm);
+              Simulation<HD, PD, 3, Number> simulation(mpi_comm);
+              TimeLoop<3, Number> time_loop(simulation);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
               time_loop_executed = true;

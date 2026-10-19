@@ -12,7 +12,7 @@ include_directories(
   )
 
 set(TEST_LIBRARIES
-  obj_common obj_${EQUATION} obj_${EQUATION}_dependent
+  obj_common obj_${EQUATION}
   obj_euler_barotropic obj_euler_barotropic_dependent
   )
 set(TEST_TARGET ryujin)

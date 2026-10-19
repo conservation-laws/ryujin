@@ -24,6 +24,7 @@ set(COMMON_SOURCE_FILES
   simd.cc
   sparsity_pattern.cc
   time_integrator.cc
+  time_loop.cc
   version_info.cc
   vtu_output.cc
   )
@@ -58,14 +59,6 @@ set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
   )
 
 #
-# Sources that depend on the pairing of a hyperbolic and a parabolic
-# description. They are compiled once per equation:
-#
-set(PAIRING_DEPENDENT_SOURCE_FILES
-  time_loop.cc
-  )
-
-#
 # Equation-specific source files and compilation targets:
 #
 
@@ -78,30 +71,26 @@ macro(setup_equation EQUATION)
   add_subdirectory(${EQUATION})
 
   #
-  # obj_${EQUATION}_dependent object library: equation dependent common code.
+  # obj_${EQUATION}_dependent object library: equation dependent common
+  # code. Only an equation directory with a hyperbolic_description.h has
+  # one. All other equation directories pair a parabolic description with
+  # the hyperbolic description of another equation directory.
   #
-  # An equation directory with a hyperbolic_description.h pairs the
-  # hyperbolic description with the stub parabolic description. All other
-  # equation directories pair a parabolic description with the hyperbolic
-  # description of another equation directory.
-  #
+
+  list(APPEND OBJECT_TARGETS obj_${EQUATION})
 
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}/hyperbolic_description.h)
-    set(_sources
-      ${HYPERBOLIC_DEPENDENT_SOURCE_FILES} ${PAIRING_DEPENDENT_SOURCE_FILES}
+    add_library(obj_${EQUATION}_dependent OBJECT
+      ${HYPERBOLIC_DEPENDENT_SOURCE_FILES}
       )
-  else()
-    set(_sources ${PAIRING_DEPENDENT_SOURCE_FILES})
+    deal_ii_setup_target(obj_${EQUATION}_dependent)
+
+    target_link_libraries(obj_${EQUATION}_dependent
+      obj_${EQUATION} ${EXTERNAL_TARGETS}
+      )
+
+    list(APPEND OBJECT_TARGETS obj_${EQUATION}_dependent)
   endif()
-
-  add_library(obj_${EQUATION}_dependent OBJECT ${_sources})
-  deal_ii_setup_target(obj_${EQUATION}_dependent)
-
-  target_link_libraries(obj_${EQUATION}_dependent
-    obj_${EQUATION} ${EXTERNAL_TARGETS}
-    )
-
-  list(APPEND OBJECT_TARGETS obj_${EQUATION} obj_${EQUATION}_dependent)
 endmacro()
 
 file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)

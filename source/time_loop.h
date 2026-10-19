@@ -7,21 +7,7 @@
 
 #include <compile_time_options.h>
 
-#include <ryujin/typed/hyperbolic_module.h>
-#include <ryujin/typed/initial_values.h>
-#include <ryujin/typed/postprocessor.h>
-#include <ryujin/typed/solution_transfer.h>
-
-#include "discretization.h"
-#include "error_evaluation.h"
-#include "mesh_adaptor.h"
-#include "mpi_ensemble.h"
-#include "mpi_ensemble_container.h"
-#include "offline_data.h"
-#include "parabolic_module.h"
-#include "quantities.h"
-#include "time_integrator.h"
-#include "vtu_output.h"
+#include <ryujin/interface/simulation.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -34,39 +20,20 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            int dim,
-            typename Number = double>
+  template <int dim, typename Number = double>
   class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Typedefs and constexpr constants
-     */
-    //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-    using ParabolicSystem = typename ParabolicDescription::ParabolicSystem;
-
-    using View = typename HyperbolicSystem::template View<dim, Number>;
-
-    using ScalarNumber = typename View::ScalarNumber;
-
-    static constexpr auto problem_dimension = View::problem_dimension;
-
-    static constexpr auto n_precomputed_values = View::n_precomputed_values;
-
-    //@}
     /**
      * @name Constructor and setup
      */
     //@{
 
     /**
-     * Constructor.
+     * Constructor. The TimeLoop works with the objects of the given
+     * @p simulation.
      */
-    TimeLoop(const MPI_Comm &mpi_comm);
+    TimeLoop(Interface::Simulation<dim, Number> &simulation);
 
     /**
      * Run the high-level time loop.
@@ -115,24 +82,7 @@ namespace ryujin
      */
     //@{
 
-    MPIEnsemble mpi_ensemble_;
-
-    MPIEnsembleContainer<HyperbolicSystem> hyperbolic_system_;
-    MPIEnsembleContainer<ParabolicSystem> parabolic_system_;
-    Discretization<dim> discretization_;
-    OfflineData<dim, Number> offline_data_;
-    MPIEnsembleContainer<InitialValues<HyperbolicDescription, dim, Number>>
-        initial_values_;
-    HyperbolicModule<HyperbolicDescription, dim, Number> hyperbolic_module_;
-    ParabolicModule<HyperbolicDescription, ParabolicDescription, dim, Number>
-        parabolic_module_;
-    TimeIntegrator<dim, Number> time_integrator_;
-    Postprocessor<HyperbolicDescription, dim, Number> postprocessor_;
-    MeshAdaptor<dim, Number> mesh_adaptor_;
-    SolutionTransfer<HyperbolicDescription, dim, Number> solution_transfer_;
-    VTUOutput<dim, Number> vtu_output_;
-    Quantities<dim, Number> quantities_;
-    ErrorEvaluation<dim, Number> error_evaluation_;
+    Interface::Simulation<dim, Number> &simulation_;
 
     dealii::types::global_dof_index n_global_dofs_;
     unsigned int n_devices_;

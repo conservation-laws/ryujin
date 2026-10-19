@@ -213,13 +213,34 @@ namespace ryujin
      * Compute and populate precomputed values.
      */
 
-    if constexpr (have_separate_memory_spaces)
-      hyperbolic_system_->template fill_precomputed_values<MemorySpace>(
-          *offline_data_, state_vector);
-    else
-      hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
+    hyperbolic_system_->template fill_precomputed_values<MemorySpace>(
+        *offline_data_, state_vector);
 
     Q.template view<n_precomputed_values, MemorySpace>().update_ghost_values();
+  }
+
+
+  template <typename HyperbolicDescription, int dim, typename Number>
+  void
+  HyperbolicModule<HyperbolicDescription, dim, Number>::fill_precomputed_values(
+      StateVector<Number> &state_vector) const
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "HyperbolicModule<HyperbolicDescription, dim, "
+                 "Number>::fill_precomputed_values()"
+              << std::endl;
+#endif
+
+    using MemorySpace = selected_memory_space_t;
+
+    move_to_memory_space<MemorySpace>(
+        state_vector, StateVectorPart::state, StateVectorPart::precomputed);
+
+    hyperbolic_system_->template fill_precomputed_values<MemorySpace>(
+        *offline_data_, state_vector, /*skip_constrained_dofs*/ false);
+
+    state_vector.precomputed.template view<n_precomputed_values, MemorySpace>()
+        .update_ghost_values();
   }
 
 
