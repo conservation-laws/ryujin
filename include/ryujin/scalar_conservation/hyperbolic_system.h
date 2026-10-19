@@ -22,6 +22,9 @@
 #include <deal.II/base/tensor.h>
 
 #include <array>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
@@ -116,10 +119,9 @@ namespace ryujin
 
       std::string flux_;
 
-      FluxLibrary::flux_list_type flux_list_;
+      std::vector<std::unique_ptr<Flux>> flux_list_;
 
-      using Flux = FluxLibrary::Flux;
-      std::shared_ptr<Flux> selected_flux_;
+      const Flux *selected_flux_ = nullptr;
 
       template <int, typename, typename>
       friend class HyperbolicSystemView;
@@ -229,7 +231,7 @@ namespace ryujin
       HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
           : parameters_(
                 hyperbolic_system.parameters_.template view<MemorySpace>())
-          , flux_(hyperbolic_system.selected_flux_.get())
+          , flux_(hyperbolic_system.selected_flux_)
       {
       }
 
@@ -512,7 +514,7 @@ namespace ryujin
       const HyperbolicSystem::Parameters *const parameters_;
 
       /* Only valid (and dereferenced) on the host: */
-      const FluxLibrary::Flux *const flux_;
+      const Flux *const flux_;
 
       //@}
     }; /* HyperbolicSystemView */
@@ -538,17 +540,19 @@ namespace ryujin
         , parameters_("scalar_conservation_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
     {
+      flux_list_ = FluxLibrary::create(subsection);
+
+      std::string flux_names;
+      for (const auto &flux : flux_list_)
+        flux_names += (flux_names.empty() ? "" : "|") + flux->name();
+
       flux_ = "burgers";
       add_parameter("flux",
                     flux_,
                     "The scalar flux. Valid names are given by any of the "
-                    "subsections defined below");
-
-      /*
-       * And finally populate the flux list with all flux configurations
-       * defined in the FluxLibrary namespace:
-       */
-      FluxLibrary::populate_flux_list(flux_list_, subsection);
+                    "subsections defined below",
+                    this->prm,
+                    dealii::Patterns::Selection(flux_names));
 
       /*
        * The flux classes update their parameters in their own
@@ -571,7 +575,7 @@ namespace ryujin
 
         /* Populate flux functions: */
         if (it->name() == flux_) {
-          selected_flux_ = it;
+          selected_flux_ = it.get();
           problem_name_ = "Scalar conservation equation (" + it->name() + ": " +
                           it->flux_formula() + ")";
           initialized = true;

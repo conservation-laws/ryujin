@@ -17,7 +17,7 @@
 
 namespace ryujin
 {
-  namespace FluxLibrary
+  namespace Fluxes
   {
     /**
      * A generic flux description parsed from a user-provided string
@@ -89,5 +89,5 @@ namespace ryujin
 
       std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
     };
-  } // namespace FluxLibrary
+  } // namespace Fluxes
 } // namespace ryujin

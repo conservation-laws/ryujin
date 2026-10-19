@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace FluxLibrary
+  namespace Fluxes
   {
     /**
      * A generic flux description parsed from a user-provided string
@@ -60,5 +60,5 @@ namespace ryujin
         }
       }
     };
-  } // namespace FluxLibrary
+  } // namespace Fluxes
 } // namespace ryujin
