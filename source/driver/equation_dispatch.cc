@@ -3,6 +3,6 @@
 // Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
-#include "equation_dispatch.h"
+#include <ryujin/driver/equation_dispatch.h>
 
 ryujin::EquationDispatch::Signals *ryujin::EquationDispatch::signals = nullptr;
