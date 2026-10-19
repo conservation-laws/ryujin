@@ -3,5 +3,5 @@
 ## Copyright (C) 2022 - 2026 by the ryujin authors
 ##
 
-set(TEST_LIBRARIES obj_common)
+set(TEST_LIBRARIES libryujin)
 deal_ii_pickup_tests()

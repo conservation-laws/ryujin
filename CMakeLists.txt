@@ -25,7 +25,7 @@ endif()
 # Set up deal.II
 #
 
-set(RYUJIN_VERSION 2.1.1)
+set(RYUJIN_VERSION 2.5.0)
 
 cmake_minimum_required(VERSION 3.15)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -60,7 +60,7 @@ if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_P4EST)
     )
 endif()
 
-project(ryujin CXX)
+project(ryujin VERSION ${RYUJIN_VERSION} LANGUAGES CXX)
 
 #
 # Compile-time options:
@@ -76,6 +76,8 @@ option(DEFAULT_ENABLE_EQUATIONS "Default enable all available equations. This pa
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 
 option(WITH_DEAL_II_THREADS "Enable deal.II threading support" OFF)
+
+option(CMAKE_INSTALL_RPATH_USE_LINK_PATH "Set the rpath of the library to the external link paths on installation" ON)
 
 #
 # External packages:

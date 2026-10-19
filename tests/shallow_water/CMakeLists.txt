@@ -5,9 +5,9 @@
 
 set(EQUATION shallow_water)
 
-set(TEST_LIBRARIES obj_common obj_${EQUATION})
+set(TEST_LIBRARIES libryujin)
 set(TEST_TARGET ryujin)
 
-if(TARGET obj_${EQUATION})
+if(TARGET object_${EQUATION})
   deal_ii_pickup_tests()
 endif()
