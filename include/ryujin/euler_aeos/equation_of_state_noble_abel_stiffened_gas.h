@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * The Noble-Abel-Stiffened gas equation of state
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class NobleAbelStiffenedGas : public EquationOfState
     {

@@ -22,7 +22,7 @@ namespace ryujin
      *   a^2 &= c^2.
      * \f}
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     class Isothermal : public BarotropicEquationOfState
     {

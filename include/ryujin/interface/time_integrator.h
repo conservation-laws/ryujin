@@ -23,7 +23,7 @@ namespace ryujin
      * advances a state vector by combining the step functions of a
      * hyperbolic and a parabolic module.
      *
-     * @ingroup TimeLoop
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class TimeIntegrator : public dealii::ParameterAcceptor

@@ -19,7 +19,7 @@ namespace ryujin
      * A parabolic system: constructed from the subsection of its run time
      * parameters.
      *
-     * @ingroup ParabolicModule
+     * @ingroup Concepts
      */
     template <typename T>
     concept ParabolicSystem =

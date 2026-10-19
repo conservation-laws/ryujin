@@ -18,7 +18,7 @@ namespace ryujin
    * The equation that pairs the @p HyperbolicDescription with the
    * @p ParabolicDescription, for the number type @p Number.
    *
-   * @ingroup TimeLoop
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription,
             typename ParabolicDescription,

@@ -26,7 +26,7 @@ namespace ryujin
    * An enum class for setting the type of Triangulation that should be
    * constructed.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   enum class MeshType {
     /** Use serial dealii::Triangulation<dim> */
@@ -65,7 +65,7 @@ namespace ryujin
    * benchmark configurations and to read in meshes in one of the formats
    * supported by the deal.II library.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   template <int dim>
   class Discretization final : public Interface::Discretization<dim>

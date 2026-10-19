@@ -25,12 +25,12 @@ namespace ryujin
    *    configure each ensemble instance individually in the parameter
    *    file.
    *
-   *  @fixme For HyperbolicSystem/ ParabolicSystem / InitialValues
+   *  @todo For HyperbolicSystem/ ParabolicSystem / InitialValues
    *  realizations that are already MPIEnsemble "aware" we should fall back
    *  to only creating one instance - possibly by checking for and calling
    *  a modified constructor that takes an mpi_ensemble as an argument.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   template <typename T>
   class MPIEnsembleContainer
@@ -88,10 +88,7 @@ namespace ryujin
   };
 
 
-  /**
-   * A trait class that determines whether a given HyperbolicDescription
-   * struct contains a method or field "n_mpi_ensembles".
-   */
+#ifndef DOXYGEN
   namespace
   {
     template <typename C>
@@ -100,7 +97,12 @@ namespace ryujin
     template <typename C>
     static auto test(int) -> decltype(C::n_mpi_ensembles(), std::true_type());
   } // namespace
+#endif
 
+  /**
+   * A trait that determines whether a given HyperbolicDescription
+   * struct contains a method or field "n_mpi_ensembles".
+   */
   template <typename T>
   constexpr bool has_n_mpi_ensembles_v = decltype(test<T>(0))::value;
 } // namespace ryujin

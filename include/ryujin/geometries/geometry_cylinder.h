@@ -24,7 +24,7 @@ namespace ryujin
      * The 3D mesh is created by extruding the 2D mesh with a width equal
      * to the "height".
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim, int spacedim, template <int, int> class Triangulation>
     void cylinder(Triangulation<dim, spacedim> &,
@@ -221,7 +221,7 @@ namespace ryujin
      * A 2D/3D cylinder configuration constructed with
      * GridGenerator::cylinder().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Cylinder : public Geometry<dim>

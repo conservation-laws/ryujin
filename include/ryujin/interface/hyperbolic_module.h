@@ -27,7 +27,7 @@ namespace ryujin
      * In addition to the common state of Interface::Module the interface
      * holds the CFL number and the acceptable tau_max ratio.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class HyperbolicModule : public Module<dim, Number>

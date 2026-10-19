@@ -14,7 +14,7 @@ namespace ryujin
   {
     /**
      * Create a 2D numerical wave tank with specifications outlined in Figure 4
-     * of @cite 2018-SW-exps. The tank consists of a rectangular water reservoir
+     * of @cite Martinez2018. The tank consists of a rectangular water reservoir
      * with a long flume attached to the "center" of the reservoir. For the sake
      * of simplicity, we assume the centerline of the flume and reservoir align
      * at y = 0.
@@ -22,7 +22,7 @@ namespace ryujin
      * All outer walls have "slip" boundary conditions except outer wall at the
      * end of the tank which has dynamic outflow conditions.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
 
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -127,7 +127,7 @@ namespace ryujin
     /**
      * A 2D wave tank configuration constructed with GridGenerator::wavetank().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class WaveTank : public Geometry<dim>

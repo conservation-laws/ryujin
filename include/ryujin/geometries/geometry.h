@@ -30,7 +30,7 @@ namespace ryujin
    * A small abstract base class to group configuration options for a
    * number of geometries together.
    *
-   * @ingroup Mesh
+   * @ingroup Geometries
    */
   template <int dim>
   class Geometry : public dealii::ParameterAcceptor

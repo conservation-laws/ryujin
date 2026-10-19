@@ -13,6 +13,8 @@ namespace ryujin
 {
   /**
    * Print git revision and version info.
+   *
+   * @ingroup Utilities
    */
   void print_revision_and_version(std::ostream &stream);
 } // namespace ryujin

@@ -36,7 +36,7 @@ namespace ryujin
    * For validation purposes a number of analytic solutions are implemented
    * as well.
    *
-   * @ingroup InitialValues
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription, int dim, typename Number = double>
   class InitialValues final : public Interface::InitialValues<dim, Number>

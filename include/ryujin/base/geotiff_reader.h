@@ -26,7 +26,7 @@ namespace ryujin
    * Controls how the height information read in from a GeoTIFF image is
    * normalized.
    *
-   * @ingroup ShallowWaterEquations
+   * @ingroup Utilities
    */
   enum class HeightNormalization {
     /** do not normalize the height: **/
@@ -55,7 +55,7 @@ namespace ryujin
    * https://gdal.org/index.html for details on GDAL and what image
    * formats it supports.
    *
-   * @ingroup ShallowWaterEquations
+   * @ingroup Utilities
    */
   class GeoTIFFReader : dealii::ParameterAcceptor
   {

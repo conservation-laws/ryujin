@@ -24,7 +24,7 @@ namespace ryujin
      * implementation with a modified approximative Riemann solver,
      * indicator, and limiter suitable for arbitrary equations of state.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     struct HyperbolicDescription {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;

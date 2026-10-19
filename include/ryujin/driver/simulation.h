@@ -33,7 +33,7 @@ namespace ryujin
    * system, and the initial values, and the postprocessor that the
    * description-free modules share.
    *
-   * @ingroup TimeLoop
+   * @ingroup Driver
    */
   template <typename HD, typename PD, int dim, typename Number = double>
     requires Concept::HyperbolicDescription<HD, dim, Number> &&

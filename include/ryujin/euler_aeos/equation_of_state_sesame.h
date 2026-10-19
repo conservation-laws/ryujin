@@ -54,7 +54,7 @@ namespace ryujin
     /**
      * A thin RAII wrapper around an eospac table handle.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class Interface
     {
@@ -218,7 +218,7 @@ namespace ryujin
      *          [p] = Pa = Kg / m / s^2
      *          [e] = J / Kg = N m / Kg = m^2 / s^2
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class Sesame : public EquationOfState
     {

@@ -25,7 +25,7 @@ namespace ryujin
      *   a &= \sqrt{\partial_\rho p(\rho)}.
      * \f}
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     class Function : public BarotropicEquationOfState
     {

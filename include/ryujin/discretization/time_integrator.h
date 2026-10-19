@@ -23,7 +23,7 @@ namespace ryujin
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
    *
-   * @ingroup TimeLoop
+   * @ingroup MeshAndOfflineData
    */
   enum class CFLRecoveryStrategy {
     /**
@@ -54,7 +54,7 @@ namespace ryujin
   /**
    * Controls the chosen time-stepping scheme.
    *
-   * @ingroup TimeLoop
+   * @ingroup MeshAndOfflineData
    */
   enum class TimeSteppingScheme {
     /**
@@ -163,56 +163,60 @@ namespace ryujin
     imex_11,
 
     /**
-     * An implicit-explicit method that utilizes the Heun's second order
-     * explicit Runge-Kutta
-     * scheme with Butcher tableau
+     * A second order implicit-explicit method. It uses the explicit
+     * midpoint rule with Butcher tableau
      *
      * \f{align*}
      * \begin{array}{c|ccc}
      *   0            & 0 \\
-     *   1 & 0.5 & 0 \\
-     *   0.5 & 0        &  2 \\
+     *   \tfrac{1}{2} & \tfrac{1}{2} & 0 \\
+     *   1            & 0 & 1 & 0
      *  \end{array} \f}
      *
-     * to solve the explicit subproblem and the two-stage Crank-Nicolson scheme
-     * diagonally implicit Runge-Kutta scheme with Butcher tableau \f{align*}
+     * to solve the hyperbolic subproblem, and a two-stage Crank-Nicolson
+     * type diagonally implicit Runge-Kutta scheme with Butcher tableau
      *
+     * \f{align*}
      * \begin{array}{c|ccc}
      *   0            & 0 \\
-     *   0.5 & 0 & \tfrac{1}{2} \\
-     *   1 & 0    &  1 \\
+     *   \tfrac{1}{2} & 0 & \tfrac{1}{2} \\
+     *   1            & \tfrac{1}{2} & \tfrac{1}{2} & 0
      *  \end{array} \f}
      *
-     * to solve the parabolic subproblem.
+     * to solve the parabolic subproblem. Each of the two stages consists
+     * of one explicit hyperbolic step and one implicit parabolic step with
+     * step size \f$\tau / 2\f$.
      */
     imex_22,
 
     /**
-     * An implicit-explicit method that utilizes the Heun's second order
-     * explicit Runge-Kutta
-     * scheme with Butcher tableau
+     * The third order implicit-explicit method IMEX(3, 3; 1), see
+     * @cite ErnGuermond2023, Section 4.3. It uses Heun's third order
+     * explicit Runge-Kutta scheme with Butcher tableau
      *
      * \f{align*}
      * \begin{array}{c|cccc}
      *   0  & 0 \\
-     *   \tfrace{1}{3} & \tfrace{1}{3} & 0 \\
-     *   \tfrace{2}{3} & 0  &  \tfrace{2}{3} & 0 \\
-          1 & \tfrace{1}{4} & 0 & \tfrace{3}{4}
+     *   \tfrac{1}{3} & \tfrac{1}{3} & 0 \\
+     *   \tfrac{2}{3} & 0  &  \tfrac{2}{3} & 0 \\
+     *   1 & \tfrac{1}{4} & 0 & \tfrac{3}{4} & 0
      *  \end{array} \f}
      *
-     * to solve the explicit subproblem and the two-stage Crank-Nicolson scheme
-     * diagonally implicit Runge-Kutta scheme with Butcher tableau \f{align*}
+     * to solve the hyperbolic subproblem, and a three-stage diagonally
+     * implicit Runge-Kutta scheme with Butcher tableau
      *
+     * \f{align*}
      * \begin{array}{c|cccc}
      *   0   & 0 \\
-     *   \tfrace{1}{3} & \tfrace{1}{3} - \gamma & \gamma \\
-     *   \tfrace{2}{3} & \gamma   &  \tfrace{2}{3} - 2 \gamma & \gamma \\
-    *     1 & \tfrace{1}{4} & 0 & \tfrace{3}{4}
+     *   \tfrac{1}{3} & \tfrac{1}{3} - \gamma & \gamma \\
+     *   \tfrac{2}{3} & \gamma   &  \tfrac{2}{3} - 2 \gamma & \gamma \\
+     *   1 & \tfrac{1}{4} & 0 & \tfrac{3}{4} & 0
      *  \end{array} \f}
      *
-     * with \gamma = \tfrace{1}{2} + \tfrace{1}{2\sqrt(3)}
-     *
-     * to solve the parabolic subproblem.
+     * with \f$\gamma = \tfrac{1}{2} + \tfrac{1}{2\sqrt{3}}\f$ to solve the
+     * parabolic subproblem. Each of the three stages consists of one
+     * explicit hyperbolic step and one implicit parabolic step with step
+     * size \f$\tau / 3\f$.
      */
     imex_33,
   };
@@ -248,7 +252,7 @@ namespace ryujin
    * The TimeIntegrator class implements IMEX timestepping strategies based
    * on explicit and diagonally-implicit Runge Kutta schemes.
    *
-   * @ingroup TimeLoop
+   * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
   class TimeIntegrator final : public Interface::TimeIntegrator<dim, Number>

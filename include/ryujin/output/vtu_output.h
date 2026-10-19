@@ -31,7 +31,7 @@ namespace ryujin
    *   |q_k|}{\max_k |q_k| - \min_k |q_k|}\right).
    * \f]
    *
-   * @ingroup TimeLoop
+   * @ingroup Output
    */
   template <int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor

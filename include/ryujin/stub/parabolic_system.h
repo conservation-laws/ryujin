@@ -14,7 +14,7 @@ namespace ryujin
    * The parabolic subsystem of a purely hyperbolic equation. This is just
    * the identity operator.
    *
-   * @ingroup ParabolicModule
+   * @ingroup Typed
    */
   class StubParabolicSystem final : public Interface::ParabolicSystem
   {

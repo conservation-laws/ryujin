@@ -39,7 +39,7 @@ namespace ryujin
    * The class also writes out the computed error into a log file `<base
    * name>-error.log`.
    *
-   * @ingroup TimeLoop
+   * @ingroup Output
    */
   template <int dim, typename Number = double>
   class ErrorEvaluation final : public dealii::ParameterAcceptor

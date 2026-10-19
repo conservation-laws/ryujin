@@ -42,7 +42,7 @@ namespace ryujin
      * The members of a hyperbolic description HD with hyperbolic system
      * System for one number type, which is scalar or vectorized.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename HD, typename System, int dim, typename Number>
     concept HyperbolicKernels =
@@ -57,7 +57,7 @@ namespace ryujin
      * limiter, and a wave speed estimator, for scalar and vectorized
      * numbers.
      *
-     * @ingroup HyperbolicModule
+     * @ingroup Concepts
      */
     template <typename HD, int dim, typename Number>
     concept HyperbolicDescription =

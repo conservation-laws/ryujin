@@ -22,7 +22,7 @@ namespace ryujin
      *   a^2 &= \gamma\,k\,\rho^{\gamma - 1}.
      * \f}
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     class Isentropic : public BarotropicEquationOfState
     {

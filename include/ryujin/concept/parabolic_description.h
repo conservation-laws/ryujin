@@ -33,7 +33,7 @@ namespace ryujin
      * description HD: a parabolic system, and a parabolic module with the
      * constructor signature that the Simulation uses.
      *
-     * @ingroup ParabolicModule
+     * @ingroup Concepts
      */
     template <typename T, typename HD, int dim, typename Number>
     concept ParabolicDescription =

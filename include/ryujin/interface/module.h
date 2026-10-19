@@ -37,7 +37,7 @@ namespace ryujin
    * time step size constraint (i.e. tau_max) is synchronized over the
    * entire global communicator.
    *
-   * @ingroup HyperbolicModule
+   * @ingroup Interfaces
    */
   enum class IDViolationStrategy : std::uint8_t {
     /**
@@ -69,7 +69,7 @@ namespace ryujin
    * The field @p suggested_tau_max is set to a tau_max value with which
    * the entire update step should be restarted.
    *
-   * @ingroup TimeLoop
+   * @ingroup Interfaces
    */
   class Restart final
   {
@@ -86,7 +86,7 @@ namespace ryujin
    * some short cuts in the parabolic update that under rare circumstances
    * require limiting.
    *
-   * @ingroup TimeLoop
+   * @ingroup Interfaces
    */
   class Correction final
   {
@@ -105,7 +105,7 @@ namespace ryujin
      * implicit parabolic update and are declared in
      * Interface::HyperbolicModule and Interface::ParabolicModule.
      *
-     * @ingroup TimeLoop
+     * @ingroup Interfaces
      */
     template <int dim, typename Number = double>
     class Module : public dealii::ParameterAcceptor

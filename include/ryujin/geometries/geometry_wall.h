@@ -21,7 +21,7 @@ namespace ryujin
      * bottom side from `[0, wall_position)`. Slip boundary conditions are
      * enforced on the bottom side on `[wall_position, length)`.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
 
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -100,7 +100,7 @@ namespace ryujin
     /**
      * A 2D Mach step configuration constructed with GridGenerator::step().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Wall : public Geometry<dim>

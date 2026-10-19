@@ -18,7 +18,7 @@ namespace ryujin
      * A 2D disk / 3D ball configuration constructed with
      * GridGenerator::hyper_ball_balanced().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Disk : public Geometry<dim>

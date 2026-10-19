@@ -28,7 +28,7 @@ namespace ryujin
      * An indicator strategy used to form the preliminary high-order
      * update.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <typename ScalarNumber = double>
     class Indicator : public dealii::ParameterAcceptor
@@ -122,7 +122,7 @@ namespace ryujin
      * be a scalar float, or double, as well as a VectorizedArray holding
      * packed scalars).
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class IndicatorView

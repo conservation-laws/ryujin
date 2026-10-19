@@ -19,7 +19,7 @@ namespace ryujin
   /**
    * A stub parabolic solver that models the identity.
    *
-   * @ingroup ParabolicModule
+   * @ingroup Typed
    */
   template <typename HyperbolicDescription, int dim, typename Number>
   class StubParabolicModule final
@@ -171,7 +171,7 @@ namespace ryujin
    * identity as parabolic system and a stub parabolic module. It can be
    * paired with every hyperbolic description.
    *
-   * @ingroup ParabolicModule
+   * @ingroup Typed
    */
   struct StubParabolicDescription {
     using ParabolicSystem = StubParabolicSystem;

@@ -27,7 +27,7 @@ namespace ryujin
      * function shipped with deal.II that fixes a compilation error when
      * instantiating with float.
      *
-     * @ingroup Mesh
+     * @ingroup FiniteElement
      */
     template <int dim, typename Number, typename Number2, bool add>
     inline void integrate_add_tensor_product_value_linear(

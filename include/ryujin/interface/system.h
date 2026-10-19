@@ -30,7 +30,7 @@ namespace ryujin
      * Precomputed values are derived from the state and recomputed
      * whenever the state changes.
      *
-     * @ingroup TimeLoop
+     * @ingroup Interfaces
      */
     class System : public dealii::ParameterAcceptor
     {

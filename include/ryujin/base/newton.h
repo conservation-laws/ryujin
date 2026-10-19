@@ -31,7 +31,7 @@ namespace ryujin
    *
    * @todo Write out the quadratic Newton step in more detail.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   template <typename Number>
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE void

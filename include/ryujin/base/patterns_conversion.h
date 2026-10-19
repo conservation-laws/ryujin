@@ -23,7 +23,7 @@ struct ConversionHelper : std::false_type {
  * Inject conversion rules into the deal.II namespace by specializing
  * Patterns::Tools::Convert for our custom enum classes.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 template <typename T>
 struct Patterns::Tools::
@@ -79,7 +79,7 @@ DEAL_II_NAMESPACE_CLOSE
  * Shorthand macro for declaring "string to enum class" conversion rules
  * for the deal.II Patterns::Tools::Convert mechanism.
  *
- * @ingroup Miscellaneous
+ * @ingroup Utilities
  */
 #define DECLARE_ENUM(type, s)                                                  \
   namespace dealii                                                             \

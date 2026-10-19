@@ -21,7 +21,7 @@ namespace ryujin
   /**
    * Controls the spatial mesh adaptation strategy.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   enum class AdaptationStrategy {
     /**
@@ -47,7 +47,7 @@ namespace ryujin
    * configuration option is ignored for the uniform global refinement
    * strategy.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   enum class MarkingStrategy {
     /**
@@ -61,7 +61,7 @@ namespace ryujin
   /**
    * Controls the time point selection strategy.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   enum class TimePointSelectionStrategy {
     /**
@@ -101,7 +101,7 @@ namespace ryujin
    * The MeshAdaptor class is responsible for performing global or local
    * mesh adaptation.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
   class MeshAdaptor final : public Interface::MeshAdaptor<dim, Number>

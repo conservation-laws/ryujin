@@ -44,12 +44,12 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc OfflineData::vector_type
+       * A distributed vector of scalar values.
        */
       using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
 
       /**
-       * @copydoc ParabolicModule::vector_type
+       * A distributed block vector of scalar values.
        */
       using block_vector_type =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;

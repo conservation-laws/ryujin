@@ -45,7 +45,7 @@ namespace ryujin
      * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
      * momentum, and \f$E\f$ is the total energy.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class HyperbolicSystem final : public Interface::HyperbolicSystem
     {
@@ -181,7 +181,7 @@ namespace ryujin
      * @note This class is designed to be copied by value into computation
      * loops with access to either the host or device memory space.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class HyperbolicSystemView

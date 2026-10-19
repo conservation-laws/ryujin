@@ -20,7 +20,7 @@ namespace ryujin
      * An equation: a pairing of a hyperbolic and a parabolic description
      * that can be selected by name with the run time parameter "equation".
      *
-     * @ingroup TimeLoop
+     * @ingroup Interfaces
      */
     class Equation
     {

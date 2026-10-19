@@ -49,7 +49,7 @@ namespace ryujin
      * \f$e_{\text{h}}=e-e_{\text{b}}(\rho)\f$ and
      * \f$p_{\text{h}}=p-p_{\text{b}}(\rho)\f$.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class BumpyBarotropicPressure : public EquationOfState
     {

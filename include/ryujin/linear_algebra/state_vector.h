@@ -29,6 +29,8 @@ namespace ryujin
    * A scalar vector representing a single component given by a deal.II
    * data type that is compatible with deal.II functions and methods and
    * lives in the host memory space.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename Number>
   using ScalarHostVector = dealii::LinearAlgebra::distributed::Vector<Number>;
@@ -37,6 +39,8 @@ namespace ryujin
   /**
    * A scalar vector representing a single component, i.e., a
    * MultiComponentVector with n_comp() == 1.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename Number>
   using ScalarVector = MultiComponentVector<Number>;
@@ -54,6 +58,8 @@ namespace ryujin
    * The parts @p state and @p dynamic_state take part in sadd(), in the
    * solution transfer, and in a checkpoint. The precomputed parts are
    * recomputed.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename Number>
   struct StateVector {
@@ -67,6 +73,8 @@ namespace ryujin
   /**
    * An enum identifying the individual parts of a StateVector. A dynamic
    * part selects all scalar vectors of it.
+   *
+   * @ingroup LinearAlgebra
    */
   enum class StateVectorPart {
     state,
@@ -79,6 +87,8 @@ namespace ryujin
   /**
    * Ensure that the selected @p parts of the given @p state_vector are
    * resident on @p MemorySpace for read access.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename MemorySpace,
             typename Number,
@@ -122,6 +132,8 @@ namespace ryujin
    * A variant of the above function that ensures that a single
    * (scalar, or multi-component) @p vector is resident on @p MemorySpace
    * for read access.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename MemorySpace, typename Number>
   void copy_to_memory_space(const MultiComponentVector<Number> &vector
@@ -137,6 +149,8 @@ namespace ryujin
   /**
    * Ensure that the selected @p parts of the given @p state_vector are
    * resident on @p MemorySpace for write access.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename MemorySpace,
             typename Number,
@@ -179,6 +193,8 @@ namespace ryujin
    * A variant of the above function that ensures that a single
    * (scalar, or multi-component) @p vector is resident on @p MemorySpace
    * for write access.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename MemorySpace, typename Number>
   void move_to_memory_space(MultiComponentVector<Number> &vector
@@ -192,10 +208,12 @@ namespace ryujin
 
 
   /**
-   * Scaled addition $U\leftarrow s\,U+b\,V$ of the parts @p state and
+   * Scaled addition \f$U\leftarrow s\,U+b\,V\f$ of the parts @p state and
    * @p dynamic_state of the given state vectors @p dst and @p src. The
    * operation is performed on @p MemorySpace. The precomputed parts are
    * left untouched.
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename MemorySpace, typename Number>
   void sadd(StateVector<Number> &dst,
@@ -234,6 +252,8 @@ namespace ryujin
    *  - the entire precomputed state vector
    *  - constrained degrees of freedom of the hyperbolic state vector
    *  - the ghost range of the hyperbolic state vector
+   *
+   * @ingroup LinearAlgebra
    */
   template <typename Number, typename OfflineData>
   void debug_poison_invalid_values(StateVector<Number> &state_vector

@@ -26,7 +26,7 @@ namespace ryujin
    *
    * @note This class is a singleton and not thread safe.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   class ComputingTimer
   {
@@ -123,7 +123,7 @@ namespace ryujin
    *
    * @note This class is a singleton and not thread safe.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   class DeviceTimer
   {

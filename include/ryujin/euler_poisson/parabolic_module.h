@@ -34,14 +34,14 @@ namespace ryujin
     enum GaussLawRestartStrategy : dealii::types::boundary_id {
       /**
        * Initialize the potential by solving
-       * $$
+       * \f[
        *   -\Delta \varphi = \alpha (\rho + \rho_b)
-       * $$
+       * \f]
        * once at the first timestep. Then, solve
-       * $$
+       * \f[
        *   -\partial_t \Delta \varphi = - \alpha \nabla \cdot \boldsymbol m +
        *   \partial_t \rho_b
-       * $$
+       * \f]
        * at each parabolic substep. Do not restart the Gauss law. This is
        * the default strategy.
        */
@@ -49,30 +49,30 @@ namespace ryujin
 
       /**
        * Initialize the potential by solving
-       * $$
+       * \f[
        *   -\Delta \varphi = \alpha (\rho + \rho_b)
-       * $$
+       * \f]
        * once at the first timestep. Then, solve
-       * $$
+       * \f[
        *   -\partial_t \Delta \varphi = - \alpha \nabla \cdot \boldsymbol m +
        *   \partial_t \rho_b
-       * $$
+       * \f]
        * at each parabolic substep. Finally, at the beginning of each
        * subsequent time step, restart the Gauss law at the beginning of
        * each time step by solving again
-       * $$
+       * \f[
        *   -\Delta \varphi = \alpha (\rho + \rho_b).
-       * $$
+       * \f]
        *
        */
       full_restart,
 
       /**
        * Solve
-       * $$
+       * \f[
        *   -\partial_t \Delta \varphi = -\alpha \nabla \cdot \boldsymbol m
        *   + \partial_t \rho_b
-       * $$
+       * \f]
        * at each parabolic substep. Then, correct the Gauss law violation
        * by artificially relaxing the kinetic energy.
        *
@@ -82,9 +82,9 @@ namespace ryujin
 
       /**
        * Initialize the potential by solving
-       * $$
+       * \f[
        * -\Delta \varphi = \alpha (\rho + \rho_b)
-       * $$
+       * \f]
        * once at the first timestep. Afterwards, do not update the potential
        * any more.
        */
@@ -92,9 +92,9 @@ namespace ryujin
 
       /**
        * Solve
-       * $$
+       * \f[
        * -\Delta \varphi = \alpha (\rho + \rho_b)
-       * $$
+       * \f]
        * at the beginning of each timestep. Do not update the potential
        * during a parabolic substep.
        */
@@ -128,7 +128,7 @@ namespace ryujin
      * Implicit backward-Euler time stepping for the parabolic limiting
      * equation for the Euler-Poisson system
      *
-     * @ingroup ParabolicModule
+     * @ingroup EulerPoissonEquations
      */
     template <typename HyperbolicDescription, int dim, typename Number>
     class ParabolicModule final : public Interface::ParabolicModule<dim, Number>

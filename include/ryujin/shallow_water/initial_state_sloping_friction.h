@@ -17,7 +17,7 @@ namespace ryujin
   {
     /**
      * A 1D benchmark configuration consisting of a steady flow over an inclined
-     * plane with Manning's friction. See section 4.1 of @Chertock2015 for
+     * plane with Manning's friction. See section 4.1 of @cite Chertock2015 for
      * details.
      *
      * @ingroup ShallowWaterEquations

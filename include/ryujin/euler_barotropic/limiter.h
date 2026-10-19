@@ -27,7 +27,7 @@ namespace ryujin
     /**
      * The convex limiter.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <typename ScalarNumber = double>
     class Limiter : public dealii::ParameterAcceptor
@@ -128,7 +128,7 @@ namespace ryujin
      * scalar float, or double, as well as a VectorizedArray holding packed
      * scalars).
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class LimiterView

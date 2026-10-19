@@ -42,7 +42,7 @@ namespace ryujin
    * A client can add its own entries with add(), for example in main() or
    * in the constructor of an object at namespace scope.
    *
-   * @ingroup Miscellaneous
+   * @ingroup Utilities
    */
   template <typename Base, typename... Args>
   class Library final

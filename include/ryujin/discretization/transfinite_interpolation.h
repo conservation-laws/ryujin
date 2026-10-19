@@ -23,7 +23,7 @@ namespace ryujin
    * and all relevant Manifold information. That way it can be initialized
    * with one Triangulation and be used with another Triangulation.
    *
-   * @ingroup Mesh
+   * @ingroup MeshAndOfflineData
    */
   template <int dim, int spacedim = dim>
   class TransfiniteInterpolationManifold : public Manifold<dim, spacedim>

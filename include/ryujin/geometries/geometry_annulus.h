@@ -18,7 +18,7 @@ namespace ryujin
      *
      * We set slip boundary conditions on all boundaries.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim, int spacedim, template <int, int> class Triangulation>
     void annulus(Triangulation<dim, spacedim> &,
@@ -236,7 +236,7 @@ namespace ryujin
      * A 2D/3D cylinder configuration constructed with
      * GridGenerator::annulus().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Annulus : public Geometry<dim>

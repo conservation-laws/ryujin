@@ -26,7 +26,7 @@ namespace ryujin
      * file. Supported boundary IDs and their meaning are collected in the
      * Boundary enum.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Reader : public Geometry<dim>

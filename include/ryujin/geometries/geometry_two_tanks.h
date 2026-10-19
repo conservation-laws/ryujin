@@ -27,7 +27,7 @@ namespace ryujin
      *
      * NOTE: The default parameters are arbitrary.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
 
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -157,7 +157,7 @@ namespace ryujin
     /**
      * A 2D tank configuration constructed with GridGenerator::twotanks().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class TwoTanks : public Geometry<dim>

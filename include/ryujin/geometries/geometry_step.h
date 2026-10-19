@@ -18,7 +18,7 @@ namespace ryujin
      * Even though this function has a template parameter @p dim, it is only
      * implemented for dimension 2.
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim, template <int, int> class Triangulation>
     void step(Triangulation<dim, dim> &,
@@ -136,7 +136,7 @@ namespace ryujin
     /**
      * A 2D Mach step configuration constructed with GridGenerator::step().
      *
-     * @ingroup Mesh
+     * @ingroup Geometries
      */
     template <int dim>
     class Step : public Geometry<dim>

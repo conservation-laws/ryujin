@@ -31,7 +31,7 @@ namespace ryujin
      * \f$\lambda_{\text{max}}\f$ that is returned by compute() is a
      * guaranteed upper bound of the maximal wavespeed.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : public dealii::ParameterAcceptor
@@ -91,7 +91,7 @@ namespace ryujin
      * (which can be a scalar float, or double, as well as a VectorizedArray
      * holding packed scalars).
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerBarotropicEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class WaveSpeedEstimatorView

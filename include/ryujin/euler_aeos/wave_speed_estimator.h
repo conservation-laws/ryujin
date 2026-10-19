@@ -31,7 +31,7 @@ namespace ryujin
      *
      * The solver is based on @cite ClaytonGuermondPopov-2022.
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <typename ScalarNumber = double>
     class WaveSpeedEstimator : protected NASGRiemannSolver<ScalarNumber>
@@ -103,7 +103,7 @@ namespace ryujin
      * (which can be a scalar float, or double, as well as a VectorizedArray
      * holding packed scalars).
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     template <int dim, typename Number, typename MemorySpace>
     class WaveSpeedEstimatorView

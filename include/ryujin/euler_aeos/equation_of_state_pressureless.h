@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * Trivial equation of state for pressureless Euler
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class Pressureless : public EquationOfState
     {

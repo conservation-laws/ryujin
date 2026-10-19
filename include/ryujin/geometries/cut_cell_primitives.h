@@ -49,7 +49,7 @@ namespace ryujin
    *
    * @note Only implemented in 2D.
    *
-   * @ingroup Mesh
+   * @ingroup Geometries
    */
   template <int dim>
   class MeshAlignment : dealii::ParameterAcceptor
@@ -556,7 +556,7 @@ namespace ryujin
    *
    * @note Only implemented in 2D.
    *
-   * @ingroup Mesh
+   * @ingroup Geometries
    */
   template <int dim>
   class CutCellDecomposition

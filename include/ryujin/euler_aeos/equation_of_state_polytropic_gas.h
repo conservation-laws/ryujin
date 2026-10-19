@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * The polytropic gas equation of state
      *
-     * @ingroup EulerEquations
+     * @ingroup EulerAEOSEquations
      */
     class PolytropicGas : public EquationOfState
     {

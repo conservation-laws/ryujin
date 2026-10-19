@@ -22,7 +22,7 @@ namespace ryujin
    * This namespace provides a collection of functions for generating
    * triangulations for some benchmark configurations.
    *
-   * @ingroup Mesh
+   * @ingroup Geometries
    */
   namespace GridGenerator
   {
