@@ -6,12 +6,11 @@
 // force distinct symbols in test
 #define EulerBarotropic EulerBarotropicTest
 
-#include <ryujin/base/simd.h>
 #include <ryujin/euler_barotropic/hyperbolic_system.h>
-#include <ryujin/euler_barotropic/wave_speed_estimator.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
-
 #define DEBUG_WAVE_SPEED_ESTIMATOR
+#include <ryujin/base/simd.h>
+#include <ryujin/euler_barotropic/wave_speed_estimator.h>
 
 using namespace ryujin::EulerBarotropic;
 using namespace ryujin;

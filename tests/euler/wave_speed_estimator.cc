@@ -7,14 +7,13 @@
 #define Euler EulerTest
 #define EulerAEOS EulerAEOSTest
 
-#include <ryujin/base/simd.h>
 #include <ryujin/euler/hyperbolic_system.h>
-#include <ryujin/euler/wave_speed_estimator.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
-
 #define DEBUG_WAVE_SPEED_ESTIMATOR
+#include <ryujin/base/simd.h>
 
 #include <deal.II/base/mpi.h>
+#include <ryujin/euler/wave_speed_estimator.h>
 
 #ifndef NEWTON_ITERATIONS
 #define NEWTON_ITERATIONS "0"

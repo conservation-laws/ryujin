@@ -6,12 +6,11 @@
 // force distinct symbols in test
 #define EulerAEOS EulerAEOSTest
 
-#include <ryujin/base/simd.h>
 #include <ryujin/euler_aeos/hyperbolic_system.h>
-#include <ryujin/euler_aeos/wave_speed_estimator.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
-
 #define DEBUG_WAVE_SPEED_ESTIMATOR
+#include <ryujin/base/simd.h>
+#include <ryujin/euler_aeos/wave_speed_estimator.h>
 
 #ifndef NEWTON_ITERATIONS
 #define NEWTON_ITERATIONS "0"

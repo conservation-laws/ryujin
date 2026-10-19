@@ -8,9 +8,8 @@
 
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 #include <ryujin/scalar_conservation/hyperbolic_system.h>
-#include <ryujin/scalar_conservation/wave_speed_estimator.h>
-
 #define DEBUG_WAVE_SPEED_ESTIMATOR
+#include <ryujin/scalar_conservation/wave_speed_estimator.h>
 
 #include <iomanip>
 #include <iostream>

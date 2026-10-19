@@ -8,7 +8,6 @@
 
 #include <ryujin/base/simd.h>
 #include <ryujin/euler/hyperbolic_system.h>
-#include <ryujin/euler/limiter.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <deal.II/base/mpi.h>
@@ -16,6 +15,7 @@
 #define DEBUG_EXPENSIVE_BOUNDS_CHECK
 #define DEBUG_OUTPUT
 #define DEBUG_OUTPUT_LIMITER
+#include <ryujin/euler/limiter.h>
 
 using namespace ryujin::Euler;
 using namespace ryujin;

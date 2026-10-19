@@ -8,12 +8,12 @@
 
 #include <ryujin/base/simd.h>
 #include <ryujin/euler_barotropic/hyperbolic_system.h>
-#include <ryujin/euler_barotropic/limiter.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #define DEBUG_EXPENSIVE_BOUNDS_CHECK
 #define DEBUG_OUTPUT
 #define DEBUG_OUTPUT_LIMITER
+#include <ryujin/euler_barotropic/limiter.h>
 
 using namespace ryujin::EulerBarotropic;
 using namespace ryujin;
