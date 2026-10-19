@@ -3,12 +3,14 @@
 // Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
-#include <instantiate.h>
+#include <ryujin/scalar_conservation/hyperbolic_description.h>
 
 #include <ryujin/typed/hyperbolic_module.template.h>
 
 namespace ryujin
 {
+  using HyperbolicDescription = ScalarConservation::HyperbolicDescription;
+
   /* instantiations */
 
   template class HyperbolicModule<HyperbolicDescription, 1, NUMBER>;

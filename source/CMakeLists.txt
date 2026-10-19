@@ -45,20 +45,6 @@ deal_ii_setup_target(obj_common)
 target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 
 #
-# Common, equation-dependent source files:
-#
-
-#
-# Sources that depend on the hyperbolic description only. They are
-# compiled once per hyperbolic description:
-#
-set(HYPERBOLIC_DEPENDENT_SOURCE_FILES
-  typed/hyperbolic_module.cc
-  typed/initial_values.cc
-  typed/solution_transfer.cc
-  )
-
-#
 # Equation-specific source files and compilation targets:
 #
 
@@ -70,27 +56,7 @@ macro(setup_equation EQUATION)
 
   add_subdirectory(${EQUATION})
 
-  #
-  # obj_${EQUATION}_dependent object library: equation dependent common
-  # code. Only an equation directory with a hyperbolic_description.h has
-  # one. All other equation directories pair a parabolic description with
-  # the hyperbolic description of another equation directory.
-  #
-
   list(APPEND OBJECT_TARGETS obj_${EQUATION})
-
-  if(EXISTS ${CMAKE_SOURCE_DIR}/include/ryujin/${EQUATION}/hyperbolic_description.h)
-    add_library(obj_${EQUATION}_dependent OBJECT
-      ${HYPERBOLIC_DEPENDENT_SOURCE_FILES}
-      )
-    deal_ii_setup_target(obj_${EQUATION}_dependent)
-
-    target_link_libraries(obj_${EQUATION}_dependent
-      obj_${EQUATION} ${EXTERNAL_TARGETS}
-      )
-
-    list(APPEND OBJECT_TARGETS obj_${EQUATION}_dependent)
-  endif()
 endmacro()
 
 file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)

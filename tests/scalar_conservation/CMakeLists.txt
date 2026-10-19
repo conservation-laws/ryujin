@@ -5,7 +5,7 @@
 
 set(EQUATION scalar_conservation)
 
-set(TEST_LIBRARIES obj_common obj_${EQUATION} obj_${EQUATION}_dependent)
+set(TEST_LIBRARIES obj_common obj_${EQUATION})
 set(TEST_TARGET ryujin)
 
 if(TARGET obj_${EQUATION})

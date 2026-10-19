@@ -7,7 +7,7 @@ set(EQUATION navier_stokes)
 
 set(TEST_LIBRARIES
   obj_common obj_${EQUATION}
-  obj_euler obj_euler_dependent
+  obj_euler
   )
 set(TEST_TARGET ryujin)
 
