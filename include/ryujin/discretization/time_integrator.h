@@ -6,17 +6,15 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
+#include <ryujin/base/convenience_macros.h>
+#include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/patterns_conversion.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/time_integrator.h>
-
-#include <ryujin/base/convenience_macros.h>
-#include <ryujin/base/mpi_ensemble.h>
-#include <ryujin/base/observer_pointer.h>
-#include <ryujin/base/patterns_conversion.h>
 
 #include <numbers>
 
@@ -504,4 +502,4 @@ namespace ryujin
     //@}
   };
 
-} /* namespace ryujin */
+} // namespace ryujin

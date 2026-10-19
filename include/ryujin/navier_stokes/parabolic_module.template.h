@@ -5,11 +5,10 @@
 
 #pragma once
 
-#include <ryujin/navier_stokes/parabolic_module.h>
-
 #include <ryujin/base/computing_timer.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/navier_stokes/parabolic_module.h>
 
 #include <deal.II/lac/linear_operator.h>
 #include <deal.II/lac/precondition.h>
@@ -1041,4 +1040,4 @@ namespace ryujin
     }
 
   } // namespace NavierStokes
-} /* namespace ryujin */
+} // namespace ryujin

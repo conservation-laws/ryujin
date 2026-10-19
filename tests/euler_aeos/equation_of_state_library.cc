@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
 #include <ryujin/euler_aeos/equation_of_state_bumpy_barotropic_pressure.h>
 #include <ryujin/euler_aeos/equation_of_state_function.h>
 #include <ryujin/euler_aeos/equation_of_state_hayes.h>

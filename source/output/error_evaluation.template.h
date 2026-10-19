@@ -237,4 +237,4 @@ namespace ryujin
     return result + " errors";
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

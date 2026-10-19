@@ -84,7 +84,7 @@ namespace ryujin
     {
       return {{f(Is)...}};
     }
-  } /* namespace */
+  } // namespace
 #endif
 
 

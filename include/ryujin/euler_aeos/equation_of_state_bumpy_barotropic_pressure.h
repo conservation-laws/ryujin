@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/euler_aeos/equation_of_state.h>
 
 namespace ryujin
@@ -397,4 +396,4 @@ namespace ryujin
       double e_0_;
     };
   } // namespace EquationOfStateLibrary
-} /* namespace ryujin */
+} // namespace ryujin

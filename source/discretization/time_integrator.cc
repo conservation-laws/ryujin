@@ -11,4 +11,4 @@ namespace ryujin
   template class TimeIntegrator<1, NUMBER>;
   template class TimeIntegrator<2, NUMBER>;
   template class TimeIntegrator<3, NUMBER>;
-} /* namespace ryujin */
+} // namespace ryujin

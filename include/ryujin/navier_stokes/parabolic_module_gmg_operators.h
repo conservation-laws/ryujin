@@ -6,13 +6,11 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/loop.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
-#include <ryujin/interface/offline_data.h>
-
 #include <ryujin/euler/hyperbolic_system.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/navier_stokes/parabolic_system.h>
 
 #include <deal.II/base/vectorization.h>
@@ -755,6 +753,6 @@ namespace ryujin
     };
 
   } // namespace NavierStokes
-} /* namespace ryujin */
+} // namespace ryujin
 
 #undef locally_owned_size

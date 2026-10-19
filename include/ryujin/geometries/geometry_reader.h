@@ -1,7 +1,11 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2024 - 2026 by the ryujin authors
+//
+
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/geometries/geometry_common_includes.h>
 
 #include <deal.II/grid/grid_in.h>

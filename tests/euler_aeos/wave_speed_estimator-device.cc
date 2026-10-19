@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
 #include <ryujin/euler_aeos/wave_speed_estimator.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 

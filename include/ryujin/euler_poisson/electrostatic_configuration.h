@@ -6,9 +6,8 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/discretization/discretization.h>
-
 #include <ryujin/base/convenience_macros.h>
+#include <ryujin/discretization/discretization.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -91,4 +90,4 @@ namespace ryujin
       std::set<dealii::types::boundary_id> dirichlet_boundaries_;
     };
   } // namespace ElectrostaticConfigurationLibrary
-} /* namespace ryujin */
+} // namespace ryujin

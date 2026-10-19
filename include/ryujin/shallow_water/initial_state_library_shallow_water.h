@@ -1,16 +1,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 // [LANL Copyright Statement]
-// Copyright (C) 2023 - 2025 by the ryujin authors
+// Copyright (C) 2023 - 2026 by the ryujin authors
 // Copyright (C) 2023 - 2024 by Triad National Security, LLC
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/typed/initial_state_library.h>
-
 #include <ryujin/shallow_water/initial_state_contrast.h>
 #include <ryujin/shallow_water/initial_state_flow_over_bump.h>
 #include <ryujin/shallow_water/initial_state_function.h>
@@ -24,6 +21,7 @@
 #include <ryujin/shallow_water/initial_state_three_bumps_dam_break.h>
 #include <ryujin/shallow_water/initial_state_transient.h>
 #include <ryujin/shallow_water/initial_state_uniform.h>
+#include <ryujin/typed/initial_state_library.h>
 
 
 namespace ryujin

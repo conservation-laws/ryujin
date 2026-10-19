@@ -942,4 +942,4 @@ namespace ryujin
     return this->efficiency_ * tau;
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

@@ -5,13 +5,12 @@
 
 #pragma once
 
-#include <ryujin/euler_poisson/laplace_operator.h>
-#include <ryujin/euler_poisson/parabolic_module.h>
-
 #include <ryujin/base/computing_timer.h>
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/euler_poisson/laplace_operator.h>
+#include <ryujin/euler_poisson/parabolic_module.h>
 
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/linear_operator.h>
@@ -1239,4 +1238,4 @@ namespace ryujin
     }
 
   } // namespace EulerPoisson
-} /* namespace ryujin */
+} // namespace ryujin

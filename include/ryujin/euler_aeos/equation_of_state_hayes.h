@@ -1,7 +1,13 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
 #pragma once
 
-#include <cmath>
 #include <ryujin/euler_aeos/equation_of_state.h>
+
+#include <cmath>
 
 namespace ryujin
 {

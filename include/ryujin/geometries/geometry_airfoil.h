@@ -6,11 +6,9 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/geometries/geometry_common_includes.h>
-
 #include <ryujin/discretization/transfinite_interpolation.template.h>
 #include <ryujin/geometries/cubic_spline.h>
+#include <ryujin/geometries/geometry_common_includes.h>
 
 namespace ryujin
 {
@@ -1422,5 +1420,5 @@ namespace ryujin
       unsigned int n_anisotropic_refinements_trailing_;
       unsigned int subdivisions_z_;
     };
-  } /* namespace Geometries */
-} /* namespace ryujin */
+  } // namespace Geometries
+} // namespace ryujin

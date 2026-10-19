@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/euler_barotropic/hyperbolic_system.h>
 #include <ryujin/euler_barotropic/indicator.h>
 #include <ryujin/euler_barotropic/limiter.h>

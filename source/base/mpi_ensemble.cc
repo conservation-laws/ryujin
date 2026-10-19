@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2024 - 2025 by the ryujin authors
+// Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
 #include <ryujin/base/mpi_ensemble.h>
@@ -147,4 +147,4 @@ namespace ryujin
       MPI_Comm_free(&peer_communicator_);
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

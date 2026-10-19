@@ -1,12 +1,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/navier_stokes/parabolic_module.h>
 #include <ryujin/navier_stokes/parabolic_system.h>
 

@@ -143,7 +143,7 @@ namespace
   {
     return *t;
   }
-} /* anonymous namespace */
+} // namespace
 #endif
 
 /**

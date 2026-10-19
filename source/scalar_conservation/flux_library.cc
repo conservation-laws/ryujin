@@ -1,13 +1,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 by the ryujin authors
+// Copyright (C) 2023 - 2026 by the ryujin authors
 //
-
-#include <ryujin/scalar_conservation/flux_library.h>
 
 #include <ryujin/scalar_conservation/flux_burgers.h>
 #include <ryujin/scalar_conservation/flux_function.h>
 #include <ryujin/scalar_conservation/flux_kpp.h>
+#include <ryujin/scalar_conservation/flux_library.h>
 
 namespace ryujin
 {

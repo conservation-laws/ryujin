@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/convenience_macros.h>
 
 #include <deal.II/base/mpi.h>
@@ -142,4 +141,4 @@ namespace ryujin
     MPI_Comm ensemble_leader_communicator_;
     MPI_Comm peer_communicator_;
   };
-} /* namespace ryujin */
+} // namespace ryujin

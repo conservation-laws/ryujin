@@ -1,10 +1,16 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define ScalarConservation ScalarConservationTest
 
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 #include <ryujin/scalar_conservation/hyperbolic_system.h>
-#define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <ryujin/scalar_conservation/wave_speed_estimator.h>
+
+#define DEBUG_WAVE_SPEED_ESTIMATOR
 
 #include <iomanip>
 #include <iostream>

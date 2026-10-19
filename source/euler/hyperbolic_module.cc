@@ -4,7 +4,6 @@
 //
 
 #include <ryujin/euler/hyperbolic_description.h>
-
 #include <ryujin/typed/hyperbolic_module.template.h>
 
 namespace ryujin
@@ -16,4 +15,4 @@ namespace ryujin
   template class HyperbolicModule<HyperbolicDescription, 1, NUMBER>;
   template class HyperbolicModule<HyperbolicDescription, 2, NUMBER>;
   template class HyperbolicModule<HyperbolicDescription, 3, NUMBER>;
-} /* namespace ryujin */
+} // namespace ryujin

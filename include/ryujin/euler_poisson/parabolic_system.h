@@ -7,7 +7,6 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/convenience_macros.h>
-
 #include <ryujin/interface/parabolic_system.h>
 
 #include <deal.II/base/function_parser.h>

@@ -6,15 +6,13 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/interface/hyperbolic_system.h>
-
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/patterns_conversion.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/discretization/discretization.h>
+#include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 #include <ryujin/linear_algebra/state_vector.h>
 

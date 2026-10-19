@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include <boost/random/detail/polynomial.hpp>
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/geometries/geometry_library.h>
+
+#include <boost/random/detail/polynomial.hpp>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_dgq.h>
@@ -374,4 +374,4 @@ namespace ryujin
         false);
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

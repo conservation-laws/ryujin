@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
 #include <ryujin/base/gpu.h>
 
 #include <deal.II/base/mpi.h>

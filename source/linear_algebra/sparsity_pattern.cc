@@ -23,4 +23,4 @@ namespace ryujin
   using VA = dealii::VectorizedArray<double>;
   constexpr auto simd_width = VA::size();
   template class SparsityPattern<simd_width == warp_size ? 1 : simd_width>;
-} /* namespace ryujin */
+} // namespace ryujin

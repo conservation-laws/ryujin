@@ -6,16 +6,14 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/interface/hyperbolic_module.h>
-#include <ryujin/interface/offline_data.h>
-#include <ryujin/typed/initial_values.h>
-
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/interface/hyperbolic_module.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
 #include <ryujin/linear_algebra/state_vector.h>
+#include <ryujin/typed/initial_values.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
@@ -328,4 +326,4 @@ namespace ryujin
     //@}
   };
 
-} /* namespace ryujin */
+} // namespace ryujin

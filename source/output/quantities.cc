@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #include "quantities.template.h"
@@ -12,4 +12,4 @@ namespace ryujin
   template class Quantities<2, NUMBER>;
   template class Quantities<3, NUMBER>;
 
-} /* namespace ryujin */
+} // namespace ryujin

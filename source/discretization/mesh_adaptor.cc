@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2024 by the ryujin authors
+// Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
 #include "mesh_adaptor.template.h"
@@ -12,4 +12,4 @@ namespace ryujin
   template class MeshAdaptor<2, NUMBER>;
   template class MeshAdaptor<3, NUMBER>;
 
-} /* namespace ryujin */
+} // namespace ryujin

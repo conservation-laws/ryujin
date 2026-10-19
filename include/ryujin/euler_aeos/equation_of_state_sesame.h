@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/lazy.h>
 #include <ryujin/euler_aeos/equation_of_state.h>
 

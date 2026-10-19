@@ -11,4 +11,4 @@ namespace ryujin
   template class TimeLoop<1, NUMBER>;
   template class TimeLoop<2, NUMBER>;
   template class TimeLoop<3, NUMBER>;
-} /* namespace ryujin */
+} // namespace ryujin

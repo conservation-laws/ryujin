@@ -1,17 +1,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2026 by the ryujin authors
+// Copyright (C) 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/interface/discretization.h>
-
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/interface/discretization.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 #include <ryujin/linear_algebra/state_vector.h>
@@ -444,4 +442,4 @@ namespace ryujin
       //@}
     };
   } // namespace Interface
-} /* namespace ryujin */
+} // namespace ryujin

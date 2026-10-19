@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define EulerAEOS EulerAEOSTest
 

@@ -1,14 +1,19 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define EulerAEOS EulerAEOSTest
 
 #include <ryujin/base/simd.h>
 #include <ryujin/euler_aeos/hyperbolic_system.h>
+#include <ryujin/euler_aeos/limiter.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #define DEBUG_EXPENSIVE_BOUNDS_CHECK
 #define DEBUG_OUTPUT
 #define DEBUG_OUTPUT_LIMITER
-#include <ryujin/euler_aeos/limiter.h>
 
 using namespace ryujin::EulerAEOS;
 using namespace ryujin;

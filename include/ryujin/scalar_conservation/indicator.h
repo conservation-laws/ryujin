@@ -6,13 +6,11 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/scalar_conservation/hyperbolic_system.h>
-
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
+#include <ryujin/scalar_conservation/hyperbolic_system.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/vectorization.h>

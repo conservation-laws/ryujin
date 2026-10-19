@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #include "discretization.template.h"
@@ -12,4 +12,4 @@ namespace ryujin
   template class Discretization<2>;
   template class Discretization<3>;
 
-} /* namespace ryujin */
+} // namespace ryujin

@@ -1,14 +1,20 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2020 - 2026 by the ryujin authors
+//
+
 // force distinct symbols in test
 #define Euler EulerTest
 #define EulerAEOS EulerAEOSTest
 
-#include <ryujin/euler/hyperbolic_system.h>
-#include <ryujin/linear_algebra/multicomponent_vector.h>
-#define DEBUG_WAVE_SPEED_ESTIMATOR
 #include <ryujin/base/simd.h>
+#include <ryujin/euler/hyperbolic_system.h>
+#include <ryujin/euler/wave_speed_estimator.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
+
+#define DEBUG_WAVE_SPEED_ESTIMATOR
 
 #include <deal.II/base/mpi.h>
-#include <ryujin/euler/wave_speed_estimator.h>
 
 #ifndef NEWTON_ITERATIONS
 #define NEWTON_ITERATIONS "0"

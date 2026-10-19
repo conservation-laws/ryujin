@@ -6,10 +6,8 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/driver/time_loop.h>
-
 #include <ryujin/driver/simulation.h>
+#include <ryujin/driver/time_loop.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>

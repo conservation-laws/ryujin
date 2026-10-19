@@ -8,7 +8,6 @@
 #pragma once
 
 #include <ryujin/shallow_water/hyperbolic_description.h>
-
 #include <ryujin/shallow_water/initial_state_library_shallow_water.h>
 #include <ryujin/typed/initial_state_library.h>
 

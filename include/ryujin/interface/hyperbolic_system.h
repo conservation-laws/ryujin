@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/interface/system.h>
 
 #include <deal.II/base/exceptions.h>

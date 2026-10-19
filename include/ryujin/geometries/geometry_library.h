@@ -1,12 +1,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2022 - 2025 by the ryujin authors
+// Copyright (C) 2022 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/geometries/geometry_airfoil.h>
 #include <ryujin/geometries/geometry_annulus.h>
 #include <ryujin/geometries/geometry_cylinder.h>
@@ -54,5 +53,5 @@ namespace ryujin
       add(std::make_shared<Wall<dim>>(subsection));
       add(std::make_shared<WaveTank<dim>>(subsection));
     }
-  } /* namespace Geometries */
-} /* namespace ryujin */
+  } // namespace Geometries
+} // namespace ryujin

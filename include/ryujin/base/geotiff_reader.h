@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/lazy.h>
 #include <ryujin/base/patterns_conversion.h>

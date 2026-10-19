@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/convenience_macros.h>
 
 #include <deal.II/base/function.h>
@@ -91,4 +90,4 @@ namespace ryujin
     };
 
   } // namespace FluxLibrary
-} /* namespace ryujin */
+} // namespace ryujin

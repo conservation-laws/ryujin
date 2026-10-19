@@ -12,4 +12,4 @@ namespace ryujin
   template class ErrorEvaluation<2, NUMBER>;
   template class ErrorEvaluation<3, NUMBER>;
 
-} /* namespace ryujin */
+} // namespace ryujin

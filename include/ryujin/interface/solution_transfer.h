@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/exceptions.h>

@@ -743,4 +743,4 @@ namespace ryujin
     output << std::flush;
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

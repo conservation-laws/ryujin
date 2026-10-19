@@ -5,9 +5,8 @@
 
 #pragma once
 
-#include <ryujin/euler_aeos/hyperbolic_description.h>
-
 #include <ryujin/euler/initial_state_library_euler.h>
+#include <ryujin/euler_aeos/hyperbolic_description.h>
 #include <ryujin/typed/initial_state_library.h>
 
 namespace ryujin

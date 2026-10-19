@@ -284,4 +284,4 @@ namespace ryujin
     data_out.reset();
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/convenience_macros.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -144,4 +143,4 @@ namespace ryujin
     const std::string name_;
   };
 
-} /* namespace ryujin */
+} // namespace ryujin

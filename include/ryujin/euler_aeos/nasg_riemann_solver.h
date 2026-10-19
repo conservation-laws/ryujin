@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/newton.h>
 #include <ryujin/base/simd.h>

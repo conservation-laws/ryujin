@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/euler/hyperbolic_description.h>
-
 #include <ryujin/euler/initial_state_library_euler.h>
 #include <ryujin/typed/initial_state_library.h>
 

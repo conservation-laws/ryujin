@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/scalar_conservation/hyperbolic_system.h>
 #include <ryujin/scalar_conservation/indicator.h>
 #include <ryujin/scalar_conservation/limiter.h>

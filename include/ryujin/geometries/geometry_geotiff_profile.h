@@ -1,12 +1,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2025 - 2026 by the ryujin authors
+// Copyright (C) 2022 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/geotiff_reader.h>
 #include <ryujin/geometries/cut_cell_primitives.h>
 #include <ryujin/geometries/geometry_rectangular_domain.h>
@@ -220,5 +219,5 @@ namespace ryujin
       unsigned int refinement_;
     };
 
-  } /* namespace Geometries */
-} /* namespace ryujin */
+  } // namespace Geometries
+} // namespace ryujin

@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/mpi_ensemble.h>
 
 #include <deal.II/base/mpi.h>
@@ -104,4 +103,4 @@ namespace ryujin
 
   template <typename T>
   constexpr bool has_n_mpi_ensembles_v = decltype(test<T>(0))::value;
-} /* namespace ryujin */
+} // namespace ryujin

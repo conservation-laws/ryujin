@@ -6,13 +6,11 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/euler_aeos/hyperbolic_system.h>
-
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/newton.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/euler_aeos/hyperbolic_system.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
 // #define DEBUG_OUTPUT_LIMITER

@@ -6,17 +6,14 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/interface/offline_data.h>
-#include <ryujin/interface/parabolic_module.h>
-#include <ryujin/typed/initial_values.h>
-
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
-
+#include <ryujin/interface/offline_data.h>
+#include <ryujin/interface/parabolic_module.h>
 #include <ryujin/navier_stokes/parabolic_module_gmg_operators.h>
+#include <ryujin/typed/initial_values.h>
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -34,7 +31,7 @@ namespace ryujin
   namespace Euler
   {
     struct HyperbolicDescription;
-  }
+  } // namespace Euler
 
   namespace NavierStokes
   {
@@ -357,4 +354,4 @@ namespace ryujin
     };
 
   } // namespace NavierStokes
-} /* namespace ryujin */
+} // namespace ryujin

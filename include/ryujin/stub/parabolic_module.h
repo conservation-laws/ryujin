@@ -6,13 +6,11 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
+#include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
-#include <ryujin/typed/initial_values.h>
-
-#include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/stub/parabolic_system.h>
+#include <ryujin/typed/initial_values.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -182,4 +180,4 @@ namespace ryujin
     using ParabolicModule =
         StubParabolicModule<HyperbolicDescription, dim, Number>;
   };
-} /* namespace ryujin */
+} // namespace ryujin

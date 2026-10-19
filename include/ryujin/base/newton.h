@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/simd.h>
 
 #include <array>
@@ -102,4 +101,4 @@ namespace ryujin
 
   //@}
 
-} /* namespace ryujin */
+} // namespace ryujin

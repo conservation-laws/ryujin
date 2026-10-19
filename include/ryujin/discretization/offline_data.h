@@ -6,13 +6,11 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/interface/offline_data.h>
-
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/discretization/discretization.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 #include <ryujin/linear_algebra/state_vector.h>
@@ -203,4 +201,4 @@ namespace ryujin
     //@}
   };
 
-} /* namespace ryujin */
+} // namespace ryujin

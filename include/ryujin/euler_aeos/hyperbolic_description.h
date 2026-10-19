@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/euler_aeos/hyperbolic_system.h>
 #include <ryujin/euler_aeos/indicator.h>
 #include <ryujin/euler_aeos/limiter.h>

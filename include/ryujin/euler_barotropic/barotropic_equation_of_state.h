@@ -1,12 +1,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2025 by the ryujin authors
+// Copyright (C) 2025 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/base/convenience_macros.h>
 
 #include <deal.II/base/array_view.h>
@@ -66,4 +65,4 @@ namespace ryujin
     };
 
   } // namespace BarotropicEquationOfStateLibrary
-} /* namespace ryujin */
+} // namespace ryujin

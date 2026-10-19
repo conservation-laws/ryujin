@@ -1623,4 +1623,4 @@ namespace ryujin
     return result;
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

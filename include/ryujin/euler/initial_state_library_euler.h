@@ -6,9 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
-#include <ryujin/typed/initial_state_library.h>
-
 #include <ryujin/euler/initial_state_astro_jet.h>
 #include <ryujin/euler/initial_state_becker_solution.h>
 #include <ryujin/euler/initial_state_contrast.h>
@@ -26,6 +23,7 @@
 #include <ryujin/euler/initial_state_smooth_wave.h>
 #include <ryujin/euler/initial_state_three_state_contrast.h>
 #include <ryujin/euler/initial_state_uniform.h>
+#include <ryujin/typed/initial_state_library.h>
 
 namespace ryujin
 {

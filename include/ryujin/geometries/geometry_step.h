@@ -1,12 +1,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2022 - 2025 by the ryujin authors
+// Copyright (C) 2022 - 2026 by the ryujin authors
 //
 
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-
 #include <ryujin/geometries/geometry_common_includes.h>
 
 namespace ryujin
@@ -129,7 +128,7 @@ namespace ryujin
       }
     }
 #endif
-  } /* namespace GridGenerator */
+  } // namespace GridGenerator
 
 
   namespace Geometries
@@ -175,6 +174,6 @@ namespace ryujin
       double step_position_;
       double step_height_;
     };
-  } /* namespace Geometries */
+  } // namespace Geometries
 
-} /* namespace ryujin */
+} // namespace ryujin

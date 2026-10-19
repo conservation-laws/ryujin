@@ -7,7 +7,6 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/convenience_macros.h>
-
 #include <ryujin/base/gpu.h>
 
 #include <deal.II/base/aligned_vector.h>
