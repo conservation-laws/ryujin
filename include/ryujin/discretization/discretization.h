@@ -89,10 +89,11 @@ namespace ryujin
     void prepare(const std::string &base_name) override;
 
     /**
-     * Recompute the cached mapping after the triangulation has changed.
+     * Recompute the cached mapping after the triangulation, or the
+     * transformation(), has changed.
      *
-     * This function only sets up and reinitializes a MappingQCache object
-     * if the selected geometry provides a Geometry::transformation().
+     * The mapping is a MappingQCache if the selected geometry provides a
+     * Geometry::transformation(), or once a transformation has been set.
      */
     void update_mapping() override;
 
@@ -121,6 +122,14 @@ namespace ryujin
 
     std::vector<std::unique_ptr<Geometry<dim>>> geometry_list_;
 
+    typename Geometry<dim>::HP_Collection collection_type_ =
+        Geometry<dim>::HP_Collection::standard_quadrilaterals;
+
     //@}
+
+    /**
+     * Create a MappingQCache and set it as the mapping of the collection.
+     */
+    void create_mapping_cache();
   };
 } // namespace ryujin

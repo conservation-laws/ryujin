@@ -7,6 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/convenience_macros.h>
+#include <ryujin/interface/discretization.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -20,8 +21,9 @@ namespace ryujin
   {
     /**
      * The interface of a MeshAdaptor: it decides, based on the current
-     * state, whether a mesh adaptation cycle should be performed and marks
-     * cells for coarsening and refinement.
+     * state, whether a mesh adaptation cycle should be performed, marks
+     * cells for coarsening and refinement, and/or may replace the
+     * transformation of the Discretization, i.e., change the geometry.
      *
      * @ingroup Mesh
      */
@@ -29,6 +31,14 @@ namespace ryujin
     class MeshAdaptor : public dealii::ParameterAcceptor
     {
     public:
+      /**
+       * @name Typedefs
+       */
+      //@{
+
+      using Transformation = typename Discretization<dim>::Transformation;
+
+      //@}
       /**
        * @name Setup
        */
@@ -60,6 +70,13 @@ namespace ryujin
        */
       virtual void mark_cells_for_coarsening_and_refinement(
           dealii::Triangulation<dim> &triangulation) const = 0;
+
+      /**
+       * Update the transformation of the Discretization that maps points
+       * of the triangulation to the actual geometry.
+       */
+      virtual void
+      update_transformation(Transformation &transformation) const = 0;
 
       //@}
       /**

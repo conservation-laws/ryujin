@@ -665,11 +665,13 @@ namespace ryujin
     AssertThrow(mpi_ensemble.n_ensembles() == 1, dealii::ExcNotImplemented());
 
     /*
-     * Mark cells for coarsening and refinement and set up triangulation:
+     * Mark cells for coarsening and refinement, update the transformation
+     * (a change of the geometry), and set up triangulation:
      */
 
     auto &triangulation = discretization.triangulation();
     mesh_adaptor.mark_cells_for_coarsening_and_refinement(triangulation);
+    mesh_adaptor.update_transformation(discretization.transformation());
 
     triangulation.prepare_coarsening_and_refinement();
 

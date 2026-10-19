@@ -148,6 +148,15 @@ namespace ryujin
     void mark_cells_for_coarsening_and_refinement(
         dealii::Triangulation<dim> &triangulation) const override;
 
+    /**
+     * Keep the current transformation.
+     */
+    void update_transformation(
+        typename Interface::MeshAdaptor<dim, Number>::Transformation
+            & /*transformation*/) const override
+    {
+    }
+
     //@}
 
   private:
