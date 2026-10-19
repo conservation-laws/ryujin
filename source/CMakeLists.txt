@@ -22,6 +22,7 @@ set(COMMON_SOURCE_FILES
   discretization/time_integrator.cc
   driver/equation_dispatch.cc
   driver/time_loop.cc
+  geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc
   linear_algebra/sparsity_pattern.cc
   output/error_evaluation.cc
