@@ -12,7 +12,7 @@
 
 namespace ryujin
 {
-  namespace BarotropicEquationOfStateLibrary
+  namespace BarotropicEquationsOfState
   {
     /**
      * A user-specified equation of state for the barotropic Euler equations.
@@ -94,5 +94,5 @@ namespace ryujin
       std::unique_ptr<dealii::FunctionParser<1>> p_function_;
       std::unique_ptr<dealii::FunctionParser<1>> sos_function_;
     };
-  } // namespace BarotropicEquationOfStateLibrary
+  } // namespace BarotropicEquationsOfState
 } // namespace ryujin

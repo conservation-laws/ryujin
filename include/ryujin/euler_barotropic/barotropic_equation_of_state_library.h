@@ -6,24 +6,30 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/library.h>
 #include <ryujin/euler_barotropic/barotropic_equation_of_state.h>
+
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
-  namespace BarotropicEquationOfStateLibrary
-  {
-    using equation_of_state_list_type =
-        std::set<std::shared_ptr<BarotropicEquationOfState>>;
+  /**
+   * The library of barotropic equations of state: a registry of all
+   * barotropic equations of state that the
+   * EulerBarotropic::HyperbolicSystem can select by name. The built-in
+   * equations of state of the namespace BarotropicEquationsOfState are
+   * registered by default.
+   *
+   * @ingroup EulerEquations
+   */
+  using BarotropicEquationOfStateLibrary =
+      Library<BarotropicEquationOfState, const std::string &>;
 
-    /**
-     * Populate a given container with all equation of states defined in
-     * this namespace.
-     *
-     * @ingroup EulerEquations
-     */
-    void populate_equation_of_state_list(
-        equation_of_state_list_type &equation_of_state_list,
-        const std::string &subsection);
+#ifndef DOXYGEN
+  template <>
+  auto BarotropicEquationOfStateLibrary::defaults() -> std::vector<Creator>;
 
-  } // namespace BarotropicEquationOfStateLibrary
+  extern template class Library<BarotropicEquationOfState, const std::string &>;
+#endif
 } // namespace ryujin

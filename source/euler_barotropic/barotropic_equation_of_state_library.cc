@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2025 - 2026 by the ryujin authors
+// Copyright (C) 2023 - 2026 by the ryujin authors
 //
 
 #include <ryujin/euler_barotropic/barotropic_equation_of_state_function.h>
@@ -11,27 +11,19 @@
 
 namespace ryujin
 {
-  namespace BarotropicEquationOfStateLibrary
+  template <>
+  auto BarotropicEquationOfStateLibrary::defaults() -> std::vector<Creator>
   {
-    /**
-     * Populate a given container with all equation of states defined in
-     * this namespace.
-     *
-     * @ingroup EulerEquations
-     */
+    using namespace BarotropicEquationsOfState;
+    return {
+        creator<Function>(),
+        creator<Isentropic>(),
+        creator<Isothermal>(),
+        creator<Pressureless>(),
+    };
+  }
 
-    void populate_equation_of_state_list(
-        equation_of_state_list_type &equation_of_state_list,
-        const std::string &subsection)
-    {
-      auto add = [&](auto &&object) {
-        equation_of_state_list.emplace(std::move(object));
-      };
+  /* instantiations */
 
-      add(std::make_shared<Function>(subsection));
-      add(std::make_shared<Isentropic>(subsection));
-      add(std::make_shared<Isothermal>(subsection));
-      add(std::make_shared<Pressureless>(subsection));
-    }
-  } // namespace BarotropicEquationOfStateLibrary
+  template class Library<BarotropicEquationOfState, const std::string &>;
 } // namespace ryujin

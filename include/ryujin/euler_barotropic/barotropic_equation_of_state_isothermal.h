@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace BarotropicEquationOfStateLibrary
+  namespace BarotropicEquationsOfState
   {
     /**
      * Isothermal equation of state for the barotropic Euler equations. The
@@ -54,5 +54,5 @@ namespace ryujin
     private:
       double speed_of_sound_;
     };
-  } // namespace BarotropicEquationOfStateLibrary
+  } // namespace BarotropicEquationsOfState
 } // namespace ryujin
