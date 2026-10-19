@@ -14,7 +14,7 @@ namespace ryujin
   {
     /**
      * Create a 2D numerical wave tank with specifications outlined in Figure 4
-     * of @cite 2018-SW-exps. The tank consists of a rectangular water reservoir
+     * of @cite Martinez2018. The tank consists of a rectangular water reservoir
      * with a long flume attached to the "center" of the reservoir. For the sake
      * of simplicity, we assume the centerline of the flume and reservoir align
      * at y = 0.

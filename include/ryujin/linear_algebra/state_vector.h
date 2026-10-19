@@ -208,7 +208,7 @@ namespace ryujin
 
 
   /**
-   * Scaled addition $U\leftarrow s\,U+b\,V$ of the parts @p state and
+   * Scaled addition \f$U\leftarrow s\,U+b\,V\f$ of the parts @p state and
    * @p dynamic_state of the given state vectors @p dst and @p src. The
    * operation is performed on @p MemorySpace. The precomputed parts are
    * left untouched.

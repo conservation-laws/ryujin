@@ -308,7 +308,7 @@ namespace ryujin
       inverse_water_depth_sharp(const state_type &U) const;
 
       /**
-       * Given a water depth @ref h this function returns 0 if h is in the
+       * Given a water depth @p h this function returns 0 if h is in the
        * interval [-relaxation * h_cutoff, relaxation * h_cutoff], otherwise
        * h is returned unmodified. Here, h_cutoff is the reference water
        * depth multiplied by eps.
@@ -416,7 +416,7 @@ namespace ryujin
 
       /**
        * Given a state @p U compute the flux
-       * \g[
+       * \f[
        * \begin{pmatrix}
        *   \textbf m \\
        *   \textbf v\otimes \textbf m \\

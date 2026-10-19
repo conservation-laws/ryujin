@@ -168,6 +168,7 @@ namespace ryujin
        *   (A / \rho_0) * (R1 v_r^2 - \omega(\omega + 1) / R1) exp(-R1 * v_r) +
        *   (B / \rho_0) * (R2 v_r^2 - \omega(\omega + 1) / R2) exp(-R2 * v_r) +
        *   \omega(\omega + 1)(e + q0)
+       * \f}
        */
       double speed_of_sound(double rho, double e) const final
       {

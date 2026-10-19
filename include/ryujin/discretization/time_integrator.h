@@ -175,8 +175,9 @@ namespace ryujin
      *  \end{array} \f}
      *
      * to solve the explicit subproblem and the two-stage Crank-Nicolson scheme
-     * diagonally implicit Runge-Kutta scheme with Butcher tableau \f{align*}
+     * diagonally implicit Runge-Kutta scheme with Butcher tableau
      *
+     * \f{align*}
      * \begin{array}{c|ccc}
      *   0            & 0 \\
      *   0.5 & 0 & \tfrac{1}{2} \\
@@ -195,22 +196,23 @@ namespace ryujin
      * \f{align*}
      * \begin{array}{c|cccc}
      *   0  & 0 \\
-     *   \tfrace{1}{3} & \tfrace{1}{3} & 0 \\
-     *   \tfrace{2}{3} & 0  &  \tfrace{2}{3} & 0 \\
-          1 & \tfrace{1}{4} & 0 & \tfrace{3}{4}
+     *   \tfrac{1}{3} & \tfrac{1}{3} & 0 \\
+     *   \tfrac{2}{3} & 0  &  \tfrac{2}{3} & 0 \\
+     *   1 & \tfrac{1}{4} & 0 & \tfrac{3}{4}
      *  \end{array} \f}
      *
      * to solve the explicit subproblem and the two-stage Crank-Nicolson scheme
-     * diagonally implicit Runge-Kutta scheme with Butcher tableau \f{align*}
+     * diagonally implicit Runge-Kutta scheme with Butcher tableau
      *
+     * \f{align*}
      * \begin{array}{c|cccc}
      *   0   & 0 \\
-     *   \tfrace{1}{3} & \tfrace{1}{3} - \gamma & \gamma \\
-     *   \tfrace{2}{3} & \gamma   &  \tfrace{2}{3} - 2 \gamma & \gamma \\
-    *     1 & \tfrace{1}{4} & 0 & \tfrace{3}{4}
+     *   \tfrac{1}{3} & \tfrac{1}{3} - \gamma & \gamma \\
+     *   \tfrac{2}{3} & \gamma   &  \tfrac{2}{3} - 2 \gamma & \gamma \\
+     *   1 & \tfrac{1}{4} & 0 & \tfrac{3}{4}
      *  \end{array} \f}
      *
-     * with \gamma = \tfrace{1}{2} + \tfrace{1}{2\sqrt(3)}
+     * with \f$\gamma = \tfrac{1}{2} + \tfrac{1}{2\sqrt{3}}\f$
      *
      * to solve the parabolic subproblem.
      */

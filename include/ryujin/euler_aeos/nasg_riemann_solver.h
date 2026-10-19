@@ -710,8 +710,9 @@ namespace ryujin
 
       /**
        * Compute a simultaneous upper bound on (5.7) second formula for
-       * \tilde p_2^\ast (5.8) first formula for \tilde p_1^\ast (5.11)
-       * formula for \tilde p_2^\ast in @cite ClaytonGuermondPopov-2022
+       * \f$\tilde p_2^\ast\f$ (5.8) first formula for \f$\tilde p_1^\ast\f$
+       * (5.11) formula for \f$\tilde p_2^\ast\f$ in
+       * @cite ClaytonGuermondPopov-2022
        *
        * Cost: 3x pow, 9x division, 2x sqrt
        *

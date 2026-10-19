@@ -65,8 +65,7 @@ namespace ryujin
      *
      * The default implementation of this function simply returns a zero
      * value. In case of the @ref ShallowWaterEquations we pre-compute the
-     * bathymetry. In case of @ref LinearTransport we precompute the
-     * advection field.
+     * bathymetry.
      */
     virtual initial_precomputed_type
     initial_precomputations(const dealii::Point<dim> & /*point*/)

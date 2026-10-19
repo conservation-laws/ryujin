@@ -17,7 +17,7 @@ namespace ryujin
   namespace ShallowWaterInitialStates
   {
     /**
-     * Wetting/drying test proposed in Section 3.8 of @hou2013.
+     * Wetting/drying test proposed in Section 3.8 of @cite hou2013.
      *
      * @ingroup ShallowWaterEquations
      */
