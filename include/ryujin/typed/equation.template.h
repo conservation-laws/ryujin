@@ -72,7 +72,7 @@ namespace ryujin
   {
     Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
         simulation(mpi_comm);
-    Scheduler<Number> scheduler(mpi_comm, {});
+    Scheduler<Number> scheduler(mpi_comm, {&simulation});
     dealii::ParameterAcceptor::initialize(parameter_file);
     scheduler.run();
   }
@@ -117,7 +117,7 @@ namespace ryujin
        */
       Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
           simulation(MPI_COMM_SELF);
-      Scheduler<Number> scheduler(MPI_COMM_SELF, {});
+      Scheduler<Number> scheduler(MPI_COMM_SELF, {&simulation});
 
       std::string base_name = this->name();
       std::ranges::replace(base_name, ' ', '_');
