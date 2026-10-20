@@ -60,7 +60,12 @@ namespace ryujin
      */
     template <typename T>
       requires std::derived_from<T, Base> && std::constructible_from<T, Args...>
-    static Creator creator();
+    static Creator creator()
+    {
+      return [](Args... args) -> std::unique_ptr<Base> {
+        return std::make_unique<T>(args...);
+      };
+    }
 
     /**
      * Append an entry to the creators() table.
@@ -73,7 +78,10 @@ namespace ryujin
      */
     template <typename T>
       requires std::derived_from<T, Base> && std::constructible_from<T, Args...>
-    static void add();
+    static void add()
+    {
+      add(creator<T>());
+    }
 
     /**
      * Construct one object per entry, in the order of registration.
@@ -115,29 +123,6 @@ namespace ryujin
      */
     static std::vector<Creator> defaults();
   };
-
-
-  // ------------------------------- inline functions --------------------------
-
-
-  template <typename Base, typename... Args>
-  template <typename T>
-    requires std::derived_from<T, Base> && std::constructible_from<T, Args...>
-  inline auto Library<Base, Args...>::creator() -> Creator
-  {
-    return [](Args... args) -> std::unique_ptr<Base> {
-      return std::make_unique<T>(args...);
-    };
-  }
-
-
-  template <typename Base, typename... Args>
-  template <typename T>
-    requires std::derived_from<T, Base> && std::constructible_from<T, Args...>
-  inline void Library<Base, Args...>::add()
-  {
-    add(creator<T>());
-  }
 
 
   // ----------------------------- member functions ---------------------------
