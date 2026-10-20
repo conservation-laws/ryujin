@@ -54,13 +54,8 @@ namespace ryujin
   public:
     EquationDispatch()
         : ParameterAcceptor("B - Equation")
-        , equations_(EquationLibrary::create())
+        , equations_(create_equations())
     {
-      AssertThrow(!equations_.empty(),
-                  dealii::ExcMessage(
-                      dave + "No equation has been registered. Consequently, "
-                             "there is nothing for us to do.\n"));
-
       dimension_ = 0;
       add_parameter("dimension", dimension_, "The spatial dimension");
 
@@ -78,14 +73,7 @@ namespace ryujin
      */
     static void create_parameter_files()
     {
-      const auto equations = EquationLibrary::create();
-
-      AssertThrow(!equations.empty(),
-                  dealii::ExcMessage(
-                      dave + "No equation has been registered. Consequently, "
-                             "there is nothing for us to do.\n"));
-
-      for (const auto &equation : equations)
+      for (const auto &equation : create_equations())
         equation->create_parameter_files();
     }
 
@@ -112,6 +100,19 @@ namespace ryujin
     }
 
   private:
+    /**
+     * Create all registered equations.
+     */
+    static std::vector<std::unique_ptr<Interface::Equation>> create_equations()
+    {
+      auto equations = EquationLibrary::create();
+      AssertThrow(!equations.empty(),
+                  dealii::ExcMessage(
+                      dave + "No equation has been registered. Consequently, "
+                             "there is nothing for us to do.\n"));
+      return equations;
+    }
+
     /**
      * @name Run time options
      */
