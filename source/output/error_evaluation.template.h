@@ -13,6 +13,7 @@
 
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 
 namespace ryujin
 {
@@ -20,18 +21,19 @@ namespace ryujin
 
   template <int dim, typename Number>
   ErrorEvaluation<dim, Number>::ErrorEvaluation(
-      const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
-      const Interface::HyperbolicSystem &hyperbolic_system,
-      const Interface::Postprocessor<dim, Number> &postprocessor,
+      const Interface::Simulation<dim, Number> &simulation,
       const std::string &subsection /*= "ErrorEvaluation"*/)
       : ParameterAcceptor(subsection)
-      , mpi_ensemble_(mpi_ensemble)
-      , offline_data_(&offline_data)
-      , postprocessor_(postprocessor)
+      , Interface::Task<Number>("error evaluation", TaskPhase::pre_step)
+      , simulation_(simulation)
+      , mpi_ensemble_(simulation.mpi_ensemble())
+      , offline_data_(&simulation.offline_data())
+      , postprocessor_(simulation.postprocessor())
       , base_name_("")
   {
-    error_quantities_ = hyperbolic_system.state_names(dim);
+    trigger_.add_parameters(*this);
+
+    error_quantities_ = simulation.hyperbolic_system().state_names(dim);
 
     add_parameter("error quantities",
                   error_quantities_,
@@ -53,13 +55,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::prepare(const std::string &name)
+  void ErrorEvaluation<dim, Number>::initialize(TaskContext<Number> &context)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<dim, Number>::prepare()" << std::endl;
+    std::cout << "ErrorEvaluation<dim, Number>::initialize()" << std::endl;
 #endif
 
-    base_name_ = name;
+    base_name_ = context.base_name;
 
     selection_ = postprocessor_.prepare(error_quantities_);
 
@@ -92,6 +94,61 @@ namespace ryujin
     for (const auto &norm : error_norms_)
       output << "\t" << norm;
     output << "\n" << std::flush;
+  }
+
+
+  template <int dim, typename Number>
+  void ErrorEvaluation<dim, Number>::execute(TaskContext<Number> &context)
+  {
+    if (!trigger_.fire(context))
+      return;
+
+    StateVector<Number> analytic;
+    simulation_.interpolate_analytic_solution(analytic, context.t);
+
+    ComputingTimer::Scope scope("time step [X]   - compute error");
+    const auto norms = compute(simulation_.state_vector(), analytic);
+
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    std::ofstream output(base_name_ + "-error.log",
+                         std::ofstream::out | std::ofstream::app);
+    output << std::scientific << std::setprecision(14);
+
+    output << context.t;
+    for (const auto &norm : norms)
+      output << "\t" << norm;
+    output << "\n" << std::flush;
+  }
+
+
+  template <int dim, typename Number>
+  void ErrorEvaluation<dim, Number>::finalize(TaskContext<Number> &context)
+  {
+    StateVector<Number> analytic;
+    simulation_.interpolate_analytic_solution(analytic, context.t);
+    const auto norms = compute(simulation_.state_vector(), analytic);
+
+    dealii::types::global_dof_index n_global_dofs = 0;
+    if (mpi_ensemble_.ensemble_rank() == 0)
+      n_global_dofs = dealii::Utilities::MPI::sum(
+          offline_data_->dof_handler().n_dofs(),
+          mpi_ensemble_.ensemble_leader_communicator());
+
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    std::cout << description() << " at final time \n";
+    std::cout << std::setprecision(16);
+    std::cout << "#dofs = " << n_global_dofs << std::endl;
+    std::cout << "t     = " << context.t << std::endl;
+
+    for (std::size_t n = 0; n < error_norms_.size(); ++n) {
+      const auto &name = error_norms_[n];
+      std::cout << name << std::string(6 - name.size(), ' ') << "= " << norms[n]
+                << std::endl;
+    }
   }
 
 
@@ -168,55 +225,6 @@ namespace ryujin
             norm, mpi_ensemble_.ensemble_leader_communicator());
 
     return norms;
-  }
-
-
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::write_out(
-      const StateVector<Number> &state_vector,
-      const StateVector<Number> &analytic,
-      const Number t) const
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<dim, Number>::write_out()" << std::endl;
-#endif
-
-    const auto norms = compute(state_vector, analytic);
-
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    std::ofstream output(base_name_ + "-error.log",
-                         std::ofstream::out | std::ofstream::app);
-    output << std::scientific << std::setprecision(14);
-
-    output << t;
-    for (const auto &norm : norms)
-      output << "\t" << norm;
-    output << "\n" << std::flush;
-  }
-
-
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::print_summary(
-      std::ostream &stream,
-      const Number t,
-      const dealii::types::global_dof_index n_global_dofs,
-      const std::vector<Number> &norms) const
-  {
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    stream << description() << " at final time \n";
-    stream << std::setprecision(16);
-    stream << "#dofs = " << n_global_dofs << std::endl;
-    stream << "t     = " << t << std::endl;
-
-    for (std::size_t n = 0; n < error_norms_.size(); ++n) {
-      const auto &name = error_norms_[n];
-      stream << name << std::string(6 - name.size(), ' ') << "= " << norms[n]
-             << std::endl;
-    }
   }
 
 

@@ -20,16 +20,20 @@ namespace ryujin
 
   template <int dim, typename Number>
   VTUOutput<dim, Number>::VTUOutput(
-      const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
-      const Interface::HyperbolicSystem &hyperbolic_system,
-      const Interface::Postprocessor<dim, Number> &postprocessor,
+      const Interface::Simulation<dim, Number> &simulation,
+      bool levelsets /*= false*/,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
-      , mpi_ensemble_(mpi_ensemble)
-      , offline_data_(&offline_data)
-      , postprocessor_(postprocessor)
+      , Interface::Task<Number>(levelsets ? "vtu levelsets" : "vtu output",
+                                TaskPhase::pre_step)
+      , levelsets_(levelsets)
+      , simulation_(simulation)
+      , mpi_ensemble_(simulation.mpi_ensemble())
+      , offline_data_(&simulation.offline_data())
+      , postprocessor_(simulation.postprocessor())
   {
+    trigger_.add_parameters(*this);
+
     use_mpi_io_ = true;
     add_parameter("use mpi io",
                   use_mpi_io_,
@@ -37,11 +41,20 @@ namespace ryujin
                   "write_vtu_in_parallel() instead of independent output files "
                   "via write_vtu_with_pvtu_record()");
 
-    add_parameter("manifolds",
-                  manifolds_,
-                  "List of level set functions. The description is used to "
-                  "only output cells that intersect the given level set.");
+    if (levelsets_)
+      add_parameter("manifolds",
+                    manifolds_,
+                    "List of level set functions. The description is used to "
+                    "only output cells that intersect the given level set.");
 
+    output_analytic_solution_ = false;
+    add_parameter(
+        "output analytic solution",
+        output_analytic_solution_,
+        "Also write out the analytic solution (as provided by the initial "
+        "values) with file name prefix \"<basename>-analytic_solution\"");
+
+    const auto &hyperbolic_system = simulation.hyperbolic_system();
     const auto &state_names = hyperbolic_system.state_names(dim);
     vtu_output_quantities_ = state_names;
 
@@ -78,7 +91,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void VTUOutput<dim, Number>::prepare()
+  void VTUOutput<dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
@@ -90,13 +103,51 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  void VTUOutput<dim, Number>::execute(TaskContext<Number> &context)
+  {
+    if (!trigger_.fire(context))
+      return;
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "VTUOutput<dim, Number>::execute(t = " << context.t << ")"
+              << std::endl;
+#endif
+
+    ComputingTimer::Scope scope("time step [X]   - perform vtu output");
+    context.info("scheduling output");
+
+    const auto t = context.t;
+    const auto cycle = context.timer_cycle;
+    const auto name = mpi_ensemble_.base_name(context.base_name);
+
+    if (output_analytic_solution_) {
+      StateVector<Number> analytic;
+      simulation_.interpolate_analytic_solution(analytic, t);
+
+      /* Apply boundary conditions and precompute values for output: */
+      simulation_.time_integrator().prepare_state_vector(analytic, t);
+
+      schedule_output(analytic, name + "-analytic_solution", t, cycle);
+    }
+
+    schedule_output(simulation_.state_vector(), name + "-solution", t, cycle);
+
+    /*
+     * Workaround: Manually reset bounds during the first output cycle
+     * (which is often just a uniform flow field) to obtain a better
+     * normalization:
+     */
+    if (cycle == 0)
+      bounds_.clear();
+  }
+
+
+  template <int dim, typename Number>
   void VTUOutput<dim, Number>::schedule_output(
       const StateVector<Number> &state_vector,
       std::string name,
-      Number t [[maybe_unused]],
-      unsigned int cycle,
-      bool output_full,
-      bool output_levelsets)
+      Number t,
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
@@ -213,7 +264,7 @@ namespace ryujin
 
     /* Perform output: */
 
-    if (output_full) {
+    if (!levelsets_) {
       data_out->build_patches(
           mapping, patch_order, DataOut<dim>::curved_inner_cells);
 
@@ -228,7 +279,7 @@ namespace ryujin
       }
     }
 
-    if (output_levelsets && manifolds_.size() != 0) {
+    if (levelsets_ && manifolds_.size() != 0) {
       /*
        * Specify an output filter that selects only cells for output that are
        * in the viscinity of a specified set of output planes:

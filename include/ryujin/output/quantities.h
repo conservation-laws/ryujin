@@ -12,6 +12,8 @@
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/postprocessor.h>
+#include <ryujin/interface/simulation.h>
+#include <ryujin/interface/task.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -41,10 +43,14 @@ namespace ryujin
    * cancellation if the fluctuations of a quantity are small compared to
    * its mean.
    *
+   * The class is the task "quantities" that accumulates statistics in
+   * every cycle and writes them out whenever its trigger fires.
+   *
    * @ingroup Output
    */
   template <int dim, typename Number = double>
-  class Quantities final : public dealii::ParameterAcceptor
+  class Quantities final : public dealii::ParameterAcceptor,
+                           public Interface::Task<Number>
   {
   public:
     /**
@@ -55,47 +61,31 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Quantities(const MPIEnsemble &mpi_ensemble,
-               const OfflineData<dim, Number> &offline_data,
-               const Interface::HyperbolicSystem &hyperbolic_system,
-               const Interface::Postprocessor<dim, Number> &postprocessor,
+    Quantities(const Interface::Simulation<dim, Number> &simulation,
                const std::string &subsection = "/Quantities");
-
-    /**
-     * Prepare evaluation. A call to @ref prepare() allocates temporary
-     * storage and is necessary before accumulate() and write_out() can be
-     * called.
-     *
-     * Calling prepare() allocates temporary storage for various boundary
-     * and interior maps. The storage requirement varies according to the
-     * supplied manifold descriptions.
-     *
-     * The string parameter @p name is used as base name for output files.
-     */
-    void prepare(const std::string &name);
 
     //@}
     /**
-     * @name Functions for accumulating and writing out quantities
+     * @name Task
      */
     //@{
 
     /**
-     * Takes a state vector @p U at time t (obtained at the end of a full
-     * Strang step) and accumulates statistics for quantities of interests
-     * for all defined manifolds.
+     * Prepare evaluation for the current mesh: allocate temporary storage
+     * for various boundary and interior maps. The storage requirement
+     * varies according to the supplied manifold descriptions.
      */
-    void accumulate(const StateVector<Number> &state_vector, const Number t);
+    void prepare(TaskContext<Number> &context) override;
 
     /**
-     * Write quantities of interest to designated output files.
+     * Accumulate statistics, and write them out whenever the trigger
+     * fires.
      */
-    void write_out(const StateVector<Number> &state_vector,
-                   const Number t,
-                   unsigned int cycle);
+    void execute(TaskContext<Number> &context) override;
+
+    //@}
 
   private:
-    //@}
     /**
      * @name Internal typedefs
      */
@@ -190,6 +180,9 @@ namespace ryujin
      */
     //@{
 
+    Trigger<Number> trigger_;
+
+    const Interface::Simulation<dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
@@ -212,6 +205,20 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
+
+    /**
+     * Take the state vector @p state_vector at time @p t (obtained at the
+     * end of a full time step) and accumulate statistics for quantities of
+     * interest for all defined manifolds.
+     */
+    void accumulate(const StateVector<Number> &state_vector, const Number t);
+
+    /**
+     * Write quantities of interest to designated output files.
+     */
+    void write_out(const StateVector<Number> &state_vector,
+                   const Number t,
+                   unsigned int cycle);
 
     /**
      * The number of values stored per point: the number of moments times
