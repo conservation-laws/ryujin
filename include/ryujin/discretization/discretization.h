@@ -378,6 +378,14 @@ namespace ryujin
     ACCESSOR(refinement)
 
     /**
+     * Return whether prepare() has created the triangulation.
+     */
+    bool has_triangulation() const
+    {
+      return triangulation_ != nullptr;
+    }
+
+    /**
      * Return a mutable reference to the triangulation.
      */
     ACCESSOR(triangulation)

@@ -147,4 +147,16 @@ namespace ryujin
       MPI_Comm_free(&peer_communicator_);
   }
 
+
+  std::string MPIEnsemble::base_name(const std::string &base_name) const
+  {
+    if (n_ensembles_ == 1)
+      return base_name;
+
+    const unsigned int digits =
+        dealii::Utilities::needed_digits(n_ensembles_ - 1);
+    return base_name + "-ensemble_" +
+           dealii::Utilities::int_to_string(ensemble_, digits);
+  }
+
 } // namespace ryujin

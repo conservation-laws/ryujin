@@ -101,6 +101,15 @@ namespace ryujin
         handle_ = dealii::numbers::invalid_unsigned_int;
       }
 
+      /**
+       * Return whether data is attached to the triangulation, i.e.,
+       * whether a valid handle is set.
+       */
+      bool has_handle() const
+      {
+        return handle_ != dealii::numbers::invalid_unsigned_int;
+      }
+
       //@}
 
     protected:
