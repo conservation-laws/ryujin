@@ -4,7 +4,6 @@
 ##
 
 add_library(object_shallow_water OBJECT
-  equation.cc
   hyperbolic_module.cc
   initial_state_library.cc
   initial_values.cc

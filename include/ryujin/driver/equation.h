@@ -1,0 +1,223 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 - 2026 by the ryujin authors
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/driver/simulation.h>
+#include <ryujin/driver/task_composition.h>
+#include <ryujin/stub/parabolic_module.h>
+
+#include <deal.II/base/exceptions.h>
+#include <deal.II/base/mpi.h>
+#include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/utilities.h>
+
+#include <algorithm>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+
+namespace ryujin
+{
+  /**
+   * Write the default parameter file "default_parameters-<name>.prm", and,
+   * if @p write_detailed_description is set, the parameter file
+   * "default_parameters-<name>-description.prm" with the documentation of
+   * all parameters.
+   *
+   * @code
+   * ryujin::write_parameter_files("euler-2d", true, [] {
+   *   struct Objects {
+   *     Simulation<HyperbolicDescription, ParabolicDescription, 2> simulation{
+   *         MPI_COMM_SELF};
+   *     TaskComposition<2> task_composition{simulation};
+   *   };
+   *   return std::make_unique<Objects>();
+   * });
+   * @endcode
+   *
+   * @ingroup Driver
+   */
+  template <typename Setup>
+  void write_parameter_files(const std::string &name,
+                             bool write_detailed_description,
+                             const Setup &setup)
+  {
+    {
+      auto &prm = dealii::ParameterAcceptor::prm;
+
+      /*
+       * Workaround: The Scheduler is constructed last and declares the
+       * "A - Scheduler" section last. Add an entry to the section so that it
+       * shows up first.
+       */
+      prm.enter_subsection("A - Scheduler");
+      prm.declare_entry("basename", "test");
+      prm.leave_subsection();
+
+      [[maybe_unused]] const auto objects = setup();
+
+      if (dealii::Utilities::MPI::this_mpi_process(MPI_COMM_SELF) == 0) {
+        if (write_detailed_description)
+          prm.print_parameters(
+              "default_parameters-" + name + "-description.prm",
+              dealii::ParameterHandler::OutputStyle::KeepDeclarationOrder);
+
+        prm.print_parameters(
+            "default_parameters-" + name + ".prm",
+            dealii::ParameterHandler::OutputStyle::Short |
+                dealii::ParameterHandler::OutputStyle::KeepDeclarationOrder);
+      }
+
+      // all objects have to go out of scope, see
+      // https://github.com/dealii/dealii/issues/15111
+    }
+
+    dealii::ParameterAcceptor::clear();
+  }
+
+
+  /**
+   * An equation: a pairing of a hyperbolic and a parabolic description
+   * that the ryujin executable selects by name with the run time
+   * parameter "equation".
+   *
+   * @ingroup Driver
+   */
+  struct Equation {
+    /**
+     * Construct and run the simulation for dimension @p dim with the
+     * parameters of @p parameter_file.
+     */
+    std::function<void(
+        int dim, const std::string &parameter_file, const MPI_Comm &mpi_comm)>
+        run;
+
+    /**
+     * Write the default parameter files of the equation for all
+     * dimensions.
+     */
+    std::function<void()> create_parameter_files;
+  };
+
+
+  /**
+   * All registered equations, sorted by name. The equations of ryujin
+   * are registered by default.
+   *
+   * @ingroup Driver
+   */
+  std::map<std::string, Equation> &equations();
+
+
+  /**
+   * Register the equation that pairs the hyperbolic description @p HD
+   * with the parabolic description @p PD under the given name. An
+   * equation is registered with a constant at namespace scope:
+   * @code
+   * const EquationRegistration<HD, PD> registration("equation");
+   * @endcode
+   *
+   * @ingroup Driver
+   */
+  template <typename HD, typename PD = StubParabolicDescription>
+  class EquationRegistration final
+  {
+  public:
+    /**
+     * Constructor taking the name of the equation.
+     */
+    EquationRegistration(const std::string &name)
+    {
+      const auto run = [](int dim,
+                          const std::string &parameter_file,
+                          const MPI_Comm &mpi_communicator) {
+        switch (dim) {
+        case 1:
+          run_simulation<1>(parameter_file, mpi_communicator);
+          break;
+        case 2:
+          run_simulation<2>(parameter_file, mpi_communicator);
+          break;
+        case 3:
+          run_simulation<3>(parameter_file, mpi_communicator);
+          break;
+        default:
+          AssertThrow(false, dealii::ExcInternalError());
+        }
+      };
+
+      const auto create_parameter_files = [name] {
+        create_parameter_file<1>(name, false);
+        create_parameter_file<2>(name, true);
+        create_parameter_file<3>(name, false);
+      };
+
+      const Equation equation{run, create_parameter_files};
+
+      const bool inserted = equations().emplace(name, equation).second;
+      AssertThrow(inserted,
+                  dealii::ExcMessage("The equation »" + name +
+                                     "« is registered more than once."));
+    }
+
+  private:
+    /**
+     * Construct the Simulation and the TaskComposition for dimension
+     * @p dim, initialize all parameters from @p parameter_file, and run.
+     */
+    template <int dim>
+    static void run_simulation(const std::string &parameter_file,
+                               const MPI_Comm &mpi_comm)
+    {
+      Simulation<HD, PD, dim, NUMBER> simulation(mpi_comm);
+      TaskComposition<dim, NUMBER> task_composition(simulation);
+
+      dealii::ParameterAcceptor::initialize(parameter_file);
+
+      task_composition.run();
+    }
+
+    /**
+     * Write the default parameter file(s) for dimension @p dim.
+     */
+    template <int dim>
+    static void create_parameter_file(const std::string &name,
+                                      bool write_detailed_description)
+    {
+      std::string base_name = name;
+      std::ranges::replace(base_name, ' ', '_');
+      base_name += "-" + std::to_string(dim) + "d";
+
+      write_parameter_files(base_name, write_detailed_description, [&name] {
+        /*
+         * The parameters "dimension" and "equation" (see source/main.cc), set
+         * to this equation:
+         */
+        auto &prm = dealii::ParameterAcceptor::prm;
+        prm.enter_subsection("B - Equation");
+        prm.declare_entry("dimension",
+                          std::to_string(dim),
+                          dealii::Patterns::Integer(),
+                          "The spatial dimension");
+        prm.declare_entry(
+            "equation", name, dealii::Patterns::Anything(), "The PDE system");
+        prm.leave_subsection();
+
+        /*
+         * Create temporary objects for the sole purpose of populating the
+         * ParameterAcceptor::prm object.
+         */
+        struct Objects {
+          Simulation<HD, PD, dim, NUMBER> simulation{MPI_COMM_SELF};
+          TaskComposition<dim, NUMBER> task_composition{simulation};
+        };
+        return std::make_unique<Objects>();
+      });
+    }
+  };
+} // namespace ryujin

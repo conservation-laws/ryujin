@@ -4,7 +4,6 @@
 ##
 
 add_library(object_euler_aeos OBJECT
-  equation.cc
   equation_of_state_library.cc
   hyperbolic_module.cc
   initial_state_library.cc

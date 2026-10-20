@@ -33,9 +33,17 @@ set(CORE_SOURCE_FILES
   discretization/time_integrator.cc
   driver/checkpointing.cc
   driver/environment.cc
-  driver/equation_library.cc
+  driver/equation.cc
+  driver/equation_euler.cc
+  driver/equation_euler_aeos.cc
+  driver/equation_euler_barotropic.cc
+  driver/equation_euler_poisson.cc
+  driver/equation_euler_poisson_aeos.cc
+  driver/equation_euler_poisson_barotropic.cc
+  driver/equation_navier_stokes.cc
+  driver/equation_scalar_conservation.cc
+  driver/equation_shallow_water.cc
   driver/logger.cc
-  driver/run.cc
   driver/scheduler.cc
   geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc

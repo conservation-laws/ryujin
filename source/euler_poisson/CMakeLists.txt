@@ -5,9 +5,6 @@
 
 add_library(object_euler_poisson OBJECT
   electrostatic_configuration_library.cc
-  equation.cc
-  equation_euler_aeos.cc
-  equation_euler_barotropic.cc
   parabolic_module.cc
   parabolic_module_euler_aeos.cc
   parabolic_module_euler_barotropic.cc

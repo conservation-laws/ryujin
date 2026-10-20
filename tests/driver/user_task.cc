@@ -5,12 +5,13 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/driver/checkpointing.h>
+#include <ryujin/driver/environment.h>
 #include <ryujin/driver/logger.h>
 #include <ryujin/driver/scheduler.h>
+#include <ryujin/driver/simulation.h>
 #include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/stub/parabolic_module.h>
-#include <ryujin/typed/equation.template.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -23,12 +24,12 @@
 #include <string>
 
 //
-// Test a user defined task in a TaskComposition of its own that an Equation
-// runs: The task runs in the step phase after the Simulation, counts its
-// executions, and stores the count in checkpoints. We run the computation
-// once uninterrupted and once split into a first run that writes a
-// checkpoint and a second run that resumes from it. Both have to report
-// the same number of executions.
+// Test a user defined task in a TaskComposition of its own that runs a
+// Simulation: The task runs in the step phase after the Simulation,
+// counts its executions, and stores the count in checkpoints. We run the
+// computation once uninterrupted and once split into a first run that
+// writes a checkpoint and a second run that resumes from it. Both have to
+// report the same number of executions.
 //
 
 using namespace ryujin;
@@ -182,12 +183,14 @@ void run(const std::string &time_loop_parameters,
   const int ierr = MPI_Barrier(MPI_COMM_WORLD);
   AssertThrowMPI(ierr);
 
-  const Equation<HyperbolicDescription,
-                 ParabolicDescription,
-                 Number,
-                 UserTaskComposition>
-      equation("user equation");
-  equation.run(dim, "user_task.prm", MPI_COMM_WORLD);
+  {
+    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+        simulation(MPI_COMM_WORLD);
+    UserTaskComposition<dim, Number> task_composition(simulation);
+
+    ParameterAcceptor::initialize("user_task.prm");
+    task_composition.run();
+  }
 
   ParameterAcceptor::clear();
 }
@@ -195,7 +198,7 @@ void run(const std::string &time_loop_parameters,
 
 int main(int argc, char *argv[])
 {
-  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+  Environment environment(argc, argv);
 
   /* An uninterrupted computation: */
   run("  set basename          = full\n"

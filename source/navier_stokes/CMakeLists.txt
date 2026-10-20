@@ -4,7 +4,6 @@
 ##
 
 add_library(object_navier_stokes OBJECT
-  equation.cc
   parabolic_module.cc
   )
 set_target_properties(object_navier_stokes PROPERTIES LINKER_LANGUAGE CXX)

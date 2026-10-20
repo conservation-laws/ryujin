@@ -1,11 +1,9 @@
-[INFO] dispatching to driver »user equation« with dim=2
 [INFO] initializing data structures
 [INFO] creating mesh and interpolating initial values
 [INFO] preparing compute kernels
 [INFO] entering main loop
 [INFO] scheduling checkpointing
 test task: initialize 1, prepare 1, execute 10, t = 0.100000
-[INFO] dispatching to driver »user equation« with dim=2
 [INFO] initializing data structures
 [INFO] creating mesh and interpolating initial values
 [INFO] preparing compute kernels
@@ -17,7 +15,6 @@ test task: initialize 1, prepare 1, execute 10, t = 0.100000
 [INFO] scheduling checkpointing
 [INFO] scheduling checkpointing
 test task: initialize 1, prepare 1, execute 5, t = 0.050000
-[INFO] dispatching to driver »user equation« with dim=2
 [INFO] initializing data structures
 [INFO] resume: reading mesh and loading state vector
 [INFO] preparing compute kernels
