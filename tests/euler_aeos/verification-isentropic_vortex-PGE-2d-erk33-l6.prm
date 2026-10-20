@@ -1,12 +1,11 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                  = validation-euler-l6
 
-  set enable compute error      = true
+  set tasks                     = error evaluation
 
   set final time                = 2.0
 
   set timer granularity         = 2.0
-  set terminal update interval  = 0
 end
 
 subsection B - Equation
@@ -50,4 +49,8 @@ subsection H - TimeIntegrator
   set cfl max            = 0.2
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

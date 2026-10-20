@@ -14,16 +14,13 @@
 #     78.6 (2015): 355-383.
 ##
 
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                      = steady_incline_1d-erk33-l9
 
-  set enable compute error          = true
+  set tasks                         = error evaluation
 
   set final time                    = 1.0
   set timer granularity             = 1.0
-
-  set terminal update interval      = 0
-
 end
 
 subsection B - Equation
@@ -72,15 +69,20 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection J - VTUOutput
-  set manifolds                  = 
-  set schlieren beta             = 10
-  set schlieren recompute bounds = true
-  set use mpi io                 = true
-  set vtu output quantities      = h, m, bathymetry, eta_m, schlieren_h
+subsection I - VTUOutput
+  subsection full
+    set schlieren beta             = 10
+    set schlieren recompute bounds = true
+    set use mpi io                 = true
+    set vtu output quantities      = h, m, bathymetry, eta_m, schlieren_h
+  end
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = true
   set error quantities = h, m
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

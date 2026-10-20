@@ -1,14 +1,11 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename             = leblanc-erk33
 
-  set enable compute error = true
+  set tasks                = error evaluation
 
   set final time           = 0.66666666666667
   set timer granularity    = 0.66666666666667
-
-  set terminal update interval  = 0
 end
-
 
 subsection B - Equation
   set dimension             = 1
@@ -19,7 +16,6 @@ subsection B - Equation
     set gamma    = 1.66666666666667
   end
 end
-
 
 subsection C - Discretization
   set geometry        = rectangular domain
@@ -35,7 +31,6 @@ subsection C - Discretization
   end
 end
 
-
 subsection E - InitialValues
   set configuration = leblanc
 
@@ -43,7 +38,6 @@ subsection E - InitialValues
   # for cG put the discontinuity right in the center of a cell
   set position      = 0.326732673267
 end
-
 
 subsection F - HyperbolicModule
   subsection limiter
@@ -54,7 +48,6 @@ subsection F - HyperbolicModule
   end
 end
 
-
 subsection H - TimeIntegrator
   set cfl min               = 0.75
   set cfl max               = 0.75
@@ -62,6 +55,10 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error quantities = rho, m, E
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

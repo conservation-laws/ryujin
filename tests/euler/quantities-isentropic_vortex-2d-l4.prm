@@ -8,18 +8,13 @@
 #
 ##
 
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                  = test
 
-  set enable compute quantities = true
-  set enable output full        = false
+  set tasks                     = quantities
 
   set final time                = 1.0
   set timer granularity         = 0.5
-
-  set terminal update interval  = 0
-
-  set debug command             = cat test-interior-R0000-space_averaged_time_series.dat test-bottom-R0000-space_averaged_time_series.dat test-bottom-R0002-time_averaged.dat
 end
 
 subsection B - Equation
@@ -61,11 +56,16 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection K - Quantities
+subsection J - Quantities
   set quantities                   = rho, v_1, v_2, p, s
   set number of moments            = 4
   set clear statistics on writeout = false
 
   set interior manifolds           = interior : 0. : space_averaged
   set boundary manifolds           = bottom : y + 5 : time_averaged space_averaged
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+  set debug command            = cat test-interior-R0000-space_averaged_time_series.dat test-bottom-R0000-space_averaged_time_series.dat test-bottom-R0002-time_averaged.dat
 end

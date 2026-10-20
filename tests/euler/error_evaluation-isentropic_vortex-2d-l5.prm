@@ -6,18 +6,13 @@
 #
 ##
 
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                       = test
 
-  set enable compute error           = true
-  set timer compute error multiplier = 2
+  set tasks                          = error evaluation
 
   set final time                     = 1.0
   set timer granularity              = 0.125
-
-  set terminal update interval       = 0
-
-  set debug filename                 = test-error.log
 end
 
 subsection B - Equation
@@ -59,8 +54,14 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = false
   set error norms      = L2, Linf
   set error quantities = rho, v_1, p
+  set trigger multiplier = 2
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+  set debug filename           = test-error.log
 end

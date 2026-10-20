@@ -3,8 +3,8 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <ryujin/driver/scheduler.h>
 #include <ryujin/driver/simulation.h>
+#include <ryujin/driver/task_composition.h>
 #include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/euler_poisson/parabolic_description.h>
 
@@ -37,15 +37,24 @@ using Number = NUMBER;
 
 
 /*
- * Run a Scheduler with the given time loop parameters.
+ * Run a TaskComposition with the given time loop parameters, with
+ * checkpointing if @p checkpointing_parameters is not empty.
  */
-void run(const std::string &time_loop_parameters)
+void run(const std::string &time_loop_parameters,
+         const std::string &checkpointing_parameters = "")
 {
   std::stringstream parameters;
-  parameters << "subsection A - TimeLoop\n"
-             << time_loop_parameters                      //
-             << "  set enable compute error   = true\n"   //
+  parameters << "subsection A - Scheduler\n"
+             << time_loop_parameters             //
+             << "  set tasks = error evaluation" //
+             << (checkpointing_parameters.empty() ? "" : ", checkpointing")
+             << "\n"                                      //
+             << "end\n"                                   //
+             << "subsection M - Logger\n"                 //
              << "  set terminal update interval = 0\n"    //
+             << "end\n"                                   //
+             << "subsection N - Checkpointing\n"          //
+             << checkpointing_parameters                  //
              << "end\n"                                   //
              << "subsection B - Equation\n"               //
              << "  set alpha                       = 1\n" //
@@ -95,9 +104,9 @@ void run(const std::string &time_loop_parameters)
   {
     Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
         simulation(MPI_COMM_WORLD);
-    Scheduler<dim, Number> scheduler(simulation);
+    TaskComposition<dim, Number> task_composition(simulation);
     ParameterAcceptor::initialize(parameters);
-    scheduler.run();
+    task_composition.run();
   }
 
   ParameterAcceptor::clear();
@@ -130,14 +139,14 @@ int main(int argc, char *argv[])
   /* A computation to half of the final time that writes a checkpoint: */
   run("  set basename         = split\n"
       "  set final time       = 0.25\n"
-      "  set timer granularity = 0.25\n"
-      "  set checkpoint update interval = 1.e-6\n");
+      "  set timer granularity = 0.25\n",
+      "  set trigger interval = 1.e-6\n");
 
   /* Resume the computation and run to the final time: */
   run("  set basename         = split\n"
       "  set final time       = 0.5\n"
-      "  set timer granularity = 0.25\n"
-      "  set resume           = true\n");
+      "  set timer granularity = 0.25\n",
+      "  set resume = true\n");
 
   if (dealii::Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0) {
     const auto full = last_error_line("full");

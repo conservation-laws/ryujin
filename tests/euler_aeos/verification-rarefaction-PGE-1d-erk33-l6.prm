@@ -1,14 +1,11 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename             = leblanc-erk33
 
-  set enable compute error = true
+  set tasks                = error evaluation
 
   set final time           = 0.30558
   set timer granularity    = 0.30558
-
-  set terminal update interval  = 0
 end
-
 
 subsection B - Equation
   set dimension             = 1
@@ -19,7 +16,6 @@ subsection B - Equation
     set gamma = 1.4
   end
 end
-
 
 subsection C - Discretization
   set geometry        = rectangular domain
@@ -35,14 +31,12 @@ subsection C - Discretization
   end
 end
 
-
 subsection E - InitialValues
   set configuration = rarefaction
 
   set direction     = 1
   set position      = 0.2
 end
-
 
 subsection F - HyperbolicModule
   subsection indicator
@@ -57,7 +51,6 @@ subsection F - HyperbolicModule
   end
 end
 
-
 subsection H - TimeIntegrator
   set cfl min               = 0.10
   set cfl max               = 0.10
@@ -65,6 +58,10 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error quantities = rho, m, E
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end
