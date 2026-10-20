@@ -15,13 +15,13 @@
 ##
 
 
-subsection A - TimeLoop
-  set basename                        = kpp
+subsection A - Scheduler
+  set basename          = kpp
 
-  set enable output full              = true
+  set tasks             = vtu output
 
-  set final time                      = 1.00
-  set timer granularity               = 1.00
+  set final time        = 1.00
+  set timer granularity = 1.00
 end
 
 
@@ -78,7 +78,9 @@ subsection H - TimeIntegrator
 end
 
 
-subsection J - VTUOutput
-  set use mpi io           = true
-  set vtu output quantities = u
+subsection I - VTUOutput
+  subsection full
+    set use mpi io            = true
+    set vtu output quantities = u
+  end
 end

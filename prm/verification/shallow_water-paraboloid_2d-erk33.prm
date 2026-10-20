@@ -15,15 +15,13 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename             = paraboloid_2d-erk33
+subsection A - Scheduler
+  set basename          = paraboloid_2d-erk33
 
-  set enable compute error = true
+  set tasks             = vtu output, error evaluation
 
-  set enable output full   = true
-
-  set final time           = 13.45710440
-  set timer granularity    = 13.45710440
+  set final time        = 13.45710440
+  set timer granularity = 13.45710440
 end
 
 subsection B - Equation
@@ -77,7 +75,7 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = true
   set error quantities = h
 end

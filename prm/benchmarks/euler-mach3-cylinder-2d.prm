@@ -19,13 +19,13 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename           = mach3-cylinder-2d
+subsection A - Scheduler
+  set basename          = mach3-cylinder-2d
 
-  set enable output full = true
+  set tasks             = vtu output
 
-  set final time         = 5.00
-  set timer granularity  = 0.10
+  set final time        = 5.00
+  set timer granularity = 0.10
 end
 
 
@@ -73,7 +73,9 @@ subsection H - TimeIntegrator
 end
 
 
-subsection J - VTUOutput
-  set use mpi io     = true
-  set schlieren beta = 10
+subsection I - VTUOutput
+  subsection full
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
 end

@@ -22,15 +22,13 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename             = isentropic_vortex-strang_erk_33_cn
+subsection A - Scheduler
+  set basename          = isentropic_vortex-strang_erk_33_cn
 
-  set enable compute error = true
+  set tasks             = vtu output, error evaluation
 
-  set enable output full   = true
-
-  set final time           = 2.0
-  set timer granularity    = 2.0
+  set final time        = 2.0
+  set timer granularity = 2.0
 end
 
 subsection B - Equation
@@ -115,11 +113,13 @@ subsection H - TimeIntegrator
   set time stepping scheme  = strang erk 33 cn
 end
 
-subsection J - VTUOutput
-  set vtu output quantities      = rho, m_1, m_2, phi, schlieren_rho
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, m_1, m_2, phi, schlieren_rho
+  end
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = true
   set error quantities = rho, m_1, m_2
 end

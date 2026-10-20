@@ -38,14 +38,14 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename                            = diocotron_instability-mode_5
+subsection A - Scheduler
+  set basename           = diocotron_instability-mode_5
 
-  set enable output full                  = true
+  set tasks              = vtu output
 
-  set final time                          = 10.00
-  set timer granularity                   = 00.10
-  set enforce final time                  = true
+  set final time         = 10.00
+  set timer granularity  = 00.10
+  set align time steps   = true
 end
 
 
@@ -138,6 +138,8 @@ subsection H - TimeIntegrator
 end
 
 
-subsection J - VTUOutput
-  set vtu output quantities    = rho, m_1, m_2, phi, schlieren_rho
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, m_1, m_2, phi, schlieren_rho
+  end
 end

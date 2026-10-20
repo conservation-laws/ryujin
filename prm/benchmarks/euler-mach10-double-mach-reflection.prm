@@ -18,13 +18,13 @@
 ##
 
 
-subsection A - TimeLoop
-  set basename           = mach10-dbmr
+subsection A - Scheduler
+  set basename          = mach10-dbmr
 
-  set enable output full = true
+  set tasks             = vtu output
 
-  set final time         = 0.20
-  set timer granularity  = 0.01
+  set final time        = 0.20
+  set timer granularity = 0.01
 end
 
 
@@ -70,7 +70,9 @@ subsection H - TimeIntegrator
 end
 
 
-subsection J - VTUOutput
-  set use mpi io     = true
-  set schlieren beta = 10
+subsection I - VTUOutput
+  subsection full
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
 end
