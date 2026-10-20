@@ -6,11 +6,14 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/interface/mesh_adaptor.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
+#include <ryujin/interface/simulation.h>
+#include <ryujin/interface/task.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -57,23 +60,6 @@ namespace ryujin
      */
     fixed_threshold,
   };
-
-  /**
-   * Controls the time point selection strategy.
-   *
-   * @ingroup MeshAndOfflineData
-   */
-  enum class TimePointSelectionStrategy {
-    /**
-     * Perform a mesh adaptation cycle at preselected fixed time points.
-     */
-    fixed_time_points,
-
-    /**
-     * Perform a mesh adaptation cycle at every nth simulation cycle.
-     */
-    simulation_cycle,
-  };
 } // namespace ryujin
 
 #ifndef DOXYGEN
@@ -87,12 +73,6 @@ DECLARE_ENUM(
 DECLARE_ENUM(ryujin::MarkingStrategy,
              LIST({ryujin::MarkingStrategy::fixed_threshold,
                    "fixed threshold"}));
-
-DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
-             LIST({ryujin::TimePointSelectionStrategy::fixed_time_points,
-                   "fixed time points"},
-                  {ryujin::TimePointSelectionStrategy::simulation_cycle,
-                   "simulation cycle"}, ));
 #endif
 
 namespace ryujin
@@ -101,10 +81,18 @@ namespace ryujin
    * The MeshAdaptor class is responsible for performing global or local
    * mesh adaptation.
    *
+   * The class is the task "mesh adaptation" that, whenever its trigger
+   * fires (by default in every 10th cycle), analyzes the state vector,
+   * marks cells for coarsening and refinement, and adapts the mesh. The
+   * state vector of the Simulation is attached to the triangulation
+   * and transferred to the new mesh when the Scheduler prepares all tasks
+   * again.
+   *
    * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
-  class MeshAdaptor final : public Interface::MeshAdaptor<dim, Number>
+  class MeshAdaptor final : public dealii::ParameterAcceptor,
+                            public Interface::Task<Number>
   {
   public:
     /**
@@ -115,47 +103,25 @@ namespace ryujin
     /**
      * Constructor.
      */
-    MeshAdaptor(const MPIEnsemble &mpi_ensemble,
-                const Interface::OfflineData<dim, Number> &offline_data,
-                const Interface::Postprocessor<dim, Number> &postprocessor,
+    MeshAdaptor(Interface::Simulation<dim, Number> &simulation,
                 const std::string &subsection = "/MeshAdaptor");
+
+    //@}
+    /**
+     * @name Task
+     */
+    //@{
 
     /**
      * Prepare temporary storage and clean up internal data for the
      * analyze() facility.
      */
-    void prepare(const Number t) override;
-
-    //@}
-    /**
-     * @name Functions for performing mesh adaptation
-     */
-    //@{
+    void prepare(TaskContext<Number> &context) override;
 
     /**
-     * Analyze the given StateVector with the configured adaptation
-     * strategy and time point selection strategy and decide whether a mesh
-     * adaptation cycle should be performed.
+     * Adapt the mesh whenever the trigger fires.
      */
-    void analyze(const StateVector<Number> &state_vector,
-                 const Number t,
-                 unsigned int cycle) override;
-
-    /**
-     * Mark cells for coarsening and refinement with the configured mesh
-     * adaptation and marking strategies.
-     */
-    void mark_cells_for_coarsening_and_refinement(
-        dealii::Triangulation<dim> &triangulation) const override;
-
-    /**
-     * Keep the current transformation.
-     */
-    void update_transformation(
-        typename Interface::MeshAdaptor<dim, Number>::Transformation
-            & /*transformation*/) const override
-    {
-    }
+    void execute(TaskContext<Number> &context) override;
 
     //@}
 
@@ -175,10 +141,6 @@ namespace ryujin
     unsigned int min_refinement_level_;
     unsigned int max_refinement_level_;
 
-    TimePointSelectionStrategy time_point_selection_strategy_;
-    std::vector<Number> adaptation_time_points_;
-    unsigned int adaptation_cycle_interval_;
-
     std::vector<std::string> smoothness_selected_quantities_;
     Number smoothness_local_global_ratio_;
     Number smoothness_min_cutoff_;
@@ -191,26 +153,28 @@ namespace ryujin
      */
     //@{
 
+    Trigger<Number> trigger_;
+
+    Interface::Simulation<dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 
     typename Interface::Postprocessor<dim, Number>::Selection selection_;
 
     /* The computed cell indicators. */
-    mutable dealii::Vector<float> indicators_;
+    dealii::Vector<float> indicators_;
 
     /* random adaptation: */
-    mutable std::mt19937_64 mersenne_twister_;
+    std::mt19937_64 mersenne_twister_;
 
     /*
      * smoothness indicators: only valid if the "smoothness indicator"
      * refinement strategy has been selected.
      */
-    mutable ScalarVector<Number> smoothness_indicators_;
+    ScalarVector<Number> smoothness_indicators_;
 
     //@}
     /**
@@ -218,18 +182,29 @@ namespace ryujin
      */
     //@{
 
+    /**
+     * Analyze the given StateVector with the configured adaptation
+     * strategy.
+     */
+    void analyze(const StateVector<Number> &state_vector);
+
+    /**
+     * Mark the cells of the triangulation for coarsening and refinement
+     * with the configured mesh adaptation and marking strategies.
+     */
+    void mark_cells_for_coarsening_and_refinement();
+
     /* random adaptation: */
-    void populate_cell_indicators_with_random_values() const;
+    void populate_cell_indicators_with_random_values();
 
     /* smoothness indicators: */
-    void populate_cell_indicators_from_smoothness_indicators() const;
+    void populate_cell_indicators_from_smoothness_indicators();
 
     /*
      * Compute smoothness indicators. This function reinitializes and
      * populates the smoothness_indicators_ vector.
      */
-    void compute_smoothness_indicators(
-        const StateVector<Number> &state_vector) const;
+    void compute_smoothness_indicators(const StateVector<Number> &state_vector);
 
     //@}
   };

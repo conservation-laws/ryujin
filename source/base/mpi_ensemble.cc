@@ -47,7 +47,7 @@ namespace ryujin
      *
      * If the ensemble is initialized with the MPI_COMM_SELF communicator,
      * skip setting up the communicators for the case that n_ensembles_ > 1.
-     * This only serves the purpose that we can create a TimeLoop instance
+     * This only serves the purpose that we can create a Scheduler instance
      * long enough to query for parameters.
      */
 
@@ -145,6 +145,18 @@ namespace ryujin
       MPI_Comm_free(&ensemble_leader_communicator_);
     if (peer_communicator_ != MPI_COMM_NULL)
       MPI_Comm_free(&peer_communicator_);
+  }
+
+
+  std::string MPIEnsemble::base_name(const std::string &base_name) const
+  {
+    if (n_ensembles_ == 1)
+      return base_name;
+
+    const unsigned int digits =
+        dealii::Utilities::needed_digits(n_ensembles_ - 1);
+    return base_name + "-ensemble_" +
+           dealii::Utilities::int_to_string(ensemble_, digits);
   }
 
 } // namespace ryujin

@@ -6,7 +6,7 @@
 #pragma once
 
 #include <ryujin/driver/simulation.h>
-#include <ryujin/driver/time_loop.h>
+#include <ryujin/driver/task_composition.h>
 #include <ryujin/typed/equation.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -18,10 +18,12 @@
 
 namespace ryujin
 {
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            typename Number>
-  void Equation<HyperbolicDescription, ParabolicDescription, Number>::run(
+  template <typename HD,
+            typename PD,
+            typename Number,
+            template <int, typename>
+            class TaskComposition>
+  void Equation<HD, PD, Number, TaskComposition>::run(
       int dim,
       const std::string &parameter_file,
       const MPI_Comm &mpi_comm) const
@@ -50,11 +52,12 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            typename Number>
-  void Equation<HyperbolicDescription, ParabolicDescription, Number>::
-      create_parameter_files() const
+  template <typename HD,
+            typename PD,
+            typename Number,
+            template <int, typename>
+            class TaskComposition>
+  void Equation<HD, PD, Number, TaskComposition>::create_parameter_files() const
   {
     create_parameter_file<1>(false);
     create_parameter_file<2>(true);
@@ -62,37 +65,40 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            typename Number>
+  template <typename HD,
+            typename PD,
+            typename Number,
+            template <int, typename>
+            class TaskComposition>
   template <int dim>
-  void
-  Equation<HyperbolicDescription, ParabolicDescription, Number>::run_simulation(
+  void Equation<HD, PD, Number, TaskComposition>::run_simulation(
       const std::string &parameter_file, const MPI_Comm &mpi_comm)
   {
-    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
-        simulation(mpi_comm);
-    TimeLoop<dim, Number> time_loop(simulation);
+    Simulation<HD, PD, dim, Number> simulation(mpi_comm);
+    TaskComposition<dim, Number> task_composition(simulation);
     dealii::ParameterAcceptor::initialize(parameter_file);
-    time_loop.run();
+    task_composition.run();
   }
 
 
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            typename Number>
+  template <typename HD,
+            typename PD,
+            typename Number,
+            template <int, typename>
+            class TaskComposition>
   template <int dim>
-  void Equation<HyperbolicDescription, ParabolicDescription, Number>::
-      create_parameter_file(bool write_detailed_description) const
+  void Equation<HD, PD, Number, TaskComposition>::create_parameter_file(
+      bool write_detailed_description) const
   {
     {
       auto &prm = dealii::ParameterAcceptor::prm;
 
       /*
-       * Workaround: Add an entry to the "A - TimeLoop" section so that is
+       * Workaround: The Scheduler is constructed last and declares the
+       * "A - Scheduler" section last. Add an entry to the section so that it
        * shows up first.
        */
-      prm.enter_subsection("A - TimeLoop");
+      prm.enter_subsection("A - Scheduler");
       prm.declare_entry("basename", "test");
       prm.leave_subsection();
 
@@ -115,9 +121,8 @@ namespace ryujin
        * Create temporary objects for the sole purpose of populating the
        * ParameterAcceptor::prm object.
        */
-      Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
-          simulation(MPI_COMM_SELF);
-      TimeLoop<dim, Number> time_loop(simulation);
+      Simulation<HD, PD, dim, Number> simulation(MPI_COMM_SELF);
+      TaskComposition<dim, Number> task_composition(simulation);
 
       std::string base_name = this->name();
       std::ranges::replace(base_name, ' ', '_');

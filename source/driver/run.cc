@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace ryujin
 {

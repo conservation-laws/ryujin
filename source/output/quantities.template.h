@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ryujin/base/computing_timer.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/output/quantities.h>
 
@@ -54,19 +55,20 @@ namespace ryujin
 
   template <int dim, typename Number>
   Quantities<dim, Number>::Quantities(
-      const MPIEnsemble &mpi_ensemble,
-      const Interface::OfflineData<dim, Number> &offline_data,
-      const Interface::HyperbolicSystem &hyperbolic_system,
-      const Interface::Postprocessor<dim, Number> &postprocessor,
+      const Interface::Simulation<dim, Number> &simulation,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
-      , mpi_ensemble_(mpi_ensemble)
-      , offline_data_(&offline_data)
-      , postprocessor_(postprocessor)
+      , Interface::Task<Number>("quantities", TaskPhase::pre_step)
+      , simulation_(simulation)
+      , mpi_ensemble_(simulation.mpi_ensemble())
+      , offline_data_(&simulation.offline_data())
+      , postprocessor_(simulation.postprocessor())
       , base_name_("")
       , mesh_files_have_been_written_(false)
   {
-    quantities_ = hyperbolic_system.primitive_names(dim);
+    trigger_.add_parameters(*this);
+
+    quantities_ = simulation.hyperbolic_system().primitive_names(dim);
 
     add_parameter("quantities",
                   quantities_,
@@ -108,13 +110,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Quantities<dim, Number>::prepare(const std::string &name)
+  void Quantities<dim, Number>::prepare(TaskContext<Number> &context)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
 #endif
 
-    base_name_ = name;
+    base_name_ = mpi_ensemble_.base_name(context.base_name);
 
     selection_ = postprocessor_.prepare(quantities_);
 
@@ -307,6 +309,24 @@ namespace ryujin
 
     /* Make sure we output new mesh files: */
     mesh_files_have_been_written_ = false;
+  }
+
+
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::execute(TaskContext<Number> &context)
+  {
+    const auto &state_vector = simulation_.state_vector();
+
+    {
+      ComputingTimer::Scope scope("time step [X]   - accumulate quantities");
+      accumulate(state_vector, context.t);
+    }
+
+    if (!trigger_.fire(context))
+      return;
+
+    ComputingTimer::Scope scope("time step [X]   - write out quantities");
+    write_out(state_vector, context.t, context.timer_cycle);
   }
 
 

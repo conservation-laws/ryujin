@@ -1,15 +1,10 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                  = test
 
-  set enable compute quantities = true
-  set enable output full        = false
+  set tasks                     = quantities
 
   set final time                = 0.5
   set timer granularity         = 0.5
-
-  set terminal update interval  = 0
-
-  set debug command             = ../../../../print_mass test-interior-R0000-space_averaged_time_series.dat
 end
 
 subsection B - Equation
@@ -53,8 +48,13 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection K - Quantities
+subsection J - Quantities
   set quantities                   = rho
   set number of moments            = 1
   set interior manifolds           = interior : 0. : space_averaged
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+  set debug command            = ../../../../print_mass test-interior-R0000-space_averaged_time_series.dat
 end

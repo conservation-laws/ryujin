@@ -1,0 +1,5 @@
+print: t = 0.250000, y = 0.777821, steps 25
+print: t = 0.500000, y = 0.605006, steps 50
+print: t = 0.750000, y = 0.470587, steps 75
+print: t = 1.000000, y = 0.366032, steps 100
+finalize: cycles 100, t = 1.000000

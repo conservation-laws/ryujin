@@ -1,10 +1,10 @@
-subsection A - TimeLoop
-  set basename           = wc-blast-ideal
+subsection A - Scheduler
+  set basename          = wc-blast-ideal
 
-  set enable output full = true
+  set tasks             = vtu output
 
-  set final time         = 0.038
-  set timer granularity  = 0.001
+  set final time        = 0.038
+  set timer granularity = 0.001
 end
 
 subsection B - Equation
@@ -68,12 +68,13 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection J - VTUOutput
-  set manifolds                  = 
-  set schlieren beta             = 10
-  set schlieren recompute bounds = true
-  set use mpi io                 = true
-  set vtu output quantities      = rho, m, E, p
+subsection I - VTUOutput
+  subsection full
+    set schlieren beta             = 10
+    set schlieren recompute bounds = true
+    set use mpi io                 = true
+    set vtu output quantities      = rho, m, E, p
+  end
 end
 
 

@@ -31,9 +31,11 @@ set(CORE_SOURCE_FILES
   discretization/mesh_adaptor.cc
   discretization/offline_data.cc
   discretization/time_integrator.cc
+  driver/checkpointing.cc
   driver/equation_library.cc
+  driver/logger.cc
   driver/run.cc
-  driver/time_loop.cc
+  driver/scheduler.cc
   geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc
   linear_algebra/sparsity_pattern.cc
@@ -100,8 +102,10 @@ foreach(_target object_core ${OBJECT_TARGETS})
 endforeach()
 
 add_library(libryujin SHARED ${_objects})
+
 deal_ii_setup_target(libryujin)
 target_link_libraries(libryujin ${EXTERNAL_TARGETS})
+
 target_compile_features(libryujin PUBLIC cxx_std_20)
 target_include_directories(libryujin PUBLIC
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
@@ -127,10 +131,11 @@ install(TARGETS libryujin
   )
 
 #
-# The executable
+# The ryujin executable:
 #
 
 add_executable(ryujin main.cc)
+
 deal_ii_setup_target(ryujin)
 target_link_libraries(ryujin libryujin)
 

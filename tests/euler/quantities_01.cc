@@ -3,13 +3,10 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <ryujin/base/mpi_ensemble.h>
-#include <ryujin/discretization/discretization.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/driver/simulation.h>
 #include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/output/quantities.h>
-#include <ryujin/stub/parabolic_system.h>
-#include <ryujin/typed/postprocessor.h>
+#include <ryujin/stub/parabolic_module.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -25,9 +22,9 @@
 // interior (diagonal) and a boundary (left edge) manifold and select a
 // conserved, two primitive, and a precomputed quantity. A state vector is
 // populated with synthetic data that depends on the position of the
-// degree of freedom and on time. We accumulate statistics at t = 0, ..., 4,
-// write out all files, accumulate two more time steps (without clearing
-// statistics), write out again, and print the resulting point maps,
+// degree of freedom and on time. We execute the task at t = 0, ..., 6 and
+// let it write out all files at the timer ticks t = 4 and t = 6 (without
+// clearing statistics in between), and print the resulting point maps,
 // instantaneous values, time averaged central moments, and space averaged time
 // series.
 //
@@ -41,7 +38,6 @@ constexpr int dim = 2;
 using Number = NUMBER;
 
 using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
-using ParabolicSystem = StubParabolicSystem;
 using SystemView = typename HyperbolicSystem::template View<dim, Number>;
 
 
@@ -52,7 +48,7 @@ using SystemView = typename HyperbolicSystem::template View<dim, Number>;
  * factor f_n = sin(n * pi / 2), i.e., by 0, 1, 0, -1, 0, ...
  */
 void populate(StateVector<Number> &state_vector,
-              const Interface::OfflineData<dim, Number> &offline_data,
+              const OfflineData<dim, Number> &offline_data,
               const std::map<types::global_dof_index, Point<dim>> &positions,
               const unsigned int n)
 {
@@ -95,24 +91,17 @@ int main(int argc, char *argv[])
 
   /* Set up a small rectangular domain and the corresponding offline data: */
 
-  MPIEnsemble mpi_ensemble(MPI_COMM_WORLD);
+  Simulation<HyperbolicDescription, StubParabolicDescription, dim, Number>
+      simulation(MPI_COMM_WORLD);
+  const auto &mpi_ensemble = simulation.mpi_ensemble();
+  const auto &discretization = simulation.discretization();
+  const auto &offline_data = simulation.offline_data();
 
-  HyperbolicSystem hyperbolic_system;
-  ParabolicSystem parabolic_system;
-  Discretization<dim> discretization(mpi_ensemble);
-  OfflineData<dim, Number> offline_data(mpi_ensemble, discretization);
-
-  MultiComponentVector<Number> initial_precomputed;
-
-  Postprocessor<HyperbolicDescription, dim, Number> postprocessor(
-      offline_data, hyperbolic_system, parabolic_system, initial_precomputed);
-
-  Quantities<dim, Number> quantities(
-      mpi_ensemble, offline_data, hyperbolic_system, postprocessor);
+  Quantities<dim, Number> quantities(simulation);
 
   std::stringstream parameters;
   parameters
-      << "subsection Discretization\n"
+      << "subsection C - Discretization\n"
       << "  set geometry        = rectangular domain\n"
       << "  set mesh refinement = 2\n"
       << "  subsection rectangular domain\n"
@@ -131,9 +120,10 @@ int main(int argc, char *argv[])
       << "end\n";
   ParameterAcceptor::initialize(parameters);
 
-  discretization.prepare("test");
-  offline_data.prepare(SystemView::problem_dimension,
-                       SystemView::n_precomputed_values);
+  TaskContext<Number> context;
+  context.base_name = "test";
+  context.info = [](const std::string &) {};
+  simulation.prepare(context);
 
   const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
@@ -145,7 +135,7 @@ int main(int argc, char *argv[])
    * the selected memory space, thus use an implicit transfer policy:
    */
 
-  StateVector<Number> state_vector;
+  auto &state_vector = simulation.state_vector();
   auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
   U.reinit_with_scalar_partitioner(scalar_partitioner,
                                    SystemView::problem_dimension,
@@ -153,26 +143,18 @@ int main(int argc, char *argv[])
   Q.reinit_with_scalar_partitioner(scalar_partitioner,
                                    SystemView::n_precomputed_values,
                                    TransferPolicy::implicit_transfers);
-  initial_precomputed.reinit_with_scalar_partitioner(
-      scalar_partitioner,
-      SystemView::n_initial_precomputed_values,
-      TransferPolicy::implicit_transfers);
 
-  /* Accumulate statistics and write out: */
+  /* Accumulate statistics and write out at the timer ticks t = 4, 6: */
 
-  quantities.prepare("test");
+  quantities.prepare(context);
 
-  for (unsigned int n = 0; n <= 4; ++n) {
+  for (unsigned int n = 0; n <= 6; ++n) {
     populate(state_vector, offline_data, positions, n);
-    quantities.accumulate(state_vector, Number(n));
+    context.t = Number(n);
+    context.timer_tick = (n == 4 || n == 6);
+    context.timer_cycle = (n == 6) ? 1 : 0;
+    quantities.execute(context);
   }
-  quantities.write_out(state_vector, Number(4.), /*cycle*/ 0);
-
-  for (unsigned int n = 5; n <= 6; ++n) {
-    populate(state_vector, offline_data, positions, n);
-    quantities.accumulate(state_vector, Number(n));
-  }
-  quantities.write_out(state_vector, Number(6.), /*cycle*/ 1);
 
   /* Print all output files: */
 

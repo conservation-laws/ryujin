@@ -14,15 +14,13 @@
 #
 ##
 
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename             = smooth_vortex-erk33
 
-  set enable compute error = true
+  set tasks                = error evaluation
 
   set final time           = 2.0
   set timer granularity    = 2.0
-
-  set terminal update interval  = 0
 end
 
 subsection B - Equation
@@ -76,7 +74,11 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = true
   set error quantities = h, m_1, m_2
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

@@ -8,7 +8,7 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/concept/parabolic_system.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/typed/initial_values.h>
 
@@ -42,7 +42,7 @@ namespace ryujin
                           Interface::ParabolicModule<dim, Number>> &&
         std::constructible_from<parabolic_module_type<T, HD, dim, Number>,
                                 const MPIEnsemble &,
-                                const Interface::OfflineData<dim, Number> &,
+                                const OfflineData<dim, Number> &,
                                 const typename HD::HyperbolicSystem &,
                                 const typename T::ParabolicSystem &,
                                 const InitialValues<HD, dim, Number> &,

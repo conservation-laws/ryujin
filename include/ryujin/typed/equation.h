@@ -14,15 +14,32 @@
 
 namespace ryujin
 {
+#ifndef DOXYGEN
+  /* forward declaration */
+  template <int dim, typename Number>
+  struct TaskComposition;
+#endif
+
   /**
-   * The equation that pairs the @p HyperbolicDescription with the
-   * @p ParabolicDescription, for the number type @p Number.
+   * The equation that pairs the hyperbolic description @p HD with the
+   * parabolic description @p PD, for the number type @p Number.
+   *
+   * The equation runs the class template @p TaskComposition for the selected
+   * dimension: it constructs a `Simulation<HD, PD, dim, Number>` from the
+   * MPI communicator and a `TaskComposition<dim, Number>` from the
+   * Simulation, initializes all run time parameters, and calls the run()
+   * function of the TaskComposition. The default is the
+   * ryujin::TaskComposition with all library tasks; a client registers an
+   * Equation with a TaskComposition of its own to run a different
+   * composition of tasks.
    *
    * @ingroup Typed
    */
-  template <typename HyperbolicDescription,
-            typename ParabolicDescription,
-            typename Number = double>
+  template <typename HD,
+            typename PD,
+            typename Number = double,
+            template <int, typename> class TaskComposition =
+                ryujin::TaskComposition>
   class Equation final : public Interface::Equation
   {
   public:
@@ -42,8 +59,8 @@ namespace ryujin
 
   private:
     /**
-     * Construct the Simulation and the TimeLoop for dimension @p dim,
-     * initialize all parameters from @p parameter_file, and run.
+     * Construct the Simulation and the TaskComposition for dimension
+     * @p dim, initialize all parameters from @p parameter_file, and run.
      */
     template <int dim>
     static void run_simulation(const std::string &parameter_file,

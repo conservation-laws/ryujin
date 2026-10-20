@@ -70,7 +70,7 @@ std::vector<ScalarHostVector<Number>> extract_gather(
     const Interface::Postprocessor<dim, Number> &postprocessor,
     const Interface::Postprocessor<dim, Number>::Selection &selection,
     const StateVector<Number> &state_vector,
-    const Interface::OfflineData<dim, Number> &offline_data,
+    const OfflineData<dim, Number> &offline_data,
     const std::vector<unsigned int> &order)
 {
   const unsigned int n_selected = selection.size();

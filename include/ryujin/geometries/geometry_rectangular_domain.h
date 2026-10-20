@@ -272,10 +272,10 @@ namespace ryujin
       }
 
 
-      typename Geometry<dim>::HP_Collection populate_hp_collections(
-          const unsigned int /*fe_degree*/,
-          typename ryujin::Interface::Discretization<dim>::Collection
-              & /*collection*/) const override
+      typename Geometry<dim>::HP_Collection
+      populate_hp_collections(const unsigned int /*fe_degree*/,
+                              typename ryujin::Discretization<dim>::Collection
+                                  & /*collection*/) const override
       {
         if (use_simplices_) {
           return Geometry<dim>::HP_Collection::standard_simplices;

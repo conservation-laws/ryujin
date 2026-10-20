@@ -6,14 +6,15 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/computing_timer.h>
 #include <ryujin/base/mpi_ensemble_container.h>
 #include <ryujin/concept/hyperbolic_description.h>
 #include <ryujin/concept/parabolic_description.h>
 #include <ryujin/discretization/discretization.h>
-#include <ryujin/discretization/mesh_adaptor.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/discretization/time_integrator.h>
 #include <ryujin/interface/simulation.h>
+#include <ryujin/interface/task.h>
 #include <ryujin/typed/hyperbolic_module.h>
 #include <ryujin/typed/initial_values.h>
 #include <ryujin/typed/postprocessor.h>
@@ -24,14 +25,16 @@
 namespace ryujin
 {
   /**
-   * The Simulation constructs all objects of a computation for the
-   * pairing of a hyperbolic and a parabolic description. It is the only
-   * class that sees both descriptions.
+   * The Simulation constructs the core objects of a simulation for
+   * the pairing of a hyperbolic and a parabolic description.
    *
    * In addition to the objects stored in Interface::Simulation it owns
    * the per-ensemble containers of the hyperbolic system, the parabolic
-   * system, and the initial values, and the postprocessor that the
-   * description-free modules share.
+   * system, and the initial values.
+   *
+   * The Simulation implements the primary task "time integration" of the
+   * Scheduler: prepare() sets up the discretization and the state vector,
+   * and execute() performs the time step.
    *
    * @ingroup Driver
    */
@@ -58,11 +61,12 @@ namespace ryujin
     //@{
 
     /**
-     * Constructor. Constructs all objects in the order of the
-     * subsections "/B - Equation" to "/L - ErrorEvaluation".
+     * Constructor.
      */
     Simulation(const MPI_Comm &mpi_comm)
     {
+      DeviceTimer::reinit();
+
       int n_ensembles = 1;
       if constexpr (has_n_mpi_ensembles_v<HD>)
         n_ensembles = HD::n_mpi_ensembles();
@@ -131,14 +135,11 @@ namespace ryujin
           *this->parabolic_module_,
           "/H - TimeIntegrator");
 
-      postprocessor_ =
+      this->postprocessor_ =
           std::make_unique<Postprocessor<HD, dim, Number>>(offline_data,
                                                            hyperbolic_system,
                                                            parabolic_system,
                                                            initial_precomputed);
-
-      this->mesh_adaptor_ = std::make_unique<MeshAdaptor<dim, Number>>(
-          mpi_ensemble, offline_data, *postprocessor_, "/I - MeshAdaptor");
 
       this->solution_transfer_ =
           std::make_unique<SolutionTransfer<HD, dim, Number>>(
@@ -147,28 +148,7 @@ namespace ryujin
               offline_data,
               hyperbolic_system,
               parabolic_system,
-              "/I - MeshAdaptor");
-
-      this->vtu_output_ =
-          std::make_unique<VTUOutput<dim, Number>>(mpi_ensemble,
-                                                   offline_data,
-                                                   hyperbolic_system,
-                                                   *postprocessor_,
-                                                   "/J - VTUOutput");
-
-      this->quantities_ =
-          std::make_unique<Quantities<dim, Number>>(mpi_ensemble,
-                                                    offline_data,
-                                                    hyperbolic_system,
-                                                    *postprocessor_,
-                                                    "/K - Quantities");
-
-      this->error_evaluation_ = std::make_unique<ErrorEvaluation<dim, Number>>(
-          mpi_ensemble,
-          offline_data,
-          hyperbolic_system,
-          *postprocessor_,
-          "/L - ErrorEvaluation");
+              "/F - HyperbolicModule");
     }
 
     /**
@@ -177,12 +157,9 @@ namespace ryujin
      */
     ~Simulation() override
     {
-      this->error_evaluation_.reset();
-      this->quantities_.reset();
-      this->vtu_output_.reset();
+      this->state_vector_ = StateVector<Number>();
       this->solution_transfer_.reset();
-      this->mesh_adaptor_.reset();
-      postprocessor_.reset();
+      this->postprocessor_.reset();
       this->time_integrator_.reset();
       this->parabolic_module_.reset();
       this->hyperbolic_module_.reset();
@@ -195,6 +172,77 @@ namespace ryujin
       this->hyperbolic_system_ = nullptr;
       hyperbolic_system_container_.reset();
       this->mpi_ensemble_.reset();
+    }
+
+    //@}
+    /**
+     * @name Task
+     */
+    //@{
+
+    /**
+     * Prepare the discretization and the state vector for the current
+     * mesh.
+     *
+     * If no triangulation has been created (or loaded from a checkpoint) yet,
+     * create the mesh. If a state vector is attached to the triangulation
+     * (after a mesh adaptation or a resume), project it onto the new mesh;
+     * otherwise interpolate the initial values.
+     */
+    void prepare(TaskContext<Number> &context) override
+    {
+      auto &mpi_ensemble = *this->mpi_ensemble_;
+      auto &discretization = *this->discretization_;
+      auto &state_vector = this->state_vector_;
+
+      if (!discretization.has_triangulation()) {
+        if (mpi_ensemble.n_ensembles() > 1)
+          context.info("setting up MPI ensemble");
+        context.info("creating mesh and interpolating initial values");
+        discretization.prepare(mpi_ensemble.base_name(context.base_name));
+      }
+
+      context.info("preparing compute kernels");
+      discretization.update_mapping();
+      this->offline_data_->prepare(
+          this->hyperbolic_module_->problem_dimension(),
+          this->hyperbolic_module_->n_precomputed_values());
+      this->hyperbolic_module_->prepare();
+      this->parabolic_module_->prepare();
+      this->time_integrator_->prepare();
+
+      this->hyperbolic_module_->reinit_state_vector(state_vector);
+      this->parabolic_module_->reinit_state_vector(state_vector);
+
+      auto &solution_transfer = *this->solution_transfer_;
+      if (solution_transfer.has_handle()) {
+        solution_transfer.project(state_vector);
+        solution_transfer.reset_handle();
+      } else {
+        ComputingTimer::Scope scope(
+            "time step [X]   - interpolate data vectors");
+        state_vector.state =
+            this->initial_values_->interpolate_hyperbolic_vector();
+      }
+      debug_poison_invalid_values(state_vector, *this->offline_data_);
+
+      /* Prepare the state vector for time stepping. */
+      this->time_integrator_->prepare_state_vector(state_vector, context.t);
+    }
+
+    /**
+     * Perform a time step from t to t + tau with the TimeIntegrator and
+     * prepare the state vector at time t + tau.
+     */
+    void execute(TaskContext<Number> &context) override
+    {
+      auto &state_vector = this->state_vector_;
+
+      context.tau =
+          this->time_integrator_->step(state_vector, context.t, context.t_max);
+
+      this->time_integrator_->prepare_state_vector(state_vector,
+                                                   context.t + context.tau);
     }
 
     //@}
@@ -211,7 +259,6 @@ namespace ryujin
         parabolic_system_container_;
     std::unique_ptr<MPIEnsembleContainer<InitialValues<HD, dim, Number>>>
         initial_values_container_;
-    std::unique_ptr<Postprocessor<HD, dim, Number>> postprocessor_;
 
     //@}
   };

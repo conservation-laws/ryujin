@@ -23,17 +23,13 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename                            = output-G2-S2
+subsection A - Scheduler
+  set basename          = output-G2-S2
 
-  set enable output full                  = true
-  set enable compute quantities           = true
+  set tasks             = vtu output, quantities
 
-  set final time                          = 50
-  set timer granularity                   = 0.1
-
-  set timer output full multiplier        = 100 # Change to 1 for nice movie
-  set timer compute quantities multiplier = 100
+  set final time        = 50
+  set timer granularity = 0.1
 end
 
 subsection B - Equation
@@ -106,15 +102,18 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 43
 end
 
-subsection J - VTUOutput
-  set manifolds                  = 
-  set schlieren beta             = 10
-  set schlieren recompute bounds = true
-  set use mpi io                 = true
-  set vtu output quantities      = h, m_1, m_2, bathymetry, v_1, schlieren_h
+subsection I - VTUOutput
+  subsection full
+    set trigger multiplier         = 100 # Change to 1 for nice movie
+    set schlieren beta             = 10
+    set schlieren recompute bounds = true
+    set use mpi io                 = true
+    set vtu output quantities      = h, m_1, m_2, bathymetry, v_1, schlieren_h
+  end
 end
 
-subsection K - Quantities
+subsection J - Quantities
+  set trigger multiplier = 100
   set clear statistics on writeout = true
   set interior manifolds = lineout-x : x - 2.40 : instantaneous, \
                            lineout-y : y - 0.   : instantaneous  

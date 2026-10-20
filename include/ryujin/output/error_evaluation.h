@@ -8,13 +8,14 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
-#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
+#include <ryujin/interface/simulation.h>
+#include <ryujin/interface/task.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
-#include <ostream>
 #include <string>
 #include <vector>
 
@@ -36,13 +37,15 @@ namespace ryujin
    * selected quantities (and, if applicable, over all MPI ensembles). The
    * result is one number per selected norm.
    *
-   * The class also writes out the computed error into a log file `<base
-   * name>-error.log`.
+   * The class is the task "error evaluation" that writes out the
+   * computed error into a log file `<base name>-error.log` whenever its
+   * trigger fires, and prints a summary of the error at the final time.
    *
    * @ingroup Output
    */
   template <int dim, typename Number = double>
-  class ErrorEvaluation final : public dealii::ParameterAcceptor
+  class ErrorEvaluation final : public dealii::ParameterAcceptor,
+                                public Interface::Task<Number>
   {
   public:
     /**
@@ -53,62 +56,39 @@ namespace ryujin
     /**
      * Constructor.
      */
-    ErrorEvaluation(const MPIEnsemble &mpi_ensemble,
-                    const Interface::OfflineData<dim, Number> &offline_data,
-                    const Interface::HyperbolicSystem &hyperbolic_system,
-                    const Interface::Postprocessor<dim, Number> &postprocessor,
+    ErrorEvaluation(const Interface::Simulation<dim, Number> &simulation,
                     const std::string &subsection = "/ErrorEvaluation");
-
-    /**
-     * Prepare error evaluation. A call to @ref prepare() validates the
-     * selected quantities and norms and is necessary before compute(),
-     * write_out(), or print_summary() can be called.
-     *
-     * The string parameter @p name is used as base name for the error log
-     * file `<name>-error.log`. Calling prepare() resets the log file and
-     * writes out a header describing its contents.
-     */
-    void prepare(const std::string &name);
 
     //@}
     /**
-     * @name Functions for computing and reporting errors
+     * @name Task
      */
     //@{
 
     /**
-     * Compute the consolidated error norms of the difference between the
-     * state vector @p state_vector and the analytic solution @p analytic
-     * (interpolated at the same time). The returned vector contains one
-     * value per selected norm in the order in which the norms have been
-     * selected.
+     * Initialize error evaluation: validate the selected quantities and
+     * norms.
      *
-     * @note The function requires MPI communication and is not reentrant.
-     * The returned values are only meaningful on world rank 0.
+     * The base name is used for the error log file
+     * `<basename>-error.log`. Calling initialize() resets the log file
+     * and writes out a header describing its contents.
      */
-    std::vector<Number> compute(const StateVector<Number> &state_vector,
-                                const StateVector<Number> &analytic) const;
+    void initialize(TaskContext<Number> &context) override;
 
     /**
-     * Compute the consolidated error norms at time @p t and append a line
-     * to the error log file.
+     * Append the error at the current time to the error log file whenever
+     * the trigger fires.
      */
-    void write_out(const StateVector<Number> &state_vector,
-                   const StateVector<Number> &analytic,
-                   Number t) const;
+    void execute(TaskContext<Number> &context) override;
 
     /**
-     * Print a human readable summary of the error norms @p norms (as
-     * returned by compute()) at time @p t and for a discretization with
-     * @p n_global_dofs degrees of freedom to @p stream.
+     * Print a summary of the error at the final time.
      */
-    void print_summary(std::ostream &stream,
-                       Number t,
-                       dealii::types::global_dof_index n_global_dofs,
-                       const std::vector<Number> &norms) const;
+    void finalize(TaskContext<Number> &context) override;
+
+    //@}
 
   private:
-    //@}
     /**
      * @name Run time options
      */
@@ -126,10 +106,12 @@ namespace ryujin
      */
     //@{
 
+    Trigger<Number> trigger_;
+
+    const Interface::Simulation<dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 
@@ -142,6 +124,19 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
+
+    /**
+     * Compute the consolidated error norms of the difference between the
+     * state vector @p state_vector and the analytic solution @p analytic
+     * (interpolated at the same time). The returned vector contains one
+     * value per selected norm in the order in which the norms have been
+     * selected.
+     *
+     * @note The function requires MPI communication and is not reentrant.
+     * The returned values are only meaningful on world rank 0.
+     */
+    std::vector<Number> compute(const StateVector<Number> &state_vector,
+                                const StateVector<Number> &analytic) const;
 
     std::string description() const;
 

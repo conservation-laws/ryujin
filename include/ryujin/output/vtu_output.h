@@ -8,9 +8,11 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
-#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
+#include <ryujin/interface/simulation.h>
+#include <ryujin/interface/task.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -31,10 +33,17 @@ namespace ryujin
    *   |q_k|}{\max_k |q_k| - \min_k |q_k|}\right).
    * \f]
    *
+   * The class is the task "vtu output" that writes out full vtu records
+   * of the solution, or, if constructed with @p levelsets set to true,
+   * the task "vtu levelsets" that writes out the cells intersecting the
+   * given "manifolds". In both cases the analytic solution can be
+   * written out in addition.
+   *
    * @ingroup Output
    */
   template <int dim, typename Number = double>
-  class VTUOutput final : public dealii::ParameterAcceptor
+  class VTUOutput final : public dealii::ParameterAcceptor,
+                          public Interface::Task<Number>
   {
   public:
     /**
@@ -45,69 +54,39 @@ namespace ryujin
     /**
      * Constructor.
      */
-    VTUOutput(const MPIEnsemble &mpi_ensemble,
-              const Interface::OfflineData<dim, Number> &offline_data,
-              const Interface::HyperbolicSystem &hyperbolic_system,
-              const Interface::Postprocessor<dim, Number> &postprocessor,
+    VTUOutput(const Interface::Simulation<dim, Number> &simulation,
+              bool levelsets = false,
               const std::string &subsection = "/VTUOutput");
-
-    /**
-     * Prepare VTU output. A call to @ref prepare() allocates temporary
-     * storage and is necessary before schedule_output() can be called.
-     *
-     * Calling prepare() allocates temporary storage for additional (dim +
-     * 5) scalar vectors of type OfflineData::scalar_type.
-     */
-    void prepare();
 
     //@}
     /**
-     * @name Functions for scheduling output
+     * @name Task
      */
     //@{
 
     /**
-     * Given a state vector @p state_vector, a file name prefix @p name, the
-     * current time @p t, and the current output cycle @p cycle schedule a
-     * solution output.
-     *
-     * The function post-processes quantities synchronously, and (depending
-     * on configuration options) schedules the write-out asynchronously
-     * onto a background worker thread. This implies that @p state_vector
-     * can again be modified once schedule_output() returned.
-     *
-     * The boolean @p output_full controls whether the full vector field
-     * is written out. Correspondingly, @p output_cutplanes controls
-     * whether cells in the vicinity of predefined cutplanes are written
-     * out.
-     *
-     * The function requires MPI communication and is not reentrant.
+     * Prepare VTU output for the current mesh: allocate temporary
+     * storage for additional (dim + 5) scalar vectors of type
+     * OfflineData::scalar_type.
      */
-    void schedule_output(const StateVector<Number> &state_vector,
-                         std::string name,
-                         Number t,
-                         unsigned int cycle,
-                         bool output_full = true,
-                         bool output_cutplanes = true);
+    void prepare(TaskContext<Number> &context) override;
 
     /**
-     * Reset computed normalization bounds. Calling this function will
-     * force a recomputation of the normalization bounds during the next
-     * call to schedule_output().
+     * Write out the solution (and the analytic solution) whenever the
+     * trigger fires.
      */
-    void reset_bounds()
-    {
-      bounds_.clear();
-    }
+    void execute(TaskContext<Number> &context) override;
+
+    //@}
 
   private:
-    //@}
     /**
      * @name Run time options
      */
     //@{
 
     bool use_mpi_io_;
+    bool output_analytic_solution_;
 
     Number beta_;
     bool recompute_bounds_;
@@ -122,10 +101,13 @@ namespace ryujin
      */
     //@{
 
+    const bool levelsets_;
+    Trigger<Number> trigger_;
+
+    const Interface::Simulation<dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 
@@ -136,6 +118,30 @@ namespace ryujin
      * component; only used for postprocessed quantities.
      */
     std::vector<std::pair<Number, Number>> bounds_;
+
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
+
+    /**
+     * Given a state vector @p state_vector, a file name prefix @p name, the
+     * current time @p t, and the current output cycle @p cycle schedule a
+     * solution output: the full vector field, or (for the levelsets task)
+     * the cells in the vicinity of the predefined levelsets.
+     *
+     * The function post-processes quantities synchronously, and (depending
+     * on configuration options) schedules the write-out asynchronously
+     * onto a background worker thread. This implies that @p state_vector
+     * can again be modified once schedule_output() returned.
+     *
+     * The function requires MPI communication and is not reentrant.
+     */
+    void schedule_output(const StateVector<Number> &state_vector,
+                         std::string name,
+                         Number t,
+                         unsigned int cycle);
 
     //@}
   };

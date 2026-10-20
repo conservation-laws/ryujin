@@ -1,13 +1,10 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                  = check_global_refinement
 
-  set enable compute error      = true
-  set enable mesh adaptivity    = true
+  set tasks                     = error evaluation, mesh adaptation
 
   set final time                = 2.0
   set timer granularity         = 0.5
-
-  set terminal update interval  = 0
 end
 
 subsection B - Equation
@@ -49,10 +46,12 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection I - MeshAdaptor
+subsection L - MeshAdaptor
   set adaptation strategy           = global refinement
-  set time point selection strategy = fixed time points
-  subsection time point selection strategies
-    set fixed time points = 1.0, 1.5
-  end
+  set trigger             = time points
+  set trigger time points = 1.0, 1.5
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

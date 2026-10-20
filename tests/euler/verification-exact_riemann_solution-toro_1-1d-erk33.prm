@@ -1,21 +1,17 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename             = exactRP_toro_1-erk33
 
-  set enable compute error = true
+  set tasks                = error evaluation
 
   set final time           = 0.2
   set timer granularity    = 0.2
-
-  set terminal update interval  = 0
 end
-
 
 subsection B - Equation
   set dimension = 1
   set equation  = euler
   set gamma     = 1.4
 end
-
 
 subsection C - Discretization
   set geometry        = rectangular domain
@@ -31,7 +27,6 @@ subsection C - Discretization
   end
 end
 
-
 subsection E - InitialValues
   set configuration = exact riemann solution
   set direction     = 1
@@ -43,7 +38,6 @@ subsection E - InitialValues
   end
 end
 
-
 subsection F - HyperbolicModule
   subsection limiter
     set iterations            = 2
@@ -53,7 +47,6 @@ subsection F - HyperbolicModule
   end
 end
 
-
 subsection H - TimeIntegrator
   set cfl min               = 0.50
   set cfl max               = 0.50
@@ -61,6 +54,10 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error quantities = rho, m, E
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

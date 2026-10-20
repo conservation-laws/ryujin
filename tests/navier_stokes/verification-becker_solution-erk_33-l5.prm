@@ -1,14 +1,11 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                  = validation-becker-l5
 
-  set enable compute error      = true
+  set tasks                     = error evaluation
 
   set final time                = 2.0
   set timer granularity         = 2.0
-
-  set terminal update interval  = 0
 end
-
 
 subsection B - Equation
   set dimension = 1
@@ -18,7 +15,6 @@ subsection B - Equation
   set lambda    = 0
   set kappa     = 1.866666666666666e-2
 end
-
 
 subsection C - Discretization
   set geometry        = rectangular domain
@@ -33,10 +29,8 @@ subsection C - Discretization
   end
 end
 
-
 subsection D - OfflineData
 end
-
 
 subsection E - InitialValues
   set configuration = becker solution
@@ -52,7 +46,6 @@ subsection E - InitialValues
   end
 end
 
-
 subsection G - ParabolicModule
   set tolerance             = 1e-16
   set tolerance linfty norm = false
@@ -61,7 +54,6 @@ subsection G - ParabolicModule
   set multigrid energy      = false
 end
 
-
 subsection H - TimeIntegrator
   set cfl min               = 0.10
   set cfl max               = 0.10
@@ -69,6 +61,10 @@ subsection H - TimeIntegrator
   set time stepping scheme  = strang erk 33 cn
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error quantities = rho, m, E
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

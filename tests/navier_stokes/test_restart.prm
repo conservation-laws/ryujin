@@ -6,14 +6,13 @@
 # CFL number.
 #
 
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                      = test
+
+  set tasks                         = error evaluation
+
   set final time                    = 0.00000000000000000000000000001
   set timer granularity             = 0.00000000000000000000000000001
-
-  set enable compute error          = true
-
-  set terminal update interval      = 0
 end
 
 subsection B - Equation
@@ -74,6 +73,10 @@ subsection H - TimeIntegrator
   set time stepping scheme  = strang erk 33 cn
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error quantities = rho, m_1, m_2, E
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

@@ -7,7 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/stub/parabolic_system.h>
 #include <ryujin/typed/initial_values.h>
@@ -51,14 +51,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    StubParabolicModule(
-        const MPIEnsemble & /*mpi_ensemble*/,
-        const Interface::OfflineData<dim, Number> & /*offline_data*/,
-        const HyperbolicSystem & /*hyperbolic_system*/,
-        const ParabolicSystem & /*parabolic_system*/,
-        const InitialValues<HyperbolicDescription, dim, Number>
-            & /*initial_values*/,
-        const std::string &subsection = "StubParabolicModule")
+    StubParabolicModule(const MPIEnsemble & /*mpi_ensemble*/,
+                        const OfflineData<dim, Number> & /*offline_data*/,
+                        const HyperbolicSystem & /*hyperbolic_system*/,
+                        const ParabolicSystem & /*parabolic_system*/,
+                        const InitialValues<HyperbolicDescription, dim, Number>
+                            & /*initial_values*/,
+                        const std::string &subsection = "StubParabolicModule")
         : Interface::ParabolicModule<dim, Number>(subsection)
     {
     }
@@ -155,7 +154,7 @@ namespace ryujin
     /**
      * Print a status line with solver statistics. This function is used
      * for constructing the status message displayed periodically in the
-     * TimeLoop.
+     * Scheduler.
      */
     void print_solver_statistics(std::ostream & /*output*/) const override
     {

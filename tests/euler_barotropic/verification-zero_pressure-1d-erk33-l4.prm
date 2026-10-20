@@ -1,23 +1,19 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename             = zero_pressure-erk33
 
-  set enable compute error = true
+  set tasks                = error evaluation
 
-  set enforce final time        = true
+  set align time steps          = true
 
   set final time           = 0.66666666666667
   set timer granularity    = 0.66666666666667
-
-  set terminal update interval  = 0
 end
-
 
 subsection B - Equation
   set dimension                    = 1
   set equation                     = euler barotropic
   set barotropic equation of state = pressureless
 end
-
 
 subsection C - Discretization
   set geometry        = rectangular domain
@@ -33,7 +29,6 @@ subsection C - Discretization
   end
 end
 
-
 subsection E - InitialValues
   set configuration = leblanc
 
@@ -41,7 +36,6 @@ subsection E - InitialValues
   # for cG put the discontinuity right in the center of a cell
   set position      = 0.326732673267
 end
-
 
 subsection F - HyperbolicModule
   subsection indicator
@@ -54,7 +48,6 @@ subsection F - HyperbolicModule
   end
 end
 
-
 subsection H - TimeIntegrator
   set cfl min               = 0.10
   set cfl max               = 0.10
@@ -62,6 +55,10 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error quantities = rho, m
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

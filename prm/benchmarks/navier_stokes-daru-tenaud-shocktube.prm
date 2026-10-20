@@ -25,17 +25,13 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename                            = shocktube-graded
+subsection A - Scheduler
+  set basename          = shocktube-graded
 
-  set enable compute quantities           = true
-  set enable output full                  = true
+  set tasks             = vtu output, quantities
 
-  set final time                          = 1.00
-  set timer granularity                   = 0.01
-
-  set timer output full multiplier        = 100
-  set timer compute quantities multiplier = 1
+  set final time        = 1.00
+  set timer granularity = 0.01
 end
 
 subsection B - Equation
@@ -105,13 +101,16 @@ subsection H - TimeIntegrator
   set time stepping scheme  = strang erk 33 cn
 end
 
-subsection J - VTUOutput
-  set schlieren beta = 10
-  set use mpi io     = true
+subsection I - VTUOutput
+  subsection full
+    set trigger multiplier = 100
+    set schlieren beta     = 10
+    set use mpi io         = true
+  end
 end
 
 
-subsection K - Quantities
+subsection J - Quantities
   set boundary manifolds = lower_boundary : y : time_averaged space_averaged
   set interior manifolds =
 end

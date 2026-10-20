@@ -14,15 +14,13 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename             = leblanc-erk33
+subsection A - Scheduler
+  set basename          = leblanc-erk33
 
-  set enable compute error = true
+  set tasks             = vtu output, error evaluation
 
-  set enable output full   = true
-
-  set final time           = 0.66666666666667
-  set timer granularity    = 0.66666666666667
+  set final time        = 0.66666666666667
+  set timer granularity = 0.66666666666667
 end
 
 
@@ -76,13 +74,14 @@ subsection H - TimeIntegrator
 end
 
 
-subsection J - VTUOutput
-  set manifolds      =
-  set use mpi io     = true
-  set schlieren beta = 10
+subsection I - VTUOutput
+  subsection full
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = true
   set error quantities = rho, m, E
 end

@@ -1,14 +1,11 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename             = verification
 
-  set enable compute error = true
+  set tasks                = error evaluation
 
   set final time           = 2.00
   set timer granularity    = 2.00
-
-  set terminal update interval  = 0
 end
-
 
 subsection B - Equation
   set dimension = 1
@@ -19,7 +16,6 @@ subsection B - Equation
     set expression                     = u
   end
 end
-
 
 subsection C - Discretization
   set finite element ansatz = cG Q1
@@ -36,7 +32,6 @@ subsection C - Discretization
   end
 end
 
-
 subsection E - InitialValues
   set configuration = function
   set direction     = 1
@@ -46,7 +41,6 @@ subsection E - InitialValues
     set expression = sin(x-t)
   end
 end
-
 
 subsection F - HyperbolicModule
   subsection indicator
@@ -63,7 +57,6 @@ subsection F - HyperbolicModule
   end
 end
 
-
 subsection H - TimeIntegrator
   set cfl max               = 0.20
   set cfl min               = 0.20
@@ -71,6 +64,10 @@ subsection H - TimeIntegrator
   set cfl recovery strategy = none
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize = true
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

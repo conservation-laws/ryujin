@@ -10,15 +10,14 @@
 #
 # [1] Nearly-incompressible flow: The Tammann equation of state. http://www.clawpack.org/riemann_book/html/Euler_Tammann.html 
 ##
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                      = nasg_smooth_wave_1d-erk33.l9
-  set enable compute error          = true
 
-  set enforce final time            = true
+  set tasks                         = error evaluation
+
+  set align time steps              = true
   set final time                    = 0.6
   set timer granularity             = 0.6
-
-  set terminal update interval      = 0
 end
 
 subsection B - Equation
@@ -75,7 +74,11 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection L - ErrorEvaluation
+subsection K - ErrorEvaluation
   set error normalize  = true
   set error quantities = rho, m, E
+end
+
+subsection M - Logger
+  set terminal update interval = 0
 end

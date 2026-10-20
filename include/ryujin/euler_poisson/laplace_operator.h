@@ -8,7 +8,7 @@
 #include <ryujin/base/loop.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/discretization/offline_data.h>
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/vectorization.h>
@@ -418,7 +418,7 @@ namespace ryujin
       double gmg_coarse_tolerance;
     };
 
-    void initialize(const Interface::OfflineData<dim, Number> &offline_data,
+    void initialize(const OfflineData<dim, Number> &offline_data,
                     const std::set<dealii::types::boundary_id> boundary_ids,
                     const MultigridParameters parameters)
     {

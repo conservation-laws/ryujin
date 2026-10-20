@@ -11,6 +11,8 @@
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/utilities.h>
 
+#include <string>
+
 namespace ryujin
 {
   /**
@@ -120,6 +122,13 @@ namespace ryujin
      * peer communicator is collective over all world ranks.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(peer_communicator);
+
+    /**
+     * Return the base name of all output files of the ensemble: @p
+     * base_name with the suffix "-ensemble_<n>" if there is more than one
+     * ensemble.
+     */
+    std::string base_name(const std::string &base_name) const;
 
   private:
     const MPI_Comm world_communicator_;

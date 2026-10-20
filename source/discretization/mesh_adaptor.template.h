@@ -20,15 +20,18 @@ namespace ryujin
 {
   template <int dim, typename Number>
   MeshAdaptor<dim, Number>::MeshAdaptor(
-      const MPIEnsemble &mpi_ensemble,
-      const Interface::OfflineData<dim, Number> &offline_data,
-      const Interface::Postprocessor<dim, Number> &postprocessor,
+      Interface::Simulation<dim, Number> &simulation,
       const std::string &subsection /*= "MeshAdaptor"*/)
-      : Interface::MeshAdaptor<dim, Number>(subsection)
-      , mpi_ensemble_(mpi_ensemble)
-      , offline_data_(&offline_data)
-      , postprocessor_(postprocessor)
+      : ParameterAcceptor(subsection)
+      , Interface::Task<Number>("mesh adaptation", TaskPhase::adapt)
+      , trigger_(TriggerMode::every_cycle, /*multiplier*/ 10)
+      , simulation_(simulation)
+      , mpi_ensemble_(simulation.mpi_ensemble())
+      , offline_data_(&simulation.offline_data())
+      , postprocessor_(simulation.postprocessor())
   {
+    trigger_.add_parameters(*this);
+
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
     this->add_parameter(
         "adaptation strategy",
@@ -41,14 +44,6 @@ namespace ryujin
         "marking strategy",
         marking_strategy_,
         "The chosen marking strategy. Possible values are: fixed threshold.");
-
-    time_point_selection_strategy_ =
-        TimePointSelectionStrategy::simulation_cycle;
-    this->add_parameter(
-        "time point selection strategy",
-        time_point_selection_strategy_,
-        "The chosen time point selection strategy. Possible values "
-        "are: fixed time points, simulation cycle");
 
     /* Options for various adaptation strategies: */
     this->enter_subsection("adaptation strategies");
@@ -137,23 +132,6 @@ namespace ryujin
         "maintained while refininig cells.");
     this->leave_subsection();
 
-    /* Options for various time point selection strategies: */
-
-    this->enter_subsection("time point selection strategies");
-    adaptation_time_points_ = {};
-    this->add_parameter(
-        "fixed time points",
-        adaptation_time_points_,
-        "List of time points in (simulation) time at which we will "
-        "perform a mesh adaptation cycle.");
-
-    adaptation_cycle_interval_ = 10;
-    this->add_parameter("simulation cycle: interval",
-                        adaptation_cycle_interval_,
-                        "The nth simulation cycle at which we will "
-                        "perform mesh adapation.");
-    this->leave_subsection();
-
     const auto call_back = [this] {
       /* Initialize Mersenne Twister with configured seed: */
       mersenne_twister_.seed(random_adaptation_mersenne_twister_seed_);
@@ -165,72 +143,62 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::prepare(const Number t)
+  void MeshAdaptor<dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MeshAdaptor<dim, Number>::prepare()" << std::endl;
 #endif
 
-    if (time_point_selection_strategy_ ==
-        TimePointSelectionStrategy::fixed_time_points) {
-      /* Remove outdated refinement timestamps: */
-      const auto new_end = std::remove_if(
-          adaptation_time_points_.begin(),
-          adaptation_time_points_.end(),
-          [&](const Number &t_refinement) { return (t > t_refinement); });
-      adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
+    selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
+  }
+
+
+  template <int dim, typename Number>
+  void MeshAdaptor<dim, Number>::execute(TaskContext<Number> &context)
+  {
+    if (!trigger_.fire(context))
+      return;
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "MeshAdaptor<dim, Number>::execute()" << std::endl;
+#endif
+
+    AssertThrow(mpi_ensemble_.n_ensembles() == 1, dealii::ExcNotImplemented());
+
+    {
+      ComputingTimer::Scope scope(
+          "time step [X]   - analyze for mesh adaptation");
+      analyze(simulation_.state_vector());
     }
 
-    selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
+    ComputingTimer::Scope scope_1("(re)initialize data structures");
+    ComputingTimer::Scope scope_2("time step [X]   - perform mesh adaptation");
+    context.info("performing mesh adaptation");
 
-    /* toggle mesh adaptation flag to off. */
-    this->need_mesh_adaptation_ = false;
+    /*
+     * Mark cells for coarsening and refinement, attach the state vector to
+     * the triangulation, and adapt the mesh:
+     */
+
+    mark_cells_for_coarsening_and_refinement();
+
+    auto &triangulation = simulation_.discretization().triangulation();
+    triangulation.prepare_coarsening_and_refinement();
+    simulation_.solution_transfer().prepare_projection(
+        simulation_.state_vector());
+    triangulation.execute_coarsening_and_refinement();
+
+    context.mesh_changed = true;
   }
 
 
   template <int dim, typename Number>
   void
-  MeshAdaptor<dim, Number>::analyze(const StateVector<Number> &state_vector,
-                                    const Number t,
-                                    unsigned int cycle)
+  MeshAdaptor<dim, Number>::analyze(const StateVector<Number> &state_vector)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MeshAdaptor<dim, Number>::analyze()" << std::endl;
 #endif
-
-    /*
-     * Decide whether we perform an adaptation cycle with the chosen time
-     * point selection strategy:
-     */
-
-    switch (time_point_selection_strategy_) {
-    case TimePointSelectionStrategy::fixed_time_points: {
-      /* Remove all refinement points from the vector that lie in the past: */
-      const auto new_end = std::remove_if( //
-          adaptation_time_points_.begin(),
-          adaptation_time_points_.end(),
-          [&](const Number &t_refinement) {
-            if (t < t_refinement)
-              return false;
-            this->need_mesh_adaptation_ = true;
-            return true;
-          });
-      adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
-    } break;
-
-    case TimePointSelectionStrategy::simulation_cycle: {
-      /* check whether we reached a cycle interval: */
-      if (cycle % adaptation_cycle_interval_ == 0)
-        this->need_mesh_adaptation_ = true;
-    } break;
-
-    default:
-      AssertThrow(false, dealii::ExcInternalError());
-      __builtin_trap();
-    }
-
-    if (!this->need_mesh_adaptation_)
-      return;
 
     /*
      * Some adaptation strategies require us to prepare some internal
@@ -259,8 +227,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void
-  MeshAdaptor<dim, Number>::populate_cell_indicators_with_random_values() const
+  void MeshAdaptor<dim, Number>::populate_cell_indicators_with_random_values()
   {
     std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
       static std::uniform_real_distribution<double> distribution(0.0, 10.0);
@@ -270,8 +237,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::
-      populate_cell_indicators_from_smoothness_indicators() const
+  void
+  MeshAdaptor<dim,
+              Number>::populate_cell_indicators_from_smoothness_indicators()
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
@@ -311,12 +279,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::mark_cells_for_coarsening_and_refinement(
-      dealii::Triangulation<dim> &triangulation [[maybe_unused]]) const
+  void MeshAdaptor<dim, Number>::mark_cells_for_coarsening_and_refinement()
   {
-    auto &discretization [[maybe_unused]] = offline_data_->discretization();
-    Assert(&triangulation == &discretization.triangulation(),
-           dealii::ExcInternalError());
+    auto &triangulation = simulation_.discretization().triangulation();
 
     /*
      * Compute cell indicators with the chosen adaptation strategy:
@@ -420,7 +385,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   void MeshAdaptor<dim, Number>::compute_smoothness_indicators(
-      const StateVector<Number> &state_vector) const
+      const StateVector<Number> &state_vector)
   {
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();

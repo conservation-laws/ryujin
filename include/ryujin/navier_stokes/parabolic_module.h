@@ -10,7 +10,7 @@
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/navier_stokes/parabolic_module_gmg_operators.h>
 #include <ryujin/typed/initial_values.h>
@@ -152,7 +152,7 @@ namespace ryujin
        * Constructor.
        */
       ParabolicModule(const MPIEnsemble &mpi_ensemble,
-                      const Interface::OfflineData<dim, Number> &offline_data,
+                      const OfflineData<dim, Number> &offline_data,
                       const HyperbolicSystem &hyperbolic_system,
                       const ParabolicSystem &parabolic_system,
                       const InitialValues<HyperbolicDescription, dim, Number>
@@ -228,7 +228,7 @@ namespace ryujin
       /**
        * Print a status line with solver statistics. This function is used
        * for constructing the status message displayed periodically in the
-       * TimeLoop.
+       * Scheduler.
        */
       void print_solver_statistics(std::ostream &output) const override;
 
@@ -269,7 +269,7 @@ namespace ryujin
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
-      dealii::ObserverPointer<const ryujin::Interface::OfflineData<dim, Number>>
+      dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
           offline_data_;
       dealii::ObserverPointer<
           const ryujin::InitialValues<HyperbolicDescription, dim, Number>>

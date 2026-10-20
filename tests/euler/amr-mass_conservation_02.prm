@@ -1,15 +1,10 @@
-subsection A - TimeLoop
+subsection A - Scheduler
   set basename                  = check_mass
 
-  set enable mesh adaptivity    = true
-  set enable compute quantities = true
+  set tasks                     = quantities, mesh adaptation
 
   set final time                = 2.0
   set timer granularity         = 0.5
-
-  set terminal update interval  = 0
-
-  set debug command             = ../../../../print_mass check_mass-interior-R0004-space_averaged_time_series.dat
 end
 
 subsection B - Equation
@@ -51,22 +46,24 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 33
 end
 
-subsection I - MeshAdaptor
+subsection J - Quantities
+  set quantities         = rho
+  set number of moments  = 1
+  set interior manifolds = interior : 0. : space_averaged
+end
+
+subsection L - MeshAdaptor
   set adaptation strategy           = random adaptation
-  set time point selection strategy = fixed time points
 
-  subsection time point selection strategies
-    set fixed time points = 0.5, 1.0, 1.5
-  end
-
+  set trigger             = time points
+  set trigger time points = 0.5, 1.0, 1.5
   subsection marking strategies
     set coarsening threshold = 0.80
     set refinement threshold = 0.90
   end
 end
 
-subsection K - Quantities
-  set quantities         = rho
-  set number of moments  = 1
-  set interior manifolds = interior : 0. : space_averaged
+subsection M - Logger
+  set terminal update interval = 0
+  set debug command            = ../../../../print_mass check_mass-interior-R0004-space_averaged_time_series.dat
 end

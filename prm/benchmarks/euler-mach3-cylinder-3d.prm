@@ -25,23 +25,18 @@
 #
 ##
 
-subsection A - TimeLoop
-  set basename                          = mach3-cylinder-3d
-
-  set enable output full                = false
+subsection A - Scheduler
+  set basename          = mach3-cylinder-3d
 
   #
   # Output reduced vtks only containing hexahedra that intersect with the
   # cutplanes x, y, z, and x^2+y^2-0.25*0.25 (as configured down below in
-  # the "subsection J - VTUOutput").
+  # the "subsection I - VTUOutput").
   #
-  set enable output levelsets           = true
+  set tasks             = vtu levelsets
 
-  set final time                        = 5.00
-  set timer granularity                 = 0.10
-
-  set timer output full multiplier      = 10
-  set timer output levelsets multiplier = 1
+  set final time        = 5.00
+  set timer granularity = 0.10
 end
 
 
@@ -89,9 +84,11 @@ subsection H - TimeIntegrator
 end
 
 
-subsection J - VTUOutput
-  set manifolds      = x, y, z, x^2+y^2-0.25*0.25
+subsection I - VTUOutput
+  subsection levelsets
+    set manifolds      = x, y, z, x^2+y^2-0.25*0.25
 
-  set use mpi io     = true
-  set schlieren beta = 10
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
 end

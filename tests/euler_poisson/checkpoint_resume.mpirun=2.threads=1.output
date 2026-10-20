@@ -26,6 +26,7 @@ L2    = 0.01113732552982985
 [INFO] resume: reading mesh and loading state vector
 [INFO] preparing compute kernels
 [INFO] entering main loop
+[INFO] scheduling checkpointing
 Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 289
 t     = 0.5347937225188055
