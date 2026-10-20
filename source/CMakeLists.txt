@@ -32,6 +32,7 @@ set(CORE_SOURCE_FILES
   discretization/offline_data.cc
   discretization/time_integrator.cc
   driver/checkpointing.cc
+  driver/environment.cc
   driver/equation_library.cc
   driver/logger.cc
   driver/run.cc
