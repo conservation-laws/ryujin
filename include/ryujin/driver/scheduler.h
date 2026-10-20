@@ -6,33 +6,54 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/interface/simulation.h>
+#include <ryujin/interface/task.h>
 
+#include <deal.II/base/mpi_stub.h>
 #include <deal.II/base/parameter_acceptor.h>
 
-#include <fstream>
+#include <functional>
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
   /**
    * The high-level time loop driving the computation.
    *
+   * The Scheduler runs tasks (see Interface::Task) in cycles.
+   *
+   * Every cycle consists of four phases:
+   *  - TaskPhase::pre_step: output and postprocessing at time t,
+   *  - TaskPhase::adapt: mesh adaptation at time t (only if a time step
+   *    follows),
+   *  - TaskPhase::step: the time step from t to t + tau, and
+   *  - TaskPhase::post_step: tasks at time t + tau.
+   *
+   * The active tasks are the required tasks (in the given order),
+   * followed by the selectable tasks chosen with the run time parameter
+   * "tasks" (in the order of the parameter). In every phase the Scheduler
+   * executes the active tasks of the phase in this order. The first
+   * required task is the primary task: it sets up the discretization and
+   * chooses the time step size.
+   *
    * @ingroup Driver
    */
-  template <int dim, typename Number = double>
+  template <typename Number = double>
   class Scheduler final : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @name Constructor and setup
-     */
-    //@{
+    using Task = Interface::Task<Number>;
 
     /**
-     * Constructor. The Scheduler works with the objects of the given
-     * @p simulation.
+     * Constructor. The Scheduler runs the @p required tasks and the
+     * selectable @p tasks chosen with the run time parameter "tasks". The
+     * status messages of the Scheduler and all tasks are passed to @p
+     * info; by default they are printed on rank 0 of @p mpi_comm.
      */
-    Scheduler(Interface::Simulation<dim, Number> &simulation);
+    Scheduler(const MPI_Comm &mpi_comm,
+              const std::vector<Task *> &required,
+              const std::vector<Task *> &tasks = {},
+              const std::function<void(const std::string &)> &info = {});
 
     /**
      * Run the high-level time loop.
@@ -40,40 +61,18 @@ namespace ryujin
     void run();
 
   private:
-    //@}
     /**
      * @name Run time options
      */
     //@{
 
     std::string base_name_;
-    std::string base_name_ensemble_;
-
-    std::string debug_command_;
-    std::string debug_filename_;
 
     Number t_final_;
-    bool enforce_t_final_;
+    bool align_time_steps_;
     Number timer_granularity_;
 
-    bool enable_output_full_;
-    bool enable_output_levelsets_;
-    bool enable_compute_error_;
-    bool enable_compute_quantities_;
-    bool enable_mesh_adaptivity_;
-
-    unsigned int timer_output_full_multiplier_;
-    unsigned int timer_output_levelsets_multiplier_;
-    unsigned int timer_compute_error_multiplier_;
-    unsigned int timer_compute_quantities_multiplier_;
-
-    bool resume_;
-    bool resume_at_time_zero_;
-
-    Number terminal_update_interval_;
-    bool terminal_correct_for_hypertreadhing_;
-
-    Number checkpoint_update_interval_;
+    std::vector<std::string> task_names_;
 
     //@}
     /**
@@ -81,12 +80,17 @@ namespace ryujin
      */
     //@{
 
-    Interface::Simulation<dim, Number> &simulation_;
+    const MPI_Comm mpi_comm_;
 
-    dealii::types::global_dof_index n_global_dofs_;
-    unsigned int n_devices_;
+    const std::vector<Task *> required_;
+    const std::vector<Task *> selectable_;
 
-    std::ofstream logfile_; /* log file */
+    std::function<void(const std::string &)> info_;
+
+    /**
+     * The active tasks in the order of execution.
+     */
+    std::vector<Task *> tasks_;
 
     //@}
     /**
@@ -95,82 +99,9 @@ namespace ryujin
     //@{
 
     /**
-     * Performs a resume operation. Given a @p base_name the function tries
-     * to locate corresponding checkpoint files and will read in the saved
-     * state @p state_vector at saved time @p t with saved output cycle
-     * @p output_cycle.
+     * Run all active tasks of the given @p phase.
      */
-    template <typename Callable>
-    void read_checkpoint(StateVector<Number> &state_vector,
-                         const std::string &base_name,
-                         Number &t,
-                         unsigned int &output_cycle,
-                         const Callable &prepare_compute_kernels);
-
-    /**
-     * Write out a checkpoint to disk. Given a @p base_name and a current
-     * state @p U at time @p t and output cycle @p output_cycle the
-     * function writes out the state to disk using boost::archive for
-     * serialization.
-     *
-     * @pre the state_vector has to have been prepared prior to a call to
-     * write_checkpoint().
-     */
-    void write_checkpoint(const StateVector<Number> &state_vector,
-                          const std::string &base_name,
-                          const Number &t,
-                          const unsigned int &output_cycle);
-
-    /**
-     * Perform a mesh adaptation cycle according to the selected strategy
-     * in the MeshAdaptor class. The state vector is transferred to the new
-     * discretization.
-     */
-    template <typename Callable>
-    void adapt_mesh_and_transfer_state_vector(
-        StateVector<Number> &state_vector,
-        const Callable &prepare_compute_kernels);
-
-    /**
-     * Interpolate the analytic solution at time @p t into the state vector
-     * @p analytic and populate precomputed values. In contrast to
-     * TimeIntegrator::prepare_state_vector() no boundary conditions are
-     * applied.
-     */
-    void interpolate_analytic_solution(StateVector<Number> &analytic, Number t);
-
-    void output(const StateVector<Number> &state_vector,
-                const std::string &name,
-                const Number t,
-                const unsigned int cycle);
-
-    void print_parameters(std::ostream &stream);
-    void print_mpi_partition(std::ostream &stream);
-    void print_device_information(std::ostream &stream);
-
-    void print_info(const std::string &header);
-
-    void print_head(const std::string &header,
-                    const std::string &secondary,
-                    std::ostream &stream);
-
-    void print_information(unsigned int output_cycle,
-                           Number last_checkpoint,
-                           std::ostream &stream,
-                           bool final_time = false);
-    void print_memory_statistics(std::ostream &stream);
-    void print_timers(std::ostream &stream);
-    void print_throughput(unsigned int cycle,
-                          Number t,
-                          std::ostream &stream,
-                          bool final_time = false);
-
-    void print_cycle_statistics(unsigned int cycle,
-                                Number t,
-                                unsigned int output_cycle,
-                                Number last_checkpoint,
-                                bool write_to_logfile = false,
-                                bool final_time = false);
+    void run_phase(TaskPhase phase, TaskContext<Number> &context);
 
     //@}
   };

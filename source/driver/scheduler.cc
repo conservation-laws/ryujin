@@ -8,7 +8,5 @@
 namespace ryujin
 {
   /* instantiations */
-  template class Scheduler<1, NUMBER>;
-  template class Scheduler<2, NUMBER>;
-  template class Scheduler<3, NUMBER>;
+  template class Scheduler<NUMBER>;
 } // namespace ryujin

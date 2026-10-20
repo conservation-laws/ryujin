@@ -1,0 +1,4 @@
+every cycle, multiplier 3: 3 6 9
+timer tick, multiplier 2: 0 2 4 6 8
+wall clock, interval 1.5: 1.5 3 4.5
+time points: 0.35 0.75
