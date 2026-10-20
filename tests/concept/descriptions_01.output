@@ -1,5 +1,6 @@
 Euler::HyperbolicDescription + StubParabolicDescription: true
 EulerAEOS::HyperbolicDescription + StubParabolicDescription: true
+EulerAtmospheric::HyperbolicDescription + StubParabolicDescription: true
 EulerBarotropic::HyperbolicDescription + StubParabolicDescription: true
 ScalarConservation::HyperbolicDescription + StubParabolicDescription: true
 ShallowWater::HyperbolicDescription + StubParabolicDescription: true

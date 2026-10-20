@@ -7,6 +7,7 @@
 #include <ryujin/concept/parabolic_description.h>
 #include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/euler_aeos/hyperbolic_description.h>
+#include <ryujin/euler_atmospheric/hyperbolic_description.h>
 #include <ryujin/euler_barotropic/hyperbolic_description.h>
 #include <ryujin/euler_poisson/parabolic_description.h>
 #include <ryujin/navier_stokes/parabolic_description.h>
@@ -41,6 +42,7 @@ int main()
 
   CHECK(Euler::HyperbolicDescription, StubParabolicDescription)
   CHECK(EulerAEOS::HyperbolicDescription, StubParabolicDescription)
+  CHECK(EulerAtmospheric::HyperbolicDescription, StubParabolicDescription)
   CHECK(EulerBarotropic::HyperbolicDescription, StubParabolicDescription)
   CHECK(ScalarConservation::HyperbolicDescription, StubParabolicDescription)
   CHECK(ShallowWater::HyperbolicDescription, StubParabolicDescription)
