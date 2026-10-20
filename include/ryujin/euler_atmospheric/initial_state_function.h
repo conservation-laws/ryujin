@@ -1,0 +1,141 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// [LANL Copyright Statement]
+// Copyright (C) 2023 - 2026 by the ryujin authors
+// Copyright (C) 2025 - 2026 by Triad National Security, LLC
+//
+
+#pragma once
+
+#include <ryujin/base/compile_time_options.h>
+#include <ryujin/typed/initial_state.h>
+
+#include <deal.II/base/function_parser.h>
+
+namespace ryujin
+{
+  namespace EulerAtmosphericInitialStates
+  {
+    /**
+     * Returns an initial state defined by a set of user specified function.
+     *
+     * @ingroup EulerAtmosphericEquations
+     */
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class Function : public InitialState<HyperbolicSystem, dim, Number>
+    {
+    public:
+      using View = typename HyperbolicSystem::template View<dim, Number>;
+      using state_type = typename View::state_type;
+
+      Function(const HyperbolicSystem &hyperbolic_system,
+               const std::string subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("function", subsection)
+          , hyperbolic_system_(hyperbolic_system)
+      {
+
+        density_expression_ = "1.4";
+        this->add_parameter("density expression",
+                            density_expression_,
+                            "A function expression describing the density");
+
+        velocity_x_expression_ = "3.0";
+        this->add_parameter(
+            "velocity x expression",
+            velocity_x_expression_,
+            "A function expression describing the x-component of the velocity");
+
+        if constexpr (dim > 1) {
+          velocity_y_expression_ = "0.0";
+          this->add_parameter("velocity y expression",
+                              velocity_y_expression_,
+                              "A function expression describing the "
+                              "y-component of the velocity");
+        }
+
+        if constexpr (dim > 2) {
+          velocity_z_expression_ = "0.0";
+          this->add_parameter("velocity z expression",
+                              velocity_z_expression_,
+                              "A function expression describing the "
+                              "z-component of the velocity");
+        }
+
+        theta_expression_ = "1.0";
+        this->add_parameter(
+            "potential temperature expression",
+            theta_expression_,
+            "A function expression describing the potential temperature");
+
+        /* Set up all muparser objects */
+        const auto set_up_muparser = [this] {
+          using FP = dealii::FunctionParser<dim>;
+          /*
+           * This variant of the constructor initializes the function
+           * parser with support for a time-dependent description involving
+           * a variable »t«:
+           */
+          density_function_ = std::make_unique<FP>(density_expression_);
+          velocity_x_function_ = std::make_unique<FP>(velocity_x_expression_);
+          if constexpr (dim > 1)
+            velocity_y_function_ = std::make_unique<FP>(velocity_y_expression_);
+          if constexpr (dim > 2)
+            velocity_z_function_ = std::make_unique<FP>(velocity_z_expression_);
+          theta_function_ = std::make_unique<FP>(theta_expression_);
+        };
+
+        set_up_muparser();
+        this->parse_parameters_call_back.connect(set_up_muparser);
+      }
+
+      state_type compute(const dealii::Point<dim> &point, Number t) final
+      {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+        state_type full_primitive_state;
+
+        density_function_->set_time(t);
+        full_primitive_state[0] = density_function_->value(point);
+
+        velocity_x_function_->set_time(t);
+        full_primitive_state[1] = velocity_x_function_->value(point);
+
+        if constexpr (dim > 1) {
+          velocity_y_function_->set_time(t);
+          full_primitive_state[2] = velocity_y_function_->value(point);
+        }
+        if constexpr (dim > 2) {
+          velocity_z_function_->set_time(t);
+          full_primitive_state[3] = velocity_z_function_->value(point);
+        }
+
+        theta_function_->set_time(t);
+        full_primitive_state[1 + dim] = theta_function_->value(point);
+
+        return view.from_initial_state(full_primitive_state);
+      }
+
+      auto initial_precomputations(const dealii::Point<dim> &point) ->
+          typename InitialState<HyperbolicSystem, dim, Number>::
+              initial_precomputed_type final
+      {
+        /* Return the vertical coordinate: */
+        return {Number(point[dim - 1])};
+      }
+
+    private:
+      const HyperbolicSystem &hyperbolic_system_;
+
+      std::string density_expression_;
+      std::string velocity_x_expression_;
+      std::string velocity_y_expression_;
+      std::string velocity_z_expression_;
+      std::string theta_expression_;
+
+      std::unique_ptr<dealii::FunctionParser<dim>> density_function_;
+      std::unique_ptr<dealii::FunctionParser<dim>> velocity_x_function_;
+      std::unique_ptr<dealii::FunctionParser<dim>> velocity_y_function_;
+      std::unique_ptr<dealii::FunctionParser<dim>> velocity_z_function_;
+      std::unique_ptr<dealii::FunctionParser<dim>> theta_function_;
+    };
+  } // namespace EulerAtmosphericInitialStates
+} // namespace ryujin
