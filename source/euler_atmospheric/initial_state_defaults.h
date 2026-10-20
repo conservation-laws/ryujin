@@ -13,6 +13,9 @@
 #include <ryujin/euler_atmospheric/initial_state_exact_source.h>
 #include <ryujin/euler_atmospheric/initial_state_function.h>
 #include <ryujin/euler_atmospheric/initial_state_smooth_wave.h>
+#include <ryujin/euler_atmospheric/initial_state_stratified.h>
+#include <ryujin/euler_atmospheric/initial_state_stratified_blast.h>
+#include <ryujin/euler_atmospheric/initial_state_stratified_function.h>
 #include <ryujin/euler_atmospheric/initial_state_uniform.h>
 #include <ryujin/typed/initial_state.h>
 
@@ -36,6 +39,9 @@ namespace ryujin
           L::template creator<ExactSource<HS, dim, Number>>(),
           L::template creator<Function<HS, dim, Number>>(),
           L::template creator<SmoothWave<HS, dim, Number>>(),
+          L::template creator<Stratified<HS, dim, Number>>(),
+          L::template creator<StratifiedBlast<HS, dim, Number>>(),
+          L::template creator<StratifiedFunction<HS, dim, Number>>(),
           L::template creator<Uniform<HS, dim, Number>>(),
       };
     }
