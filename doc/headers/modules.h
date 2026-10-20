@@ -113,7 +113,11 @@
  *    and <code>include/ryujin/stub</code>): implementations of the
  *    interfaces that are templated on HD and PD.
  *
- * At run time, the objects are created and owned as follows:
+ * At run time, the objects are created and owned as follows. The ryujin
+ * executable (<code>source/main.cc</code>) selects one of the registered
+ * equations and the dimension with the run time parameters "equation" and
+ * "dimension"; the equation constructs the Simulation and the
+ * TaskComposition. A client program constructs them directly:
  *
  * @dot
  digraph G
@@ -125,8 +129,6 @@
         color="black", fillcolor="white", style="filled"];
   edge [color="black",fontname="FreeSans",fontsize=11];
 
-  dispatch    [label="EquationDispatch", URL="\ref ryujin::EquationDispatch"];
-  equation    [label="Equation\<HD, PD\>", URL="\ref ryujin::Equation"];
   composition [label="TaskComposition", URL="\ref ryujin::TaskComposition"];
   loop        [label="Scheduler", URL="\ref ryujin::Scheduler"];
   simulation  [label="Simulation\<HD, PD\>", URL="\ref ryujin::Simulation"];
@@ -140,9 +142,7 @@
   integrator  [label="TimeIntegrator", URL="\ref ryujin::TimeIntegrator"];
   transfer    [label="SolutionTransfer", URL="\ref ryujin::Interface::SolutionTransfer"];
 
-  dispatch -> equation [label="selects"];
-  equation -> simulation;
-  equation -> composition [label="runs"];
+  composition -> simulation;
   composition -> tasks;
   composition -> loop;
   loop -> simulation [label="runs"];
@@ -279,8 +279,7 @@
 /**
  * @defgroup DriverLayer Driver and Output
  *
- * Selecting an equation, setting up and running the simulation, and
- * writing out results. The corresponding headers are found in
+ * Setting up and running the simulation, and writing out results. The corresponding headers are found in
  * <code>include/ryujin/driver</code> and
  * <code>include/ryujin/output</code>.
  */
@@ -290,10 +289,11 @@
  * @defgroup Driver Driver
  * @ingroup DriverLayer
  *
- * The EquationDispatch class that selects an equation by name, the
- * library of available equations, the TaskComposition that assembles the
- * Simulation and the tasks, and the Scheduler that runs them
- * (<code>include/ryujin/driver</code>).
+ * The Environment that initializes MPI, the thread pools, and the
+ * instrumentation, the registry of equations, the Simulation, the
+ * TaskComposition that assembles the Simulation and the tasks, the
+ * Scheduler that runs them, and write_parameter_files() that writes the
+ * default parameter files (<code>include/ryujin/driver</code>).
  */
 
 
