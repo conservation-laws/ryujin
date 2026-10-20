@@ -125,34 +125,36 @@
         color="black", fillcolor="white", style="filled"];
   edge [color="black",fontname="FreeSans",fontsize=11];
 
-  dispatch   [label="EquationDispatch", URL="\ref ryujin::EquationDispatch"];
-  equation   [label="Equation\<HD, PD\>", URL="\ref ryujin::Equation"];
-  loop       [label="Scheduler", URL="\ref ryujin::Scheduler"];
-  simulation [label="Simulation\<HD, PD\>", URL="\ref ryujin::Simulation"];
+  dispatch    [label="EquationDispatch", URL="\ref ryujin::EquationDispatch"];
+  equation    [label="Equation\<HD, PD\>", URL="\ref ryujin::Equation"];
+  composition [label="TaskComposition", URL="\ref ryujin::TaskComposition"];
+  loop        [label="Scheduler", URL="\ref ryujin::Scheduler"];
+  simulation  [label="Simulation\<HD, PD\>", URL="\ref ryujin::Simulation"];
+  tasks       [label="Logger | MeshAdaptor | VTUOutput | Quantities | ErrorEvaluation | Checkpointing", URL="\ref ryujin::Interface::Task"];
 
-  ensemble   [label="MPIEnsemble", URL="\ref ryujin::MPIEnsemble"];
-  discr      [label="Discretization", URL="\ref ryujin::Discretization"];
-  offline    [label="OfflineData", URL="\ref ryujin::OfflineData"];
-  hyperbolic [label="HyperbolicModule", URL="\ref ryujin::Interface::HyperbolicModule"];
-  parabolic  [label="ParabolicModule", URL="\ref ryujin::Interface::ParabolicModule"];
-  integrator [label="TimeIntegrator", URL="\ref ryujin::TimeIntegrator"];
-  adaptor    [label="MeshAdaptor", URL="\ref ryujin::MeshAdaptor"];
-  transfer   [label="SolutionTransfer", URL="\ref ryujin::Interface::SolutionTransfer"];
-  output     [label="VTUOutput | Quantities | ErrorEvaluation", URL="\ref Output"];
+  ensemble    [label="MPIEnsemble", URL="\ref ryujin::MPIEnsemble"];
+  discr       [label="Discretization", URL="\ref ryujin::Discretization"];
+  offline     [label="OfflineData", URL="\ref ryujin::OfflineData"];
+  hyperbolic  [label="HyperbolicModule", URL="\ref ryujin::Interface::HyperbolicModule"];
+  parabolic   [label="ParabolicModule", URL="\ref ryujin::Interface::ParabolicModule"];
+  integrator  [label="TimeIntegrator", URL="\ref ryujin::TimeIntegrator"];
+  transfer    [label="SolutionTransfer", URL="\ref ryujin::Interface::SolutionTransfer"];
 
   dispatch -> equation [label="selects"];
-  equation -> loop [label="runs"];
-  loop -> simulation [label="drives"];
-  equation -> simulation [label="creates"];
+  equation -> simulation;
+  equation -> composition [label="runs"];
+  composition -> tasks;
+  composition -> loop;
+  loop -> simulation [label="runs"];
+  loop -> tasks [label="runs"];
+  tasks -> simulation [label="use"];
   simulation -> ensemble;
   simulation -> discr;
   simulation -> offline;
   simulation -> hyperbolic;
   simulation -> parabolic;
   simulation -> integrator;
-  simulation -> adaptor;
   simulation -> transfer;
-  simulation -> output;
 }
  * @enddot
  */
@@ -163,7 +165,8 @@
  * @ingroup FrameworkLayer
  *
  * Abstract base classes in namespace ryujin::Interface that hide the
- * equation dependent types from the driver and the discretization
+ * equation dependent types from the driver and the discretization, and
+ * Interface::Task, the interface of all tasks that the Scheduler runs
  * (<code>include/ryujin/interface</code>).
  */
 
@@ -288,7 +291,8 @@
  * @ingroup DriverLayer
  *
  * The EquationDispatch class that selects an equation by name, the
- * library of available equations, the Simulation, and the Scheduler
+ * library of available equations, the TaskComposition that assembles the
+ * Simulation and the tasks, and the Scheduler that runs them
  * (<code>include/ryujin/driver</code>).
  */
 
