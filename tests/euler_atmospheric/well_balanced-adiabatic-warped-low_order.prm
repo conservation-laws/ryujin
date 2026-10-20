@@ -1,0 +1,75 @@
+##
+#
+# Well-balancing of an adiabatic atmosphere at rest (theta = 300 K) with
+# slip boundary conditions, low-order scheme on a warped mesh, Section 4.1.3 (Figure 4.1) of the
+# atmospheric Euler paper. The velocity has to stay zero up to round-off.
+#
+##
+
+subsection A - Scheduler
+  set basename             = test
+  set tasks                = error evaluation
+  set final time           = 10
+  set timer granularity    = 10
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 717
+  set gamma              = 1.400278940027894
+  set gravity            = 9.81
+  set reference pressure = 100000
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+  set mesh writeout   = false
+
+  subsection rectangular domain
+    set position bottom left      = -1, -1
+    set position top right        =  1,  1
+    set transformation            = 500*(1 + x + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y)); 500*(1 + y + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y))
+    set subdivisions x            = 16
+    set subdivisions y            = 16
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = stratified
+  set position      = 0, 0
+
+  subsection stratified
+    set velocity x expression = 0
+    set velocity y expression = 0
+    set theta expression      = 300
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations = 0
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = none
+  set tau_max               = 0.01
+end
+
+subsection K - ErrorEvaluation
+  set error quantities = v_1, v_2
+  set error normalize  = false
+  set error norms      = Linf, L2
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end

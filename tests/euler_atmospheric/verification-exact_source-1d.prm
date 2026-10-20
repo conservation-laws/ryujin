@@ -1,0 +1,65 @@
+##
+#
+# Exact solution with gravity source (constant density and vertical
+# velocity, advected hydrostatic potential temperature), 1D, high-order
+# scheme, Section 4.1.2 (Table 4.3) of the atmospheric Euler paper.
+#
+##
+
+subsection A - Scheduler
+  set basename             = test
+  set tasks                = error evaluation
+  set final time           = 1
+  set timer granularity    = 1
+  set align time steps     = true
+end
+
+subsection B - Equation
+  set dimension          = 1
+  set equation           = euler atmospheric
+  set c_v                = 817
+  set gamma              = 1.4
+  set gravity            = 1
+  set reference pressure = 100000
+end
+
+subsection C - Discretization
+  set mesh refinement = 0
+  set mesh writeout   = false
+
+  subsection rectangular domain
+    set position bottom left     = -11
+    set position top right       = -1
+    set subdivisions x           = 50
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = exact source
+  set position      = 0
+
+  subsection exact source
+    set reference density = 1
+    set velocity          = 1
+  end
+end
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.5
+  set cfl max = 0.5
+end
+
+subsection K - ErrorEvaluation
+  set error quantities = rho, m, rho_theta
+  set error normalize  = true
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end

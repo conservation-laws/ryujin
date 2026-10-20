@@ -1,0 +1,61 @@
+##
+#
+# Well-balancing of a 1D isothermal steady state, Section 4.1.4 (Table
+# 4.4) of the atmospheric Euler paper. The error has to stay at
+# round-off level.
+#
+##
+
+subsection A - Scheduler
+  set basename             = test
+  set tasks                = error evaluation
+  set final time           = 0.2
+  set timer granularity    = 0.2
+end
+
+subsection B - Equation
+  set dimension          = 1
+  set equation           = euler atmospheric
+  set c_v                = 2.5
+  set gamma              = 1.4
+  set gravity            = 1
+  set reference pressure = 1
+end
+
+subsection C - Discretization
+  set mesh refinement = 0
+  set mesh writeout   = false
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 5
+    set subdivisions x           = 200
+    set boundary condition left  = slip
+    set boundary condition right = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set position      = 0
+
+  subsection function
+    set density expression               = exp(-x+2)
+    set velocity x expression            = 0
+    set potential temperature expression = (1/exp(-x+2)) * (exp(-x+2))^(1/1.4)
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.05
+  set cfl max = 0.05
+end
+
+subsection K - ErrorEvaluation
+  set error quantities = rho, rho_theta
+  set error normalize  = true
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end
