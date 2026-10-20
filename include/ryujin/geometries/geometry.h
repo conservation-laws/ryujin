@@ -19,11 +19,8 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   /* forward declaration */
-  namespace Interface
-  {
-    template <int dim>
-    class Discretization;
-  } // namespace Interface
+  template <int dim>
+  class Discretization;
 #endif
 
   /**
@@ -98,8 +95,7 @@ namespace ryujin
      */
     virtual HP_Collection populate_hp_collections(
         const unsigned int /*fe_degree*/,
-        typename ryujin::Interface::Discretization<dim>::Collection
-            & /*collection*/) const
+        typename ryujin::Discretization<dim>::Collection & /*collection*/) const
     {
       /*
        * Signal, that we did nothing. In this case the Discretization

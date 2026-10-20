@@ -21,7 +21,7 @@ namespace ryujin
   template <int dim, typename Number>
   ErrorEvaluation<dim, Number>::ErrorEvaluation(
       const MPIEnsemble &mpi_ensemble,
-      const Interface::OfflineData<dim, Number> &offline_data,
+      const OfflineData<dim, Number> &offline_data,
       const Interface::HyperbolicSystem &hyperbolic_system,
       const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "ErrorEvaluation"*/)

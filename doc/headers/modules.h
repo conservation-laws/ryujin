@@ -131,12 +131,12 @@
   simulation [label="Simulation\<HD, PD\>", URL="\ref ryujin::Simulation"];
 
   ensemble   [label="MPIEnsemble", URL="\ref ryujin::MPIEnsemble"];
-  discr      [label="Discretization", URL="\ref ryujin::Interface::Discretization"];
-  offline    [label="OfflineData", URL="\ref ryujin::Interface::OfflineData"];
+  discr      [label="Discretization", URL="\ref ryujin::Discretization"];
+  offline    [label="OfflineData", URL="\ref ryujin::OfflineData"];
   hyperbolic [label="HyperbolicModule", URL="\ref ryujin::Interface::HyperbolicModule"];
   parabolic  [label="ParabolicModule", URL="\ref ryujin::Interface::ParabolicModule"];
-  integrator [label="TimeIntegrator", URL="\ref ryujin::Interface::TimeIntegrator"];
-  adaptor    [label="MeshAdaptor", URL="\ref ryujin::Interface::MeshAdaptor"];
+  integrator [label="TimeIntegrator", URL="\ref ryujin::TimeIntegrator"];
+  adaptor    [label="MeshAdaptor", URL="\ref ryujin::MeshAdaptor"];
   transfer   [label="SolutionTransfer", URL="\ref ryujin::Interface::SolutionTransfer"];
   output     [label="VTUOutput | Quantities | ErrorEvaluation", URL="\ref Output"];
 

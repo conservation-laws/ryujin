@@ -21,12 +21,13 @@ namespace ryujin
       const Interface::HyperbolicModule<dim, Number> &hyperbolic_module,
       const Interface::ParabolicModule<dim, Number> &parabolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
-      : Interface::TimeIntegrator<dim, Number>(subsection)
+      : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , hyperbolic_module_(&hyperbolic_module)
       , parabolic_module_(&parabolic_module)
+      , efficiency_(Number(1.))
   {
     cfl_min_ = Number(0.45);
     this->add_parameter(
@@ -81,7 +82,7 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
 #endif
 
-    this->time_stepping_scheme_name_ =
+    time_stepping_scheme_name_ =
         Patterns::Tools::Convert<TimeSteppingScheme>::to_string(
             time_stepping_scheme_);
 
@@ -90,55 +91,55 @@ namespace ryujin
     switch (time_stepping_scheme_) {
     case TimeSteppingScheme::ssprk_22:
       temp_.resize(2);
-      this->efficiency_ = 1.;
+      efficiency_ = 1.;
       break;
     case TimeSteppingScheme::ssprk_33:
       temp_.resize(2);
-      this->efficiency_ = 1.;
+      efficiency_ = 1.;
       break;
     case TimeSteppingScheme::erk_11:
       temp_.resize(1);
-      this->efficiency_ = 1.;
+      efficiency_ = 1.;
       break;
     case TimeSteppingScheme::erk_22:
       temp_.resize(2);
-      this->efficiency_ = 2.;
+      efficiency_ = 2.;
       break;
     case TimeSteppingScheme::erk_33:
       temp_.resize(3);
-      this->efficiency_ = 3.;
+      efficiency_ = 3.;
       break;
     case TimeSteppingScheme::erk_43:
       temp_.resize(4);
-      this->efficiency_ = 4.;
+      efficiency_ = 4.;
       break;
     case TimeSteppingScheme::erk_54:
       temp_.resize(5);
-      this->efficiency_ = 5.;
+      efficiency_ = 5.;
       break;
     case TimeSteppingScheme::strang_ssprk_33_cn:
       temp_.resize(3);
-      this->efficiency_ = 2.;
+      efficiency_ = 2.;
       break;
     case TimeSteppingScheme::strang_erk_33_cn:
       temp_.resize(4);
-      this->efficiency_ = 6.;
+      efficiency_ = 6.;
       break;
     case TimeSteppingScheme::strang_erk_43_cn:
       temp_.resize(4);
-      this->efficiency_ = 8.;
+      efficiency_ = 8.;
       break;
     case TimeSteppingScheme::imex_11:
       temp_.resize(2);
-      this->efficiency_ = 1.;
+      efficiency_ = 1.;
       break;
     case TimeSteppingScheme::imex_22:
       temp_.resize(4);
-      this->efficiency_ = 2.;
+      efficiency_ = 2.;
       break;
     case TimeSteppingScheme::imex_33:
       temp_.resize(6);
-      this->efficiency_ = 3.;
+      efficiency_ = 3.;
       break;
     }
 
@@ -334,8 +335,8 @@ namespace ryujin
         // tau_max can be larger). We thus multiply tau_max with the
         // efficiency factor.
         //
-        tau_max = std::min(
-            tau_max, this->efficiency_ * Number(restart.suggested_tau_max));
+        tau_max =
+            std::min(tau_max, efficiency_ * Number(restart.suggested_tau_max));
       }
 
       return single_step();
@@ -360,7 +361,7 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_ssprk_22()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+    Assert(efficiency_ == 1., dealii::ExcInternalError());
 
     /* Step 1: T0 = U_old + tau * L(U_old) at t -> t + tau */
     Number tau = hyperbolic_module_->step(
@@ -389,7 +390,7 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_ssprk_33()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+    Assert(efficiency_ == 1., dealii::ExcInternalError());
 
     /* Step 1: T0 = U_old + tau * L(U_old) at time t -> t + tau */
     Number tau = hyperbolic_module_->step(
@@ -424,7 +425,7 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+    Assert(efficiency_ == 1., dealii::ExcInternalError());
 
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
     Number tau = hyperbolic_module_->step(
@@ -443,15 +444,11 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+    Assert(efficiency_ == 2., dealii::ExcInternalError());
 
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(.0),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(.0), tau_max / efficiency_);
 
     /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -459,7 +456,7 @@ namespace ryujin
         temp_[0], {state_vector}, {Number(-1.)}, temp_[1], tau);
 
     std::swap(state_vector, temp_[1]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -471,15 +468,11 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 3., dealii::ExcInternalError());
+    Assert(efficiency_ == 3., dealii::ExcInternalError());
 
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -498,7 +491,7 @@ namespace ryujin
                              tau);
 
     std::swap(state_vector, temp_[2]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -510,15 +503,11 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 4., dealii::ExcInternalError());
+    Assert(efficiency_ == 4., dealii::ExcInternalError());
 
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -542,7 +531,7 @@ namespace ryujin
                              tau);
 
     std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -554,7 +543,7 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_erk_54()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 5., dealii::ExcInternalError());
+    Assert(efficiency_ == 5., dealii::ExcInternalError());
 
     constexpr Number c = 0.2; /* equidistant c_i */
     constexpr Number a_21 = +0.2;
@@ -574,12 +563,8 @@ namespace ryujin
     constexpr Number a_65 [[maybe_unused]] = +0.35321654878641495; /* aka b_5 */
 
     /* Step 1: at time t -> t + 1*tau */
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     /* Step 2: at time t + 1*tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -615,7 +600,7 @@ namespace ryujin
                              tau);
 
     std::swap(state_vector, temp_[4]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -630,16 +615,12 @@ namespace ryujin
               << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+    Assert(efficiency_ == 2., dealii::ExcInternalError());
 
     /* First explicit SSPRK 3 step with final result in temp_[0]: */
 
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.0),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.0), tau_max / efficiency_);
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->step(temp_[0], {}, {}, temp_[1], tau);
@@ -657,7 +638,7 @@ namespace ryujin
       parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
-      restart.suggested_tau_max /= this->efficiency_;
+      restart.suggested_tau_max /= efficiency_;
       throw;
     }
 
@@ -677,7 +658,7 @@ namespace ryujin
         temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
 
     std::swap(state_vector, temp_[0]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -692,16 +673,12 @@ namespace ryujin
               << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 6., dealii::ExcInternalError());
+    Assert(efficiency_ == 6., dealii::ExcInternalError());
 
     /* First explicit ERK(3,3,1) step with final result in temp_[2]: */
 
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->step(
@@ -720,7 +697,7 @@ namespace ryujin
       parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
-      restart.suggested_tau_max /= this->efficiency_;
+      restart.suggested_tau_max /= efficiency_;
       throw;
     }
 
@@ -742,7 +719,7 @@ namespace ryujin
                              tau);
 
     std::swap(state_vector, temp_[2]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -757,16 +734,12 @@ namespace ryujin
               << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 8., dealii::ExcInternalError());
+    Assert(efficiency_ == 8., dealii::ExcInternalError());
 
     /* First explicit ERK(4,3,1) step with final result in temp_[3]: */
 
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->step(
@@ -789,7 +762,7 @@ namespace ryujin
       parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
-      restart.suggested_tau_max /= this->efficiency_;
+      restart.suggested_tau_max /= efficiency_;
       throw;
     }
 
@@ -815,7 +788,7 @@ namespace ryujin
                              tau);
 
     std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -827,7 +800,7 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_imex_11()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
+    Assert(efficiency_ == 1., dealii::ExcInternalError());
 
     /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
     Number tau = hyperbolic_module_->step(
@@ -850,15 +823,11 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_imex_22()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+    Assert(efficiency_ == 2., dealii::ExcInternalError());
 
     /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
     parabolic_module_->backward_euler_step(temp_[0], t, {}, {}, temp_[1], tau);
@@ -873,7 +842,7 @@ namespace ryujin
         temp_[2], t + 1.0 * tau, {state_vector}, {Number(1.)}, temp_[3], tau);
 
     std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 
@@ -885,19 +854,15 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step_imex_33()" << std::endl;
 #endif
 
-    Assert(this->efficiency_ == 3., dealii::ExcInternalError());
+    Assert(efficiency_ == 3., dealii::ExcInternalError());
 
     /* IMEX(3, 3; 1), see @cite ErnGuermond2023, Sec. 4.3. */
 
     const Number gamma = Number(0.5) + std::sqrt(Number(3.0)) / Number(6.0);
 
     /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    Number tau = hyperbolic_module_->step(state_vector,
-                                          {},
-                                          {},
-                                          temp_[0],
-                                          Number(0.),
-                                          tau_max / this->efficiency_);
+    Number tau = hyperbolic_module_->step(
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
 
     /* Implicit step 1: T1 <- {U_old, 1 - 3*gamma} at time t -> t + tau */
     parabolic_module_->backward_euler_step(
@@ -939,7 +904,7 @@ namespace ryujin
                                            tau);
 
     std::swap(state_vector, temp_[5]);
-    return this->efficiency_ * tau;
+    return efficiency_ * tau;
   }
 
 } // namespace ryujin

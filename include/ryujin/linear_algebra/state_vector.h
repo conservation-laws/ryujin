@@ -18,11 +18,8 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   /* Forward declaration */
-  namespace Interface
-  {
-    template <int dim, typename Number>
-    class OfflineData;
-  } // namespace Interface
+  template <int dim, typename Number>
+  class OfflineData;
 #endif
 
   /**

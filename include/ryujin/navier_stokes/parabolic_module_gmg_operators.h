@@ -9,8 +9,8 @@
 #include <ryujin/base/loop.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/euler/hyperbolic_system.h>
-#include <ryujin/interface/offline_data.h>
 #include <ryujin/navier_stokes/parabolic_system.h>
 
 #include <deal.II/base/vectorization.h>
@@ -180,7 +180,7 @@ namespace ryujin
 
       void initialize(
           const ParabolicSystem &parabolic_system,
-          const Interface::OfflineData<dim, Number2> &offline_data,
+          const OfflineData<dim, Number2> &offline_data,
           const dealii::MatrixFree<dim, Number> &matrix_free,
           const dealii::LinearAlgebra::distributed::Vector<Number> &density,
           const Number theta_x_tau,
@@ -381,7 +381,7 @@ namespace ryujin
 
     private:
       const ParabolicSystem *parabolic_system_;
-      const Interface::OfflineData<dim, Number2> *offline_data_;
+      const OfflineData<dim, Number2> *offline_data_;
       const dealii::MatrixFree<dim, Number> *matrix_free_;
       const vector_type *density_;
       Number theta_x_tau_;
@@ -542,7 +542,7 @@ namespace ryujin
       EnergyMatrix() = default;
 
       void initialize(
-          const Interface::OfflineData<dim, Number2> &offline_data,
+          const OfflineData<dim, Number2> &offline_data,
           const dealii::MatrixFree<dim, Number> &matrix_free,
           const dealii::LinearAlgebra::distributed::Vector<Number> &density,
           const Number time_factor,
@@ -700,7 +700,7 @@ namespace ryujin
       }
 
     private:
-      const Interface::OfflineData<dim, Number2> *offline_data_;
+      const OfflineData<dim, Number2> *offline_data_;
       const dealii::MatrixFree<dim, Number> *matrix_free_;
       const dealii::LinearAlgebra::distributed::Vector<Number> *density_;
       Number factor_;

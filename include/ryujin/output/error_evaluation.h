@@ -8,8 +8,8 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
-#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -54,7 +54,7 @@ namespace ryujin
      * Constructor.
      */
     ErrorEvaluation(const MPIEnsemble &mpi_ensemble,
-                    const Interface::OfflineData<dim, Number> &offline_data,
+                    const OfflineData<dim, Number> &offline_data,
                     const Interface::HyperbolicSystem &hyperbolic_system,
                     const Interface::Postprocessor<dim, Number> &postprocessor,
                     const std::string &subsection = "/ErrorEvaluation");
@@ -128,8 +128,7 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 

@@ -14,9 +14,14 @@
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
-#include <ryujin/interface/time_integrator.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
+#include <deal.II/base/parameter_acceptor.h>
+
+#include <limits>
 #include <numbers>
+#include <string>
+#include <vector>
 
 namespace ryujin
 {
@@ -255,7 +260,7 @@ namespace ryujin
    * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
-  class TimeIntegrator final : public Interface::TimeIntegrator<dim, Number>
+  class TimeIntegrator final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -279,7 +284,7 @@ namespace ryujin
      * storage and is necessary before any of the following time-stepping
      * functions can be called.
      */
-    void prepare() override;
+    void prepare();
 
     //@}
     /**
@@ -297,7 +302,7 @@ namespace ryujin
      * HyperbolicModule::prepare_state_vector().
      */
     void prepare_state_vector(StateVector<Number> &state_vector,
-                              Number t) const override;
+                              Number t) const;
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -318,7 +323,7 @@ namespace ryujin
      */
     Number step(StateVector<Number> &state_vector,
                 Number t,
-                Number t_final = std::numeric_limits<Number>::max()) override;
+                Number t_final = std::numeric_limits<Number>::max());
 
     //@}
     /**
@@ -330,6 +335,23 @@ namespace ryujin
      * The selected time-stepping scheme.
      */
     ACCESSOR_READ_ONLY(time_stepping_scheme)
+
+    /**
+     * The name of the selected time-stepping scheme.
+     *
+     * @note Valid once prepare() has been called.
+     */
+    ACCESSOR_READ_ONLY(time_stepping_scheme_name)
+
+    /**
+     * The efficiency of the selected time-stepping scheme expressed as
+     * the ratio of step size of the combined method to step size of an
+     * elementary forward Euler step. For example, SSPRK33 has an
+     * efficiency ratio of 1 whereas ERK33 has an efficiency ratio of 3.
+     *
+     * @note Valid once prepare() has been called.
+     */
+    ACCESSOR_READ_ONLY(efficiency)
 
   private:
     //@}
@@ -363,6 +385,9 @@ namespace ryujin
         hyperbolic_module_;
     dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>
         parabolic_module_;
+
+    std::string time_stepping_scheme_name_;
+    Number efficiency_;
 
     std::vector<StateVector<Number>> temp_;
 

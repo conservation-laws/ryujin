@@ -46,7 +46,7 @@ namespace ryujin
   template <typename HyperbolicDescription, int dim, typename Number>
   HyperbolicModule<HyperbolicDescription, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
-      const Interface::OfflineData<dim, Number> &offline_data,
+      const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)

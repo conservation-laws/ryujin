@@ -8,8 +8,8 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/initial_values.h>
-#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/typed/initial_state.h>
 
@@ -70,7 +70,7 @@ namespace ryujin
      * Constructor.
      */
     InitialValues(const MPIEnsemble &mpi_ensemble,
-                  const Interface::OfflineData<dim, Number> &offline_data,
+                  const OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
                   const Interface::ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/InitialValues");
@@ -151,8 +151,7 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 

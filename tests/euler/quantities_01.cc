@@ -52,7 +52,7 @@ using SystemView = typename HyperbolicSystem::template View<dim, Number>;
  * factor f_n = sin(n * pi / 2), i.e., by 0, 1, 0, -1, 0, ...
  */
 void populate(StateVector<Number> &state_vector,
-              const Interface::OfflineData<dim, Number> &offline_data,
+              const OfflineData<dim, Number> &offline_data,
               const std::map<types::global_dof_index, Point<dim>> &positions,
               const unsigned int n)
 {

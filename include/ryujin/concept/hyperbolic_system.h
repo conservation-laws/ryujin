@@ -7,8 +7,8 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
-#include <ryujin/interface/offline_data.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/tensor.h>
@@ -137,7 +137,7 @@ namespace ryujin
     template <typename T, int dim, typename Number>
     concept HyperbolicSystemFillsPrecomputedValues =
         requires(const T &system,
-                 const Interface::OfflineData<dim, Number> &offline_data,
+                 const OfflineData<dim, Number> &offline_data,
                  StateVector<Number> &state_vector) {
           system.fill_precomputed_values(offline_data, state_vector);
         };

@@ -6,11 +6,13 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/interface/mesh_adaptor.h>
-#include <ryujin/interface/offline_data.h>
+#include <ryujin/discretization/discretization.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
+#include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -104,9 +106,17 @@ namespace ryujin
    * @ingroup MeshAndOfflineData
    */
   template <int dim, typename Number = double>
-  class MeshAdaptor final : public Interface::MeshAdaptor<dim, Number>
+  class MeshAdaptor final : public dealii::ParameterAcceptor
   {
   public:
+    /**
+     * @name Typedefs
+     */
+    //@{
+
+    using Transformation = typename Discretization<dim>::Transformation;
+
+    //@}
     /**
      * @name Constructor and setup
      */
@@ -116,7 +126,7 @@ namespace ryujin
      * Constructor.
      */
     MeshAdaptor(const MPIEnsemble &mpi_ensemble,
-                const Interface::OfflineData<dim, Number> &offline_data,
+                const OfflineData<dim, Number> &offline_data,
                 const Interface::Postprocessor<dim, Number> &postprocessor,
                 const std::string &subsection = "/MeshAdaptor");
 
@@ -124,7 +134,7 @@ namespace ryujin
      * Prepare temporary storage and clean up internal data for the
      * analyze() facility.
      */
-    void prepare(const Number t) override;
+    void prepare(const Number t);
 
     //@}
     /**
@@ -139,23 +149,32 @@ namespace ryujin
      */
     void analyze(const StateVector<Number> &state_vector,
                  const Number t,
-                 unsigned int cycle) override;
+                 unsigned int cycle);
 
     /**
      * Mark cells for coarsening and refinement with the configured mesh
      * adaptation and marking strategies.
      */
     void mark_cells_for_coarsening_and_refinement(
-        dealii::Triangulation<dim> &triangulation) const override;
+        dealii::Triangulation<dim> &triangulation) const;
 
     /**
      * Keep the current transformation.
      */
-    void update_transformation(
-        typename Interface::MeshAdaptor<dim, Number>::Transformation
-            & /*transformation*/) const override
-    {
-    }
+    void update_transformation(Transformation & /*transformation*/) const {}
+
+    //@}
+    /**
+     * @name Information and statistics
+     */
+    //@{
+
+    /**
+     * A boolean indicating whether we should perform a mesh adaptation
+     * step in the current cycle. The analyze() method sets this boolean
+     * to true whenever an adaptation cycle should be performed.
+     */
+    ACCESSOR_READ_ONLY(need_mesh_adaptation)
 
     //@}
 
@@ -193,10 +212,11 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
-        offline_data_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
+
+    bool need_mesh_adaptation_;
 
     typename Interface::Postprocessor<dim, Number>::Selection selection_;
 

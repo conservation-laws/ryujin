@@ -21,13 +21,14 @@ namespace ryujin
   template <int dim, typename Number>
   MeshAdaptor<dim, Number>::MeshAdaptor(
       const MPIEnsemble &mpi_ensemble,
-      const Interface::OfflineData<dim, Number> &offline_data,
+      const OfflineData<dim, Number> &offline_data,
       const Interface::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "MeshAdaptor"*/)
-      : Interface::MeshAdaptor<dim, Number>(subsection)
+      : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , offline_data_(&offline_data)
       , postprocessor_(postprocessor)
+      , need_mesh_adaptation_(false)
   {
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
     this->add_parameter(
@@ -184,7 +185,7 @@ namespace ryujin
     selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
-    this->need_mesh_adaptation_ = false;
+    need_mesh_adaptation_ = false;
   }
 
 
@@ -212,7 +213,7 @@ namespace ryujin
           [&](const Number &t_refinement) {
             if (t < t_refinement)
               return false;
-            this->need_mesh_adaptation_ = true;
+            need_mesh_adaptation_ = true;
             return true;
           });
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
@@ -221,7 +222,7 @@ namespace ryujin
     case TimePointSelectionStrategy::simulation_cycle: {
       /* check whether we reached a cycle interval: */
       if (cycle % adaptation_cycle_interval_ == 0)
-        this->need_mesh_adaptation_ = true;
+        need_mesh_adaptation_ = true;
     } break;
 
     default:
@@ -229,7 +230,7 @@ namespace ryujin
       __builtin_trap();
     }
 
-    if (!this->need_mesh_adaptation_)
+    if (!need_mesh_adaptation_)
       return;
 
     /*
