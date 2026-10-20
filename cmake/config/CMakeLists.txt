@@ -64,22 +64,6 @@ foreach(_feature
     )
 endforeach()
 
-file(GLOB _files RELATIVE ${PROJECT_SOURCE_DIR}/source CONFIGURE_DEPENDS
-  ${PROJECT_SOURCE_DIR}/source/*/CMakeLists.txt
-  )
-foreach(_file ${_files})
-  get_filename_component(_directory "${_file}" DIRECTORY)
-  string(TOUPPER "${_directory}" _directory_upper)
-  if(EQUATION_${_directory_upper})
-    set(_value ON)
-  else()
-    set(_value OFF)
-  endif()
-  string(APPEND FEATURE_CONFIGURATION_STRING
-    "set(RYUJIN_WITH_EQUATION_${_directory_upper} ${_value})\n"
-    )
-endforeach()
-
 #
 # Version and configuration files:
 #

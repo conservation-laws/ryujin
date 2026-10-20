@@ -65,33 +65,13 @@ target_link_libraries(object_core ${EXTERNAL_TARGETS})
 #
 
 set(OBJECT_TARGETS)
-set(EQUATION_DEFINITIONS)
-macro(setup_equation EQUATION)
-  #
-  # object_${EQUATION} object library: equation specific code:
-  #
-
-  add_subdirectory(${EQUATION})
-
-  list(APPEND OBJECT_TARGETS object_${EQUATION})
-endmacro()
-
-file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)
-foreach(_file ${_files})
-  get_filename_component(_directory "${_file}" DIRECTORY)
-
-  string(TOUPPER "${_directory}" _directory_upper)
-  set(EQUATION_${_directory_upper} ${DEFAULT_ENABLE_EQUATIONS} CACHE BOOL "Enable the equation »${_directory}« compute module")
-
-  if(EQUATION_${_directory_upper})
-    setup_equation("${_directory}")
-    list(APPEND EQUATION_DEFINITIONS RYUJIN_WITH_EQUATION_${_directory_upper})
-  endif()
+foreach(_equation
+    euler euler_aeos euler_barotropic euler_poisson
+    navier_stokes scalar_conservation shallow_water
+    )
+  add_subdirectory(${_equation})
+  list(APPEND OBJECT_TARGETS object_${_equation})
 endforeach()
-
-set_property(SOURCE driver/equation_library.cc APPEND PROPERTY COMPILE_DEFINITIONS
-  ${EQUATION_DEFINITIONS}
-  )
 
 #
 # The shared library libryujin.so:

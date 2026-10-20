@@ -5,7 +5,4 @@
 
 set(TEST_LIBRARIES libryujin)
 
-# The tests of the driver run the Euler equations:
-if(TARGET object_euler)
-  deal_ii_pickup_tests()
-endif()
+deal_ii_pickup_tests()
