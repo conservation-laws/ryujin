@@ -32,8 +32,8 @@ namespace ryujin
      *            \mathbf{c}_{ij} u_j\Big|;
      *    \f]
      *  - "vorticity_&lt;name&gt;": the curl of the vector field formed by the
-     *    component &lt;name&gt; and its dim - 1 subsequent components, in 2D the
-     *    (signed) scalar curl, in 3D the magnitude of the curl,
+     *    component &lt;name&gt; and its dim - 1 subsequent components, in 2D
+     *    the (signed) scalar curl, in 3D the magnitude of the curl,
      *    \f[
      *      \mathbf q_i = \frac{1}{m_i}\sum_{j\in \mathcal{J}(i)}
      *                    \mathbf{c}_{ij} \times \mathbf{u}_j.
