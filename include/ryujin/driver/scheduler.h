@@ -20,7 +20,7 @@ namespace ryujin
    * @ingroup Driver
    */
   template <int dim, typename Number = double>
-  class TimeLoop final : public dealii::ParameterAcceptor
+  class Scheduler final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -29,10 +29,10 @@ namespace ryujin
     //@{
 
     /**
-     * Constructor. The TimeLoop works with the objects of the given
+     * Constructor. The Scheduler works with the objects of the given
      * @p simulation.
      */
-    TimeLoop(Interface::Simulation<dim, Number> &simulation);
+    Scheduler(Interface::Simulation<dim, Number> &simulation);
 
     /**
      * Run the high-level time loop.

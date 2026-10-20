@@ -3,8 +3,8 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/driver/scheduler.h>
 #include <ryujin/driver/simulation.h>
-#include <ryujin/driver/time_loop.h>
 #include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/euler_poisson/parabolic_description.h>
 
@@ -37,7 +37,7 @@ using Number = NUMBER;
 
 
 /*
- * Run a TimeLoop with the given time loop parameters.
+ * Run a Scheduler with the given time loop parameters.
  */
 void run(const std::string &time_loop_parameters)
 {
@@ -95,9 +95,9 @@ void run(const std::string &time_loop_parameters)
   {
     Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
         simulation(MPI_COMM_WORLD);
-    TimeLoop<dim, Number> time_loop(simulation);
+    Scheduler<dim, Number> scheduler(simulation);
     ParameterAcceptor::initialize(parameters);
-    time_loop.run();
+    scheduler.run();
   }
 
   ParameterAcceptor::clear();

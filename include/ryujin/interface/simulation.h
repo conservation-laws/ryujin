@@ -30,7 +30,7 @@ namespace ryujin
   {
     /**
      * The description-free interface of a Simulation: it stores all
-     * objects that the TimeLoop works with and has an accessor for each.
+     * objects that the Scheduler works with and has an accessor for each.
      *
      * The objects are constructed by a derived class, see the typed
      * Simulation, which is the only class that sees the hyperbolic and

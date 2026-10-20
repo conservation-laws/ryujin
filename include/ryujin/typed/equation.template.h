@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include <ryujin/driver/scheduler.h>
 #include <ryujin/driver/simulation.h>
-#include <ryujin/driver/time_loop.h>
 #include <ryujin/typed/equation.h>
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -72,9 +72,9 @@ namespace ryujin
   {
     Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
         simulation(mpi_comm);
-    TimeLoop<dim, Number> time_loop(simulation);
+    Scheduler<dim, Number> scheduler(simulation);
     dealii::ParameterAcceptor::initialize(parameter_file);
-    time_loop.run();
+    scheduler.run();
   }
 
 
@@ -117,7 +117,7 @@ namespace ryujin
        */
       Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
           simulation(MPI_COMM_SELF);
-      TimeLoop<dim, Number> time_loop(simulation);
+      Scheduler<dim, Number> scheduler(simulation);
 
       std::string base_name = this->name();
       std::ranges::replace(base_name, ' ', '_');

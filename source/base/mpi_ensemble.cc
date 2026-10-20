@@ -47,7 +47,7 @@ namespace ryujin
      *
      * If the ensemble is initialized with the MPI_COMM_SELF communicator,
      * skip setting up the communicators for the case that n_ensembles_ > 1.
-     * This only serves the purpose that we can create a TimeLoop instance
+     * This only serves the purpose that we can create a Scheduler instance
      * long enough to query for parameters.
      */
 

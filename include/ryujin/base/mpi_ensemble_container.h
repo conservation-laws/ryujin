@@ -14,7 +14,7 @@
 namespace ryujin
 {
   /**
-   * A specialized wrapper container used in the TimeLoop that helps
+   * A specialized wrapper container used in the Scheduler that helps
    * creating instances of HyperbolicSystem / ParabolicSystem /
    * InitialValues that are MPIEnsemble "aware:"
    *  - For regular equation descriptions we populate a vector with a

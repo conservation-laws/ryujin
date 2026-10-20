@@ -127,7 +127,7 @@
 
   dispatch   [label="EquationDispatch", URL="\ref ryujin::EquationDispatch"];
   equation   [label="Equation\<HD, PD\>", URL="\ref ryujin::Equation"];
-  loop       [label="TimeLoop", URL="\ref ryujin::TimeLoop"];
+  loop       [label="Scheduler", URL="\ref ryujin::Scheduler"];
   simulation [label="Simulation\<HD, PD\>", URL="\ref ryujin::Simulation"];
 
   ensemble   [label="MPIEnsemble", URL="\ref ryujin::MPIEnsemble"];
@@ -288,7 +288,7 @@
  * @ingroup DriverLayer
  *
  * The EquationDispatch class that selects an equation by name, the
- * library of available equations, the Simulation, and the TimeLoop
+ * library of available equations, the Simulation, and the Scheduler
  * (<code>include/ryujin/driver</code>).
  */
 

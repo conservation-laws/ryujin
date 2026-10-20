@@ -42,7 +42,7 @@ namespace ryujin
 
   private:
     /**
-     * Construct the Simulation and the TimeLoop for dimension @p dim,
+     * Construct the Simulation and the Scheduler for dimension @p dim,
      * initialize all parameters from @p parameter_file, and run.
      */
     template <int dim>

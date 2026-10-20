@@ -249,7 +249,7 @@ namespace ryujin
       /**
        * Print a status line with solver statistics. This function is used
        * for constructing the status message displayed periodically in the
-       * TimeLoop.
+       * Scheduler.
        */
       void print_solver_statistics(std::ostream &output) const override;
 

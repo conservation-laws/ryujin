@@ -8,7 +8,7 @@
 #include <ryujin/base/computing_timer.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/version_info.h>
-#include <ryujin/driver/time_loop.h>
+#include <ryujin/driver/scheduler.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
 #include <deal.II/base/logstream.h>
@@ -29,7 +29,7 @@ using namespace dealii;
 namespace ryujin
 {
   template <int dim, typename Number>
-  TimeLoop<dim, Number>::TimeLoop(
+  Scheduler<dim, Number>::Scheduler(
       Interface::Simulation<dim, Number> &simulation)
       : ParameterAcceptor("/A - TimeLoop")
       , simulation_(simulation)
@@ -176,10 +176,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::run()
+  void Scheduler<dim, Number>::run()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
+    std::cout << "Scheduler<dim, Number>::run()" << std::endl;
 #endif
 
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
@@ -518,7 +518,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<dim, Number>::read_checkpoint(
+  void Scheduler<dim, Number>::read_checkpoint(
       StateVector<Number> &state_vector,
       const std::string &base_name,
       Number &t,
@@ -526,7 +526,7 @@ namespace ryujin
       const Callable &prepare_compute_kernels)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::read_checkpoint()" << std::endl;
+    std::cout << "Scheduler<dim, Number>::read_checkpoint()" << std::endl;
 #endif
 
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
@@ -597,14 +597,14 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::write_checkpoint(
+  void Scheduler<dim, Number>::write_checkpoint(
       const StateVector<Number> &state_vector,
       const std::string &base_name,
       const Number &t,
       const unsigned int &timer_cycle)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
+    std::cout << "Scheduler<dim, Number>::write_checkpoint()" << std::endl;
 #endif
 
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
@@ -645,13 +645,14 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <typename Callable>
-  void TimeLoop<dim, Number>::adapt_mesh_and_transfer_state_vector(
+  void Scheduler<dim, Number>::adapt_mesh_and_transfer_state_vector(
       StateVector<Number> &state_vector,
       const Callable &prepare_compute_kernels)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::adapt_mesh_and_transfer_state_vector()"
-              << std::endl;
+    std::cout
+        << "Scheduler<dim, Number>::adapt_mesh_and_transfer_state_vector()"
+        << std::endl;
 #endif
 
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
@@ -692,11 +693,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::interpolate_analytic_solution(
+  void Scheduler<dim, Number>::interpolate_analytic_solution(
       StateVector<Number> &analytic, const Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::interpolate_analytic_solution()"
+    std::cout << "Scheduler<dim, Number>::interpolate_analytic_solution()"
               << std::endl;
 #endif
 
@@ -716,13 +717,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::output(const StateVector<Number> &state_vector,
-                                     const std::string &name,
-                                     const Number t,
-                                     const unsigned int cycle)
+  void Scheduler<dim, Number>::output(const StateVector<Number> &state_vector,
+                                      const std::string &name,
+                                      const Number t,
+                                      const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
+    std::cout << "Scheduler<dim, Number>::output(t = " << t << ")" << std::endl;
 #endif
 
     auto &vtu_output = simulation_.vtu_output();
@@ -763,7 +764,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_parameters(std::ostream &stream)
+  void Scheduler<dim, Number>::print_parameters(std::ostream &stream)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
@@ -789,7 +790,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_mpi_partition(std::ostream &stream)
+  void Scheduler<dim, Number>::print_mpi_partition(std::ostream &stream)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
     const auto &offline_data = simulation_.offline_data();
@@ -870,7 +871,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_device_information(std::ostream &stream)
+  void Scheduler<dim, Number>::print_device_information(std::ostream &stream)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
@@ -968,7 +969,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_info(const std::string &header)
+  void Scheduler<dim, Number>::print_info(const std::string &header)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
@@ -980,9 +981,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_head(const std::string &header,
-                                         const std::string &secondary,
-                                         std::ostream &stream)
+  void Scheduler<dim, Number>::print_head(const std::string &header,
+                                          const std::string &secondary,
+                                          std::ostream &stream)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
@@ -1011,10 +1012,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_information(unsigned int timer_cycle,
-                                                Number last_checkpoint,
-                                                std::ostream &stream,
-                                                bool final_time)
+  void Scheduler<dim, Number>::print_information(unsigned int timer_cycle,
+                                                 Number last_checkpoint,
+                                                 std::ostream &stream,
+                                                 bool final_time)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
     const auto &hyperbolic_system = simulation_.hyperbolic_system();
@@ -1095,7 +1096,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_memory_statistics(std::ostream &stream)
+  void Scheduler<dim, Number>::print_memory_statistics(std::ostream &stream)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
@@ -1125,7 +1126,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_timers(std::ostream &stream)
+  void Scheduler<dim, Number>::print_timers(std::ostream &stream)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
@@ -1214,10 +1215,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
-                                               Number t,
-                                               std::ostream &stream,
-                                               bool final_time)
+  void Scheduler<dim, Number>::print_throughput(unsigned int cycle,
+                                                Number t,
+                                                std::ostream &stream,
+                                                bool final_time)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
     const auto &parabolic_system = simulation_.parabolic_system();
@@ -1440,12 +1441,12 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
-                                                     Number t,
-                                                     unsigned int timer_cycle,
-                                                     Number last_checkpoint,
-                                                     bool write_to_logfile,
-                                                     bool final_time)
+  void Scheduler<dim, Number>::print_cycle_statistics(unsigned int cycle,
+                                                      Number t,
+                                                      unsigned int timer_cycle,
+                                                      Number last_checkpoint,
+                                                      bool write_to_logfile,
+                                                      bool final_time)
   {
     const auto &mpi_ensemble = simulation_.mpi_ensemble();
 
