@@ -188,7 +188,7 @@ namespace ryujin
         simulation_.state_vector());
     triangulation.execute_coarsening_and_refinement();
 
-    context.mesh_changed = true;
+    context.prepare_required = true;
   }
 
 
