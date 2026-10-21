@@ -353,19 +353,24 @@ namespace ryujin
       //@{
 
       /**
-       * Initialize the task. Called once at the begin.
+       * Initialize the task.
+       *
+       * Called once at the very beginning.
        */
       virtual void initialize(TaskContext<Number> & /*context*/) {}
 
       /**
-       * Start the computation. Called once after all tasks have been
-       * initialized and before the first call to prepare().
+       * Start the computation.
+       *
+       * Called once after all tasks have been initialized and before the
+       * first call to prepare().
        */
       virtual void start(TaskContext<Number> & /*context*/) {}
 
       /**
-       * Prepare the task for the current mesh. Called after start() and
-       * whenever a task of the adapt phase sets
+       * Prepare the task for the current mesh.
+       *
+       * Called after start() and whenever a task of the adapt phase sets
        * TaskContext::prepare_required.
        *
        * @note prepare() must preserve the internal state of the task.
@@ -379,7 +384,8 @@ namespace ryujin
       //@{
 
       /**
-       * Execute the task. Called in every cycle in the phase of the task.
+       * Execute the task. Called in every cycle in the selected phase of
+       * the task.
        */
       virtual void execute(TaskContext<Number> &context) = 0;
 
@@ -396,7 +402,7 @@ namespace ryujin
 
       /**
        * Store the internal state of the task in a checkpoint. Called on
-       * all MPI ranks; the data of rank 0 is written.
+       * all MPI ranks; but only the data of rank 0 is written.
        */
       virtual void save(boost::archive::binary_oarchive & /*archive*/) const {}
 

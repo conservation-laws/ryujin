@@ -19,13 +19,9 @@ namespace ryujin
 {
   /**
    * A TaskComposition assembles the library tasks and the Scheduler around
-   * a Simulation. It only sees the Simulation through
-   * Interface::Simulation and is thus independent of the hyperbolic and
-   * the parabolic description.
-   *
-   * The tasks are constructed (and declare their run time parameters) in
-   * the order of the subsections "/I - VTUOutput" to "/N - Checkpointing",
-   * which is the order of their phases in a cycle.
+   * a Simulation. The tasks are constructed (and declare their run time
+   * parameters) in the order of the subsections "/I - VTUOutput" to "/N -
+   * Checkpointing", which is the order of their phases in a cycle.
    *
    * The Simulation and the Logger are required tasks; all other tasks
    * are selected with the run time parameter "tasks" of the Scheduler.

@@ -25,8 +25,8 @@
 namespace ryujin
 {
   /**
-   * The Simulation constructs the core objects of a simulation for
-   * the pairing of a hyperbolic and a parabolic description.
+   * The Simulation constructs the core objects of a simulation for a given
+   * pairing of a hyperbolic and a parabolic description.
    *
    * In addition to the objects stored in Interface::Simulation it owns
    * the per-ensemble containers of the hyperbolic system, the parabolic
@@ -215,15 +215,20 @@ namespace ryujin
       this->parabolic_module_->reinit_state_vector(state_vector);
 
       auto &solution_transfer = *this->solution_transfer_;
+
       if (solution_transfer.has_handle()) {
+        /* project the state vector if solution_transfer contains a handle: */
         solution_transfer.project(state_vector);
         solution_transfer.reset_handle();
+
       } else {
+        /* Otherwise interpolate initial values: */
         ComputingTimer::Scope scope(
             "time step [X]   - interpolate data vectors");
         state_vector.state =
             this->initial_values_->interpolate_hyperbolic_vector();
       }
+
       debug_poison_invalid_values(state_vector, *this->offline_data_);
 
       /* Prepare the state vector for time stepping. */
