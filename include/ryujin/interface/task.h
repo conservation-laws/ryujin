@@ -40,7 +40,7 @@ namespace ryujin
     /**
      * Mesh adaptation, at time t. The Scheduler runs this phase only if a
      * time step follows. A task of this phase that changes the mesh sets
-     * TaskContext::mesh_changed.
+     * TaskContext::prepare_required.
      */
     adapt,
 
@@ -184,10 +184,11 @@ namespace ryujin
     std::string base_name;
 
     /**
-     * Set by a task of the adapt phase that has changed the mesh. The
-     * Scheduler then prepares all tasks for the new mesh.
+     * Set by a task of the adapt phase that has invalidated the data
+     * structures of the tasks, for example by changing the mesh. The
+     * Scheduler then calls Interface::Task::prepare() on all tasks.
      */
-    bool mesh_changed = false;
+    bool prepare_required = false;
 
     /**
      * All active tasks in the order of execution.
@@ -327,9 +328,9 @@ namespace ryujin
      * following order:
      *  - initialize() once at the begin,
      *  - start() once after all tasks have been initialized,
-     *  - prepare() after start() and after every mesh adaptation,
-     *  - max_tau() before, and execute() in the phase of the task in
-     *    every cycle,
+     *  - prepare() after start() and whenever a task of the adapt phase
+     *    sets TaskContext::prepare_required,
+     *  - execute() in the phase of the task in every cycle,
      *  - finalize() once at the end, in reverse order.
      *
      * In addition, a task stores its internal state in checkpoints with
@@ -352,19 +353,25 @@ namespace ryujin
       //@{
 
       /**
-       * Initialize the task. Called once at the begin.
+       * Initialize the task.
+       *
+       * Called once at the very beginning.
        */
       virtual void initialize(TaskContext<Number> & /*context*/) {}
 
       /**
-       * Start the computation. Called once after all tasks have been
-       * initialized and before the first call to prepare().
+       * Start the computation.
+       *
+       * Called once after all tasks have been initialized and before the
+       * first call to prepare().
        */
       virtual void start(TaskContext<Number> & /*context*/) {}
 
       /**
-       * Prepare the task for the current mesh. Called after start() and
-       * after every mesh adaptation.
+       * Prepare the task for the current mesh.
+       *
+       * Called after start() and whenever a task of the adapt phase sets
+       * TaskContext::prepare_required.
        *
        * @note prepare() must preserve the internal state of the task.
        */
@@ -377,16 +384,8 @@ namespace ryujin
       //@{
 
       /**
-       * Return the largest time step size that the task admits at the
-       * current state.
-       */
-      virtual Number max_tau(const TaskContext<Number> & /*context*/) const
-      {
-        return std::numeric_limits<Number>::max();
-      }
-
-      /**
-       * Execute the task. Called in every cycle in the phase of the task.
+       * Execute the task. Called in every cycle in the selected phase of
+       * the task.
        */
       virtual void execute(TaskContext<Number> &context) = 0;
 
@@ -403,7 +402,7 @@ namespace ryujin
 
       /**
        * Store the internal state of the task in a checkpoint. Called on
-       * all MPI ranks; the data of rank 0 is written.
+       * all MPI ranks; but only the data of rank 0 is written.
        */
       virtual void save(boost::archive::binary_oarchive & /*archive*/) const {}
 

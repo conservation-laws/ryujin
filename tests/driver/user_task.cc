@@ -5,12 +5,13 @@
 
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/driver/checkpointing.h>
+#include <ryujin/driver/environment.h>
 #include <ryujin/driver/logger.h>
 #include <ryujin/driver/scheduler.h>
+#include <ryujin/driver/simulation.h>
 #include <ryujin/euler/hyperbolic_description.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/stub/parabolic_module.h>
-#include <ryujin/typed/equation.template.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -23,12 +24,12 @@
 #include <string>
 
 //
-// Test a user defined task in a TaskComposition of its own that an Equation
-// runs: The task runs in the step phase after the Simulation,
-// restricts the time step size with max_tau(), counts its executions, and
-// stores the count in checkpoints. We run the computation once uninterrupted
-// and once split into a first run that writes a checkpoint and a second run
-// that resumes from it. Both have to report the same number of executions.
+// Test a user defined task in a TaskComposition of its own that runs a
+// Simulation: The task runs in the step phase after the Simulation,
+// counts its executions, and stores the count in checkpoints. We run the
+// computation once uninterrupted and once split into a first run that
+// writes a checkpoint and a second run that resumes from it. Both have to
+// report the same number of executions.
 //
 
 using namespace ryujin;
@@ -49,8 +50,6 @@ public:
       , Interface::Task<Number>("test task", TaskPhase::step)
       , mpi_ensemble_(mpi_ensemble)
   {
-    max_tau_ = Number(0.01);
-    add_parameter("max tau", max_tau_, "Largest time step size");
   }
 
   void initialize(TaskContext<Number> & /*context*/) override
@@ -63,18 +62,12 @@ public:
     ++n_prepare_;
   }
 
-  Number max_tau(const TaskContext<Number> & /*context*/) const override
-  {
-    return max_tau_;
-  }
-
   void execute(TaskContext<Number> &context) override
   {
     /* The Simulation has already chosen tau: */
     AssertThrow(context.tau > Number(0.), ExcInternalError());
 
     ++n_execute_;
-    max_tau_seen_ = std::max(max_tau_seen_, context.tau);
   }
 
   void save(boost::archive::binary_oarchive &archive) const override
@@ -92,24 +85,18 @@ public:
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
-    const bool tau_restricted =
-        max_tau_seen_ <= max_tau_ * (Number(1.) + Number(1.e-10));
-
     std::cout << "test task: initialize " << n_initialize_ << ", prepare "
-              << n_prepare_ << ", execute " << n_execute_ << ", tau restricted "
-              << (tau_restricted ? "yes" : "no") << ", t = " << std::fixed
-              << std::setprecision(6) << context.t << std::endl;
+              << n_prepare_ << ", execute " << n_execute_
+              << ", t = " << std::fixed << std::setprecision(6) << context.t
+              << std::endl;
   }
 
 private:
-  Number max_tau_;
-
   const MPIEnsemble &mpi_ensemble_;
 
   unsigned int n_initialize_ = 0;
   unsigned int n_prepare_ = 0;
   unsigned int n_execute_ = 0;
-  Number max_tau_seen_ = Number(0.);
 };
 
 
@@ -196,12 +183,14 @@ void run(const std::string &time_loop_parameters,
   const int ierr = MPI_Barrier(MPI_COMM_WORLD);
   AssertThrowMPI(ierr);
 
-  const Equation<HyperbolicDescription,
-                 ParabolicDescription,
-                 Number,
-                 UserTaskComposition>
-      equation("user equation");
-  equation.run(dim, "user_task.prm", MPI_COMM_WORLD);
+  {
+    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+        simulation(MPI_COMM_WORLD);
+    UserTaskComposition<dim, Number> task_composition(simulation);
+
+    ParameterAcceptor::initialize("user_task.prm");
+    task_composition.run();
+  }
 
   ParameterAcceptor::clear();
 }
@@ -209,24 +198,27 @@ void run(const std::string &time_loop_parameters,
 
 int main(int argc, char *argv[])
 {
-  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+  Environment environment(argc, argv);
 
   /* An uninterrupted computation: */
   run("  set basename          = full\n"
       "  set final time        = 0.1\n"
-      "  set timer granularity = 0.1\n",
+      "  set timer granularity = 0.01\n"
+      "  set align time steps  = true\n",
       "");
 
   /* A computation to half of the final time that writes a checkpoint: */
   run("  set basename          = split\n"
       "  set final time        = 0.05\n"
-      "  set timer granularity = 0.05\n",
+      "  set timer granularity = 0.01\n"
+      "  set align time steps  = true\n",
       "  set trigger interval = 1.e-6\n");
 
   /* Resume the computation and run to the final time: */
   run("  set basename          = split\n"
       "  set final time        = 0.1\n"
-      "  set timer granularity = 0.05\n",
+      "  set timer granularity = 0.01\n"
+      "  set align time steps  = true\n",
       "  set resume = true\n");
 
   return 0;

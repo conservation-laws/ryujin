@@ -19,7 +19,7 @@
 
 //
 // Test Concept::HyperbolicDescription and Concept::ParabolicDescription:
-// every pairing of the EquationLibrary satisfies the concepts in all
+// every pairing of the ryujin executable satisfies the concepts in all
 // dimensions for double and float, and the Navier-Stokes module pairs
 // with the Euler equations only.
 //

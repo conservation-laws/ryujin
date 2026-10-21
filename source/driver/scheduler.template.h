@@ -99,12 +99,11 @@ namespace ryujin
       tasks_.push_back(*it);
     }
 
-    TaskContext<Number> context;
-    context.t_final = t_final_;
-    context.timer_granularity = timer_granularity_;
-    context.base_name = base_name_;
-    context.tasks = tasks_;
-    context.info = info_;
+    TaskContext<Number> context{.t_final = t_final_,
+                                .timer_granularity = timer_granularity_,
+                                .base_name = base_name_,
+                                .tasks = tasks_,
+                                .info = info_};
 
     /*
      * Initialize and prepare all tasks:
@@ -151,15 +150,13 @@ namespace ryujin
       if (context.t >= relax * t_final_)
         break;
 
-      /* Adapt the mesh and prepare all tasks for the new mesh: */
+      /* Adapt the mesh and prepare all tasks if requested: */
 
-      context.mesh_changed = false;
+      context.prepare_required = false;
       run_phase(TaskPhase::adapt, context);
 
-      if (context.mesh_changed) {
-        ComputingTimer::Scope scope_1("(re)initialize data structures");
-        ComputingTimer::Scope scope_2(
-            "time step [X]   - perform mesh adaptation");
+      if (context.prepare_required) {
+        ComputingTimer::Scope scope("(re)initialize data structures");
 
         for (auto *task : tasks_)
           task->prepare(context);
@@ -172,11 +169,6 @@ namespace ryujin
           align_time_steps_
               ? std::min(t_final_, context.timer_cycle * timer_granularity_)
               : std::numeric_limits<Number>::max();
-      for (const auto *task : tasks_) {
-        const auto max_tau = task->max_tau(context);
-        if (max_tau < std::numeric_limits<Number>::max())
-          context.t_max = std::min(context.t_max, context.t + max_tau);
-      }
 
       run_phase(TaskPhase::step, context);
 

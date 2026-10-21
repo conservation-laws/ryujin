@@ -4,7 +4,6 @@
 ##
 
 add_library(object_scalar_conservation OBJECT
-  equation.cc
   flux_library.cc
   hyperbolic_module.cc
   initial_state_library.cc

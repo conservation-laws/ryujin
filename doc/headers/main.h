@@ -84,9 +84,9 @@
  * hyperbolic update, initial values, and postprocessing for a given
  * hyperbolic and parabolic description. Each of the
  * @ref EquationsLayer "equations" is such a pair of descriptions. Finally,
- * the @ref Driver "driver" selects an equation at run time, sets up the
- * simulation, and runs the time loop, and the @ref Output "output" classes
- * write out results.
+ * the @ref Driver "driver" sets up the simulation and runs the time
+ * loop, and the @ref Output "output" classes write out results. The
+ * ryujin executable selects an equation and the dimension at run time.
  *
  * ryujin is based on discretization approaches and algorithms that have
  * been developed in a number of publications
