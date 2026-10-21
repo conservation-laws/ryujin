@@ -294,6 +294,120 @@
  * TaskComposition that assembles the Simulation and the tasks, the
  * Scheduler that runs them, and write_parameter_files() that writes the
  * default parameter files (<code>include/ryujin/driver</code>).
+ *
+ * <h3>Equation dispatch</h3>
+ *
+ * The ryujin executable selects the equation and the dimension at run
+ * time. Every equation registers itself with a constant
+ * EquationRegistration<HD, PD> at namespace scope in
+ * <code>source/driver/equation_*.cc</code>. Its constructor runs during
+ * static initialization and inserts an Equation under the given name into
+ * the map returned by equations(). An Equation holds two std::function
+ * objects, so that main() (<code>source/main.cc</code>) can call them
+ * without knowing HD, PD, or the dimension. main() reads the run time
+ * parameters "dimension" and "equation", looks up the equation, and calls
+ * Equation::run, which switches over the dimension and constructs the
+ * Simulation and the TaskComposition. If the parameter file does not
+ * exist, main() instead calls Equation::create_parameter_files of every
+ * registered equation:
+ *
+ * @dot
+ digraph G
+{
+  graph[rankdir="TB",bgcolor="transparent",nodesep=0.4];
+
+  node [fontname="FreeSans",fontsize=12,
+        shape=record,height=0.2,width=0.4,
+        color="black", fillcolor="white", style="filled"];
+  edge [color="black",fontname="FreeSans",fontsize=11];
+
+  main      [label="main()\nreads \"dimension\" and \"equation\""];
+  registry  [label="equations()", URL="\ref ryujin::equations"];
+  equation  [label="{Equation | {<run> run(dim, ...) | <prm> create_parameter_files()}}", URL="\ref ryujin::Equation"];
+
+  subgraph cluster_registration {
+    label="EquationRegistration\<HD, PD\>"; URL="\ref ryujin::EquationRegistration";
+    fontname="FreeSans"; style="rounded"; color="gray";
+    constructor [label="constructor(name)", URL="\ref ryujin::EquationRegistration"];
+    run         [label="run_simulation\<dim\>()", URL="\ref ryujin::EquationRegistration"];
+    prm         [label="create_parameter_file\<dim\>()", URL="\ref ryujin::EquationRegistration"];
+  }
+
+  simulation  [label="Simulation\<HD, PD, dim\>", URL="\ref ryujin::Simulation"];
+  composition [label="TaskComposition\<dim\>\nsees Interface::Simulation", URL="\ref ryujin::TaskComposition"];
+  scheduler   [label="Scheduler::run()", URL="\ref ryujin::Scheduler"];
+  write       [label="write_parameter_files()", URL="\ref ryujin::write_parameter_files"];
+
+  registry -> constructor [label="inserts Equation", dir="back"];
+  main -> registry [label="at(equation)"];
+  registry -> equation;
+  equation:run -> run [label="switch over dim"];
+  equation:prm -> prm [label="dim = 1, 2, 3"];
+  run -> simulation [label="constructs"];
+  run -> composition [label="constructs"];
+  composition -> scheduler [label="run()"];
+  prm -> write;
+}
+ * @enddot
+ *
+ * Only EquationRegistration and the Simulation depend on HD and PD. The
+ * TaskComposition and all tasks use the Simulation through
+ * Interface::Simulation and are compiled once per dimension.
+ *
+ * <h3>Scheduler</h3>
+ *
+ * The Scheduler runs a list of tasks (see Interface::Task). The active
+ * tasks are the required tasks, followed by the tasks named in the run
+ * time parameter "tasks". After calling initialize(), start(), and
+ * prepare() on every active task, the Scheduler runs cycles of four
+ * phases. Each task belongs to exactly one TaskPhase; within a phase the
+ * Scheduler executes the tasks of that phase in the order of the active
+ * tasks. The diagram lists the tasks that TaskComposition assigns to each
+ * phase:
+ *
+ * @dot
+ digraph G
+{
+  graph[rankdir="TB",bgcolor="transparent",nodesep=0.4];
+
+  node [fontname="FreeSans",fontsize=12,
+        shape=record,height=0.2,width=0.4,
+        color="black", fillcolor="white", style="filled"];
+  edge [color="black",fontname="FreeSans",fontsize=11];
+
+  select    [label="select the active tasks:\nrequired tasks, then the tasks\nof the run time parameter \"tasks\""];
+  setup     [label="{initialize() | start() | prepare()}", URL="\ref ryujin::Interface::Task"];
+  pre_step  [label="{TaskPhase::pre_step | VTUOutput, Quantities,\nErrorEvaluation}", URL="\ref ryujin::TaskPhase"];
+  final     [label="t \>= t_final?", shape=diamond];
+  adapt     [label="{TaskPhase::adapt | MeshAdaptor}", URL="\ref ryujin::TaskPhase"];
+  changed   [label="prepare_required?", shape=diamond];
+  prepare   [label="prepare()", URL="\ref ryujin::Interface::Task"];
+  step      [label="{TaskPhase::step | Simulation (chooses tau)}", URL="\ref ryujin::TaskPhase"];
+  advance   [label="t += tau,\nsynchronize wall time"];
+  post_step [label="{TaskPhase::post_step | Logger, Checkpointing}", URL="\ref ryujin::TaskPhase"];
+  finalize  [label="finalize()\nin reverse order", URL="\ref ryujin::Interface::Task"];
+
+  select -> setup;
+  setup -> pre_step;
+  pre_step -> final;
+  final -> finalize [label="yes"];
+  final -> adapt [label="no"];
+  adapt -> changed;
+  changed -> prepare [label="yes"];
+  changed -> step [label="no"];
+  prepare -> step;
+  step -> advance;
+  advance -> post_step;
+  post_step -> pre_step [label="next cycle", constraint=false];
+}
+ * @enddot
+ *
+ * The first required task is the primary task. In TaskComposition this is
+ * the Simulation, which sets up the discretization in prepare() and
+ * chooses the time step size tau in the step phase. All values the
+ * Scheduler shares with the tasks, such as t, tau, the cycle, and
+ * whether a timer tick has been reached, are stored in the TaskContext.
+ * Tasks decide in which cycles to do their work with a Trigger.
  */
 
 
