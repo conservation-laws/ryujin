@@ -8,6 +8,8 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/geometries/geometry_common_includes.h>
 
+#include <deal.II/base/function_parser.h>
+
 namespace ryujin
 {
   namespace Geometries
@@ -22,6 +24,11 @@ namespace ryujin
      *
      * A mesh grading can be enforced by defining an optional pull back and
      * push forward operation.
+     *
+     * Alternatively, the domain can be deformed by an optional forward
+     * transformation given as a semicolon separated list of dim
+     * expressions in x, y, z. If set, the geometry is realized with a
+     * MappingQCache, see Geometry::transformation().
      *
      * By convention the rectangular domain is orient with the x-axis to
      * from "left to right", the y-axis from "bottom to top" and the z-axis
@@ -57,6 +64,13 @@ namespace ryujin
         this->add_parameter("grading pull back",
                             grading_pull_back_,
                             "pull back of grading manifold");
+
+        this->add_parameter(
+            "transformation",
+            transformation_expression_,
+            "Optional forward transformation of the rectangular domain given "
+            "as a semicolon separated list of dim expressions in x, y, z. If "
+            "empty, no transformation is applied.");
 
         subdivisions_x_ = 1;
         subdivisions_y_ = 1;
@@ -180,6 +194,33 @@ namespace ryujin
 
         triangulation.copy_triangulation(tria1);
 
+        /* create transformation: */
+
+        if (!transformation_expression_.empty()) {
+          AssertThrow(!use_simplices_,
+                      dealii::ExcMessage(
+                          "A transformation can only be used with a mesh "
+                          "consisting of quadrilaterals or hexahedra."));
+
+          const auto transformation =
+              std::make_shared<dealii::FunctionParser<dim>>(
+                  transformation_expression_);
+          AssertThrow(transformation->n_components == dim,
+                      dealii::ExcMessage(
+                          "The transformation must consist of exactly dim "
+                          "semicolon separated expressions."));
+
+          this->transformation_ =
+              [transformation](
+                  const typename dealii::Triangulation<dim>::cell_iterator &,
+                  const dealii::Point<dim> &point) {
+                dealii::Point<dim> result;
+                for (unsigned int d = 0; d < dim; ++d)
+                  result[d] = transformation->value(point, d);
+                return result;
+              };
+        }
+
         /* create grading: */
 
         // FIXME: We should ideally check the push forward and pull back
@@ -295,6 +336,8 @@ namespace ryujin
 
       std::string grading_push_forward_;
       std::string grading_pull_back_;
+
+      std::string transformation_expression_;
 
       Boundary boundary_back_;
       Boundary boundary_bottom_;
