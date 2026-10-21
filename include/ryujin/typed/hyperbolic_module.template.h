@@ -648,7 +648,7 @@ namespace ryujin
     };
 
     const auto loop_name = [&step_no]() {
-      return "hyperbolic_kernel_" + std::format("{:02}", step_no);
+      return "hyperbolic_kernel_" + Utilities::int_to_string(step_no, 2);
     };
 
     /* A flag signalling that a restart is necessary. */

@@ -15,12 +15,9 @@ namespace ryujin
 
   template class SparsityPattern<warp_size>;
 
-  /*
-   * The testsuite also uses the sparsity pattern with the SIMD width of
-   * double precision numbers. Only instantiate if this is a different
-   * specialization than the one for the warp size above:
-   */
+#if DEAL_II_VECTORIZATION_WIDTH_IN_BITS > 0
   using VA = dealii::VectorizedArray<double>;
   constexpr auto simd_width = VA::size();
   template class SparsityPattern<simd_width == warp_size ? 1 : simd_width>;
+#endif
 } // namespace ryujin
