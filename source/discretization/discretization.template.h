@@ -338,12 +338,15 @@ namespace ryujin
       if (!transformation_)
         return;
 
-      /* A MeshAdaptor has set a transformation: */
+      /* The geometry or a MeshAdaptor has set a transformation: */
       AssertThrow(
           collection_type_ ==
               Geometry<dim>::HP_Collection::standard_quadrilaterals,
-          ExcMessage("A transformation can only be set for a geometry that "
-                     "does not populate the hp collections itself."));
+          ExcMessage("Discretization: A transformation (set by the geometry "
+                     "or a mesh adaptor) is only supported for the standard "
+                     "Q_k setup on quadrilateral or hexahedral meshes. It "
+                     "cannot be used with simplex meshes or with a geometry "
+                     "that populates the hp collections itself."));
       create_mapping_cache();
     }
 
@@ -362,11 +365,8 @@ namespace ryujin
   template <int dim>
   void Discretization<dim>::create_mapping_cache()
   {
-    /*
-     * The cache is stored by pointer (and not cloned) so that the
-     * collection always refers to the current cache:
-     */
     mapping_cache_ = std::make_shared<MappingQCache<dim>>(polynomial_degree());
+
     auto mapping = std::make_unique<hp::MappingCollection<dim>>();
     hp::Collection<Mapping<dim>> &base = *mapping;
     base.push_back(mapping_cache_);
