@@ -20,8 +20,8 @@
 //
 // Test Concept::HyperbolicDescription and Concept::ParabolicDescription:
 // every pairing of the ryujin executable satisfies the concepts in all
-// dimensions for double and float, and the Navier-Stokes module pairs
-// with the Euler equations only.
+// dimensions for the configured NUMBER type, and the Navier-Stokes module
+// pairs with the Euler equations only.
 //
 
 using namespace ryujin;
@@ -33,8 +33,7 @@ constexpr bool pairs = []<int... dim>(std::integer_sequence<int, dim...>) {
 }(std::integer_sequence<int, 1, 2, 3>());
 
 #define CHECK(HD, PD)                                                          \
-  std::cout << #HD " + " #PD ": " << pairs<HD, PD, double> << " "              \
-            << pairs<HD, PD, float> << std::endl;
+  std::cout << #HD " + " #PD ": " << pairs<HD, PD, NUMBER> << std::endl;
 
 int main()
 {
