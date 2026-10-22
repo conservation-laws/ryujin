@@ -1081,27 +1081,14 @@ namespace ryujin
             U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
             F_iH += d_ijH * (U_star_ji - U_star_ij);
             P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
-
-            limiter_view.accumulate(old_precomputed_view,
-                                    U_j,
-                                    U_star_ij,
-                                    U_star_ji,
-                                    scaled_c_ij,
-                                    affine_shift);
-
           } else {
-
             U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
             F_iH += d_ijH * (U_j - U_i);
             P_ij += (d_ijH - d_ij) * (U_j - U_i);
-
-            limiter_view.accumulate(old_precomputed_view,
-                                    js,
-                                    U_j,
-                                    flux_j,
-                                    scaled_c_ij,
-                                    affine_shift);
           }
+
+          limiter_view.accumulate(
+              old_precomputed_view, js, U_j, flux_j, scaled_c_ij, affine_shift);
 
           if constexpr (View::have_source_terms) {
             F_iH -= m_ij * S_iH;

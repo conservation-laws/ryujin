@@ -144,19 +144,8 @@ compute_quantities(const View &limiter_view,
 
   limiter.reset(pv, i, U_i, flux_i);
 
-  {
-    const auto &[U_star_ij, U_star_ji] =
-        system_view.equilibrated_states(flux_i, flux_j_1);
-    limiter.accumulate(
-        pv, U_j_1, U_star_ij, U_star_ji, scaled_c_ij_1, affine_shift);
-  }
-
-  {
-    const auto &[U_star_ij, U_star_ji] =
-        system_view.equilibrated_states(flux_i, flux_j_2);
-    limiter.accumulate(
-        pv, U_j_2, U_star_ij, U_star_ji, scaled_c_ij_2, affine_shift);
-  }
+  limiter.accumulate(pv, &j_1, U_j_1, flux_j_1, scaled_c_ij_1, affine_shift);
+  limiter.accumulate(pv, &j_2, U_j_2, flux_j_2, scaled_c_ij_2, affine_shift);
 
   const auto accumulated_bounds = limiter.bounds(hd_i);
   for (unsigned int d = 0; d < n_bounds; ++d)

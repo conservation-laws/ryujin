@@ -292,9 +292,9 @@ namespace ryujin
        */
       DEAL_II_HOST_DEVICE void
       accumulate(const PrecomputedVectorView &pv,
+                 const unsigned int *js,
                  const state_type &U_j,
-                 const state_type &U_star_ij,
-                 const state_type &U_star_ji,
+                 const flux_contribution_type &flux_j,
                  const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                  const state_type &affine_shift);
 
@@ -332,7 +332,7 @@ namespace ryujin
       const View view_;
       const Limiter<ScalarNumber>::Parameters *const parameters_;
 
-      state_type U_i_;
+      flux_contribution_type flux_i_;
 
       Bounds bounds_;
 
@@ -414,10 +414,10 @@ namespace ryujin
     LimiterView<dim, Number, MemorySpace>::reset(
         const PrecomputedVectorView & /*pv*/,
         unsigned int /*i*/,
-        const state_type &U_i,
-        const flux_contribution_type & /*flux_i*/)
+        const state_type & /*U_i*/,
+        const flux_contribution_type &flux_i)
     {
-      U_i_ = U_i;
+      flux_i_ = flux_i;
 
       auto &[h_min, h_max, v2_max] = bounds_;
 
@@ -435,23 +435,27 @@ namespace ryujin
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE void
     LimiterView<dim, Number, MemorySpace>::accumulate(
         const PrecomputedVectorView & /*pv*/,
-        const state_type &U_j,
-        const state_type &U_star_ij,
-        const state_type &U_star_ji,
+        const unsigned int * /*js*/,
+        const state_type & /*U_j*/,
+        const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const state_type &affine_shift)
     {
-      /* The bar states: */
-
-      const auto f_star_ij = view_.f(U_star_ij);
-      const auto f_star_ji = view_.f(U_star_ji);
+      const auto &[U_i, Z_i, V_i] = flux_i_;
+      const auto &[U_j, Z_j, V_j] = flux_j;
+      const auto &[U_star_ij, U_star_ji] =
+          view_.equilibrated_states(flux_i_, flux_j);
 
       /* bar state shifted by an affine shift: */
-      const auto U_ij_bar =
-          ScalarNumber(0.5) *
-              (U_star_ij + U_star_ji +
-               contract(add(f_star_ij, -f_star_ji), scaled_c_ij)) +
-          affine_shift;
+
+      const auto p_star_ij = view_.pressure(U_star_ij);
+      const auto p_star_ji = view_.pressure(U_star_ji);
+
+      auto U_ij_bar = U_star_ij * (Number(1.) + V_i * scaled_c_ij) +
+                      U_star_ji * (Number(1.) - V_j * scaled_c_ij);
+      for (unsigned int d = 0; d < dim; ++d)
+        U_ij_bar[1 + d] += (p_star_ij - p_star_ji) * scaled_c_ij[d];
+      U_ij_bar = ScalarNumber(0.5) * U_ij_bar + affine_shift;
 
       /* Bounds: */
 
@@ -473,16 +477,12 @@ namespace ryujin
 
       relaxation_denominator_ += std::abs(beta_ij);
 
-      const auto h_i = view_.water_depth(U_i_);
+      const auto h_i = view_.water_depth(U_i);
       const auto h_j = view_.water_depth(U_j);
       h_relaxation_numerator_ += beta_ij * (h_i + h_j);
 
-      const auto vel_i =
-          view_.momentum(U_i_) * view_.inverse_water_depth_mollified(U_i_);
-      const auto vel_j =
-          view_.momentum(U_j) * view_.inverse_water_depth_mollified(U_j);
       v2_relaxation_numerator_ +=
-          beta_ij * (-vel_i.norm_square() + vel_j.norm_square());
+          beta_ij * (-V_i.norm_square() + V_j.norm_square());
     }
 
 
