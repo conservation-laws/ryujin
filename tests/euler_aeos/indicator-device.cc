@@ -39,10 +39,12 @@ constexpr const char *quantity_names[]{"evc_factor", "alpha"};
 constexpr unsigned int n_results = std::size(quantity_names);
 
 
-template <typename View>
+template <typename View, typename SystemView>
 DEAL_II_HOST_DEVICE dealii::Tensor<1, n_results, double>
 compute_quantities(const View &indicator_view,
+                   const SystemView &system_view,
                    const typename View::PrecomputedVectorView &pv,
+                   const typename SystemView::InitialPrecomputedVectorView &ipv,
                    const unsigned int i,
                    const state_type &U_i,
                    const unsigned int j_1,
@@ -59,9 +61,13 @@ compute_quantities(const View &indicator_view,
   /* The view is stateful, work on a copy: */
   auto indicator = indicator_view;
 
-  indicator.reset(pv, i, U_i);
-  indicator.accumulate(pv, &j_1, U_j_1, c_ij_1);
-  indicator.accumulate(pv, &j_2, U_j_2, c_ij_2);
+  const auto flux_i = system_view.flux_contribution(pv, ipv, i, U_i);
+  const auto flux_j_1 = system_view.flux_contribution(pv, ipv, &j_1, U_j_1);
+  const auto flux_j_2 = system_view.flux_contribution(pv, ipv, &j_2, U_j_2);
+
+  indicator.reset(pv, i, U_i, flux_i);
+  indicator.accumulate(pv, &j_1, U_j_1, flux_j_1, c_ij_1);
+  indicator.accumulate(pv, &j_2, U_j_2, flux_j_2, c_ij_2);
 
   result[k++] = indicator.evc_factor();
   result[k++] = indicator.alpha(hd_i);
@@ -99,6 +105,8 @@ int main(int argc, char *argv[])
 
   const auto host_system_view =
       hyperbolic_system.view<dim, double, HostSpace>();
+  const auto device_system_view =
+      hyperbolic_system.view<dim, double, DefaultSpace>();
   const auto host_view = indicator.view<dim, double, HostSpace>();
   const auto device_view = indicator.view<dim, double, DefaultSpace>();
 
@@ -119,6 +127,10 @@ int main(int argc, char *argv[])
   MultiComponentVector<double> precomputed;
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
+
+  MultiComponentVector<double> initial_precomputed;
+  initial_precomputed.reinit_with_scalar_partitioner(
+      scalar_partitioner, HostSystemView::n_initial_precomputed_values);
 
   MultiComponentVector<double> results;
   results.reinit_with_scalar_partitioner(scalar_partitioner, n_results);
@@ -172,9 +184,14 @@ int main(int argc, char *argv[])
 
   std::array<dealii::Tensor<1, n_results, double>, n_states> host_results;
   {
+    const auto &v = host_view;
+    const auto &s = host_system_view;
     const auto U_view = U.view<problem_dimension, HostSpace>();
     const auto pv =
         precomputed.view<HostSystemView::n_precomputed_values, HostSpace>();
+    const auto ipv =
+        initial_precomputed
+            .view<HostSystemView::n_initial_precomputed_values, HostSpace>();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       const unsigned int j_1 = (i + 1) % n_states;
@@ -183,7 +200,7 @@ int main(int argc, char *argv[])
       const auto U_j_1 = U_view.read_tensor<double>(j_1);
       const auto U_j_2 = U_view.read_tensor<double>(j_2);
       host_results[i] = compute_quantities(
-          host_view, pv, i, U_i, j_1, U_j_1, j_2, U_j_2, c_ij_1, c_ij_2, hd_i);
+          v, s, pv, ipv, i, U_i, j_1, U_j_1, j_2, U_j_2, c_ij_1, c_ij_2, hd_i);
     }
   }
 
@@ -191,11 +208,15 @@ int main(int argc, char *argv[])
 
   U.move_to_memory_space<DefaultSpace>();
   precomputed.move_to_memory_space<DefaultSpace>();
+  initial_precomputed.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
 
   const auto U_view = U.view<problem_dimension, DefaultSpace>();
   const auto pv =
       precomputed.view<HostSystemView::n_precomputed_values, DefaultSpace>();
+  const auto ipv =
+      initial_precomputed
+          .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
@@ -211,7 +232,9 @@ int main(int argc, char *argv[])
         const auto U_j_1 = U_view.read_tensor(j_1);
         const auto U_j_2 = U_view.read_tensor(j_2);
         const auto result = compute_quantities(device_view,
+                                               device_system_view,
                                                pv,
+                                               ipv,
                                                i,
                                                U_i,
                                                j_1,

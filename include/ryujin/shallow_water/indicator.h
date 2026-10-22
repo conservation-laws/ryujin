@@ -148,6 +148,8 @@ namespace ryujin
 
       using state_type = typename View::state_type;
 
+      using flux_contribution_type = typename View::flux_contribution_type;
+
       using flux_type = typename View::flux_type;
 
       using precomputed_type = typename View::precomputed_type;
@@ -163,10 +165,10 @@ namespace ryujin
        * IndicatorView<dim, Number> indicator_view;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   indicator_view.reset(pv, i, U_i);
+       *   indicator_view.reset(pv, i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator_view.accumulate(pv, js, U_j, c_ij);
+       *     indicator_view.accumulate(pv, js, U_j, flux_j, c_ij);
        *   }
        *   indicator_view.alpha(hd_i);
        * }
@@ -199,7 +201,8 @@ namespace ryujin
        */
       DEAL_II_HOST_DEVICE void reset(const PrecomputedVectorView &pv,
                                      const unsigned int i,
-                                     const state_type &U_i);
+                                     const state_type &U_i,
+                                     const flux_contribution_type &flux_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
@@ -209,6 +212,7 @@ namespace ryujin
       accumulate(const PrecomputedVectorView &pv,
                  const unsigned int *js,
                  const state_type &U_j,
+                 const flux_contribution_type &flux_j,
                  const dealii::Tensor<1, dim, Number> &c_ij);
 
       /**
@@ -251,7 +255,8 @@ namespace ryujin
     IndicatorView<dim, Number, MemorySpace>::reset(
         const PrecomputedVectorView &pv,
         const unsigned int i,
-        const state_type &U_i)
+        const state_type &U_i,
+        const flux_contribution_type & /*flux_i*/)
     {
       /* entropy viscosity commutator: */
 
@@ -275,6 +280,7 @@ namespace ryujin
         const PrecomputedVectorView &pv,
         const unsigned int *js,
         const state_type &U_j,
+        const flux_contribution_type & /*flux_j*/,
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
       /* entropy viscosity commutator: */

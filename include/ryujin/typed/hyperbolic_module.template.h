@@ -705,7 +705,7 @@ namespace ryujin
         const auto flux_i = view.flux_contribution(
             old_precomputed_view, initial_precomputed_view, i, U_i);
 
-        indicator_view.reset(old_precomputed_view, i, U_i);
+        indicator_view.reset(old_precomputed_view, i, U_i, flux_i);
 
         const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
@@ -717,7 +717,8 @@ namespace ryujin
 
           const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
-          indicator_view.accumulate(old_precomputed_view, js, U_j, c_ij);
+          indicator_view.accumulate(
+              old_precomputed_view, js, U_j, flux_j, c_ij);
 
           /* Skip diagonal. */
           if (col_idx == 0)
