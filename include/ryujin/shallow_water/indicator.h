@@ -260,7 +260,7 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
-      const auto &[eta_m, h_star] =
+      const auto &[eta_m, h_star, factor] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
       h_i_ = view_.water_depth(U_i);
@@ -285,7 +285,7 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
-      const auto &[eta_j, h_star_j] =
+      const auto &[eta_j, h_star_j, factor_j] =
           pv.template read_tensor<Number, precomputed_type>(js);
 
       const auto velocity_j =

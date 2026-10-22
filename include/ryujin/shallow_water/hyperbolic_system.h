@@ -185,7 +185,7 @@ namespace ryujin
       /**
        * The number of precomputed values.
        */
-      static constexpr unsigned int n_precomputed_values = 2;
+      static constexpr unsigned int n_precomputed_values = 3;
 
       /**
        * Array type used for precomputed values.
@@ -530,6 +530,13 @@ namespace ryujin
       static constexpr bool have_source_terms = true;
 
       /**
+       * For a given state @p U return the factor
+       * \f$2 g n^2 |\mathbf V|\f$ of the Gauckler-Manning friction.
+       */
+      DEAL_II_HOST_DEVICE Number
+      manning_friction_factor(const state_type &U) const;
+
+      /**
        * A regularized Gauckler-Manning friction coefficient.
        *
        * FIXME: details
@@ -537,6 +544,7 @@ namespace ryujin
       DEAL_II_HOST_DEVICE
       state_type manning_friction(const state_type &U,
                                   const Number &h_star,
+                                  const Number &factor,
                                   const ScalarNumber tau) const;
 
       DEAL_II_HOST_DEVICE
@@ -632,7 +640,9 @@ namespace ryujin
               "Shallow water equations",
               {{{"h", "m"}, {"h", "m_1", "m_2"}, {"h", "m_1", "m_2", "m_3"}}},
               {{{"h", "v"}, {"h", "v_1", "v_2"}, {"h", "v_1", "v_2", "v_3"}}},
-              {{{"eta_m", "h_star"}, {"eta_m", "h_star"}, {"eta_m", "h_star"}}},
+              {{{"eta_m", "h_star", "friction_factor"},
+                {"eta_m", "h_star", "friction_factor"},
+                {"eta_m", "h_star", "friction_factor"}}},
               {{{"bathymetry"}, {"bathymetry"}, {"bathymetry"}}},
               subsection)
         , parameters_("shallow_water_hyperbolic_system_parameters",
@@ -711,8 +721,9 @@ namespace ryujin
         const auto eta_m = view.mathematical_entropy(U_i);
         const auto h_sharp = view.water_depth_sharp(U_i);
         const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
+        const auto factor = view.manning_friction_factor(U_i);
 
-        const precomputed_type prec_i{eta_m, h_star};
+        const precomputed_type prec_i{eta_m, h_star, factor};
         precomputed_view.template write_tensor<T>(prec_i, i);
       };
 
@@ -1217,20 +1228,29 @@ namespace ryujin
 
     template <int dim, typename Number, typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction(
-        const state_type &U, const Number &h_star, const ScalarNumber tau) const
-        -> state_type
+    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction_factor(
+        const state_type &U) const -> Number
     {
-      state_type result;
-
       const auto g = gravity();
       const auto n = manning_friction_coefficient();
 
-      const auto h_inverse = inverse_water_depth_mollified(U);
+      const auto v_norm =
+          (momentum(U) * inverse_water_depth_mollified(U)).norm();
+      return ScalarNumber(2.) * g * n * n * v_norm;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction(
+        const state_type &U,
+        const Number &h_star,
+        const Number &factor,
+        const ScalarNumber tau) const -> state_type
+    {
+      state_type result;
 
       const auto m = momentum(U);
-      const auto v_norm = (m * h_inverse).norm();
-      const auto factor = ScalarNumber(2.) * g * n * n * v_norm;
 
       const auto denominator = h_star + std::max(h_star, tau * factor);
       const auto denominator_inverse = ScalarNumber(1.) / denominator;
@@ -1250,10 +1270,10 @@ namespace ryujin
         const state_type &U_i,
         const ScalarNumber tau) const -> state_type
     {
-      const auto &[eta_m, h_star] =
+      const auto &[eta_m, h_star, factor] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
-      return manning_friction(U_i, h_star, tau);
+      return manning_friction(U_i, h_star, factor, tau);
     }
 
 
@@ -1265,10 +1285,10 @@ namespace ryujin
         const state_type &U_j,
         const ScalarNumber tau) const -> state_type
     {
-      const auto &[eta_m, h_star] =
+      const auto &[eta_m, h_star, factor] =
           pv.template read_tensor<Number, precomputed_type>(js);
 
-      return manning_friction(U_j, h_star, tau);
+      return manning_friction(U_j, h_star, factor, tau);
     }
 
 

@@ -159,7 +159,8 @@ int main(int argc, char *argv[])
 
       const typename HostSystemView::precomputed_type prec_i{
           host_system_view.mathematical_entropy(U_i),
-          ryujin::pow(host_system_view.water_depth_sharp(U_i), 4. / 3.)};
+          ryujin::pow(host_system_view.water_depth_sharp(U_i), 4. / 3.),
+          host_system_view.manning_friction_factor(U_i)};
       precomputed_view.write_tensor(prec_i, i);
     }
   }

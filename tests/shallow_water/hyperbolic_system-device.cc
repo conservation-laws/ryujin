@@ -170,7 +170,7 @@ compute_quantities(const View &view,
   dealii::Tensor<1, n_results, double> result;
   unsigned int k = 0;
 
-  const auto &[eta_m, h_star] =
+  const auto &[eta_m, h_star, factor] =
       pv.template read_tensor<double, precomputed_type>(i);
 
   result[k++] = view.water_depth(U);
@@ -254,7 +254,7 @@ compute_quantities(const View &view,
   }
 
   {
-    const auto source = view.manning_friction(U, h_star, tau);
+    const auto source = view.manning_friction(U, h_star, factor, tau);
     for (unsigned int d = 0; d < problem_dimension; ++d)
       result[k++] = source[d];
   }
@@ -413,7 +413,8 @@ int main(int argc, char *argv[])
 
       const precomputed_type prec_i{
           host_view.mathematical_entropy(U_i),
-          ryujin::pow(host_view.water_depth_sharp(U_i), 4. / 3.)};
+          ryujin::pow(host_view.water_depth_sharp(U_i), 4. / 3.),
+          host_view.manning_friction_factor(U_i)};
       precomputed_view.write_tensor(prec_i, i);
 
       const initial_precomputed_type bathymetry_i{0.05 * ((i + 7) % n_states)};
