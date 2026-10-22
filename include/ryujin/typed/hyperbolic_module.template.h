@@ -10,6 +10,7 @@
 #include <ryujin/base/loop.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/concept/hyperbolic_system.h>
 #include <ryujin/typed/hyperbolic_module.h>
 
 #include <numeric>
@@ -17,11 +18,6 @@
 
 namespace ryujin
 {
-  namespace ShallowWater
-  {
-    struct HyperbolicDescription;
-  } // namespace ShallowWater
-
   using namespace dealii;
 
   namespace
@@ -501,23 +497,8 @@ namespace ryujin
     if (have_separate_memory_spaces)
       ComputingTimer::timer("time step [X] _ - memory space transfers").start();
 
-    /*
-     * Workaround: A constexpr boolean storing the fact whether we
-     * instantiate the HyperbolicModule for the shallow water equations.
-     *
-     * Rationale: Currently, the shallow water equations is the only
-     * hyperbolic system for which we have to (a) form equilibrated states
-     * for the low-order update, and (b) apply an affine shift for
-     * computing limiter bounds. It's not so easy to come up with a
-     * meaningful abstraction layer for this (in particular because we only
-     * have one PDE). Thus, for the time being we simply special case a
-     * small amount of code in this routine.
-     *
-     * FIXME: Refactor into a proper abstraction layer / interface.
-     */
-    constexpr bool shallow_water =
-        std::is_same_v<HyperbolicDescription,
-                       ShallowWater::HyperbolicDescription>;
+    constexpr bool equilibrated_states =
+        Concept::HyperbolicSystemViewEquilibratesStates<View, dim, Number>;
 
     /* Index ranges for the iteration over the sparsity pattern : */
 
@@ -1013,14 +994,8 @@ namespace ryujin
 
         [[maybe_unused]] state_type affine_shift;
 
-        /*
-         * Workaround: For shallow water we need to accumulate an
-         * additional contribution to the affine shift over the stencil
-         * before we can compute limiter bounds.
-         */
-
         const unsigned int *js = sparsity_simd_view.columns(i);
-        if constexpr (shallow_water) {
+        if constexpr (equilibrated_states) {
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
@@ -1099,11 +1074,7 @@ namespace ryujin
           U_i_new += tau * m_i_inv * flux_ij;
           auto P_ij = -flux_ij;
 
-          if constexpr (shallow_water) {
-            /*
-             * Workaround: Shallow water (and related) are special:
-             */
-
+          if constexpr (equilibrated_states) {
             const auto &[U_star_ij, U_star_ji] =
                 view.equilibrated_states(flux_i, flux_j);
 
