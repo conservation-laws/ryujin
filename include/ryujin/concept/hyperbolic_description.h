@@ -10,8 +10,11 @@
 #include <ryujin/concept/indicator.h>
 #include <ryujin/concept/limiter.h>
 #include <ryujin/concept/wave_speed_estimator.h>
+#include <ryujin/interface/hyperbolic_module.h>
 
 #include <deal.II/base/vectorization.h>
+
+#include <concepts>
 
 namespace ryujin
 {
@@ -37,6 +40,10 @@ namespace ryujin
     template <typename Number>
     using vectorized_type = dealii::VectorizedArray<Number>;
 
+    template <typename HD, int dim, typename Number>
+    using hyperbolic_module_type =
+        typename HD::template HyperbolicModule<dim, Number>;
+
 
     /**
      * The members of a hyperbolic description HD with hyperbolic system
@@ -55,13 +62,15 @@ namespace ryujin
     /**
      * A hyperbolic description: a hyperbolic system with an indicator, a
      * limiter, and a wave speed estimator, for scalar and vectorized
-     * numbers.
+     * numbers, and a hyperbolic module that the TimeIntegrator can use.
      *
      * @ingroup Concepts
      */
     template <typename HD, int dim, typename Number>
     concept HyperbolicDescription =
         HyperbolicKernels<HD, system_type<HD>, dim, Number> &&
-        HyperbolicKernels<HD, system_type<HD>, dim, vectorized_type<Number>>;
+        HyperbolicKernels<HD, system_type<HD>, dim, vectorized_type<Number>> &&
+        std::derived_from<hyperbolic_module_type<HD, dim, Number>,
+                          Interface::HyperbolicModule<dim, Number>>;
   } // namespace Concept
 } // namespace ryujin

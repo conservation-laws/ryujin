@@ -15,7 +15,6 @@
 #include <ryujin/discretization/time_integrator.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/interface/task.h>
-#include <ryujin/typed/hyperbolic_module.h>
 #include <ryujin/typed/initial_values.h>
 #include <ryujin/typed/postprocessor.h>
 #include <ryujin/typed/solution_transfer.h>
@@ -51,6 +50,8 @@ namespace ryujin
 
     using HyperbolicSystem = typename HD::HyperbolicSystem;
     using ParabolicSystem = typename PD::ParabolicSystem;
+    using HyperbolicModule =
+        typename HD::template HyperbolicModule<dim, Number>;
     using ParabolicModule =
         typename PD::template ParabolicModule<HD, dim, Number>;
 
@@ -109,12 +110,11 @@ namespace ryujin
       this->initial_values_ = &initial_values;
 
       auto hyperbolic_module =
-          std::make_unique<HyperbolicModule<HD, dim, Number>>(
-              mpi_ensemble,
-              offline_data,
-              hyperbolic_system,
-              initial_values,
-              "/F - HyperbolicModule");
+          std::make_unique<HyperbolicModule>(mpi_ensemble,
+                                             offline_data,
+                                             hyperbolic_system,
+                                             initial_values,
+                                             "/F - HyperbolicModule");
       const auto &initial_precomputed =
           hyperbolic_module->initial_precomputed();
       this->hyperbolic_module_ = std::move(hyperbolic_module);
