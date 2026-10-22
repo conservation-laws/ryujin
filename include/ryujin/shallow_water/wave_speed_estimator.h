@@ -369,8 +369,8 @@ namespace ryujin
       std::cout << h_min << "  <- h_min/max ->  " << h_max << std::endl;
 #endif
 
-      const Number a_min = std::sqrt(gravity * h_min);
-      const Number a_max = std::sqrt(gravity * h_max);
+      const Number a_min = std::min(a_i, a_j);
+      const Number a_max = std::max(a_i, a_j);
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << a_min << "  <- a_min/max ->  " << a_max << std::endl;
@@ -410,7 +410,7 @@ namespace ryujin
       /* Double modified shock (h_star middle): */
 
       tmp = Number(1.) + sqrt_two * (u_i - u_j) / (a_min + a_max);
-      const Number h_star_middle = std::sqrt(h_min * h_max) * tmp;
+      const Number h_star_middle = gravity_inverse * a_min * a_max * tmp;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "middle: " << h_star_middle << std::endl;
@@ -420,13 +420,13 @@ namespace ryujin
 
       const auto left_radicand =
           ScalarNumber(3.) * h_min +
-          ScalarNumber(2.) * sqrt_two * std::sqrt(h_min * h_max);
+          ScalarNumber(2.) * sqrt_two * gravity_inverse * a_min * a_max;
 
       const auto right_radicand =
-          sqrt_two * std::sqrt(gravity_inverse * h_min) * (u_i - u_j);
+          sqrt_two * gravity_inverse * a_min * (u_i - u_j);
 
       tmp = std::sqrt(positive_part(left_radicand + right_radicand));
-      tmp -= sqrt_two * std::sqrt(h_min);
+      tmp -= sqrt_two * std::sqrt(gravity_inverse) * a_min;
 
       const Number h_star_right = tmp * tmp;
 
