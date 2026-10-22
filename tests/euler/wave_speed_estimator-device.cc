@@ -62,10 +62,12 @@ compute_constants(const View &view)
 constexpr unsigned int n_results = 1; /* lambda_max */
 
 
-template <typename View>
+template <typename View, typename SystemView>
 DEAL_II_HOST_DEVICE dealii::Tensor<1, n_results, double>
 compute_quantities(const View &wave_speed_estimator_view,
+                   const SystemView &system_view,
                    const typename View::PrecomputedVectorView &pv,
+                   const typename SystemView::InitialPrecomputedVectorView &ipv,
                    const unsigned int i,
                    const state_type &U_i,
                    const state_type &U_j,
@@ -74,7 +76,10 @@ compute_quantities(const View &wave_speed_estimator_view,
   dealii::Tensor<1, n_results, double> result;
   unsigned int k = 0;
 
-  result[k++] = wave_speed_estimator_view.compute(pv, U_i, U_j, i, &i, n_ij);
+  const auto flux_i = system_view.flux_contribution(pv, ipv, i, U_i);
+  const auto flux_j = system_view.flux_contribution(pv, ipv, &i, U_j);
+  result[k++] = wave_speed_estimator_view.compute(
+      pv, i, &i, U_i, U_j, flux_i, flux_j, n_ij);
 
   Assert(k == n_results, dealii::ExcInternalError());
   return result;
@@ -108,6 +113,8 @@ int main(int argc, char *argv[])
 
   const auto host_system_view =
       hyperbolic_system.view<dim, double, HostSpace>();
+  const auto device_system_view =
+      hyperbolic_system.view<dim, double, DefaultSpace>();
   const auto host_view = wave_speed_estimator.view<dim, double, HostSpace>();
   const auto device_view =
       wave_speed_estimator.view<dim, double, DefaultSpace>();
@@ -134,6 +141,10 @@ int main(int argc, char *argv[])
   MultiComponentVector<double> precomputed;
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
+
+  MultiComponentVector<double> initial_precomputed;
+  initial_precomputed.reinit_with_scalar_partitioner(
+      scalar_partitioner, HostSystemView::n_initial_precomputed_values);
 
   MultiComponentVector<double> constants;
   constants.reinit_with_scalar_partitioner(scalar_partitioner, n_constants);
@@ -189,11 +200,14 @@ int main(int argc, char *argv[])
     const auto U_view = U.view<problem_dimension, HostSpace>();
     const auto pv =
         precomputed.view<HostSystemView::n_precomputed_values, HostSpace>();
+    const auto ipv =
+        initial_precomputed
+            .view<HostSystemView::n_initial_precomputed_values, HostSpace>();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       const auto U_i = U_view.read_tensor<double>(i);
-      host_results[i] =
-          compute_quantities(host_view, pv, i, U_i, U_bar, normal);
+      host_results[i] = compute_quantities(
+          host_view, host_system_view, pv, ipv, i, U_i, U_bar, normal);
     }
   }
 
@@ -201,12 +215,16 @@ int main(int argc, char *argv[])
 
   U.move_to_memory_space<DefaultSpace>();
   precomputed.move_to_memory_space<DefaultSpace>();
+  initial_precomputed.move_to_memory_space<DefaultSpace>();
   constants.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
 
   const auto U_view = U.view<problem_dimension, DefaultSpace>();
   const auto pv =
       precomputed.view<HostSystemView::n_precomputed_values, DefaultSpace>();
+  const auto ipv =
+      initial_precomputed
+          .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
   const auto constants_view = constants.view<n_constants, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
@@ -226,8 +244,8 @@ int main(int argc, char *argv[])
       Kokkos::RangePolicy<ExecutionSpace>(exec, 0, n_states),
       KOKKOS_LAMBDA(std::size_t i) {
         const auto U_i = U_view.read_tensor(i);
-        const auto result =
-            compute_quantities(device_view, pv, i, U_i, U_bar, normal);
+        const auto result = compute_quantities(
+            device_view, device_system_view, pv, ipv, i, U_i, U_bar, normal);
         results_view.write_tensor(result, i);
       });
 

@@ -699,7 +699,11 @@ namespace ryujin
         if (row_length == 1)
           return;
 
+        const auto view = hyperbolic_system_views.template view<T>();
+
         const auto U_i = old_U_view.template read_tensor<T>(i);
+        const auto flux_i = view.flux_contribution(
+            old_precomputed_view, initial_precomputed_view, i, U_i);
 
         indicator_view.reset(old_precomputed_view, i, U_i);
 
@@ -708,6 +712,8 @@ namespace ryujin
              ++col_idx, js += stride_size) {
 
           const auto U_j = old_U_view.template read_tensor<T>(js);
+          const auto flux_j = view.flux_contribution(
+              old_precomputed_view, initial_precomputed_view, js, U_j);
 
           const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
@@ -724,7 +730,7 @@ namespace ryujin
           const auto norm = c_ij.norm();
           const auto n_ij = c_ij / norm;
           const auto lambda_max = wave_speed_estimator_view.compute(
-              old_precomputed_view, U_i, U_j, i, js, n_ij);
+              old_precomputed_view, i, js, U_i, U_j, flux_i, flux_j, n_ij);
           const auto d_ij = norm * lambda_max;
 
           dij_matrix_view.write_entry(d_ij, i, col_idx, true);
@@ -781,8 +787,14 @@ namespace ryujin
         if (j < i)
           return;
 
+        const auto view = hyperbolic_system_views.template view<Number>();
+
         const auto U_i = old_U_view.read_tensor(i);
         const auto U_j = old_U_view.read_tensor(j);
+        const auto flux_i = view.flux_contribution(
+            old_precomputed_view, initial_precomputed_view, i, U_i);
+        const auto flux_j = view.flux_contribution(
+            old_precomputed_view, initial_precomputed_view, j, U_j);
 
         const auto c_ji = cij_matrix_view.read_transposed_tensor(i, col_idx);
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
@@ -792,7 +804,7 @@ namespace ryujin
         const auto d_ij = dij_matrix_view.read_entry(i, col_idx);
 
         const auto lambda_max = wave_speed_estimator_view.compute(
-            old_precomputed_view, U_j, U_i, j, &i, n_ji);
+            old_precomputed_view, j, &i, U_j, U_i, flux_j, flux_i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
 
         dij_matrix_view.write_entry(std::max(d_ij, d_ji), i, col_idx);
@@ -808,6 +820,7 @@ namespace ryujin
       const auto body = [=](auto, unsigned int i) -> Number {
 
 #ifdef DEBUG_SYMMETRY_CHECK
+        const auto view = hyperbolic_system_views.template view<Number>();
         const auto wave_speed_estimator_view =
             wave_speed_estimator_views.template view<Number>();
 #endif
@@ -834,6 +847,10 @@ namespace ryujin
 
             const auto U_i = old_U_view.read_tensor(i);
             const auto U_j = old_U_view.read_tensor(j);
+            const auto flux_i = view.flux_contribution(
+                old_precomputed_view, initial_precomputed_view, i, U_i);
+            const auto flux_j = view.flux_contribution(
+                old_precomputed_view, initial_precomputed_view, j, U_j);
 
             const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
             Assert(c_ij.norm() > 1.e-12, ExcInternalError());
@@ -841,7 +858,7 @@ namespace ryujin
             const auto n_ij = c_ij / norm_ij;
 
             const auto lambda_max = wave_speed_estimator_view.compute(
-                old_precomputed_view, U_i, U_j, i, &j, n_ij);
+                old_precomputed_view, i, &j, U_i, U_j, flux_i, flux_j, n_ij);
             const auto d_ij = norm_ij * lambda_max;
 
             Assert(d_ij <= d_ji + 1.0e-12,
