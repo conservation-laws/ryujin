@@ -1083,7 +1083,9 @@ namespace ryujin
       const Number h = water_depth(U);
       const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
 
-      return U * H_star * inverse_water_depth_mollified(U);
+      state_type result = U * (H_star * inverse_water_depth_mollified(U));
+      result[0] = H_star;
+      return result;
     }
 
 
