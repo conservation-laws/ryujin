@@ -158,7 +158,9 @@ namespace ryujin
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
-       * compute an estimation of an upper bound for lambda.
+       * compute an estimation of an upper bound for lambda of the Riemann
+       * problem with the equilibrated states \f$U_i^{\ast,j}\f$ and
+       * \f$U_j^{\ast,i}\f$.
        */
       DEAL_II_HOST_DEVICE Number
       compute(const PrecomputedVectorView &pv,
@@ -199,11 +201,6 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number
       compute_h_star(const primitive_type &riemann_data_i,
                      const primitive_type &riemann_data_j) const;
-
-    protected:
-      DEAL_II_HOST_DEVICE primitive_type
-      riemann_data_from_state(const state_type &U,
-                              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
       //@}
@@ -246,14 +243,26 @@ namespace ryujin
         const PrecomputedVectorView & /*pv*/,
         const unsigned int /*i*/,
         const unsigned int * /*js*/,
-        const state_type &U_i,
-        const state_type &U_j,
-        const flux_contribution_type & /*flux_i*/,
-        const flux_contribution_type & /*flux_j*/,
+        const state_type & /*U_i*/,
+        const state_type & /*U_j*/,
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+      const auto &[U_i, Z_i, V_i] = flux_i;
+      const auto &[U_j, Z_j, V_j] = flux_j;
+      const auto &[U_star_ij, U_star_ji] =
+          view_.equilibrated_states(flux_i, flux_j);
+
+      const ScalarNumber gravity = view_.gravity();
+      const Number h_i = view_.water_depth_sharp(U_star_ij);
+      const Number h_j = view_.water_depth_sharp(U_star_ji);
+
+      const primitive_type riemann_data_i{
+          {h_i, V_i * n_ij, std::sqrt(gravity * h_i)}};
+      const primitive_type riemann_data_j{
+          {h_j, V_j * n_ij, std::sqrt(gravity * h_j)}};
+
       return compute(riemann_data_i, riemann_data_j);
     }
 
@@ -436,23 +445,6 @@ namespace ryujin
               phi_value_max, Number(0.), h_star_middle, h_star);
 
       return h_star;
-    }
-
-
-    template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    WaveSpeedEstimatorView<dim, Number, MemorySpace>::riemann_data_from_state(
-        const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
-        -> primitive_type
-    {
-      const Number h = view_.water_depth_sharp(U);
-      const Number gravity = view_.gravity();
-
-      const auto velocity = view_.momentum(U) / h;
-      const auto projected_velocity = n_ij * velocity;
-      const auto a = std::sqrt(h * gravity);
-
-      return {{h, projected_velocity, a}};
     }
   } // namespace ShallowWater
 } // namespace ryujin
