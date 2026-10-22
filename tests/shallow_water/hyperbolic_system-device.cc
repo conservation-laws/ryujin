@@ -214,15 +214,15 @@ compute_quantities(const View &view,
 
   /*
    * Exercise both flux_contribution() variants. The flux contribution
-   * consists of the state and the bathymetry:
+   * consists of the state, the bathymetry, and the regularized velocity:
    */
   const auto flux_i = view.flux_contribution(pv, ipv, i, U);
   const auto flux_j = view.flux_contribution(pv, ipv, &j, U_bar);
 
   {
-    const auto &[U_i, Z_i] = flux_i;
-    const auto &[U_j, Z_j] = flux_j;
-    const auto state = view.star_state(U_i, Z_i, Z_j);
+    const auto &[U_i, Z_i, V_i] = flux_i;
+    const auto &[U_j, Z_j, V_j] = flux_j;
+    const auto state = view.star_state(U_i, V_i, Z_i, Z_j);
     for (unsigned int d = 0; d < problem_dimension; ++d)
       result[k++] = state[d];
   }
