@@ -1,0 +1,5 @@
+Euler::HyperbolicDescription: false
+EulerAEOS::HyperbolicDescription: false
+EulerBarotropic::HyperbolicDescription: false
+ScalarConservation::HyperbolicDescription: false
+ShallowWater::HyperbolicDescription: true

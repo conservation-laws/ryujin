@@ -129,6 +129,30 @@ namespace ryujin
 
 
     /**
+     * The view of a hyperbolic system that forms equilibrated states
+     * \f$U_i^{\ast,j}\f$ and \f$U_j^{\ast,i}\f$ for the low-order update,
+     * the graph viscosity, and the limiter bounds. The latter are
+     * additionally shifted by an affine shift.
+     *
+     * @ingroup Concepts
+     */
+    template <typename V, int dim, typename Number>
+    concept HyperbolicSystemViewEquilibratesStates =
+        HyperbolicSystemView<V, dim, Number> &&
+        requires(const V &view,
+                 const typename V::flux_contribution_type &flux,
+                 const dealii::Tensor<1, dim, Number> &c_ij,
+                 const Number &d_ij) {
+          {
+            view.equilibrated_states(flux, flux)
+          } -> std::same_as<std::array<typename V::state_type, 2>>;
+          {
+            view.affine_shift(flux, flux, c_ij, d_ij)
+          } -> std::same_as<typename V::state_type>;
+        };
+
+
+    /**
      * A hyperbolic system fills the precomputed values for the scalar
      * number type Number.
      *
