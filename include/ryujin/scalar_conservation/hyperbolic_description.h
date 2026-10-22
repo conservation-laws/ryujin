@@ -10,6 +10,7 @@
 #include <ryujin/scalar_conservation/indicator.h>
 #include <ryujin/scalar_conservation/limiter.h>
 #include <ryujin/scalar_conservation/wave_speed_estimator.h>
+#include <ryujin/typed/hyperbolic_module.h>
 
 namespace ryujin
 {
@@ -37,6 +38,10 @@ namespace ryujin
       template <typename ScalarNumber = double>
       using WaveSpeedEstimator =
           ScalarConservation::WaveSpeedEstimator<ScalarNumber>;
+
+      template <int dim, typename Number>
+      using HyperbolicModule =
+          ryujin::HyperbolicModule<HyperbolicDescription, dim, Number>;
     };
   } // namespace ScalarConservation
 } // namespace ryujin

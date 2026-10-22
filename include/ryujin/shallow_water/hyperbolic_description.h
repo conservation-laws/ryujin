@@ -12,6 +12,7 @@
 #include <ryujin/shallow_water/indicator.h>
 #include <ryujin/shallow_water/limiter.h>
 #include <ryujin/shallow_water/wave_speed_estimator.h>
+#include <ryujin/typed/hyperbolic_module.h>
 
 namespace ryujin
 {
@@ -37,6 +38,10 @@ namespace ryujin
 
       template <typename ScalarNumber = double>
       using WaveSpeedEstimator = ShallowWater::WaveSpeedEstimator<ScalarNumber>;
+
+      template <int dim, typename Number>
+      using HyperbolicModule =
+          ryujin::HyperbolicModule<HyperbolicDescription, dim, Number>;
     };
   } // namespace ShallowWater
 } // namespace ryujin

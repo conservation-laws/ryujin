@@ -10,6 +10,7 @@
 #include <ryujin/euler_barotropic/indicator.h>
 #include <ryujin/euler_barotropic/limiter.h>
 #include <ryujin/euler_barotropic/wave_speed_estimator.h>
+#include <ryujin/typed/hyperbolic_module.h>
 
 namespace ryujin
 {
@@ -40,6 +41,10 @@ namespace ryujin
       template <typename ScalarNumber = double>
       using WaveSpeedEstimator =
           EulerBarotropic::WaveSpeedEstimator<ScalarNumber>;
+
+      template <int dim, typename Number>
+      using HyperbolicModule =
+          ryujin::HyperbolicModule<HyperbolicDescription, dim, Number>;
     };
   } // namespace EulerBarotropic
 } // namespace ryujin

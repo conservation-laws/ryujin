@@ -10,6 +10,7 @@
 #include <ryujin/euler/indicator.h>
 #include <ryujin/euler/limiter.h>
 #include <ryujin/euler/wave_speed_estimator.h>
+#include <ryujin/typed/hyperbolic_module.h>
 
 namespace ryujin
 {
@@ -36,6 +37,10 @@ namespace ryujin
 
       template <typename ScalarNumber = double>
       using WaveSpeedEstimator = Euler::WaveSpeedEstimator<ScalarNumber>;
+
+      template <int dim, typename Number>
+      using HyperbolicModule =
+          ryujin::HyperbolicModule<HyperbolicDescription, dim, Number>;
     };
   } // namespace Euler
 } // namespace ryujin
