@@ -26,6 +26,8 @@
 #include <deal.II/multigrid/mg_smoother.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
+#include <limits>
+
 namespace ryujin
 {
   namespace Euler
@@ -194,7 +196,7 @@ namespace ryujin
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform an implicit
+       * at time @p t and a time-step size @p tau perform an implicit
        * backward euler step (and store the result in @p new_state_vector).
        *
        * The function takes an optional list of states @p
@@ -202,22 +204,26 @@ namespace ryujin
        * stage_weights to construct a modified high-order right-hand side /
        * flux.
        */
-      void backward_euler_step(const StateVector<Number> &old_state_vector,
-                               const Number old_t,
-                               StageVectors stage_state_vectors,
-                               StageWeights stage_weights,
-                               StateVector<Number> &new_state_vector,
-                               Number tau) const override;
+      Number backward_euler_step(
+          const StateVector<Number> &old_state_vector,
+          StageVectors stage_state_vectors,
+          StageWeights stage_weights,
+          StateVector<Number> &new_state_vector,
+          Number t,
+          Number tau,
+          Number tau_max = std::numeric_limits<Number>::max()) const override;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform an implicit
+       * at time @p t and a time-step size @p tau perform an implicit
        * Crank Nicolson step (and store the result in @p new_state_vector).
        */
-      void crank_nicolson_step(const StateVector<Number> &old_state_vector,
-                               const Number old_t,
-                               StateVector<Number> &new_state_vector,
-                               Number tau) const override;
+      Number crank_nicolson_step(
+          const StateVector<Number> &old_state_vector,
+          StateVector<Number> &new_state_vector,
+          Number t,
+          Number tau,
+          Number tau_max = std::numeric_limits<Number>::max()) const override;
 
       //@}
       /**
@@ -329,15 +335,15 @@ namespace ryujin
        */
       template <int stages>
       void backward_euler_step(const StateVector<Number> &old_state_vector,
-                               const Number old_t,
                                StageVectors stage_state_vectors,
                                StageWeights stage_weights,
                                StateVector<Number> &new_state_vector,
+                               Number t,
                                Number tau) const;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform a backward
+       * at time @p t and a time-step size @p tau perform a backward
        * Euler time step (and store the result in @p new_state_vector).
        *
        * If the boolean @crank_nicolson_extrapolation is set to true, then
@@ -345,8 +351,8 @@ namespace ryujin
        * t + 2 * tau.
        */
       void step(const StateVector<Number> &old_state_vector,
-                const Number old_t,
                 StateVector<Number> &new_state_vector,
+                Number t,
                 Number tau,
                 const bool crank_nicolson_extrapolation) const;
 

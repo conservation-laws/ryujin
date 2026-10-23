@@ -651,7 +651,7 @@ namespace ryujin
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
     try {
-      parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
+      parabolic_module_->crank_nicolson_step(temp_[0], temp_[2], t, 2.0 * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
       restart.suggested_tau_max /= efficiency_;
@@ -714,7 +714,7 @@ namespace ryujin
     /* Implicit Crank-Nicolson step with final result in temp_[3]: */
 
     try {
-      parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
+      parabolic_module_->crank_nicolson_step(temp_[2], temp_[3], t, 6.0 * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
       restart.suggested_tau_max /= efficiency_;
@@ -785,7 +785,7 @@ namespace ryujin
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
     try {
-      parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
+      parabolic_module_->crank_nicolson_step(temp_[3], temp_[2], t, 8.0 * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
       restart.suggested_tau_max /= efficiency_;
@@ -839,7 +839,7 @@ namespace ryujin
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
     parabolic_module_->backward_euler_step(
-        temp_[0], t, {}, {}, temp_[1], 1.0 * tau);
+        temp_[0], {}, {}, temp_[1], t, 1.0 * tau);
 
     std::swap(state_vector, temp_[1]);
     return tau;
@@ -861,7 +861,7 @@ namespace ryujin
         state_vector, {}, {}, temp_[0], t, Number(0.), tau_max / efficiency_);
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
-    parabolic_module_->backward_euler_step(temp_[0], t, {}, {}, temp_[1], tau);
+    parabolic_module_->backward_euler_step(temp_[0], {}, {}, temp_[1], t, tau);
 
     /* Explicit step 2: T2 <- {T1, 2} and {U_old, -1} at t + tau -> t + 2 tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
@@ -870,7 +870,7 @@ namespace ryujin
 
     /* Implicit step 2: T3 <- {T2, 0} and {U_old, 1} at t + tau -> t + 2 tau */
     parabolic_module_->backward_euler_step(
-        temp_[2], t + 1.0 * tau, {state_vector}, {Number(1.)}, temp_[3], tau);
+        temp_[2], {state_vector}, {Number(1.)}, temp_[3], t + 1.0 * tau, tau);
 
     std::swap(state_vector, temp_[3]);
     return efficiency_ * tau;
@@ -897,7 +897,7 @@ namespace ryujin
 
     /* Implicit step 1: T1 <- {U_old, 1 - 3*gamma} at time t -> t + tau */
     parabolic_module_->backward_euler_step(
-        temp_[0], t, {state_vector}, {Number(1. - 3. * gamma)}, temp_[1], tau);
+        temp_[0], {state_vector}, {Number(1. - 3. * gamma)}, temp_[1], t, tau);
 
     /* Explicit step 2: T2 <- {U_old, -1} and {T1, 2} at time t -> t + 2 tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
@@ -910,10 +910,10 @@ namespace ryujin
      */
     parabolic_module_->backward_euler_step(
         temp_[2],
-        t + tau,
         {state_vector, temp_[1]},
         {Number(6. * gamma - 1.), Number(2. - 9 * gamma)},
         temp_[3],
+        t + tau,
         tau);
 
     /* Explicit step 3: T4 <- {U_old, 3 / 4} and {T1, -2} at t -> t + 3 tau */
@@ -927,12 +927,12 @@ namespace ryujin
 
     /* Implicit step 3: */
     parabolic_module_->backward_euler_step(temp_[4],
-                                           t + 2. * tau,
                                            {state_vector, temp_[1], temp_[3]},
                                            {Number(0.75 - 3. * gamma),
                                             Number(6. * gamma - 2.),
                                             Number(9. / 4. - 3. * gamma)},
                                            temp_[5],
+                                           t + 2. * tau,
                                            tau);
 
     std::swap(state_vector, temp_[5]);

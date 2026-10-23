@@ -14,6 +14,8 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <limits>
+
 namespace ryujin
 {
   /**
@@ -108,41 +110,47 @@ namespace ryujin
 
     /**
      * Given a reference to a previous state vector @p old_state_vector at
-     * time @p old_t and a time-step size @p tau perform an implicit
+     * time @p t and a time-step size @p tau perform an implicit
      * backward euler step (and store the result in @p new_state_vector).
      */
-    void backward_euler_step(const StateVector<Number> &old_state_vector,
-                             const Number /*old_t*/,
-                             StageVectors /*stage_state_vectors*/,
-                             StageWeights /*stage_weights*/,
-                             StateVector<Number> &new_state_vector,
-                             Number /*tau*/) const override
+    Number backward_euler_step(
+        const StateVector<Number> &old_state_vector,
+        StageVectors /*stage_state_vectors*/,
+        StageWeights /*stage_weights*/,
+        StateVector<Number> &new_state_vector,
+        Number /*t*/,
+        Number tau,
+        Number /*tau_max*/ = std::numeric_limits<Number>::max()) const override
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
                                 "function should have never been called."));
 
       new_state_vector = old_state_vector;
+      return tau;
     }
 
     /**
      * Given a reference to a previous state vector @p old_U at time @p
-     * old_t and a time-step size @p tau perform an implicit Crank-Nicolson
+     * t and a time-step size @p tau perform an implicit Crank-Nicolson
      * step (and store the result in @p new_U).
      *
      * This variant is used in the TimeIntegrator class for the Strang
      * split variants.
      */
-    void crank_nicolson_step(const StateVector<Number> &old_state_vector,
-                             const Number /*old_t*/,
-                             StateVector<Number> &new_state_vector,
-                             Number /*tau*/) const override
+    Number crank_nicolson_step(
+        const StateVector<Number> &old_state_vector,
+        StateVector<Number> &new_state_vector,
+        Number /*t*/,
+        Number tau,
+        Number /*tau_max*/ = std::numeric_limits<Number>::max()) const override
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
                                 "function should have never been called."));
 
       new_state_vector = old_state_vector;
+      return tau;
     }
 
     //@}

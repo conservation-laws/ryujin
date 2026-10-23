@@ -9,6 +9,7 @@
 #include <ryujin/interface/module.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
+#include <limits>
 #include <string>
 
 namespace ryujin
@@ -44,38 +45,48 @@ namespace ryujin
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform an implicit
+       * at time @p t and a time-step size @p tau perform an implicit
        * backward Euler step (and store the result in @p new_state_vector).
        *
        * The stage state vectors @p stage_state_vectors together with the
        * weights @p stage_weights are used to construct a modified high
        * order right-hand side / flux.
        *
+       * The function returns the time step size @p tau. A parabolic module
+       * cannot choose the time step size: @p tau must be nonzero and @p
+       * tau_max is ignored.
+       *
        * @todo This function should always operate on the selected memory space.
        */
-      virtual void
-      backward_euler_step(const StateVector<Number> &old_state_vector,
-                          const Number old_t,
-                          StageVectors stage_state_vectors,
-                          StageWeights stage_weights,
-                          StateVector<Number> &new_state_vector,
-                          Number tau) const = 0;
+      virtual Number backward_euler_step(
+          const StateVector<Number> &old_state_vector,
+          StageVectors stage_state_vectors,
+          StageWeights stage_weights,
+          StateVector<Number> &new_state_vector,
+          Number t,
+          Number tau,
+          Number tau_max = std::numeric_limits<Number>::max()) const = 0;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform an implicit
+       * at time @p t and a time-step size @p tau perform an implicit
        * Crank-Nicolson step (and store the result in @p new_state_vector).
        *
        * This variant is used in the TimeIntegrator class for the Strang
        * split variants.
        *
+       * The function returns the time step size @p tau. A parabolic module
+       * cannot choose the time step size: @p tau must be nonzero and @p
+       * tau_max is ignored.
+       *
        * @todo This function should always operate on the selected memory space.
        */
-      virtual void
-      crank_nicolson_step(const StateVector<Number> &old_state_vector,
-                          const Number old_t,
-                          StateVector<Number> &new_state_vector,
-                          Number tau) const = 0;
+      virtual Number crank_nicolson_step(
+          const StateVector<Number> &old_state_vector,
+          StateVector<Number> &new_state_vector,
+          Number t,
+          Number tau,
+          Number tau_max = std::numeric_limits<Number>::max()) const = 0;
 
       //@}
 
