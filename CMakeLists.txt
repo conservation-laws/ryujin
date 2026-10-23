@@ -194,6 +194,9 @@ set(CMAKE_EXE_LINKER_FLAGS "")
 # Feature configuration:
 #
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/macros/macro_ryujin_check_submodule.cmake)
+ryujin_check_submodule(simd-math)
+
 set(EXTERNAL_TARGETS)
 
 if(WITH_EOSPAC)
@@ -202,13 +205,7 @@ if(WITH_EOSPAC)
 endif()
 
 if(WITH_FTXUI)
-  if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ftxui/CMakeLists.txt)
-    message(FATAL_ERROR
-      "The FTXUI submodule is missing. Either run\n"
-      "  $ git submodule update --init ftxui\n"
-      "or configure with -DWITH_FTXUI=OFF"
-      )
-  endif()
+  ryujin_check_submodule(ftxui WITH_FTXUI)
   set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
   set(FTXUI_QUIET ON CACHE BOOL "" FORCE)
   add_subdirectory(ftxui EXCLUDE_FROM_ALL)
