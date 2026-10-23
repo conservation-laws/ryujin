@@ -406,7 +406,8 @@ namespace ryujin
 
 
   template <typename HyperbolicDescription, int dim, typename Number>
-  Number HyperbolicModule<HyperbolicDescription, dim, Number>::step(
+  Number
+  HyperbolicModule<HyperbolicDescription, dim, Number>::forward_euler_step(
       const StateVector<Number> &old_state_vector,
       StageVectors stage_state_vectors,
       StageWeights stage_weights,
@@ -416,40 +417,40 @@ namespace ryujin
   {
     switch (stage_state_vectors.size()) {
     case 0:
-      return step<0>(old_state_vector,
-                     stage_state_vectors,
-                     stage_weights,
-                     new_state_vector,
-                     tau,
-                     tau_max);
+      return forward_euler_step<0>(old_state_vector,
+                                   stage_state_vectors,
+                                   stage_weights,
+                                   new_state_vector,
+                                   tau,
+                                   tau_max);
     case 1:
-      return step<1>(old_state_vector,
-                     stage_state_vectors,
-                     stage_weights,
-                     new_state_vector,
-                     tau,
-                     tau_max);
+      return forward_euler_step<1>(old_state_vector,
+                                   stage_state_vectors,
+                                   stage_weights,
+                                   new_state_vector,
+                                   tau,
+                                   tau_max);
     case 2:
-      return step<2>(old_state_vector,
-                     stage_state_vectors,
-                     stage_weights,
-                     new_state_vector,
-                     tau,
-                     tau_max);
+      return forward_euler_step<2>(old_state_vector,
+                                   stage_state_vectors,
+                                   stage_weights,
+                                   new_state_vector,
+                                   tau,
+                                   tau_max);
     case 3:
-      return step<3>(old_state_vector,
-                     stage_state_vectors,
-                     stage_weights,
-                     new_state_vector,
-                     tau,
-                     tau_max);
+      return forward_euler_step<3>(old_state_vector,
+                                   stage_state_vectors,
+                                   stage_weights,
+                                   new_state_vector,
+                                   tau,
+                                   tau_max);
     case 4:
-      return step<4>(old_state_vector,
-                     stage_state_vectors,
-                     stage_weights,
-                     new_state_vector,
-                     tau,
-                     tau_max);
+      return forward_euler_step<4>(old_state_vector,
+                                   stage_state_vectors,
+                                   stage_weights,
+                                   new_state_vector,
+                                   tau,
+                                   tau_max);
     default:
       AssertThrow(false, dealii::ExcMessage("Unsupported number of stages."));
       __builtin_trap();
@@ -459,7 +460,8 @@ namespace ryujin
 
   template <typename HyperbolicDescription, int dim, typename Number>
   template <int stages>
-  Number HyperbolicModule<HyperbolicDescription, dim, Number>::step(
+  Number
+  HyperbolicModule<HyperbolicDescription, dim, Number>::forward_euler_step(
       const StateVector<Number> &old_state_vector,
       StageVectors stage_state_vectors,
       StageWeights stage_weights,
@@ -473,7 +475,8 @@ namespace ryujin
                               "weights must match the number of stages."));
 
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<HyperbolicDescription, dim, Number>::step()"
+    std::cout << "HyperbolicModule<HyperbolicDescription, dim, "
+                 "Number>::forward_euler_step()"
               << std::endl;
 #endif
 

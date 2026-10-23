@@ -41,7 +41,7 @@ namespace ryujin
             const_view.iterations()
           } -> std::convertible_to<unsigned int>;
 
-          /* Used by HyperbolicModule::step(): */
+          /* Used by HyperbolicModule::forward_euler_step(): */
           view.reset(precomputed, i, U, flux);
           view.accumulate(precomputed, js, U, flux, scaled_c_ij, U);
           {

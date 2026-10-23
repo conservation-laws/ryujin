@@ -75,17 +75,17 @@ namespace ryujin
        * order flux, see the typed HyperbolicModule for details.
        *
        * @note The state vector @p old_state_vector has to be prepared
-       * with prepare_state_vector() prior to calling the step function.
+       * with prepare_state_vector() prior to calling forward_euler_step().
        *
        * @note This function operates on the selected memory space.
        */
-      virtual Number
-      step(const StateVector<Number> &old_state_vector,
-           StageVectors stage_state_vectors,
-           StageWeights stage_weights,
-           StateVector<Number> &new_state_vector,
-           Number tau = Number(0.),
-           Number tau_max = std::numeric_limits<Number>::max()) const = 0;
+      virtual Number forward_euler_step(
+          const StateVector<Number> &old_state_vector,
+          StageVectors stage_state_vectors,
+          StageWeights stage_weights,
+          StateVector<Number> &new_state_vector,
+          Number tau = Number(0.),
+          Number tau_max = std::numeric_limits<Number>::max()) const = 0;
 
       /**
        * Sets the relative CFL number used for computing an appropriate

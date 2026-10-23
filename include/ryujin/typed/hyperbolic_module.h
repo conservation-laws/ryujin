@@ -112,8 +112,8 @@ namespace ryujin
 
     /**
      * This function preprocesses a given state vector @p U in preparation
-     * for an explicit euler step performed by the step() function. The
-     * function performs the following tasks:
+     * for an explicit euler step performed by the forward_euler_step()
+     * function. The function performs the following tasks:
      *
      *  - We update the @p U component of the state vector by enforcing
      *    boundary conditions for the supplied time time @p t. We then
@@ -197,15 +197,15 @@ namespace ryujin
      * update step, nor automatically updates the ghost range of the
      * vector. It is thus necessary to call
      * HyperbolicModule::prepare_state_vector() on @p old_state_vector
-     * prior to calling the step function.
+     * prior to calling forward_euler_step().
      */
-    Number
-    step(const StateVector<Number> &old_state_vector,
-         StageVectors stage_state_vectors,
-         StageWeights stage_weights,
-         StateVector<Number> &new_state_vector,
-         Number tau = Number(0.),
-         Number tau_max = std::numeric_limits<Number>::max()) const override;
+    Number forward_euler_step(
+        const StateVector<Number> &old_state_vector,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights,
+        StateVector<Number> &new_state_vector,
+        Number tau = Number(0.),
+        Number tau_max = std::numeric_limits<Number>::max()) const override;
 
     //@}
     /**
@@ -252,17 +252,17 @@ namespace ryujin
     //@{
 
     /**
-     * The implementation of the step() function for a fixed number of
-     * stages @p stages. The step() function dispatches to it with the
-     * number of supplied stage state vectors.
+     * The implementation of the forward_euler_step() function for a fixed
+     * number of stages @p stages. The forward_euler_step() function dispatches
+     * to it with the number of supplied stage state vectors.
      */
     template <int stages>
-    Number step(const StateVector<Number> &old_state_vector,
-                StageVectors stage_state_vectors,
-                StageWeights stage_weights,
-                StateVector<Number> &new_state_vector,
-                Number tau,
-                Number tau_max) const;
+    Number forward_euler_step(const StateVector<Number> &old_state_vector,
+                              StageVectors stage_state_vectors,
+                              StageWeights stage_weights,
+                              StateVector<Number> &new_state_vector,
+                              Number tau,
+                              Number tau_max) const;
 
     /**
      * Update all boundary values of the hyperbolic state vector component
