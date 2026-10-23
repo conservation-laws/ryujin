@@ -11,7 +11,6 @@
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/discretization/offline_data.h>
-#include <ryujin/discretization/time_integrator.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/initial_values.h>
@@ -20,6 +19,7 @@
 #include <ryujin/interface/postprocessor.h>
 #include <ryujin/interface/solution_transfer.h>
 #include <ryujin/interface/task.h>
+#include <ryujin/interface/time_integrator.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
 #include <memory>
