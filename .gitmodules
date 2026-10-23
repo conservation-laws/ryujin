@@ -1,3 +1,6 @@
 [submodule "simd-math"]
 	path = simd-math
 	url = https://github.com/vectorclass/version2
+[submodule "ftxui"]
+	path = ftxui
+	url = https://github.com/ArthurSonzogni/FTXUI
