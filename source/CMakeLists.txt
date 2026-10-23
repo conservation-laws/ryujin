@@ -53,6 +53,10 @@ set(CORE_SOURCE_FILES
   output/vtu_output.cc
   )
 
+if(WITH_FTXUI)
+  list(APPEND CORE_SOURCE_FILES driver/dashboard.cc)
+endif()
+
 set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
