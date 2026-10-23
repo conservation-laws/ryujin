@@ -243,8 +243,8 @@ namespace ryujin
     {
       auto &state_vector = this->state_vector_;
 
-      context.tau =
-          this->time_integrator_->step(state_vector, context.t, context.t_max);
+      context.tau = this->time_integrator_->step(
+          state_vector, context.t, Number(0.), context.t_max - context.t);
 
       this->time_integrator_->prepare_state_vector(state_vector,
                                                    context.t + context.tau);

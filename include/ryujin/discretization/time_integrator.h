@@ -305,10 +305,14 @@ namespace ryujin
                               Number t) const;
 
     /**
-     * Given a reference to a previous state vector U performs an explicit
-     * time step (and store the result in U). The function returns the
-     * chosen time step size tau. The time step size tau is selected such
-     * that $t + tau <= t_final$.
+     * Given a reference to a previous state vector U at time @p t performs
+     * a time step (and store the result in U). The function returns the
+     * time step size tau with which the update was performed.
+     *
+     * If @p tau is nonzero the step is performed with @p tau. A Restart
+     * signalled during such a step is passed on to the caller. If @p tau
+     * is 0 the time step size is chosen such that it is less than or equal
+     * to @p tau_max and the run time parameter "tau_max".
      *
      * @note This function switches between different Runge-Kutta methods
      * depending on chosen runtime parameters.
@@ -323,7 +327,8 @@ namespace ryujin
      */
     Number step(StateVector<Number> &state_vector,
                 Number t,
-                Number t_final = std::numeric_limits<Number>::max());
+                Number tau,
+                Number tau_max = std::numeric_limits<Number>::max());
 
     //@}
     /**
@@ -400,133 +405,147 @@ namespace ryujin
     /**
      * Given a reference to a previous state vector U performs an explicit
      * second-order strong-stability preserving Runge-Kutta SSPRK(2,2;1/2)
-     * time step (and store the result in U). The function returns the
-     * chosen time step size tau, which is guaranteed to be less than or
-     * equal to the parameter @p tau_max.
+     * time step (and store the result in U). The function returns the time step
+     * size tau, see step().
      */
-    Number
-    step_ssprk_22(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_ssprk_22(StateVector<Number> &state_vector,
+                         Number t,
+                         Number tau,
+                         Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order strong-stability preserving Runge-Kutta SSPRK(3,3;1/3)
-     * time step (and store the result in U). The function returns the
-     * chosen time step size tau, which is guaranteed to be less than or
-     * equal to the parameter @p tau_max.
+     * time step (and store the result in U). The function returns the time step
+     * size tau, see step().
      */
-    Number
-    step_ssprk_33(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_ssprk_33(StateVector<Number> &state_vector,
+                         Number t,
+                         Number tau,
+                         Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * first-order Euler step ERK(1,1;1) time step (and store the result
-     * in U). The function returns the chosen time step size tau, which is
-     * guaranteed to be less than or equal to the parameter @p tau_max.
+     * in U). The function returns the time step size tau, see step().
      */
-    Number
-    step_erk_11(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_erk_11(StateVector<Number> &state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * second-order Runge-Kutta ERK(2,2;1) time step (and store the result
-     * in U). The function returns the chosen time step size tau, which is
-     * guaranteed to be less than or equal to the parameter @p tau_max.
+     * in U). The function returns the time step size tau, see step().
      */
-    Number
-    step_erk_22(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_erk_22(StateVector<Number> &state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order Runge-Kutta ERK(3,3;1) time step (and store the result
-     * in U). The function returns the chosen time step size tau, which is
-     * guaranteed to be less than or equal to the parameter @p tau_max.
+     * in U). The function returns the time step size tau, see step().
      */
-    Number
-    step_erk_33(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_erk_33(StateVector<Number> &state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * 4 stage third-order Runge-Kutta ERK(4,3;1) time step (and store the
-     * result in U). The function returns the chosen time step size tau,
-     * which is guaranteed to be less than or equal to the parameter @p
-     * tau_max.
+     * result in U). The function returns the time step size tau, see
+     * step().
      */
-    Number
-    step_erk_43(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_erk_43(StateVector<Number> &state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * 4 stage fourth-order Runge-Kutta ERK(5,4;1) time step (and store
-     * the result in U). The function returns the chosen time step size
-     * tau, which is guaranteed to be less than or equal to the parameter
-     * @p tau_max.
+     * the result in U). The function returns the time step size tau, see
+     * step().
      */
-    Number
-    step_erk_54(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_erk_54(StateVector<Number> &state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(3,3;1/3) time step and an implicit Crank-Nicolson step (and
-     * store the result in U). The function returns the chosen time step
-     * size tau, which is guaranteed to be less than or equal to the
-     * parameter @p tau_max.
+     * store the result in U). The function returns the time step size tau, see
+     * step().
      */
     Number step_strang_ssprk_33_cn(StateVector<Number> &state_vector,
                                    Number t,
+                                   Number tau,
                                    Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(3,3;1) time step and an implicit Crank-Nicolson step (and store
-     * the result in U). The function returns the chosen time step size
-     * tau, which is guaranteed to be less than or equal to the parameter
-     * @p tau_max.
+     * the result in U). The function returns the time step size tau, see
+     * step().
      */
     Number step_strang_erk_33_cn(StateVector<Number> &state_vector,
                                  Number t,
+                                 Number tau,
                                  Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(4,3;1) time step and an implicit Crank-Nicolson step (and store
-     * the result in U). The function returns the chosen time step size
-     * tau, which is guaranteed to be less than or equal to the parameter
-     * @p tau_max.
+     * the result in U). The function returns the time step size tau, see
+     * step().
      */
     Number step_strang_erk_43_cn(StateVector<Number> &state_vector,
                                  Number t,
+                                 Number tau,
                                  Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an
      * implicit-explicit IMEX(1,1;1) step using a forward Euler scheme for
      * the hyperbolic subproblem and a backward Euler scheme for the
-     * parabolic subproblem. The function returns the chosen time step size
-     * tau.
+     * parabolic subproblem. The function returns the time step size tau, see
+     * step().
      */
-    Number
-    step_imex_11(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_imex_11(StateVector<Number> &state_vector,
+                        Number t,
+                        Number tau,
+                        Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an
      * implicit-explicit IMEX(2,2;1) step using a two stage midpoint rule for
      * the hyperbolic subproblem and a two stage midpoint rule for the parabolic
-     * subproblem. The function returns the chosen time step size tau.
+     * subproblem. The function returns the time step size tau, see step().
      */
-    Number
-    step_imex_22(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_imex_22(StateVector<Number> &state_vector,
+                        Number t,
+                        Number tau,
+                        Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an
      * implicit-explicit IMEX(3,3;1) step using a three stage ERK tableau for
      * the hyperbolic subproblem and a three stage DIRK tableau for the
-     * parabolic subproblem. The function returns the chosen time step size tau.
+     * parabolic subproblem. The function returns the time step size tau, see
+     * step().
      */
-    Number
-    step_imex_33(StateVector<Number> &state_vector, Number t, Number tau_max);
+    Number step_imex_33(StateVector<Number> &state_vector,
+                        Number t,
+                        Number tau,
+                        Number tau_max);
 
     //@}
   };
