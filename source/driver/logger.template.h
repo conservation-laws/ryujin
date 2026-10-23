@@ -22,6 +22,8 @@
 #include <set>
 #include <sstream>
 
+#include <unistd.h>
+
 #ifdef WITH_OPENMP
 #include "omp.h"
 #endif
@@ -57,6 +59,42 @@ namespace ryujin
         "If set to true, the CPU throughput is corrected by dividing the total "
         "consumed CPU time by a factor of 2. This correction is only active if "
         "the number of threads (per MPI rank) is 2.");
+
+#if defined(WITH_FTXUI)
+    add_parameter("dashboard",
+                  dashboard_settings_.mode,
+                  "Draw the terminal dashboard that redraws the terminal in "
+                  "place: auto (if stdout is a terminal), on, off (print plain "
+                  "text instead). Under mpirun stdout is always a terminal, so "
+                  "set this to off when redirecting the output to a file.");
+
+    add_parameter("dashboard width",
+                  dashboard_settings_.width,
+                  "Maximal width of the terminal dashboard in columns. The "
+                  "dashboard fills the terminal up to this width. Setting the "
+                  "width to zero removes the limit.");
+
+    add_parameter("dashboard height",
+                  dashboard_settings_.height,
+                  "Maximal height of the terminal dashboard in lines. If "
+                  "nonzero, the dashboard stretches to fill the terminal up to "
+                  "this height. Setting the height to zero keeps the natural "
+                  "height of the dashboard.");
+
+    add_parameter("dashboard center",
+                  dashboard_settings_.center,
+                  "Center the terminal dashboard horizontally and vertically.");
+
+    add_parameter("dashboard color scheme",
+                  dashboard_settings_.color_scheme,
+                  "Color scheme of the terminal dashboard: ryujin, rainbow, "
+                  "tamu, monochrome");
+
+    add_parameter("dashboard sparkles",
+                  dashboard_settings_.sparkles,
+                  "Fill the space around the terminal dashboard with sparkles "
+                  "that change with every update.");
+#endif
 
     debug_command_ = "";
     add_parameter("debug command",
@@ -94,6 +132,23 @@ namespace ryujin
       logfile_.open(context.base_name + ".log");
 
     print_parameters(context.base_name, logfile_);
+
+    /*
+     * Record all status messages for the dashboard. Print them as usual
+     * unless the dashboard is shown, so that they do not scroll it away:
+     */
+
+    print_info_ = context.info;
+    context.info = [this, &context](const std::string &message) {
+      constexpr std::size_t n_messages = 5;
+      auto &messages = dashboard_data_.messages;
+      messages.push_back({message, context.cycle, context.t});
+      if (messages.size() > n_messages)
+        messages.pop_front();
+
+      if (!dashboard_active_ && print_info_)
+        print_info_(message);
+    };
   }
 
 
@@ -143,6 +198,9 @@ namespace ryujin
 
     if (terminal_update_interval_ != Number(0.))
       print_cycle_statistics(context, /*logfile*/ true, /*final*/ true);
+
+    /* Print status messages after the final statistics as usual: */
+    dashboard_active_ = false;
 
     print_debug_output();
   }
@@ -426,6 +484,34 @@ namespace ryujin
         return "SIMD, " + precision + ", width " + std::to_string(simd_size);
     }();
 
+    std::string threads;
+#if defined(WITH_OPENMP)
+    threads = std::to_string(omp_get_max_threads()) + " threads";
+#ifndef WITH_DEAL_II_THREADS
+    threads += " [serial dealii]";
+#endif
+#elif defined(WITH_DEAL_II_THREADS)
+    threads = std::to_string(MultithreadInfo::n_threads()) + " threads";
+#endif
+
+    auto &data = dashboard_data_;
+    data.hyperbolic_name = simulation_.hyperbolic_system().problem_name();
+    data.parabolic_name = simulation_.parabolic_system().is_identity()
+                              ? ""
+                              : simulation_.parabolic_system().problem_name();
+    data.base_name = context.base_name;
+    data.backend = backend_name;
+    data.threads = threads;
+    data.n_global_dofs = n_global_dofs_;
+    data.n_ensembles = mpi_ensemble_.n_ensembles();
+    data.n_ranks = mpi_ensemble_.n_world_ranks();
+    data.last_output_cycle = context.timer_cycle - 1;
+    data.last_output_time =
+        context.timer_granularity * (context.timer_cycle - 1);
+    data.tasks.clear();
+    for (const auto *task : context.tasks)
+      data.tasks.push_back(task->name());
+
     stream << "Information: (HYP) "
            << simulation_.hyperbolic_system().problem_name();
     if (!simulation_.parabolic_system().is_identity()) {
@@ -438,14 +524,7 @@ namespace ryujin
     }
     stream << "with " << n_global_dofs_ << " Qdofs on "
            << mpi_ensemble_.n_world_ranks() << " ranks "
-#if defined(WITH_OPENMP)
-           << "/ " << omp_get_max_threads() << " threads "
-#ifndef WITH_DEAL_II_THREADS
-           << "[serial dealii] "
-#endif
-#elif defined(WITH_DEAL_II_THREADS)
-           << "/ " << MultithreadInfo::n_threads() << " threads "
-#endif
+           << (threads.empty() ? "" : "/ " + threads + " ") //
            << "<" << backend_name << ">\n";
 
     stream << "             Last output cycle " //
@@ -472,6 +551,8 @@ namespace ryujin
 
     if (mpi_ensemble_.world_rank() != 0)
       return;
+
+    dashboard_data_.memory = data;
 
     std::ostringstream output;
 
@@ -506,9 +587,10 @@ namespace ryujin
         it << std::string(length - it.str().length() + 1, ' ');
     };
 
-    const auto print_wall_time = [&](auto &timer, auto &stream) {
+    const auto print_wall_time = [&](auto &timer, auto &stream, auto &entry) {
       const auto wall_time = Utilities::MPI::min_max_avg(
           timer.wall_time(), mpi_ensemble_.world_communicator());
+      entry.wall_time = wall_time;
 
       constexpr auto eps = std::numeric_limits<double>::epsilon();
       /*
@@ -536,9 +618,11 @@ namespace ryujin
     const double total_cpu_time = cpu_time_statistics.sum;
 
     const auto print_cpu_time =
-        [&](auto &timer, auto &stream, bool percentage) {
+        [&](auto &timer, auto &stream, auto &entry, bool percentage) {
           const auto cpu_time = Utilities::MPI::min_max_avg(
               timer.cpu_time(), mpi_ensemble_.world_communicator());
+          entry.cpu_time = cpu_time.sum;
+          entry.fraction = percentage ? cpu_time.sum / total_cpu_time : -1.;
 
           stream << std::setprecision(2) << std::fixed << std::setw(12)
                  << cpu_time.sum << "s ";
@@ -548,20 +632,27 @@ namespace ryujin
                    << 100. * cpu_time.sum / total_cpu_time << "%)";
         };
 
+    auto &timers = dashboard_data_.timers;
+    timers.clear();
+
     auto jt = output.begin();
-    for (auto &it : ComputingTimer::timers())
+    for (auto &it : ComputingTimer::timers()) {
       *jt++ << "  " << it.first;
+      timers.push_back({it.first});
+    }
     equalize();
 
     jt = output.begin();
+    auto kt = timers.begin();
     for (auto &it : ComputingTimer::timers())
-      print_wall_time(it.second, *jt++);
+      print_wall_time(it.second, *jt++, *kt++);
     equalize();
 
     jt = output.begin();
+    kt = timers.begin();
     bool compute_percentages = false;
     for (auto &it : ComputingTimer::timers()) {
-      print_cpu_time(it.second, *jt++, compute_percentages);
+      print_cpu_time(it.second, *jt++, *kt++, compute_percentages);
       if (it.first.starts_with("time loop"))
         compute_percentages = true;
     }
@@ -632,6 +723,27 @@ namespace ryujin
     const double time_per_second =
         (current_.t - previous_.t) / (current_.wall_time - previous_.wall_time);
 
+    auto &data = dashboard_data_;
+    data.device = have_separate_memory_spaces;
+    data.n_devices = n_devices_;
+    data.wall_m_dofs_per_sec = wall_m_dofs_per_sec;
+    data.cycles_per_second = cycles_per_second;
+    data.tau = delta_time;
+    data.time_per_second = time_per_second;
+    data.terminal_update_interval = terminal_update_interval_;
+
+    const auto &hyperbolic_module = simulation_.hyperbolic_module();
+    const auto &parabolic_module = simulation_.parabolic_module();
+    data.time_stepping_scheme =
+        simulation_.time_integrator().time_stepping_scheme_name();
+    data.cfl = hyperbolic_module.cfl();
+    data.restarts = {hyperbolic_module.n_restarts(),
+                     parabolic_module.n_restarts()};
+    data.warnings = {hyperbolic_module.n_warnings(),
+                     parabolic_module.n_warnings()};
+    data.corrections = {hyperbolic_module.n_corrections(),
+                        parabolic_module.n_corrections()};
+
     /* Print Jean-Luc and Martin metrics: */
 
     std::ostringstream output;
@@ -653,6 +765,8 @@ namespace ryujin
 
       const double device_m_dofs_per_sec =
           delta_cycles * n_dofs * efficiency / 1.e6 / delta_device_time;
+      data.compute_m_dofs_per_sec = device_m_dofs_per_sec;
+      data.utilization = utilization;
       output << "  GPU : "
              << std::setprecision(4) << std::fixed << device_m_dofs_per_sec
              << " MQ/s in compute kernels (on "
@@ -685,6 +799,8 @@ namespace ryujin
 
       if (fudge_cpu_timings)
         cpu_m_dofs_per_sec *= 2.;
+      data.compute_m_dofs_per_sec = cpu_m_dofs_per_sec;
+      data.fudged_cpu_timings = fudge_cpu_timings;
 
       double cpu_time_skew = (current_.cpu_time_max - current_.cpu_time_min - //
                               previous_.cpu_time_max + previous_.cpu_time_min) /
@@ -695,6 +811,8 @@ namespace ryujin
       const double cpu_time_skew_percentage =
           cpu_time_skew * delta_cycles /
           (current_.cpu_time_avg - previous_.cpu_time_avg);
+      data.cpu_time_skew = cpu_time_skew;
+      data.cpu_time_skew_fraction = cpu_time_skew_percentage;
 
       output << "  "
              << (fudge_cpu_timings ? "CPU*: " : "CPU : ")
@@ -737,8 +855,22 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << simulation_.parabolic_module().n_corrections()
            << " corr) ]" << std::endl;
 
-    if (!simulation_.parabolic_system().is_identity())
-      simulation_.parabolic_module().print_solver_statistics(output);
+    data.solver_statistics.clear();
+    if (!simulation_.parabolic_system().is_identity()) {
+      std::ostringstream solver_statistics;
+      parabolic_module.print_solver_statistics(solver_statistics);
+      output << solver_statistics.str();
+
+      /* Strip the indentation and brackets of every line: */
+      std::istringstream lines(solver_statistics.str());
+      for (std::string line; std::getline(lines, line);) {
+        const auto first = line.find_first_not_of(" [");
+        const auto last = line.find_last_not_of(" ]");
+        if (first != std::string::npos)
+          data.solver_statistics.push_back(
+              line.substr(first, last - first + 1));
+      }
+    }
 
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
@@ -750,8 +882,8 @@ namespace ryujin
     /* And print an ETA: */
 
     time_per_second_exp_ = 0.8 * time_per_second_exp_ + 0.2 * time_per_second;
-    auto eta = static_cast<unsigned int>(
-        std::max(context.t_final - t, Number(0.)) / time_per_second_exp_);
+    data.eta = std::max(context.t_final - t, Number(0.)) / time_per_second_exp_;
+    auto eta = static_cast<unsigned int>(data.eta);
 
     output << "\n  ETA : ";
 
@@ -808,6 +940,11 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
+    dashboard_data_.final_time = final_time;
+    dashboard_data_.cycle = cycle;
+    dashboard_data_.t = t;
+    dashboard_data_.t_final = context.t_final;
+
     /* Print information and statistics: */
 
     print_information(context, output);
@@ -819,10 +956,26 @@ namespace ryujin
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
-#ifndef DEBUG_OUTPUT
-    std::cout << "\033[2J\033[H";
+#if defined(DEBUG_OUTPUT)
+    const bool interactive_terminal = false;
+#else
+    /* Only use terminal control sequences on an interactive terminal: */
+    const auto mode = dashboard_settings_.mode;
+    const bool interactive_terminal =
+        mode == DashboardMode::on ||
+        (mode == DashboardMode::automatic && isatty(STDOUT_FILENO));
 #endif
-    std::cout << output.str() << std::flush;
+
+    if (!interactive_terminal) {
+      std::cout << output.str() << std::flush;
+    } else {
+#if defined(WITH_FTXUI)
+      dashboard_.show(dashboard_data_, dashboard_settings_);
+      dashboard_active_ = true;
+#else
+      std::cout << "\033[2J\033[H" << output.str() << std::flush;
+#endif
+    }
 
     if (write_to_logfile) {
       logfile_ << "\n" << output.str() << std::flush;

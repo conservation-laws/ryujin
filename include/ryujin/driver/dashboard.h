@@ -127,7 +127,7 @@ namespace ryujin
      * Fill the space around the dashboard with sparkles that change with
      * every update.
      */
-    bool sparkles = false;
+    bool sparkles = true;
   };
 
 
