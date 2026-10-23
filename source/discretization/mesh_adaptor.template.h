@@ -24,13 +24,14 @@ namespace ryujin
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("mesh adaptation", TaskPhase::adapt)
-      , trigger_(TriggerMode::every_cycle, /*multiplier*/ 10)
       , simulation_(simulation)
       , mpi_ensemble_(simulation.mpi_ensemble())
       , offline_data_(&simulation.offline_data())
       , postprocessor_(simulation.postprocessor())
   {
-    trigger_.add_parameters(*this);
+    this->trigger_ = std::make_unique<Trigger<Number>>(TriggerMode::every_cycle,
+                                                       /*multiplier*/ 10);
+    this->trigger_->add_parameters(*this);
 
     adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
     this->add_parameter(
@@ -156,7 +157,7 @@ namespace ryujin
   template <int dim, typename Number>
   void MeshAdaptor<dim, Number>::execute(TaskContext<Number> &context)
   {
-    if (!trigger_.fire(context))
+    if (!this->trigger_->fire(context))
       return;
 
 #ifdef DEBUG_OUTPUT

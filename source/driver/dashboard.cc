@@ -1,0 +1,1091 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2026 by the ryujin authors
+//
+
+#include <ryujin/driver/dashboard.h>
+
+#include <ftxui/dom/canvas.hpp>
+#include <ftxui/dom/elements.hpp>
+#include <ftxui/screen/screen.hpp>
+#include <ftxui/screen/terminal.hpp>
+
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <cerrno>
+#include <chrono>
+#include <cmath>
+#include <format>
+#include <iostream>
+#include <numbers>
+
+namespace ryujin
+{
+  using namespace ftxui;
+
+  namespace
+  {
+    /*
+     * Palette:
+     */
+
+    struct Palette {
+      /* header badge and its text: */
+      Color badge;
+      Color badge_ink;
+      /* text on light backgrounds: */
+      Color ink;
+      /* panel titles and the header border: */
+      Color accent;
+      /* chips, bars, and the "running" badge: */
+      Color highlight;
+      /* labels and captions: */
+      Color caption;
+      Color good;
+      Color warn;
+      Color bad;
+      /* secondary text and panel borders: */
+      Color muted;
+      /* the background of bars and gauges: */
+      Color track;
+      std::vector<Color> segments;
+      std::vector<Color> sparkles;
+      /* the color scale of the skew, from none to large: */
+      std::vector<Color> heat;
+    };
+
+
+    Color hex(std::uint32_t rgb)
+    {
+      return Color::RGB((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
+    }
+
+
+    Palette make_palette(DashboardColorScheme scheme)
+    {
+      switch (scheme) {
+      case DashboardColorScheme::ryujin:
+        /* Shades of blue, and yellow, orange and red for the skew: */
+        return {
+            .badge = hex(0x7aa2f7),
+            .badge_ink = hex(0x1a1b26),
+            .ink = hex(0x1a1b26),
+            .accent = hex(0x7aa2f7),
+            .highlight = hex(0x2ac3de),
+            .caption = hex(0x7dcfff),
+            .good = hex(0xb4f9f8),
+            .warn = hex(0x89ddff),
+            .bad = hex(0xc0caf5),
+            .muted = hex(0x565f89),
+            .track = hex(0x292e42),
+            .segments = {hex(0x7aa2f7),
+                         hex(0x2ac3de),
+                         hex(0x3d59a1),
+                         hex(0x7dcfff),
+                         hex(0x0db9d7),
+                         hex(0x89ddff),
+                         hex(0x394b70),
+                         hex(0xb4f9f8),
+                         hex(0xa9b1d6),
+                         hex(0xc0caf5)},
+            .sparkles = {hex(0x7dcfff),
+                         hex(0x7aa2f7),
+                         hex(0x89ddff),
+                         hex(0xb4f9f8),
+                         hex(0xc0caf5)},
+            .heat = {hex(0x7aa2f7),
+                     hex(0xe0af68),
+                     hex(0xff9e64),
+                     hex(0xf7768e)},
+        };
+
+      case DashboardColorScheme::rainbow:
+        return {
+            .badge = hex(0x729fff),
+            .badge_ink = hex(0x1a1b26),
+            .ink = hex(0x1a1b26),
+            .accent = hex(0x729fff),
+            .highlight = hex(0xb993fe),
+            .caption = hex(0x7dcfff),
+            .good = hex(0x9ed662),
+            .warn = hex(0xe9b15f),
+            .bad = hex(0xff6e89),
+            .muted = hex(0x565f89),
+            .track = hex(0x292e42),
+            .segments = {hex(0x729fff),
+                         hex(0x9ed662),
+                         hex(0xe9b15f),
+                         hex(0xb993fe),
+                         hex(0x7dcfff),
+                         hex(0xff6e89),
+                         hex(0x6be2cf),
+                         hex(0xff9e64),
+                         hex(0x1dccec),
+                         hex(0xbcc8f9)},
+            .sparkles = {hex(0x7dcfff),
+                         hex(0x729fff),
+                         hex(0xb993fe),
+                         hex(0xbcc8f9)},
+            .heat = {hex(0x9ed662), hex(0xe9b15f), hex(0xff6e89)},
+        };
+
+      case DashboardColorScheme::tamu:
+        /*
+         * Aggie Maroon (#500000), white, and the neutrals of the Texas
+         * A&M brand. Text uses tints of Aggie Maroon that are readable on
+         * a dark terminal:
+         */
+        return {
+            .badge = hex(0x500000),
+            .badge_ink = hex(0xffffff),
+            .ink = hex(0x202020),
+            .accent = hex(0x966666),
+            .highlight = hex(0xc2a6a6),
+            .caption = hex(0xdccccc),
+            .good = hex(0x84ee53),
+            .warn = hex(0xeebd53),
+            .bad = hex(0xee5389),
+            .muted = hex(0x707070),
+            .track = hex(0x3e3e3e),
+            .segments = {hex(0x500000),
+                         hex(0x966666),
+                         hex(0x707070),
+                         hex(0xc2a6a6),
+                         hex(0xb0b0b0),
+                         hex(0x733232),
+                         hex(0xdccccc),
+                         hex(0x4a4a4a),
+                         hex(0xa87979),
+                         hex(0xd9d9d9)},
+            .sparkles = {hex(0x966666),
+                         hex(0xc2a6a6),
+                         hex(0xdccccc),
+                         hex(0xffffff)},
+            .heat = {hex(0x84ee53), hex(0xeebd53), hex(0xee5389)},
+        };
+
+      case DashboardColorScheme::monochrome:
+        return {
+            .badge = hex(0xd0d0d0),
+            .badge_ink = hex(0x1c1c1c),
+            .ink = hex(0x1c1c1c),
+            .accent = hex(0xbcbcbc),
+            .highlight = hex(0x9e9e9e),
+            .caption = hex(0xd0d0d0),
+            .good = hex(0xe4e4e4),
+            .warn = hex(0xb2b2b2),
+            .bad = hex(0xffffff),
+            .muted = hex(0x6c6c6c),
+            .track = hex(0x303030),
+            .segments = {hex(0xeeeeee),
+                         hex(0xbcbcbc),
+                         hex(0x8a8a8a),
+                         hex(0x5f5f5f),
+                         hex(0xd0d0d0),
+                         hex(0xa8a8a8),
+                         hex(0x767676),
+                         hex(0xe4e4e4),
+                         hex(0x949494),
+                         hex(0x4e4e4e)},
+            .sparkles = {hex(0x6c6c6c),
+                         hex(0x9e9e9e),
+                         hex(0xd0d0d0),
+                         hex(0xffffff)},
+            .heat = {hex(0xe4e4e4), hex(0xb2b2b2), hex(0xffffff)},
+        };
+      }
+
+      __builtin_unreachable();
+    }
+
+
+    /* The palette of the current call to Dashboard::render(): */
+    Palette theme = make_palette(DashboardColorScheme::ryujin);
+
+
+    /*
+     * Sparkles:
+     */
+
+    const std::vector<std::string> sparkle_glyphs = {
+        "·", "·", "⋅", "+", "*", "⋆", "✦", "✧", "˚"};
+
+    /* The fraction of the free cells covered by sparkles: */
+    constexpr double sparkle_density = 0.02;
+
+    /* The interval in which the background thread twinkles: */
+    constexpr auto twinkle_interval = std::chrono::milliseconds(150);
+
+
+    /* Save and restore the cursor position (DECSC and DECRC): */
+    const std::string save_cursor = std::string("\033") + "7";
+    const std::string restore_cursor = std::string("\033") + "8";
+
+
+    /* Move the cursor to column x and row y (counting from zero): */
+    std::string move_to(int x, int y)
+    {
+      return std::format("\033[{};{}H", y + 1, x + 1);
+    }
+
+
+    /*
+     * Formatting helpers:
+     */
+
+    /* Map x in [0, 1] onto the heat scale of the palette: */
+    Color heat(double x)
+    {
+      const auto &stops = theme.heat;
+      x = std::clamp(x, 0., 1.) * double(stops.size() - 1);
+      const auto i = std::min(static_cast<std::size_t>(x), stops.size() - 2);
+      return Color::Interpolate(float(x - double(i)), stops[i], stops[i + 1]);
+    }
+
+
+    std::string format_duration(double seconds)
+    {
+      if (!std::isfinite(seconds) || seconds < 0.)
+        return "--";
+
+      auto s = static_cast<unsigned long>(seconds);
+      const auto days = s / 86400;
+      const auto hours = (s % 86400) / 3600;
+      const auto minutes = (s % 3600) / 60;
+      s %= 60;
+
+      if (days > 0)
+        return std::format("{}d {:02}h {:02}m", days, hours, minutes);
+      if (hours > 0)
+        return std::format("{}h {:02}m {:02}s", hours, minutes, s);
+      return std::format("{}m {:02}s", minutes, s);
+    }
+
+
+    std::string format_si(double value)
+    {
+      if (value >= 1.e9)
+        return std::format("{:.2f} G", value / 1.e9);
+      if (value >= 1.e6)
+        return std::format("{:.2f} M", value / 1.e6);
+      if (value >= 1.e3)
+        return std::format("{:.2f} k", value / 1.e3);
+      return std::format("{:.0f} ", value);
+    }
+
+
+    /* Round up to the next number of the form {1, 1.5, 2, ..., 8} * 10^k: */
+    double nice_scale(double value)
+    {
+      if (!(value > 0.) || !std::isfinite(value))
+        return 1.;
+      const double magnitude = std::pow(10., std::floor(std::log10(value)));
+      for (const double step : {1., 1.5, 2., 2.5, 3., 4., 5., 6., 8., 10.})
+        if (step * magnitude >= value)
+          return step * magnitude;
+      return 10. * magnitude;
+    }
+
+
+    double safe(double value)
+    {
+      return std::isfinite(value) ? value : 0.;
+    }
+
+
+    /*
+     * Elements:
+     */
+
+    Element panel(const std::string &title, Element content)
+    {
+      return window(text(" " + title + " ") | bold | color(theme.accent),
+                    content | color(Color::Default)) |
+             color(theme.muted);
+    }
+
+
+    Element label(const std::string &name)
+    {
+      return text(name) | color(theme.caption) | size(WIDTH, EQUAL, 11);
+    }
+
+
+    Element chip(const std::string &name, Color foreground)
+    {
+      return text(" " + name + " ") | color(foreground) | bgcolor(theme.track);
+    }
+
+
+    Element bar(double fraction, Color begin, Color end)
+    {
+      return gauge(float(std::clamp(safe(fraction), 0., 1.))) |
+             color(LinearGradient(begin, end)) | bgcolor(theme.track);
+    }
+
+
+    /* A sparkline of the most recent `width` values of a history: */
+    Element sparkline(const std::deque<double> &history, int width, Color c)
+    {
+      static const char *const blocks[] = {
+          "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"};
+
+      const auto n = std::min<int>(width, history.size());
+      const auto [min_it, max_it] =
+          std::minmax_element(history.end() - n, history.end());
+      const double min = *min_it;
+      const double range = std::max(*max_it - min, 1.e-3 * *max_it);
+
+      Elements elements;
+      if (n < width)
+        elements.push_back(text(std::string(width - n, ' ')));
+
+      for (auto it = history.end() - n; it != history.end(); ++it) {
+        const double level =
+            range > 0. ? std::clamp((safe(*it) - min) / range, 0., 1.) : 0.5;
+        const auto index = std::clamp(int(std::round(level * 7.)), 0, 7);
+        elements.push_back(
+            text(blocks[index]) |
+            color(Color::Interpolate(float(level), theme.muted, c)));
+      }
+
+      return hbox(std::move(elements));
+    }
+
+
+    /* A range bar marking [min, max] and the average relative to scale: */
+    Element
+    range_bar(const DashboardData::MinMaxAvg &v, double scale, int width)
+    {
+      const auto position = [&](double value) {
+        return std::clamp(int(value / scale * (width - 1)), 0, width - 1);
+      };
+
+      const auto min = position(v.min);
+      const auto max = position(v.max);
+      const auto avg = position(v.avg);
+
+      Elements elements;
+      for (int i = 0; i < width; ++i) {
+        if (i == avg)
+          elements.push_back(text("◆") | color(theme.warn));
+        else if (i >= min && i <= max)
+          elements.push_back(text("━") | color(theme.accent));
+        else if (i < min)
+          elements.push_back(text("━") | color(theme.muted));
+        else
+          elements.push_back(text("─") | color(theme.track));
+      }
+      return hbox(std::move(elements));
+    }
+
+
+    /* A speedometer with a needle pointing at value in [0, scale]: */
+    Element speedometer(double value, double scale)
+    {
+      constexpr int width = 58;
+      constexpr int height = 28;
+      constexpr int cx = 29;
+      constexpr int cy = 27;
+      constexpr int radius = 25;
+      constexpr double pi = std::numbers::pi;
+
+      const double fraction = std::clamp(safe(value) / scale, 0., 1.);
+
+      Canvas c(width, height);
+
+      const auto point = [&](double s, double r) {
+        const double phi = pi * (1. - s);
+        return std::pair{int(std::round(cx + r * std::cos(phi))),
+                         int(std::round(cy - r * std::sin(phi)))};
+      };
+
+      /* The dial: */
+      constexpr int n_steps = 160;
+      for (int i = 0; i <= n_steps; ++i) {
+        const double s = double(i) / n_steps;
+        const auto dial =
+            s <= fraction
+                ? Color::Interpolate(float(s), theme.highlight, theme.good)
+                : theme.muted;
+        for (const double r : {radius, radius - 1, radius - 2}) {
+          const auto [x, y] = point(s, r);
+          c.DrawPoint(x, y, true, dial);
+        }
+      }
+
+      /* Ticks: */
+      for (int i = 0; i <= 10; ++i) {
+        const double s = i / 10.;
+        const auto [x1, y1] = point(s, radius - 5);
+        const auto [x2, y2] = point(s, i % 5 == 0 ? radius - 9 : radius - 7);
+        c.DrawPointLine(
+            x1, y1, x2, y2, i % 5 == 0 ? theme.caption : theme.muted);
+      }
+
+      /* The needle: */
+      const auto [x, y] = point(fraction, radius - 8);
+      c.DrawPointLine(cx, cy, x, y, theme.warn);
+      c.DrawPointLine(cx + 1, cy, x + 1, y, theme.warn);
+      c.DrawPointCircleFilled(cx, cy, 2, theme.bad);
+
+      return canvas(std::move(c));
+    }
+  } // namespace
+
+
+  std::string Dashboard::render(const DashboardData &data,
+                                const DashboardSettings &settings)
+  {
+    theme = make_palette(settings.color_scheme);
+
+    /* Clear the screen if the terminal has been resized: */
+    const auto [columns, lines] = terminal_size();
+    const bool resized =
+        columns != terminal_width_ || lines != terminal_height_;
+    terminal_width_ = columns;
+    terminal_height_ = lines;
+
+    /* Limit the width of the dashboard on wide terminals: */
+    const int terminal_columns = std::max(terminal_width_, 80);
+    const int screen_width =
+        settings.width == 0
+            ? terminal_columns
+            : std::min(terminal_columns, std::max<int>(settings.width, 80));
+
+    /*
+     * Header: cycle, time, and progress
+     */
+
+    /* The last time step may overshoot the final time: */
+    const double progress =
+        data.t_final > 0. ? std::clamp(data.t / data.t_final, 0., 1.) : 0.;
+
+    auto header = vbox({
+        hbox({
+            text("  ryujin  ") | bold | color(theme.badge_ink) |
+                bgcolor(theme.badge),
+            text(" "),
+            data.final_time ? text(" FINAL ") | bold | color(theme.ink) |
+                                  bgcolor(theme.good)
+                            : text(" running ") | color(theme.ink) |
+                                  bgcolor(theme.highlight),
+            text("   cycle ") | color(theme.caption),
+            text(std::format("{}", data.cycle)) | bold,
+            text("   t = ") | color(theme.caption),
+            text(std::format("{:.8f}", data.t)) | bold,
+            text(std::format(" / {:.4g}", data.t_final)) | color(theme.muted),
+            filler(),
+            text("ETA ") | color(theme.caption),
+            text(format_duration(data.eta)) | bold,
+            text(" "),
+        }),
+        hbox({
+            bar(progress, theme.highlight, theme.good) | flex,
+            text(std::format(" {:5.1f}% ", 100. * progress)) | bold,
+        }),
+    });
+
+    /*
+     * Information
+     */
+
+    Elements information = {
+        hbox({label("Hyperbolic"), text(data.hyperbolic_name) | bold}),
+    };
+    if (!data.parabolic_name.empty())
+      information.push_back(
+          hbox({label("Parabolic"), text(data.parabolic_name) | bold}));
+
+    std::string ranks =
+        std::format("{} rank{}", data.n_ranks, data.n_ranks == 1 ? "" : "s");
+    if (!data.threads.empty())
+      ranks += " × " + data.threads;
+    if (data.n_ensembles > 1)
+      ranks += std::format(" ({} ensembles)", data.n_ensembles);
+
+    information.push_back(hbox({label("run"), text(data.base_name)}));
+    information.push_back(hbox({
+        label("size"),
+        text(format_si(data.n_global_dofs)) | bold,
+        text("Qdofs"),
+    }));
+    information.push_back(hbox({label("parallel"), text(ranks)}));
+    information.push_back(
+        hbox({label("backend"), chip(data.backend, theme.highlight)}));
+    information.push_back(hbox({
+        label("output"),
+        text(std::format("cycle {} at t = {:.4g}",
+                         data.last_output_cycle,
+                         data.last_output_time)),
+    }));
+
+    /*
+     * Throughput speedometer
+     */
+
+    /* Scale with the recent samples to forget the warm-up phase: */
+    const auto recent = std::min<std::size_t>(wall_history_.size(), 32);
+    const double scale =
+        nice_scale(1.1 * *std::max_element(wall_history_.end() - recent,
+                                           wall_history_.end()));
+
+    const std::string compute_label = data.device               ? "GPU "
+                                      : data.fudged_cpu_timings ? "CPU*"
+                                                                : "CPU ";
+
+    auto throughput = vbox({
+        hbox(
+            {filler(), speedometer(data.wall_m_dofs_per_sec, scale), filler()}),
+        hbox({
+            text(" 0") | color(theme.muted),
+            filler(),
+            text(std::format("{:.2f}", data.wall_m_dofs_per_sec)) | bold |
+                color(theme.good),
+            text(" MQ/s wall"),
+            filler(),
+            text(std::format("{:g} ", scale)) | color(theme.muted),
+        }),
+        separatorLight() | color(theme.track),
+        hbox({
+            text(compute_label) | color(theme.caption),
+            text(std::format(" {:9.3f} MQ/s ", data.compute_m_dofs_per_sec)),
+            filler(),
+            sparkline(compute_history_, 14, theme.highlight),
+        }),
+        hbox({
+            text("WALL") | color(theme.caption),
+            text(std::format(" {:9.3f} MQ/s ", data.wall_m_dofs_per_sec)),
+            filler(),
+            sparkline(wall_history_, 14, theme.good),
+        }),
+        hbox({
+            text("rate") | color(theme.caption),
+            text(std::format(" {:9.2f} cycles/s", data.cycles_per_second)),
+        }),
+    });
+
+    /*
+     * Throughput history: an area chart of the most recent wall
+     * throughput samples, one sample per half cell
+     */
+
+    auto history_graph = [this, scale](int width, int height) {
+      /* A negative value leaves the column empty: */
+      std::vector<int> values(width, -1);
+      const auto n = std::min<std::size_t>(width, wall_history_.size());
+      for (std::size_t i = 0; i < n; ++i) {
+        const double value = wall_history_[wall_history_.size() - n + i];
+        values[width - n + i] =
+            std::clamp(int(std::round(value / scale * height)), 0, height);
+      }
+      return values;
+    };
+
+    auto history = hbox({
+        vbox({
+            text(std::format("{:g}", scale)) | color(theme.muted),
+            filler(),
+            text("0") | color(theme.muted),
+        }) | size(WIDTH, EQUAL, 5),
+        graph(std::move(history_graph)) | color(theme.good) | flex,
+    });
+
+    /*
+     * Messages: the most recent status messages, scrolled to the newest
+     */
+
+    Elements message_lines;
+    for (const auto &message : data.messages)
+      message_lines.push_back(
+          hbox({
+              text(std::format("{:>6} ", message.cycle)) | color(theme.muted),
+              text(message.text),
+          }) |
+          flex_shrink);
+    if (message_lines.empty())
+      message_lines.push_back(text("no messages") | color(theme.muted));
+
+    auto messages = vbox(std::move(message_lines)) |
+                    focusPositionRelative(0.f, 1.f) | yframe;
+
+    /*
+     * Time stepping
+     */
+
+    const auto counter = [](const std::string &name, const auto &n) {
+      const auto c = [](unsigned int k) {
+        return k == 0 ? text("0") | color(theme.muted)
+                      : text(std::to_string(k)) | bold |
+                            color(k < 10 ? theme.warn : theme.bad);
+      };
+      return hbox({
+          text(name + " ") | color(theme.caption),
+          c(n[0]),
+          text("/") | color(theme.muted),
+          c(n[1]),
+          text("   "),
+      });
+    };
+
+    Elements stepping = {
+        hbox({
+            label("scheme"),
+            chip(data.time_stepping_scheme, theme.good),
+            text("  CFL ") | color(theme.caption),
+            text(std::format("{:.2f}", data.cfl)) | bold,
+        }),
+        hbox({
+            label("tau"),
+            text(std::format("{:.3e}", data.tau)) | bold,
+            text(std::format("   ({:.3e} t/s)", data.time_per_second)) |
+                color(theme.muted),
+        }),
+        hbox({
+            label("events"),
+            counter("restarts", data.restarts),
+            counter("warnings", data.warnings),
+            counter("corrections", data.corrections),
+        }),
+    };
+
+    for (const auto &line : data.solver_statistics)
+      stepping.push_back(hbox({label("solver"), text(line)}));
+
+    if (data.device) {
+      stepping.push_back(hbox({
+          label("GPU util"),
+          bar(data.utilization, theme.bad, theme.good) | size(WIDTH, EQUAL, 24),
+          text(std::format(" {:5.1f}%", 100. * data.utilization)) | bold,
+          text(std::format("  on {} device{}",
+                           data.n_devices,
+                           data.n_devices == 1 ? "" : "s")) |
+              color(theme.muted),
+      }));
+    } else {
+      const auto skew = std::clamp(safe(data.cpu_time_skew_fraction), 0., 1.);
+      stepping.push_back(hbox({
+          label("cpu skew"),
+          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
+              size(WIDTH, EQUAL, 24),
+          text(std::format(" {:5.1f}%", 100. * skew)) | bold,
+          text(std::format("  ({:.2e} s/cycle)", data.cpu_time_skew)) |
+              color(theme.muted),
+      }));
+    }
+
+    /*
+     * Memory
+     */
+
+    const auto &memory = data.memory;
+    auto memory_panel = vbox({
+        hbox({
+            text("min ") | color(theme.caption),
+            text(std::format("{:9.1f}", memory.min)),
+            text(std::format(" [p{}]", memory.min_index)) | color(theme.muted),
+        }),
+        hbox({
+            text("avg ") | color(theme.caption),
+            text(std::format("{:9.1f}", memory.avg)) | bold,
+        }),
+        hbox({
+            text("max ") | color(theme.caption),
+            text(std::format("{:9.1f}", memory.max)),
+            text(std::format(" [p{}]", memory.max_index)) | color(theme.muted),
+        }),
+        range_bar(memory, nice_scale(memory.max), 32),
+        hbox({
+            text("0") | color(theme.muted),
+            filler(),
+            text(std::format("{:g} MiB", nice_scale(memory.max))) |
+                color(theme.muted),
+        }),
+    });
+
+    /*
+     * Timers: a stacked colorbar of the time loop and a table
+     */
+
+    const int composition_width = screen_width - 4;
+    Elements composition;
+    std::vector<std::vector<Element>> table = {{
+        text(" "),
+        text("timer") | bold | flex_shrink,
+        text("wall avg ") | bold | align_right,
+        text(" skew -/+ ") | bold | align_right,
+        text(" ranks ") | bold,
+        text("cpu sum ") | bold | align_right,
+        text("share") | bold,
+        text(""),
+    }};
+
+    int used = 0;
+    unsigned int n_segment = 0;
+    for (const auto &timer : data.timers) {
+      const auto &wall = timer.wall_time;
+      const double skew_negative =
+          wall.avg > 0.
+              ? std::max(100. * (wall.min - wall.avg) / wall.avg, -99.9)
+              : 0.;
+      const double skew_positive =
+          wall.avg > 0.
+              ? std::min(100. * (wall.max - wall.avg) / wall.avg, 99.9)
+              : 0.;
+
+      Element marker = text(" ");
+      Element share = text("");
+      Element percentage = text("");
+
+      if (timer.fraction >= 0.) {
+        const auto c = theme.segments[n_segment++ % theme.segments.size()];
+        const auto fraction = std::clamp(safe(timer.fraction), 0., 1.);
+        const int n = std::min(int(std::round(fraction * composition_width)),
+                               composition_width - used);
+        if (n > 0) {
+          composition.push_back(text(std::string(n, ' ')) | bgcolor(c));
+          used += n;
+        }
+        marker = text("■ ") | color(c);
+        share = gauge(float(fraction)) | color(c) | bgcolor(theme.track) |
+                size(WIDTH, EQUAL, 20);
+        percentage = text(std::format(" {:5.1f}%", 100. * fraction));
+      }
+
+      /* Every timer of the time loop is a "time step": */
+      std::string name = timer.name;
+      if (name.starts_with("time step "))
+        name.erase(0, 10);
+
+      table.push_back({
+          marker,
+          /* Truncate the name first if the terminal is too narrow: */
+          text(name + "  ") | flex_shrink,
+          text(std::format("{:.2f}s ", wall.avg)) | align_right,
+          text(
+              std::format(" {:5.1f}/{:4.1f}% ", skew_negative, skew_positive)) |
+              color(heat(std::max(-skew_negative, skew_positive) / 25.)) |
+              align_right,
+          text(std::format(" p{}/p{} ", wall.min_index, wall.max_index)) |
+              color(theme.muted),
+          text(std::format("{:.2f}s ", timer.cpu_time)) | align_right,
+          share,
+          percentage,
+      });
+    }
+
+    if (used < composition_width)
+      composition.push_back(text(std::string(composition_width - used, ' ')) |
+                            bgcolor(theme.track));
+
+    auto timers = vbox({
+        hbox(std::move(composition)),
+        text(""),
+        gridbox(std::move(table)),
+    });
+
+    /*
+     * Tasks: the trigger of every task, when it fired last, and when it
+     * fires next
+     */
+
+    std::vector<std::vector<Element>> task_table = {{
+        text("task") | bold,
+        text("  phase") | bold,
+        text("  trigger") | bold,
+        text("  last fired") | bold | flex_shrink,
+        text("  ") | bold,
+        text(" next") | bold,
+    }};
+
+    for (const auto &task : data.tasks) {
+      const bool triggered = !task.trigger.empty();
+
+      Element progress = text("");
+      if (task.progress >= 0.)
+        progress = gauge(float(task.progress)) | color(theme.highlight) |
+                   bgcolor(theme.track) | size(WIDTH, EQUAL, 16);
+
+      task_table.push_back({
+          text(task.name) | bold,
+          hbox({text("  "), chip(task.phase, theme.highlight)}),
+          text("  " + (triggered ? task.trigger : "--")) |
+              color(triggered ? theme.caption : theme.muted),
+          text("  " + (task.last.empty() ? "--" : task.last)) |
+              color(task.last.empty() ? theme.muted : Color::Default) |
+              flex_shrink,
+          hbox({text("  "), progress}),
+          text(" " + (task.next.empty() ? "--" : task.next)) |
+              color(task.next.empty() ? theme.muted : theme.good),
+      });
+    }
+
+    /*
+     * Footer
+     */
+
+    auto footer = hbox({
+        text(" terminal update every ") | color(theme.muted),
+        text(std::format("{:.2f}s", data.terminal_update_interval)) |
+            color(theme.caption),
+    });
+
+    /*
+     * Assemble the dashboard:
+     */
+
+    auto document = vbox({
+        borderRounded(header | color(Color::Default)) | color(theme.accent),
+        hbox({
+            vbox({
+                panel("simulation", vbox(std::move(information))),
+                hbox({
+                    panel("wall throughput history [MQ/s]", history) | flex,
+                    panel("messages", messages) | flex,
+                }) | yflex,
+                panel("time stepping", vbox(std::move(stepping))),
+            }) | flex,
+            vbox({
+                panel("throughput", throughput),
+                panel("memory [MiB]", memory_panel) | yflex,
+            }) | size(WIDTH, EQUAL, 36),
+        }),
+        panel("timers", timers),
+        panel("tasks", gridbox(std::move(task_table))),
+        footer,
+    });
+
+    /*
+     * Render the dashboard with its natural height, or stretched to fill
+     * the terminal up to the maximal height:
+     */
+
+    auto dashboard = document | size(WIDTH, EQUAL, screen_width);
+    int height = Dimension::Fit(dashboard, true).dimy;
+    if (settings.height > 0)
+      height = std::max(
+          height,
+          std::min(static_cast<int>(settings.height), terminal_height_));
+
+    auto image = Screen::Create(Dimension::Fixed(screen_width),
+                                Dimension::Fixed(height));
+    Render(image, dashboard | size(HEIGHT, EQUAL, height));
+
+    /*
+     * Place the dashboard on a screen that covers the whole terminal (or
+     * more if the dashboard does not fit):
+     */
+
+    const int rows = std::max(height, terminal_height_);
+    const int left =
+        settings.center ? (terminal_columns - screen_width) / 2 : 0;
+    const int top = settings.center ? (rows - height) / 2 : 0;
+
+    auto screen = Screen::Create(Dimension::Fixed(terminal_columns),
+                                 Dimension::Fixed(rows));
+    for (int y = 0; y < height; ++y)
+      for (int x = 0; x < screen_width; ++x)
+        screen.PixelAt(left + x, top + y) = image.PixelAt(x, y);
+
+    /* Scatter sparkles over the space around the dashboard: */
+
+    columns_ = terminal_columns;
+    rows_ = rows;
+    left_ = left;
+    top_ = top;
+    width_ = screen_width;
+    height_ = height;
+    sparkles_.clear();
+
+    if (settings.sparkles) {
+      std::uniform_real_distribution<double> uniform(0., 1.);
+      std::uniform_int_distribution<std::size_t> glyph(
+          0, sparkle_glyphs.size() - 1);
+      std::uniform_int_distribution<std::size_t> shade(
+          0, theme.sparkles.size() - 1);
+
+      for (int y = 0; y < rows; ++y)
+        for (int x = 0; x < terminal_columns; ++x) {
+          const bool inside = x >= left && x < left + screen_width &&
+                              y >= top && y < top + height;
+          if (inside || uniform(random_engine_) >= sparkle_density)
+            continue;
+
+          sparkles_.emplace_back(x, y);
+          auto &pixel = screen.PixelAt(x, y);
+          pixel.character = sparkle_glyphs[glyph(random_engine_)];
+          pixel.foreground_color = theme.sparkles[shade(random_engine_)];
+          pixel.dim = uniform(random_engine_) < 0.5;
+        }
+    }
+
+    /* Redraw the whole terminal in place: */
+    std::string output = resized ? "\033[2J\033[H" : "\033[H";
+    output += screen.ToString();
+
+    /* If the dashboard does not fit, clear whatever is left below: */
+    if (rows > terminal_height_)
+      output += "\n\033[J";
+
+    return output;
+  }
+
+
+  std::string Dashboard::twinkle()
+  {
+    /* Nothing to do without sparkles, or if the last frame has scrolled: */
+    if (!settings_.sparkles || sparkles_.empty() || rows_ > terminal_height_)
+      return "";
+
+    const auto inside = [&](int x, int y) {
+      return x >= left_ && x < left_ + width_ && y >= top_ &&
+             y < top_ + height_;
+    };
+
+    std::uniform_real_distribution<double> uniform(0., 1.);
+    std::uniform_int_distribution<int> column(0, columns_ - 1);
+    std::uniform_int_distribution<int> row(0, rows_ - 1);
+    std::uniform_int_distribution<std::size_t> pick(0, sparkles_.size() - 1);
+    std::uniform_int_distribution<std::size_t> glyph(0,
+                                                     sparkle_glyphs.size() - 1);
+    std::uniform_int_distribution<std::size_t> shade(0,
+                                                     theme.sparkles.size() - 1);
+
+    std::string output = save_cursor;
+
+    /* Move about one in eight sparkles to a free cell: */
+    const auto n = std::max<std::size_t>(1, sparkles_.size() / 8);
+    for (std::size_t i = 0; i < n; ++i) {
+      auto &[x, y] = sparkles_[pick(random_engine_)];
+      output += move_to(x, y) + "\033[0m ";
+
+      for (int attempt = 0; attempt < 16; ++attempt) {
+        const int new_x = column(random_engine_);
+        const int new_y = row(random_engine_);
+        if (!inside(new_x, new_y) &&
+            std::ranges::find(sparkles_, std::pair{new_x, new_y}) ==
+                sparkles_.end()) {
+          x = new_x;
+          y = new_y;
+          break;
+        }
+      }
+
+      const auto &c = theme.sparkles[shade(random_engine_)];
+      output += move_to(x, y) + "\033[0;" +
+                (uniform(random_engine_) < 0.5 ? "2;" : "") + c.Print(false) +
+                "m" + sparkle_glyphs[glyph(random_engine_)];
+    }
+
+    return output + "\033[0m" + restore_cursor;
+  }
+
+
+  void Dashboard::animate()
+  {
+    std::unique_lock lock(mutex_);
+    while (!condition_.wait_for(
+        lock, twinkle_interval, [this] { return stop_; })) {
+      /* Redraw the last snapshot right away if the terminal is resized: */
+      const auto [columns, lines] = terminal_size();
+      const bool resized =
+          columns != terminal_width_ || lines != terminal_height_;
+
+      write(resized ? render(data_, settings_) : twinkle());
+    }
+  }
+
+
+  void Dashboard::stop()
+  {
+    {
+      std::lock_guard lock(mutex_);
+      stop_ = true;
+    }
+    condition_.notify_all();
+    if (thread_.joinable())
+      thread_.join();
+  }
+
+
+  Dashboard::~Dashboard()
+  {
+    stop();
+    if (terminal_ >= 0)
+      ::close(terminal_);
+  }
+
+
+  std::pair<int, int> Dashboard::terminal_size() const
+  {
+    winsize size{};
+    if (terminal_ >= 0 && ::ioctl(terminal_, TIOCGWINSZ, &size) == 0 &&
+        size.ws_col > 0 && size.ws_row > 0)
+      return {size.ws_col, size.ws_row};
+
+    const auto fallback = Terminal::Size();
+    return {fallback.dimx, fallback.dimy};
+  }
+
+
+  void Dashboard::write(const std::string &output) const
+  {
+    if (terminal_ < 0) {
+      std::cout << output << std::flush;
+      return;
+    }
+
+    const char *data = output.data();
+    std::size_t remaining = output.size();
+    while (remaining > 0) {
+      const auto n = ::write(terminal_, data, remaining);
+      if (n < 0) {
+        if (errno == EINTR)
+          continue;
+        return;
+      }
+      data += n;
+      remaining -= static_cast<std::size_t>(n);
+    }
+  }
+
+
+  void Dashboard::show(const DashboardData &data,
+                       const DashboardSettings &settings)
+  {
+    /* No more updates after the final snapshot: */
+    if (data.final_time)
+      stop();
+
+    std::lock_guard lock(mutex_);
+
+    /* Update the throughput history: */
+
+    constexpr std::size_t history_size = 512;
+    wall_history_.push_back(safe(data.wall_m_dofs_per_sec));
+    compute_history_.push_back(safe(data.compute_m_dofs_per_sec));
+    if (wall_history_.size() > history_size) {
+      wall_history_.pop_front();
+      compute_history_.pop_front();
+    }
+
+    data_ = data;
+    settings_ = settings;
+
+    /* Open the terminal on the first call: */
+    if (!thread_.joinable() && terminal_ < 0)
+      terminal_ = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);
+
+    /* Write out everything that is still pending on stdout first: */
+    std::cout << std::flush;
+
+    /* Continue with subsequent output below the final dashboard: */
+    write(render(data_, settings_) + (data.final_time ? "\n" : ""));
+
+    if (!data.final_time && !thread_.joinable())
+      thread_ = std::thread([this] { animate(); });
+  }
+} // namespace ryujin

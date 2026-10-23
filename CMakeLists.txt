@@ -85,6 +85,29 @@ option(CMAKE_INSTALL_RPATH_USE_LINK_PATH "Set the rpath of the library to the ex
 #
 
 option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
+
+if("${WITH_FTXUI}" STREQUAL "")
+  #
+  # The terminal dashboard needs std::format with floating point support,
+  # let's  check whether it is available:
+  #
+  include(CheckCXXSourceCompiles)
+  set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX20_STANDARD_COMPILE_OPTION}")
+  check_cxx_source_compiles(
+    "
+    #include <format>
+    #include <string>
+    int main()
+    {
+      const std::string s = std::format(\"{:.2f} {:>6}\", 1.5, 42);
+      return s.empty();
+    }
+    "
+    RYUJIN_HAVE_STD_FORMAT)
+  unset(CMAKE_REQUIRED_FLAGS)
+endif()
+option(WITH_FTXUI "Render the terminal output with the FTXUI library (git submodule)" ${RYUJIN_HAVE_STD_FORMAT})
+
 option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
 option(WITH_NVTX "Compile and link against the NVIDIA Tools Extension (NVTX) library and annotate compute sections for the CUDA profiler" OFF)
 
@@ -176,6 +199,22 @@ set(EXTERNAL_TARGETS)
 if(WITH_EOSPAC)
   find_package(EOSPAC REQUIRED)
   list(APPEND EXTERNAL_TARGETS "Eospac::Eospac6")
+endif()
+
+if(WITH_FTXUI)
+  if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ftxui/CMakeLists.txt)
+    message(FATAL_ERROR
+      "The FTXUI submodule is missing. Either run\n"
+      "  $ git submodule update --init ftxui\n"
+      "or configure with -DWITH_FTXUI=OFF"
+      )
+  endif()
+  set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+  set(FTXUI_QUIET ON CACHE BOOL "" FORCE)
+  add_subdirectory(ftxui EXCLUDE_FROM_ALL)
+  # The static FTXUI libraries end up in the shared library libryujin.so:
+  set_target_properties(screen dom PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  list(APPEND EXTERNAL_TARGETS "$<BUILD_INTERFACE:ftxui::dom>")
 endif()
 
 if(WITH_GDAL)

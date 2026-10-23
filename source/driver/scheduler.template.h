@@ -135,6 +135,14 @@ namespace ryujin
 
     for (context.cycle = 1;; ++context.cycle) {
 
+      /*
+       * No time step follows once we have reached the final time, so the
+       * final pre_step phase still belongs to the last cycle:
+       */
+      const bool final_time = context.t >= relax * t_final_;
+      if (final_time)
+        --context.cycle;
+
 #ifdef DEBUG_OUTPUT
       std::cout << "\n\n###   cycle = " << context.cycle << "   ###\n\n"
                 << std::endl;
@@ -145,9 +153,7 @@ namespace ryujin
       if (context.timer_tick)
         ++context.timer_cycle;
 
-      /* Break if we have reached the final time. */
-
-      if (context.t >= relax * t_final_)
+      if (final_time)
         break;
 
       /* Adapt the mesh and prepare all tasks if requested: */
@@ -189,9 +195,6 @@ namespace ryujin
 
       run_phase(TaskPhase::post_step, context);
     }
-
-    /* We have actually performed one cycle less. */
-    --context.cycle;
 
     ComputingTimer::timer("time loop").stop();
 

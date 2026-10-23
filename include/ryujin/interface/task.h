@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -225,7 +226,6 @@ namespace ryujin
         : mode_(mode)
         , multiplier_(multiplier)
         , interval_(interval)
-        , last_fired_(Number(0.))
     {
     }
 
@@ -272,6 +272,132 @@ namespace ryujin
      */
     bool fire(const TaskContext<Number> &context)
     {
+      if (!evaluate(context))
+        return false;
+
+      fired_ = true;
+      last_cycle_ = context.cycle;
+      last_t_ = context.t;
+      last_wall_time_ = context.wall_time;
+      return true;
+    }
+
+    /**
+     * Return when the trigger fires next: the cycle (every cycle), the
+     * time (timer tick, time points), or the wall time (wall clock).
+     * Returns std::numeric_limits<Number>::max() if the trigger does not
+     * fire again.
+     */
+    Number next(const TaskContext<Number> &context) const
+    {
+      constexpr auto never = std::numeric_limits<Number>::max();
+
+      switch (mode_) {
+      case TriggerMode::every_cycle:
+        return (context.cycle / multiplier_ + 1) * multiplier_;
+
+      case TriggerMode::timer_tick: {
+        /* The smallest multiple of the multiplier not below timer_cycle: */
+        const auto k =
+            (context.timer_cycle + multiplier_ - 1) / multiplier_ * multiplier_;
+        const Number t = k * context.timer_granularity;
+        return t <= context.t_final ? t : never;
+      }
+
+      case TriggerMode::wall_clock:
+        return last_wall_time_ + interval_;
+
+      case TriggerMode::time_points: {
+        const auto it =
+            next_time_point_ == std::numeric_limits<std::size_t>::max()
+                ? std::ranges::lower_bound(time_points_, context.t)
+                : time_points_.begin() + next_time_point_;
+        return it != time_points_.end() ? *it : never;
+      }
+      }
+
+      __builtin_unreachable();
+    }
+
+    /**
+     * Return how far the trigger has advanced from the previous to the
+     * next firing as a fraction in [0, 1], or a negative value if the
+     * trigger does not fire again.
+     */
+    double progress(const TaskContext<Number> &context) const
+    {
+      const Number next_firing = next(context);
+      if (next_firing == std::numeric_limits<Number>::max())
+        return -1.;
+
+      const auto fraction = [](double begin, double now, double end) {
+        return end > begin ? std::clamp((now - begin) / (end - begin), 0., 1.)
+                           : 1.;
+      };
+
+      switch (mode_) {
+      case TriggerMode::every_cycle:
+        return fraction(next_firing - multiplier_, context.cycle, next_firing);
+
+      case TriggerMode::timer_tick:
+        return fraction(next_firing - multiplier_ * context.timer_granularity,
+                        context.t,
+                        next_firing);
+
+      case TriggerMode::wall_clock:
+        return fraction(last_wall_time_, context.wall_time, next_firing);
+
+      case TriggerMode::time_points: {
+        const auto it = std::ranges::lower_bound(time_points_, next_firing);
+        const Number previous =
+            it != time_points_.begin() ? *(it - 1) : Number(0.);
+        return fraction(previous, context.t, next_firing);
+      }
+      }
+
+      __builtin_unreachable();
+    }
+
+    /**
+     * The condition under which the trigger fires.
+     */
+    ACCESSOR_READ_ONLY(mode)
+
+    /**
+     * The multiplier of the modes "every cycle" and "timer tick".
+     */
+    ACCESSOR_READ_ONLY(multiplier)
+
+    /**
+     * The interval of the mode "wall clock" (in seconds).
+     */
+    ACCESSOR_READ_ONLY(interval)
+
+    /**
+     * The time points of the mode "time points".
+     */
+    ACCESSOR_READ_ONLY(time_points)
+
+    /**
+     * Whether the trigger has fired at least once.
+     */
+    ACCESSOR_READ_ONLY(fired)
+
+    /**
+     * The cycle, the time, and the wall time at which the trigger fired
+     * last.
+     */
+    ACCESSOR_READ_ONLY(last_cycle)
+    ACCESSOR_READ_ONLY(last_t)
+    ACCESSOR_READ_ONLY(last_wall_time)
+
+  private:
+    /**
+     * Return whether the condition of the trigger is met in the current
+     * cycle.
+     */
+    bool evaluate(const TaskContext<Number> &context)
+    {
       switch (mode_) {
       case TriggerMode::every_cycle:
         return context.cycle % multiplier_ == 0;
@@ -280,10 +406,7 @@ namespace ryujin
         return context.timer_tick && context.timer_cycle % multiplier_ == 0;
 
       case TriggerMode::wall_clock:
-        if (context.wall_time < last_fired_ + interval_)
-          return false;
-        last_fired_ = context.wall_time;
-        return true;
+        return context.wall_time >= last_wall_time_ + interval_;
 
       case TriggerMode::time_points: {
         /* Skip all time points before the first evaluation: */
@@ -307,13 +430,15 @@ namespace ryujin
       __builtin_unreachable();
     }
 
-  private:
     TriggerMode mode_;
     unsigned int multiplier_;
     Number interval_;
     std::vector<Number> time_points_;
 
-    Number last_fired_;
+    bool fired_ = false;
+    unsigned int last_cycle_ = 0;
+    Number last_t_ = Number(0.);
+    Number last_wall_time_ = Number(0.);
     std::size_t next_time_point_ = std::numeric_limits<std::size_t>::max();
   };
 
@@ -429,6 +554,20 @@ namespace ryujin
        */
       ACCESSOR_READ_ONLY(phase)
 
+      /**
+       * Return whether the task has a Trigger.
+       */
+      bool has_trigger() const
+      {
+        return trigger_ != nullptr;
+      }
+
+      /**
+       * The Trigger that decides when the task performs its work. Must
+       * only be called if has_trigger() returns true.
+       */
+      ACCESSOR_READ_ONLY(trigger)
+
       //@}
 
     protected:
@@ -441,6 +580,12 @@ namespace ryujin
           , phase_(phase)
       {
       }
+
+      /**
+       * The Trigger of the task. A derived class that needs one sets it
+       * in its constructor.
+       */
+      std::unique_ptr<Trigger<Number>> trigger_;
 
     private:
       std::string name_;

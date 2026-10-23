@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/driver/dashboard.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/interface/task.h>
 
@@ -13,6 +14,7 @@
 #include <deal.II/base/types.h>
 
 #include <fstream>
+#include <functional>
 #include <ostream>
 #include <string>
 
@@ -78,6 +80,7 @@ namespace ryujin
 
     Number terminal_update_interval_;
     bool terminal_correct_for_hyperthreading_;
+    DashboardSettings dashboard_settings_;
 
     std::string debug_command_;
     std::string debug_filename_;
@@ -111,6 +114,16 @@ namespace ryujin
 
     double time_per_second_exp_;
 
+    DashboardData dashboard_data_;
+#if defined(WITH_FTXUI)
+    Dashboard dashboard_;
+#endif
+
+    /* The original status message printer of the TaskContext: */
+    std::function<void(const std::string &)> print_info_;
+    /* Whether status messages go to the dashboard instead of stdout: */
+    bool dashboard_active_ = false;
+
     //@}
     /**
      * @name Internal methods
@@ -135,6 +148,8 @@ namespace ryujin
     void print_memory_statistics(std::ostream &stream);
 
     void print_timers(std::ostream &stream);
+
+    void print_tasks(const TaskContext<Number> &context, std::ostream &stream);
 
     void print_throughput(const TaskContext<Number> &context,
                           std::ostream &stream,

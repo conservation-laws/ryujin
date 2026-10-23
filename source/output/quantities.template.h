@@ -66,7 +66,8 @@ namespace ryujin
       , base_name_("")
       , mesh_files_have_been_written_(false)
   {
-    trigger_.add_parameters(*this);
+    this->trigger_ = std::make_unique<Trigger<Number>>();
+    this->trigger_->add_parameters(*this);
 
     quantities_ = simulation.hyperbolic_system().primitive_names(dim);
 
@@ -322,7 +323,7 @@ namespace ryujin
       accumulate(state_vector, context.t);
     }
 
-    if (!trigger_.fire(context))
+    if (!this->trigger_->fire(context))
       return;
 
     ComputingTimer::Scope scope("time step [X]   - write out quantities");
