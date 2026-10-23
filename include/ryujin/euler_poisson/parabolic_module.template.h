@@ -296,59 +296,66 @@ namespace ryujin
 
 
     template <typename HyperbolicDescription, int dim, typename Number>
-    void
+    Number
     ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
-        const Number old_t,
         StageVectors stage_state_vectors,
         StageWeights stage_weights,
         StateVector<Number> &new_state_vector,
-        Number tau) const
+        Number t,
+        Number tau,
+        Number /*tau_max*/) const
     {
+      AssertThrow(tau != Number(0.),
+                  dealii::ExcMessage("A parabolic module cannot choose the "
+                                     "time step size: tau must be nonzero."));
+
       switch (stage_state_vectors.size()) {
       case 0:
         backward_euler_step<0>(old_state_vector,
-                               old_t,
                                stage_state_vectors,
                                stage_weights,
                                new_state_vector,
+                               t,
                                tau);
         break;
       case 1:
         backward_euler_step<1>(old_state_vector,
-                               old_t,
                                stage_state_vectors,
                                stage_weights,
                                new_state_vector,
+                               t,
                                tau);
         break;
       case 2:
         backward_euler_step<2>(old_state_vector,
-                               old_t,
                                stage_state_vectors,
                                stage_weights,
                                new_state_vector,
+                               t,
                                tau);
         break;
       case 3:
         backward_euler_step<3>(old_state_vector,
-                               old_t,
                                stage_state_vectors,
                                stage_weights,
                                new_state_vector,
+                               t,
                                tau);
         break;
       case 4:
         backward_euler_step<4>(old_state_vector,
-                               old_t,
                                stage_state_vectors,
                                stage_weights,
                                new_state_vector,
+                               t,
                                tau);
         break;
       default:
         AssertThrow(false, dealii::ExcMessage("Unsupported number of stages."));
       }
+
+      return tau;
     }
 
 
@@ -357,34 +364,39 @@ namespace ryujin
     void
     ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
-        const Number old_t,
         StageVectors /*stage_state_vectors*/,
         StageWeights /*stage_weights*/,
         StateVector<Number> &new_state_vector,
+        Number t,
         Number tau) const
     {
       step(old_state_vector,
-           old_t,
            new_state_vector,
+           t,
            tau,
            /*crank_nicolson_extrapolation = */ false);
     }
 
 
     template <typename HyperbolicDescription, int dim, typename Number>
-    void
+    Number
     ParabolicModule<HyperbolicDescription, dim, Number>::crank_nicolson_step(
         const StateVector<Number> &old_state_vector,
-        const Number old_t,
         StateVector<Number> &new_state_vector,
-        Number tau) const
+        Number t,
+        Number tau,
+        Number /*tau_max*/) const
     {
+      AssertThrow(tau != Number(0.),
+                  dealii::ExcMessage("A parabolic module cannot choose the "
+                                     "time step size: tau must be nonzero."));
+
       try {
         /* Backward Euler step to half time step, and extrapolate: */
 
         step(old_state_vector,
-             old_t,
              new_state_vector,
+             t,
              tau / Number(2.),
              /*crank_nicolson_extrapolation = */ true);
 
@@ -399,11 +411,13 @@ namespace ryujin
          * step:
          */
         step(old_state_vector,
-             old_t,
              new_state_vector,
+             t,
              tau,
              /*crank_nicolson_extrapolation = */ false);
       }
+
+      return tau;
     }
 
 
@@ -847,8 +861,8 @@ namespace ryujin
     template <typename HyperbolicDescription, int dim, typename Number>
     void ParabolicModule<HyperbolicDescription, dim, Number>::step(
         const StateVector<Number> &old_state_vector,
-        const Number t,
         StateVector<Number> &new_state_vector,
+        Number t,
         Number tau [[maybe_unused]],
         const bool crank_nicolson_extrapolation [[maybe_unused]]) const
     {

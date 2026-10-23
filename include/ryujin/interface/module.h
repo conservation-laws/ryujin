@@ -56,15 +56,16 @@ namespace ryujin
 
 
   /**
-   * A class signalling a restart, thrown in HyperbolicModule::single_step
-   * and caught in the TimeIntegrator when performing a time step. We
-   * currently signal a restart whenever we encounter an invariant domain
-   * violation of the low-order update.
+   * A class signalling a restart, thrown in
+   * HyperbolicModule::forward_euler_step() and caught in the TimeIntegrator
+   * when performing a time step. We currently signal a restart whenever we
+   * encounter an invariant domain violation of the low-order update.
    *
-   * This might happen, for example, in subsequent invocations of step() in
-   * high-order time stepping algorithms when the time step size has to be
-   * kept constant. A standard strategy implemented in TimeIntegrator is to
-   * simply fall back to a smaller relative CFL number and try again.
+   * This might happen, for example, in subsequent invocations of
+   * forward_euler_step() in high-order time stepping algorithms when the time
+   * step size has to be kept constant. A standard strategy implemented in
+   * TimeIntegrator is to simply fall back to a smaller relative CFL number and
+   * try again.
    *
    * The field @p suggested_tau_max is set to a tau_max value with which
    * the entire update step should be restarted.
