@@ -180,8 +180,6 @@ namespace ryujin
      */
     //@{
 
-    Trigger<Number> trigger_;
-
     const Interface::Simulation<dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 

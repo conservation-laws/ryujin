@@ -32,7 +32,8 @@ namespace ryujin
       , offline_data_(&simulation.offline_data())
       , postprocessor_(simulation.postprocessor())
   {
-    trigger_.add_parameters(*this);
+    this->trigger_ = std::make_unique<Trigger<Number>>();
+    this->trigger_->add_parameters(*this);
 
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -105,7 +106,7 @@ namespace ryujin
   template <int dim, typename Number>
   void VTUOutput<dim, Number>::execute(TaskContext<Number> &context)
   {
-    if (!trigger_.fire(context))
+    if (!this->trigger_->fire(context))
       return;
 
 #ifdef DEBUG_OUTPUT

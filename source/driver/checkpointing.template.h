@@ -28,10 +28,11 @@ namespace ryujin
       const std::string &subsection /*= "/Checkpointing"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("checkpointing", TaskPhase::post_step)
-      , trigger_(TriggerMode::wall_clock, /*multiplier*/ 1, /*interval*/ 3600)
       , simulation_(simulation)
   {
-    trigger_.add_parameters(*this);
+    this->trigger_ = std::make_unique<Trigger<Number>>(
+        TriggerMode::wall_clock, /*multiplier*/ 1, /*interval*/ 3600);
+    this->trigger_->add_parameters(*this);
 
     resume_ = false;
     add_parameter("resume", resume_, "Resume an interrupted computation");
@@ -119,7 +120,7 @@ namespace ryujin
   template <int dim, typename Number>
   void Checkpointing<dim, Number>::execute(TaskContext<Number> &context)
   {
-    if (!trigger_.fire(context))
+    if (!this->trigger_->fire(context))
       return;
 
     write_checkpoint(context);

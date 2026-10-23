@@ -31,7 +31,8 @@ namespace ryujin
       , postprocessor_(simulation.postprocessor())
       , base_name_("")
   {
-    trigger_.add_parameters(*this);
+    this->trigger_ = std::make_unique<Trigger<Number>>();
+    this->trigger_->add_parameters(*this);
 
     error_quantities_ = simulation.hyperbolic_system().state_names(dim);
 
@@ -100,7 +101,7 @@ namespace ryujin
   template <int dim, typename Number>
   void ErrorEvaluation<dim, Number>::execute(TaskContext<Number> &context)
   {
-    if (!trigger_.fire(context))
+    if (!this->trigger_->fire(context))
       return;
 
     StateVector<Number> analytic;

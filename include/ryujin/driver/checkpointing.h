@@ -77,8 +77,6 @@ namespace ryujin
      */
     //@{
 
-    Trigger<Number> trigger_;
-
     Interface::Simulation<dim, Number> &simulation_;
 
     //@}
