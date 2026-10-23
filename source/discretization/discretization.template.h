@@ -25,6 +25,7 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_tools.h>
 
+#include <fstream>
 #include <random>
 
 namespace ryujin

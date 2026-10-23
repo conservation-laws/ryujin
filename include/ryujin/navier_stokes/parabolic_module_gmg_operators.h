@@ -670,7 +670,7 @@ namespace ryujin
             *matrix_free_,
             vector,
             &EnergyMatrix::template apply_local_operator<
-                dealii::FEEvaluation<dim, -1, 0, dim, Number>>,
+                dealii::FEEvaluation<dim, -1, 0, 1, Number>>,
             this);
 
         const unsigned int n_owned =
