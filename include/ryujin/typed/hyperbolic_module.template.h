@@ -412,7 +412,8 @@ namespace ryujin
       StageVectors stage_state_vectors,
       StageWeights stage_weights,
       StateVector<Number> &new_state_vector,
-      Number tau /*= 0.*/,
+      Number t,
+      Number tau,
       Number tau_max /*= std::numeric_limits<Number>::max()*/) const
   {
     switch (stage_state_vectors.size()) {
@@ -421,6 +422,7 @@ namespace ryujin
                                    stage_state_vectors,
                                    stage_weights,
                                    new_state_vector,
+                                   t,
                                    tau,
                                    tau_max);
     case 1:
@@ -428,6 +430,7 @@ namespace ryujin
                                    stage_state_vectors,
                                    stage_weights,
                                    new_state_vector,
+                                   t,
                                    tau,
                                    tau_max);
     case 2:
@@ -435,6 +438,7 @@ namespace ryujin
                                    stage_state_vectors,
                                    stage_weights,
                                    new_state_vector,
+                                   t,
                                    tau,
                                    tau_max);
     case 3:
@@ -442,6 +446,7 @@ namespace ryujin
                                    stage_state_vectors,
                                    stage_weights,
                                    new_state_vector,
+                                   t,
                                    tau,
                                    tau_max);
     case 4:
@@ -449,6 +454,7 @@ namespace ryujin
                                    stage_state_vectors,
                                    stage_weights,
                                    new_state_vector,
+                                   t,
                                    tau,
                                    tau_max);
     default:
@@ -466,6 +472,7 @@ namespace ryujin
       StageVectors stage_state_vectors,
       StageWeights stage_weights,
       StateVector<Number> &new_state_vector,
+      Number /*t*/,
       Number tau,
       Number tau_max) const
   {

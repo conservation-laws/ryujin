@@ -133,16 +133,13 @@ namespace ryujin
 
     /**
      * Given a reference to a previous state vector @p old_state_vector
-     * perform an explicit euler step (and store the result in @p
-     * new_state_vector). The
-     * function returns the chosen time step size tau with which the update
-     * was performed.
+     * at time @p t perform an explicit euler step (and store the result in
+     * @p new_state_vector). The function returns the time step size tau
+     * with which the update was performed.
      *
-     * The time step is performed with either tau_max (if @p tau is set to
-     * 0), or tau (if @p tau is nonzero). Here, tau_max is the minimum of
-     * the specified parameter @p tau_max and the computed maximal time
-     * step size according to the CFL condition. @p tau is the last
-     * parameter of the function.
+     * If @p tau is nonzero the step is performed with @p tau. If @p tau is
+     * 0 the step is performed with the minimum of @p tau_max and the
+     * computed maximal time step size according to the CFL condition.
      *
      * The function takes an optional list of states @p
      * stage_state_vectors together with a list of weights @p
@@ -204,7 +201,8 @@ namespace ryujin
         StageVectors stage_state_vectors,
         StageWeights stage_weights,
         StateVector<Number> &new_state_vector,
-        Number tau = Number(0.),
+        Number t,
+        Number tau,
         Number tau_max = std::numeric_limits<Number>::max()) const override;
 
     //@}
@@ -261,6 +259,7 @@ namespace ryujin
                               StageVectors stage_state_vectors,
                               StageWeights stage_weights,
                               StateVector<Number> &new_state_vector,
+                              Number t,
                               Number tau,
                               Number tau_max) const;
 
