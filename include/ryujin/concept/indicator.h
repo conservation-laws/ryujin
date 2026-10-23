@@ -28,12 +28,13 @@ namespace ryujin
                  const V &const_view,
                  const typename V::PrecomputedVectorView &precomputed,
                  const typename V::state_type &U,
+                 const typename V::flux_contribution_type &flux,
                  const dealii::Tensor<1, dim, Number> &c_ij,
                  const unsigned int i,
                  const unsigned int *js,
                  const Number hd_i) {
-          view.reset(precomputed, i, U);
-          view.accumulate(precomputed, js, U, c_ij);
+          view.reset(precomputed, i, U, flux);
+          view.accumulate(precomputed, js, U, flux, c_ij);
           {
             const_view.alpha(hd_i)
           } -> std::same_as<Number>;

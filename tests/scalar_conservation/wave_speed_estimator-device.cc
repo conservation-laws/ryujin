@@ -59,6 +59,7 @@ compute_quantities(const View &wave_speed_estimator_view,
                    const View &greedy_wave_speed_estimator_view,
                    const SystemView &system_view,
                    const typename View::PrecomputedVectorView &pv,
+                   const typename SystemView::InitialPrecomputedVectorView &ipv,
                    const unsigned int i,
                    const state_type &U_i,
                    const unsigned int j,
@@ -79,7 +80,9 @@ compute_quantities(const View &wave_speed_estimator_view,
        {wave_speed_estimator_view, greedy_wave_speed_estimator_view}) {
     result[k++] = view.use_greedy_wavespeed() ? 1. : 0.;
 
-    result[k++] = view.compute(pv, U_i, U_j, i, &j, n_ij);
+    const auto flux_i = system_view.flux_contribution(pv, ipv, i, U_i);
+    const auto flux_j = system_view.flux_contribution(pv, ipv, &j, U_j);
+    result[k++] = view.compute(pv, i, &j, U_i, U_j, flux_i, flux_j, n_ij);
 
     /* Exercise the variant taking precomputed values directly: */
     result[k++] = view.compute(u_i, u_j, prec_i, prec_j, n_ij);
@@ -148,6 +151,10 @@ int main(int argc, char *argv[])
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
 
+  MultiComponentVector<double> initial_precomputed;
+  initial_precomputed.reinit_with_scalar_partitioner(
+      scalar_partitioner, HostSystemView::n_initial_precomputed_values);
+
   MultiComponentVector<double> results;
   results.reinit_with_scalar_partitioner(scalar_partitioner, n_results);
 
@@ -192,6 +199,9 @@ int main(int argc, char *argv[])
     const auto U_view = U.view<problem_dimension, HostSpace>();
     const auto pv =
         precomputed.view<HostSystemView::n_precomputed_values, HostSpace>();
+    const auto ipv =
+        initial_precomputed
+            .view<HostSystemView::n_initial_precomputed_values, HostSpace>();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       const unsigned int j = (i + 3) % n_states;
@@ -201,6 +211,7 @@ int main(int argc, char *argv[])
                                            greedy_host_view,
                                            host_system_view,
                                            pv,
+                                           ipv,
                                            i,
                                            U_i,
                                            j,
@@ -213,11 +224,15 @@ int main(int argc, char *argv[])
 
   U.move_to_memory_space<DefaultSpace>();
   precomputed.move_to_memory_space<DefaultSpace>();
+  initial_precomputed.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
 
   const auto U_view = U.view<problem_dimension, DefaultSpace>();
   const auto pv =
       precomputed.view<HostSystemView::n_precomputed_values, DefaultSpace>();
+  const auto ipv =
+      initial_precomputed
+          .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
@@ -234,6 +249,7 @@ int main(int argc, char *argv[])
                                                greedy_device_view,
                                                device_system_view,
                                                pv,
+                                               ipv,
                                                i,
                                                U_i,
                                                j,

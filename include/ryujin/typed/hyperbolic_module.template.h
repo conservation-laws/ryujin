@@ -10,6 +10,7 @@
 #include <ryujin/base/loop.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/concept/hyperbolic_system.h>
 #include <ryujin/typed/hyperbolic_module.h>
 
 #include <numeric>
@@ -17,11 +18,6 @@
 
 namespace ryujin
 {
-  namespace ShallowWater
-  {
-    struct HyperbolicDescription;
-  } // namespace ShallowWater
-
   using namespace dealii;
 
   namespace
@@ -501,23 +497,8 @@ namespace ryujin
     if (have_separate_memory_spaces)
       ComputingTimer::timer("time step [X] _ - memory space transfers").start();
 
-    /*
-     * Workaround: A constexpr boolean storing the fact whether we
-     * instantiate the HyperbolicModule for the shallow water equations.
-     *
-     * Rationale: Currently, the shallow water equations is the only
-     * hyperbolic system for which we have to (a) form equilibrated states
-     * for the low-order update, and (b) apply an affine shift for
-     * computing limiter bounds. It's not so easy to come up with a
-     * meaningful abstraction layer for this (in particular because we only
-     * have one PDE). Thus, for the time being we simply special case a
-     * small amount of code in this routine.
-     *
-     * FIXME: Refactor into a proper abstraction layer / interface.
-     */
-    constexpr bool shallow_water =
-        std::is_same_v<HyperbolicDescription,
-                       ShallowWater::HyperbolicDescription>;
+    constexpr bool equilibrated_states =
+        Concept::HyperbolicSystemViewEquilibratesStates<View, dim, Number>;
 
     /* Index ranges for the iteration over the sparsity pattern : */
 
@@ -699,19 +680,26 @@ namespace ryujin
         if (row_length == 1)
           return;
 
-        const auto U_i = old_U_view.template read_tensor<T>(i);
+        const auto view = hyperbolic_system_views.template view<T>();
 
-        indicator_view.reset(old_precomputed_view, i, U_i);
+        const auto U_i = old_U_view.template read_tensor<T>(i);
+        const auto flux_i = view.flux_contribution(
+            old_precomputed_view, initial_precomputed_view, i, U_i);
+
+        indicator_view.reset(old_precomputed_view, i, U_i, flux_i);
 
         const unsigned int *js = sparsity_simd_view.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += stride_size) {
 
           const auto U_j = old_U_view.template read_tensor<T>(js);
+          const auto flux_j = view.flux_contribution(
+              old_precomputed_view, initial_precomputed_view, js, U_j);
 
           const auto c_ij = cij_matrix_view.template read_tensor<T>(i, col_idx);
 
-          indicator_view.accumulate(old_precomputed_view, js, U_j, c_ij);
+          indicator_view.accumulate(
+              old_precomputed_view, js, U_j, flux_j, c_ij);
 
           /* Skip diagonal. */
           if (col_idx == 0)
@@ -724,7 +712,7 @@ namespace ryujin
           const auto norm = c_ij.norm();
           const auto n_ij = c_ij / norm;
           const auto lambda_max = wave_speed_estimator_view.compute(
-              old_precomputed_view, U_i, U_j, i, js, n_ij);
+              old_precomputed_view, i, js, U_i, U_j, flux_i, flux_j, n_ij);
           const auto d_ij = norm * lambda_max;
 
           dij_matrix_view.write_entry(d_ij, i, col_idx, true);
@@ -781,8 +769,14 @@ namespace ryujin
         if (j < i)
           return;
 
+        const auto view = hyperbolic_system_views.template view<Number>();
+
         const auto U_i = old_U_view.read_tensor(i);
         const auto U_j = old_U_view.read_tensor(j);
+        const auto flux_i = view.flux_contribution(
+            old_precomputed_view, initial_precomputed_view, i, U_i);
+        const auto flux_j = view.flux_contribution(
+            old_precomputed_view, initial_precomputed_view, j, U_j);
 
         const auto c_ji = cij_matrix_view.read_transposed_tensor(i, col_idx);
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
@@ -792,7 +786,7 @@ namespace ryujin
         const auto d_ij = dij_matrix_view.read_entry(i, col_idx);
 
         const auto lambda_max = wave_speed_estimator_view.compute(
-            old_precomputed_view, U_j, U_i, j, &i, n_ji);
+            old_precomputed_view, j, &i, U_j, U_i, flux_j, flux_i, n_ji);
         const auto d_ji = norm_ji * lambda_max;
 
         dij_matrix_view.write_entry(std::max(d_ij, d_ji), i, col_idx);
@@ -808,6 +802,7 @@ namespace ryujin
       const auto body = [=](auto, unsigned int i) -> Number {
 
 #ifdef DEBUG_SYMMETRY_CHECK
+        const auto view = hyperbolic_system_views.template view<Number>();
         const auto wave_speed_estimator_view =
             wave_speed_estimator_views.template view<Number>();
 #endif
@@ -834,6 +829,10 @@ namespace ryujin
 
             const auto U_i = old_U_view.read_tensor(i);
             const auto U_j = old_U_view.read_tensor(j);
+            const auto flux_i = view.flux_contribution(
+                old_precomputed_view, initial_precomputed_view, i, U_i);
+            const auto flux_j = view.flux_contribution(
+                old_precomputed_view, initial_precomputed_view, j, U_j);
 
             const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
             Assert(c_ij.norm() > 1.e-12, ExcInternalError());
@@ -841,7 +840,7 @@ namespace ryujin
             const auto n_ij = c_ij / norm_ij;
 
             const auto lambda_max = wave_speed_estimator_view.compute(
-                old_precomputed_view, U_i, U_j, i, &j, n_ij);
+                old_precomputed_view, i, &j, U_i, U_j, flux_i, flux_j, n_ij);
             const auto d_ij = norm_ij * lambda_max;
 
             Assert(d_ij <= d_ji + 1.0e-12,
@@ -995,14 +994,8 @@ namespace ryujin
 
         [[maybe_unused]] state_type affine_shift;
 
-        /*
-         * Workaround: For shallow water we need to accumulate an
-         * additional contribution to the affine shift over the stencil
-         * before we can compute limiter bounds.
-         */
-
         const unsigned int *js = sparsity_simd_view.columns(i);
-        if constexpr (shallow_water) {
+        if constexpr (equilibrated_states) {
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
@@ -1081,38 +1074,21 @@ namespace ryujin
           U_i_new += tau * m_i_inv * flux_ij;
           auto P_ij = -flux_ij;
 
-          if constexpr (shallow_water) {
-            /*
-             * Workaround: Shallow water (and related) are special:
-             */
-
+          if constexpr (equilibrated_states) {
             const auto &[U_star_ij, U_star_ji] =
                 view.equilibrated_states(flux_i, flux_j);
 
             U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
             F_iH += d_ijH * (U_star_ji - U_star_ij);
             P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
-
-            limiter_view.accumulate(old_precomputed_view,
-                                    U_j,
-                                    U_star_ij,
-                                    U_star_ji,
-                                    scaled_c_ij,
-                                    affine_shift);
-
           } else {
-
             U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
             F_iH += d_ijH * (U_j - U_i);
             P_ij += (d_ijH - d_ij) * (U_j - U_i);
-
-            limiter_view.accumulate(old_precomputed_view,
-                                    js,
-                                    U_j,
-                                    flux_j,
-                                    scaled_c_ij,
-                                    affine_shift);
           }
+
+          limiter_view.accumulate(
+              old_precomputed_view, js, U_j, flux_j, scaled_c_ij, affine_shift);
 
           if constexpr (View::have_source_terms) {
             F_iH -= m_ij * S_iH;

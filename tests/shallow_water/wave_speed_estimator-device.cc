@@ -47,6 +47,7 @@ DEAL_II_HOST_DEVICE dealii::Tensor<1, n_results, double>
 compute_quantities(const View &wave_speed_estimator_view,
                    const SystemView &system_view,
                    const typename View::PrecomputedVectorView &pv,
+                   const typename SystemView::InitialPrecomputedVectorView &ipv,
                    const unsigned int i,
                    const state_type &U_i,
                    const unsigned int j,
@@ -58,7 +59,10 @@ compute_quantities(const View &wave_speed_estimator_view,
   dealii::Tensor<1, n_results, double> result;
   unsigned int k = 0;
 
-  result[k++] = wave_speed_estimator_view.compute(pv, U_i, U_j, i, &j, n_ij);
+  const auto flux_i = system_view.flux_contribution(pv, ipv, i, U_i);
+  const auto flux_j = system_view.flux_contribution(pv, ipv, &j, U_j);
+  result[k++] = wave_speed_estimator_view.compute(
+      pv, i, &j, U_i, U_j, flux_i, flux_j, n_ij);
 
   {
     /* Exercise the variants taking Riemann data directly: */
@@ -129,6 +133,10 @@ int main(int argc, char *argv[])
   precomputed.reinit_with_scalar_partitioner(
       scalar_partitioner, HostSystemView::n_precomputed_values);
 
+  MultiComponentVector<double> initial_precomputed;
+  initial_precomputed.reinit_with_scalar_partitioner(
+      scalar_partitioner, HostSystemView::n_initial_precomputed_values);
+
   MultiComponentVector<double> results;
   results.reinit_with_scalar_partitioner(scalar_partitioner, n_results);
 
@@ -151,7 +159,8 @@ int main(int argc, char *argv[])
 
       const typename HostSystemView::precomputed_type prec_i{
           host_system_view.mathematical_entropy(U_i),
-          ryujin::pow(host_system_view.water_depth_sharp(U_i), 4. / 3.)};
+          ryujin::pow(host_system_view.water_depth_sharp(U_i), 4. / 3.),
+          host_system_view.manning_friction_factor(U_i)};
       precomputed_view.write_tensor(prec_i, i);
     }
   }
@@ -169,13 +178,16 @@ int main(int argc, char *argv[])
     const auto U_view = U.view<problem_dimension, HostSpace>();
     const auto pv =
         precomputed.view<HostSystemView::n_precomputed_values, HostSpace>();
+    const auto ipv =
+        initial_precomputed
+            .view<HostSystemView::n_initial_precomputed_values, HostSpace>();
 
     for (unsigned int i = 0; i < n_states; ++i) {
       const unsigned int j = (i + 3) % n_states;
       const auto U_i = U_view.read_tensor<double>(i);
       const auto U_j = U_view.read_tensor<double>(j);
       host_results[i] = compute_quantities(
-          host_view, host_system_view, pv, i, U_i, j, U_j, normal);
+          host_view, host_system_view, pv, ipv, i, U_i, j, U_j, normal);
     }
   }
 
@@ -183,11 +195,15 @@ int main(int argc, char *argv[])
 
   U.move_to_memory_space<DefaultSpace>();
   precomputed.move_to_memory_space<DefaultSpace>();
+  initial_precomputed.move_to_memory_space<DefaultSpace>();
   results.move_to_memory_space<DefaultSpace>();
 
   const auto U_view = U.view<problem_dimension, DefaultSpace>();
   const auto pv =
       precomputed.view<HostSystemView::n_precomputed_values, DefaultSpace>();
+  const auto ipv =
+      initial_precomputed
+          .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
   using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
@@ -201,7 +217,7 @@ int main(int argc, char *argv[])
         const auto U_i = U_view.read_tensor(i);
         const auto U_j = U_view.read_tensor(j);
         const auto result = compute_quantities(
-            device_view, device_system_view, pv, i, U_i, j, U_j, normal);
+            device_view, device_system_view, pv, ipv, i, U_i, j, U_j, normal);
         results_view.write_tensor(result, i);
       });
 

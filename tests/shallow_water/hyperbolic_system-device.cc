@@ -170,7 +170,7 @@ compute_quantities(const View &view,
   dealii::Tensor<1, n_results, double> result;
   unsigned int k = 0;
 
-  const auto &[eta_m, h_star] =
+  const auto &[eta_m, h_star, factor] =
       pv.template read_tensor<double, precomputed_type>(i);
 
   result[k++] = view.water_depth(U);
@@ -214,15 +214,15 @@ compute_quantities(const View &view,
 
   /*
    * Exercise both flux_contribution() variants. The flux contribution
-   * consists of the state and the bathymetry:
+   * consists of the state, the bathymetry, and the regularized velocity:
    */
   const auto flux_i = view.flux_contribution(pv, ipv, i, U);
   const auto flux_j = view.flux_contribution(pv, ipv, &j, U_bar);
 
   {
-    const auto &[U_i, Z_i] = flux_i;
-    const auto &[U_j, Z_j] = flux_j;
-    const auto state = view.star_state(U_i, Z_i, Z_j);
+    const auto &[U_i, Z_i, V_i] = flux_i;
+    const auto &[U_j, Z_j, V_j] = flux_j;
+    const auto state = view.star_state(U_i, V_i, Z_i, Z_j);
     for (unsigned int d = 0; d < problem_dimension; ++d)
       result[k++] = state[d];
   }
@@ -254,7 +254,7 @@ compute_quantities(const View &view,
   }
 
   {
-    const auto source = view.manning_friction(U, h_star, tau);
+    const auto source = view.manning_friction(U, h_star, factor, tau);
     for (unsigned int d = 0; d < problem_dimension; ++d)
       result[k++] = source[d];
   }
@@ -413,7 +413,8 @@ int main(int argc, char *argv[])
 
       const precomputed_type prec_i{
           host_view.mathematical_entropy(U_i),
-          ryujin::pow(host_view.water_depth_sharp(U_i), 4. / 3.)};
+          ryujin::pow(host_view.water_depth_sharp(U_i), 4. / 3.),
+          host_view.manning_friction_factor(U_i)};
       precomputed_view.write_tensor(prec_i, i);
 
       const initial_precomputed_type bathymetry_i{0.05 * ((i + 7) % n_states)};

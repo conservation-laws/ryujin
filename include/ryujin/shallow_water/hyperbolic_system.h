@@ -176,14 +176,16 @@ namespace ryujin
           dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
 
       /**
-       * The storage type used for flux contributions.
+       * The storage type used for flux contributions: the state, the
+       * bathymetry, and the regularized velocity.
        */
-      using flux_contribution_type = std::tuple<state_type, Number>;
+      using flux_contribution_type =
+          std::tuple<state_type, Number, dealii::Tensor<1, dim, Number>>;
 
       /**
        * The number of precomputed values.
        */
-      static constexpr unsigned int n_precomputed_values = 2;
+      static constexpr unsigned int n_precomputed_values = 3;
 
       /**
        * Array type used for precomputed values.
@@ -426,13 +428,16 @@ namespace ryujin
       DEAL_II_HOST_DEVICE flux_type g(const state_type &U) const;
 
       /**
-       * For a given (1+dim dimensional) state vector <code>U</code> and
-       * left/right topography states <code>Z_left</code> and
-       * <code>Z_right</code>, return the star_state <code>U_star</code>
+       * For a given (1+dim dimensional) state vector <code>U</code> with
+       * regularized velocity <code>V</code> and left/right topography
+       * states <code>Z_left</code> and <code>Z_right</code>, return the
+       * star_state <code>U_star</code>
        */
-      DEAL_II_HOST_DEVICE state_type star_state(const state_type &U,
-                                                const Number &Z_left,
-                                                const Number &Z_right) const;
+      DEAL_II_HOST_DEVICE state_type
+      star_state(const state_type &U,
+                 const dealii::Tensor<1, dim, Number> &V,
+                 const Number &Z_left,
+                 const Number &Z_right) const;
 
       /**
        * Given precomputed flux contributions @p prec_i and @p prec_j
@@ -460,8 +465,8 @@ namespace ryujin
        * }
        * ```
        *
-       * For the Shallow water equations we simply retrieve the
-       * bathymetry and return, both, state and bathymetry.
+       * For the Shallow water equations we retrieve the bathymetry and
+       * return the state, the bathymetry, and the regularized velocity.
        */
       DEAL_II_HOST_DEVICE
       flux_contribution_type
@@ -525,6 +530,13 @@ namespace ryujin
       static constexpr bool have_source_terms = true;
 
       /**
+       * For a given state @p U return the factor
+       * \f$2 g n^2 |\mathbf V|\f$ of the Gauckler-Manning friction.
+       */
+      DEAL_II_HOST_DEVICE Number
+      manning_friction_factor(const state_type &U) const;
+
+      /**
        * A regularized Gauckler-Manning friction coefficient.
        *
        * FIXME: details
@@ -532,6 +544,7 @@ namespace ryujin
       DEAL_II_HOST_DEVICE
       state_type manning_friction(const state_type &U,
                                   const Number &h_star,
+                                  const Number &factor,
                                   const ScalarNumber tau) const;
 
       DEAL_II_HOST_DEVICE
@@ -627,7 +640,9 @@ namespace ryujin
               "Shallow water equations",
               {{{"h", "m"}, {"h", "m_1", "m_2"}, {"h", "m_1", "m_2", "m_3"}}},
               {{{"h", "v"}, {"h", "v_1", "v_2"}, {"h", "v_1", "v_2", "v_3"}}},
-              {{{"eta_m", "h_star"}, {"eta_m", "h_star"}, {"eta_m", "h_star"}}},
+              {{{"eta_m", "h_star", "friction_factor"},
+                {"eta_m", "h_star", "friction_factor"},
+                {"eta_m", "h_star", "friction_factor"}}},
               {{{"bathymetry"}, {"bathymetry"}, {"bathymetry"}}},
               subsection)
         , parameters_("shallow_water_hyperbolic_system_parameters",
@@ -706,8 +721,9 @@ namespace ryujin
         const auto eta_m = view.mathematical_entropy(U_i);
         const auto h_sharp = view.water_depth_sharp(U_i);
         const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
+        const auto factor = view.manning_friction_factor(U_i);
 
-        const precomputed_type prec_i{eta_m, h_star};
+        const precomputed_type prec_i{eta_m, h_star, factor};
         precomputed_view.template write_tensor<T>(prec_i, i);
       };
 
@@ -1076,14 +1092,20 @@ namespace ryujin
     template <int dim, typename Number, typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::star_state(
-        const state_type &U, const Number &Z_left, const Number &Z_right) const
-        -> state_type
+        const state_type &U,
+        const dealii::Tensor<1, dim, Number> &V,
+        const Number &Z_left,
+        const Number &Z_right) const -> state_type
     {
       const Number Z_max = std::max(Z_left, Z_right);
       const Number h = water_depth(U);
       const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
 
-      return U * H_star * inverse_water_depth_mollified(U);
+      state_type result;
+      result[0] = H_star;
+      for (unsigned int d = 0; d < dim; ++d)
+        result[1 + d] = H_star * V[d];
+      return result;
     }
 
 
@@ -1093,11 +1115,11 @@ namespace ryujin
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j) const -> std::array<state_type, 2>
     {
-      const auto &[U_i, Z_i] = flux_i;
-      const auto &[U_j, Z_j] = flux_j;
+      const auto &[U_i, Z_i, V_i] = flux_i;
+      const auto &[U_j, Z_j, V_j] = flux_j;
 
-      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
-      const auto U_star_ji = star_state(U_j, Z_j, Z_i);
+      const auto U_star_ij = star_state(U_i, V_i, Z_i, Z_j);
+      const auto U_star_ji = star_state(U_j, V_j, Z_j, Z_i);
 
       return {U_star_ij, U_star_ji};
     }
@@ -1112,7 +1134,8 @@ namespace ryujin
         const state_type &U_i) const -> flux_contribution_type
     {
       const auto Z_i = piv.template read_tensor<Number>(i)[0];
-      return {U_i, Z_i};
+      const auto V_i = momentum(U_i) * inverse_water_depth_mollified(U_i);
+      return {U_i, Z_i, V_i};
     }
 
 
@@ -1125,7 +1148,8 @@ namespace ryujin
         const state_type &U_j) const -> flux_contribution_type
     {
       const auto Z_j = piv.template read_tensor<Number>(js)[0];
-      return {U_j, Z_j};
+      const auto V_j = momentum(U_j) * inverse_water_depth_mollified(U_j);
+      return {U_j, Z_j, V_j};
     }
 
 
@@ -1136,28 +1160,28 @@ namespace ryujin
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
-      const auto &[U_i, Z_i] = flux_i;
+      const auto &[U_i, Z_i, V_i] = flux_i;
+      const auto &[U_j, Z_j, V_j] = flux_j;
       const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
 
       const auto H_i = water_depth(U_i);
       const auto H_star_ij = water_depth(U_star_ij);
       const auto H_star_ji = water_depth(U_star_ji);
 
-      const auto g_i = g(U_star_ij);
-      const auto g_j = g(U_star_ji);
+      const auto V_i_c_ij = V_i * c_ij;
+      const auto V_j_c_ij = V_j * c_ij;
 
-      auto result = -add(g_i, g_j);
+      state_type result = -(U_star_ij * V_i_c_ij + U_star_ji * V_j_c_ij);
 
       const auto factor =
           (ScalarNumber(0.5) * (H_star_ji * H_star_ji - H_star_ij * H_star_ij) +
            H_i * H_i) *
           gravity();
 
-      for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i][i] -= factor;
-      }
+      for (unsigned int d = 0; d < dim; ++d)
+        result[1 + d] -= factor * c_ij[d];
 
-      return contract(result, c_ij);
+      return result;
     }
 
 
@@ -1168,23 +1192,19 @@ namespace ryujin
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
-      const auto &[U_i, Z_i] = flux_i;
-      const auto &[U_j, Z_j] = flux_j;
+      const auto &[U_i, Z_i, V_i] = flux_i;
+      const auto &[U_j, Z_j, V_j] = flux_j;
 
       const auto H_i = water_depth(U_i);
       const auto H_j = water_depth(U_j);
 
-      const auto g_i = g(U_i);
-      const auto g_j = g(U_j);
-
-      auto result = -add(g_i, g_j);
+      state_type result = -(U_i * (V_i * c_ij) + U_j * (V_j * c_ij));
 
       const auto factor = gravity() * H_i * (H_j + Z_j - Z_i);
-      for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i][i] -= factor;
-      }
+      for (unsigned int d = 0; d < dim; ++d)
+        result[1 + d] -= factor * c_ij[d];
 
-      return contract(result, c_ij);
+      return result;
     }
 
 
@@ -1196,13 +1216,11 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &c_ij,
         const Number &d_ij) const -> state_type
     {
-      const auto &[U_i, Z_i] = flux_i;
-      const auto &[U_j, Z_j] = flux_j;
-      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
+      const auto &[U_i, Z_i, V_i] = flux_i;
+      const auto &[U_j, Z_j, V_j] = flux_j;
+      const auto U_star_ij = star_state(U_i, V_i, Z_i, Z_j);
 
-      const auto h_inverse = inverse_water_depth_sharp(U_i);
-      const auto m = momentum(U_i);
-      const auto factor = ScalarNumber(2.) * (d_ij + h_inverse * (m * c_ij));
+      const auto factor = ScalarNumber(2.) * (d_ij + V_i * c_ij);
 
       return -factor * (U_star_ij - U_i);
     }
@@ -1210,20 +1228,29 @@ namespace ryujin
 
     template <int dim, typename Number, typename MemorySpace>
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction(
-        const state_type &U, const Number &h_star, const ScalarNumber tau) const
-        -> state_type
+    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction_factor(
+        const state_type &U) const -> Number
     {
-      state_type result;
-
       const auto g = gravity();
       const auto n = manning_friction_coefficient();
 
-      const auto h_inverse = inverse_water_depth_mollified(U);
+      const auto v_norm =
+          (momentum(U) * inverse_water_depth_mollified(U)).norm();
+      return ScalarNumber(2.) * g * n * n * v_norm;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::manning_friction(
+        const state_type &U,
+        const Number &h_star,
+        const Number &factor,
+        const ScalarNumber tau) const -> state_type
+    {
+      state_type result;
 
       const auto m = momentum(U);
-      const auto v_norm = (m * h_inverse).norm();
-      const auto factor = ScalarNumber(2.) * g * n * n * v_norm;
 
       const auto denominator = h_star + std::max(h_star, tau * factor);
       const auto denominator_inverse = ScalarNumber(1.) / denominator;
@@ -1243,10 +1270,10 @@ namespace ryujin
         const state_type &U_i,
         const ScalarNumber tau) const -> state_type
     {
-      const auto &[eta_m, h_star] =
+      const auto &[eta_m, h_star, factor] =
           pv.template read_tensor<Number, precomputed_type>(i);
 
-      return manning_friction(U_i, h_star, tau);
+      return manning_friction(U_i, h_star, factor, tau);
     }
 
 
@@ -1258,10 +1285,10 @@ namespace ryujin
         const state_type &U_j,
         const ScalarNumber tau) const -> state_type
     {
-      const auto &[eta_m, h_star] =
+      const auto &[eta_m, h_star, factor] =
           pv.template read_tensor<Number, precomputed_type>(js);
 
-      return manning_friction(U_j, h_star, tau);
+      return manning_friction(U_j, h_star, factor, tau);
     }
 
 

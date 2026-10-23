@@ -27,11 +27,12 @@ namespace ryujin
         requires(const V &const_view,
                  const typename V::PrecomputedVectorView &precomputed,
                  const typename V::state_type &U,
+                 const typename V::flux_contribution_type &flux,
                  const dealii::Tensor<1, dim, Number> &n_ij,
                  const unsigned int i,
                  const unsigned int *js) {
           {
-            const_view.compute(precomputed, U, U, i, js, n_ij)
+            const_view.compute(precomputed, i, js, U, U, flux, flux, n_ij)
           } -> std::same_as<Number>;
         };
 

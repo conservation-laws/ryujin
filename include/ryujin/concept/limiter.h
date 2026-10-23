@@ -20,40 +20,6 @@ namespace ryujin
   namespace Concept
   {
     /**
-     * The first form of LimiterView::accumulate(): it accumulates flux
-     * contributions.
-     *
-     * @ingroup Concepts
-     */
-    template <typename V, int dim, typename Number>
-    concept LimiterAccumulatesFluxes =
-        requires(V view,
-                 const typename V::PrecomputedVectorView &precomputed,
-                 const typename V::state_type &U,
-                 const typename V::flux_contribution_type &flux,
-                 const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-                 const unsigned int *js) {
-          view.accumulate(precomputed, js, U, flux, scaled_c_ij, U);
-        };
-
-
-    /**
-     * The second form of LimiterView::accumulate(): the form of the
-     * shallow water equations, which pass equilibrated states.
-     *
-     * @ingroup Concepts
-     */
-    template <typename V, int dim, typename Number>
-    concept LimiterAccumulatesEquilibratedStates =
-        requires(V view,
-                 const typename V::PrecomputedVectorView &precomputed,
-                 const typename V::state_type &U,
-                 const dealii::Tensor<1, dim, Number> &scaled_c_ij) {
-          view.accumulate(precomputed, U, U, U, scaled_c_ij, U);
-        };
-
-
-    /**
      * The view of a limiter.
      *
      * @ingroup Concepts
@@ -61,25 +27,23 @@ namespace ryujin
     template <typename V, int dim, typename Number>
     concept LimiterView =
         std::same_as<typename V::Bounds, std::array<Number, V::n_bounds>> &&
-        (LimiterAccumulatesFluxes<V, dim, Number> ||
-         LimiterAccumulatesEquilibratedStates<
-             V,
-             dim,
-             Number>)&&requires(V view,
-                                const V &const_view,
-                                const typename V::PrecomputedVectorView
-                                    &precomputed,
-                                const typename V::state_type &U,
-                                const typename V::flux_contribution_type &flux,
-                                const typename V::Bounds &bounds,
-                                const unsigned int i,
-                                const Number hd_i) {
+        requires(V view,
+                 const V &const_view,
+                 const typename V::PrecomputedVectorView &precomputed,
+                 const typename V::state_type &U,
+                 const typename V::flux_contribution_type &flux,
+                 const typename V::Bounds &bounds,
+                 const dealii::Tensor<1, dim, Number> &scaled_c_ij,
+                 const unsigned int i,
+                 const unsigned int *js,
+                 const Number hd_i) {
           {
             const_view.iterations()
           } -> std::convertible_to<unsigned int>;
 
           /* Used by HyperbolicModule::step(): */
           view.reset(precomputed, i, U, flux);
+          view.accumulate(precomputed, js, U, flux, scaled_c_ij, U);
           {
             const_view.bounds(hd_i)
           } -> std::same_as<typename V::Bounds>;

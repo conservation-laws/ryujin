@@ -115,6 +115,8 @@ namespace ryujin
 
       using state_type = typename View::state_type;
 
+      using flux_contribution_type = typename View::flux_contribution_type;
+
       /**
        * Number of components in a primitive state, we store \f$[\rho, v,
        * p, a]\f$, thus, 4.
@@ -156,14 +158,18 @@ namespace ryujin
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
-       * compute an estimation of an upper bound for lambda.
+       * compute an estimation of an upper bound for lambda of the Riemann
+       * problem with the equilibrated states \f$U_i^{\ast,j}\f$ and
+       * \f$U_j^{\ast,i}\f$.
        */
       DEAL_II_HOST_DEVICE Number
       compute(const PrecomputedVectorView &pv,
-              const state_type &U_i,
-              const state_type &U_j,
               const unsigned int i,
               const unsigned int *js,
+              const state_type &U_i,
+              const state_type &U_j,
+              const flux_contribution_type &flux_i,
+              const flux_contribution_type &flux_j,
               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     protected:
@@ -195,11 +201,6 @@ namespace ryujin
       DEAL_II_HOST_DEVICE Number
       compute_h_star(const primitive_type &riemann_data_i,
                      const primitive_type &riemann_data_j) const;
-
-    protected:
-      DEAL_II_HOST_DEVICE primitive_type
-      riemann_data_from_state(const state_type &U,
-                              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
       //@}
@@ -240,14 +241,28 @@ namespace ryujin
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const PrecomputedVectorView & /*pv*/,
-        const state_type &U_i,
-        const state_type &U_j,
         const unsigned int /*i*/,
         const unsigned int * /*js*/,
+        const state_type & /*U_i*/,
+        const state_type & /*U_j*/,
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+      const auto &[U_i, Z_i, V_i] = flux_i;
+      const auto &[U_j, Z_j, V_j] = flux_j;
+      const auto &[U_star_ij, U_star_ji] =
+          view_.equilibrated_states(flux_i, flux_j);
+
+      const ScalarNumber gravity = view_.gravity();
+      const Number h_i = view_.water_depth_sharp(U_star_ij);
+      const Number h_j = view_.water_depth_sharp(U_star_ji);
+
+      const primitive_type riemann_data_i{
+          {h_i, V_i * n_ij, std::sqrt(gravity * h_i)}};
+      const primitive_type riemann_data_j{
+          {h_j, V_j * n_ij, std::sqrt(gravity * h_j)}};
+
       return compute(riemann_data_i, riemann_data_j);
     }
 
@@ -354,8 +369,8 @@ namespace ryujin
       std::cout << h_min << "  <- h_min/max ->  " << h_max << std::endl;
 #endif
 
-      const Number a_min = std::sqrt(gravity * h_min);
-      const Number a_max = std::sqrt(gravity * h_max);
+      const Number a_min = std::min(a_i, a_j);
+      const Number a_max = std::max(a_i, a_j);
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << a_min << "  <- a_min/max ->  " << a_max << std::endl;
@@ -395,7 +410,7 @@ namespace ryujin
       /* Double modified shock (h_star middle): */
 
       tmp = Number(1.) + sqrt_two * (u_i - u_j) / (a_min + a_max);
-      const Number h_star_middle = std::sqrt(h_min * h_max) * tmp;
+      const Number h_star_middle = gravity_inverse * a_min * a_max * tmp;
 
 #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
       std::cout << "middle: " << h_star_middle << std::endl;
@@ -405,13 +420,13 @@ namespace ryujin
 
       const auto left_radicand =
           ScalarNumber(3.) * h_min +
-          ScalarNumber(2.) * sqrt_two * std::sqrt(h_min * h_max);
+          ScalarNumber(2.) * sqrt_two * gravity_inverse * a_min * a_max;
 
       const auto right_radicand =
-          sqrt_two * std::sqrt(gravity_inverse * h_min) * (u_i - u_j);
+          sqrt_two * gravity_inverse * a_min * (u_i - u_j);
 
       tmp = std::sqrt(positive_part(left_radicand + right_radicand));
-      tmp -= sqrt_two * std::sqrt(h_min);
+      tmp -= sqrt_two * std::sqrt(gravity_inverse) * a_min;
 
       const Number h_star_right = tmp * tmp;
 
@@ -430,23 +445,6 @@ namespace ryujin
               phi_value_max, Number(0.), h_star_middle, h_star);
 
       return h_star;
-    }
-
-
-    template <int dim, typename Number, typename MemorySpace>
-    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
-    WaveSpeedEstimatorView<dim, Number, MemorySpace>::riemann_data_from_state(
-        const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
-        -> primitive_type
-    {
-      const Number h = view_.water_depth_sharp(U);
-      const Number gravity = view_.gravity();
-
-      const auto velocity = view_.momentum(U) / h;
-      const auto projected_velocity = n_ij * velocity;
-      const auto a = std::sqrt(h * gravity);
-
-      return {{h, projected_velocity, a}};
     }
   } // namespace ShallowWater
 } // namespace ryujin

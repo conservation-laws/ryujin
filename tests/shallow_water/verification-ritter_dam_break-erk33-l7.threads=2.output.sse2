@@ -1,0 +1,12 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »shallow water« with dim=1
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 3201
+t     = 6.002426924609304
+Linf  = 0.001049533552214404
+L1    = 2.002245480794987e-05
+L2    = 6.306289834510492e-05

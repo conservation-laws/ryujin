@@ -113,6 +113,8 @@ namespace ryujin
 
       using state_type = typename View::state_type;
 
+      using flux_contribution_type = typename View::flux_contribution_type;
+
       /**
        * Number of components in a primitive state, we store \f$[v, a]\f$.
        */
@@ -160,10 +162,12 @@ namespace ryujin
        */
       DEAL_II_HOST_DEVICE Number
       compute(const PrecomputedVectorView &pv,
-              const state_type &U_i,
-              const state_type &U_j,
               const unsigned int i,
               const unsigned int *js,
+              const state_type &U_i,
+              const state_type &U_j,
+              const flux_contribution_type &flux_i,
+              const flux_contribution_type &flux_j,
               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
@@ -212,10 +216,12 @@ namespace ryujin
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
     WaveSpeedEstimatorView<dim, Number, MemorySpace>::compute(
         const PrecomputedVectorView &pv,
-        const state_type &U_i,
-        const state_type &U_j,
         const unsigned int i,
         const unsigned int *js,
+        const state_type &U_i,
+        const state_type &U_j,
+        const flux_contribution_type & /*flux_i*/,
+        const flux_contribution_type & /*flux_j*/,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
       const auto &[e_i, p_i, a_i] =
