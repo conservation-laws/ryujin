@@ -488,12 +488,6 @@ namespace ryujin
      * Information
      */
 
-    Elements tasks;
-    for (const auto &task : data.tasks) {
-      tasks.push_back(chip(task, theme.caption));
-      tasks.push_back(text(" "));
-    }
-
     Elements information = {
         hbox({label("Hyperbolic"), text(data.hyperbolic_name) | bold}),
     };
@@ -523,7 +517,6 @@ namespace ryujin
                          data.last_output_cycle,
                          data.last_output_time)),
     }));
-    information.push_back(hbox({label("tasks"), hflow(std::move(tasks))}));
 
     /*
      * Throughput speedometer
@@ -790,6 +783,42 @@ namespace ryujin
     });
 
     /*
+     * Tasks: the trigger of every task, when it fired last, and when it
+     * fires next
+     */
+
+    std::vector<std::vector<Element>> task_table = {{
+        text("task") | bold,
+        text("  phase") | bold,
+        text("  trigger") | bold,
+        text("  last fired") | bold | flex_shrink,
+        text("  ") | bold,
+        text(" next") | bold,
+    }};
+
+    for (const auto &task : data.tasks) {
+      const bool triggered = !task.trigger.empty();
+
+      Element progress = text("");
+      if (task.progress >= 0.)
+        progress = gauge(float(task.progress)) | color(theme.highlight) |
+                   bgcolor(theme.track) | size(WIDTH, EQUAL, 16);
+
+      task_table.push_back({
+          text(task.name) | bold,
+          hbox({text("  "), chip(task.phase, theme.highlight)}),
+          text("  " + (triggered ? task.trigger : "--")) |
+              color(triggered ? theme.caption : theme.muted),
+          text("  " + (task.last.empty() ? "--" : task.last)) |
+              color(task.last.empty() ? theme.muted : Color::Default) |
+              flex_shrink,
+          hbox({text("  "), progress}),
+          text(" " + (task.next.empty() ? "--" : task.next)) |
+              color(task.next.empty() ? theme.muted : theme.good),
+      });
+    }
+
+    /*
      * Footer
      */
 
@@ -820,6 +849,7 @@ namespace ryujin
             }) | size(WIDTH, EQUAL, 36),
         }),
         panel("timers", timers),
+        panel("tasks", gridbox(std::move(task_table))),
         footer,
     });
 

@@ -14,6 +14,7 @@
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/utilities.h>
 
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -508,10 +509,6 @@ namespace ryujin
     data.last_output_cycle = context.timer_cycle - 1;
     data.last_output_time =
         context.timer_granularity * (context.timer_cycle - 1);
-    data.tasks.clear();
-    for (const auto *task : context.tasks)
-      data.tasks.push_back(task->name());
-
     stream << "Information: (HYP) "
            << simulation_.hyperbolic_system().problem_name();
     if (!simulation_.parabolic_system().is_identity()) {
@@ -664,6 +661,135 @@ namespace ryujin
     stream << std::endl << "Timer statistics:\n";
     for (auto &it : output)
       stream << it.str() << std::endl;
+  }
+
+
+  template <int dim, typename Number>
+  void Logger<dim, Number>::print_tasks(const TaskContext<Number> &context,
+                                        std::ostream &stream)
+  {
+    const auto format_duration = [](double seconds) {
+      const auto s =
+          static_cast<unsigned long>(std::round(std::max(seconds, 0.)));
+      std::ostringstream output;
+      output << std::setfill('0');
+      if (s >= 3600)
+        output << s / 3600 << "h " << std::setw(2) << s % 3600 / 60 << "m "
+               << std::setw(2) << s % 60 << "s";
+      else if (s >= 60)
+        output << s / 60 << "m " << std::setw(2) << s % 60 << "s";
+      else
+        output << s << "s";
+      return output.str();
+    };
+
+    const auto format_time = [](Number t) {
+      std::ostringstream output;
+      output << "t = " << std::setprecision(6) << t;
+      return output.str();
+    };
+
+    const auto phase_name = [](TaskPhase phase) -> std::string {
+      switch (phase) {
+      case TaskPhase::pre_step:
+        return "pre step";
+      case TaskPhase::adapt:
+        return "adapt";
+      case TaskPhase::step:
+        return "step";
+      case TaskPhase::post_step:
+        return "post step";
+      }
+      __builtin_unreachable();
+    };
+
+    auto &tasks = dashboard_data_.tasks;
+    tasks.clear();
+
+    for (const auto *task : context.tasks) {
+      auto &entry = tasks.emplace_back();
+      entry.name = task->name();
+      entry.phase = phase_name(task->phase());
+
+      if (!task->has_trigger())
+        continue;
+      const auto &trigger = task->trigger();
+
+      const auto multiplier = trigger.multiplier();
+      switch (trigger.mode()) {
+      case TriggerMode::every_cycle:
+        entry.trigger = multiplier == 1
+                            ? "every cycle"
+                            : "every " + std::to_string(multiplier) + " cycles";
+        break;
+      case TriggerMode::timer_tick:
+        entry.trigger =
+            multiplier == 1
+                ? "every timer tick"
+                : "every " + std::to_string(multiplier) + " timer ticks";
+        break;
+      case TriggerMode::wall_clock:
+        entry.trigger =
+            "every " + format_duration(trigger.interval()) + " wall time";
+        break;
+      case TriggerMode::time_points:
+        entry.trigger =
+            std::to_string(trigger.time_points().size()) + " time points";
+        break;
+      }
+
+      if (trigger.fired())
+        entry.last =
+            "cycle " + std::to_string(trigger.last_cycle()) + ", " +
+            format_time(trigger.last_t()) + ", " +
+            format_duration(context.wall_time - trigger.last_wall_time()) +
+            " ago";
+
+      const Number next = trigger.next(context);
+      if (next != std::numeric_limits<Number>::max()) {
+        switch (trigger.mode()) {
+        case TriggerMode::every_cycle:
+          entry.next =
+              "cycle " + std::to_string(static_cast<unsigned int>(next));
+          break;
+        case TriggerMode::timer_tick:
+        case TriggerMode::time_points:
+          entry.next = format_time(next);
+          break;
+        case TriggerMode::wall_clock:
+          entry.next = "in " + format_duration(next - context.wall_time);
+          break;
+        }
+      }
+
+      entry.progress = trigger.progress(context);
+    }
+
+    /* Print a table with aligned columns: */
+
+    std::size_t name_width = 0;
+    std::size_t trigger_width = 0;
+    std::size_t last_width = 0;
+    for (const auto &entry : tasks) {
+      name_width = std::max(name_width, entry.name.length());
+      trigger_width = std::max(trigger_width, entry.trigger.length());
+      last_width = std::max(last_width, entry.last.length());
+    }
+
+    std::ostringstream output;
+    output << "\nTasks:\n";
+    for (const auto &entry : tasks) {
+      output << "  " << std::left << std::setw(name_width) << entry.name
+             << "  [" << std::setw(9) << entry.phase << "]";
+      if (!entry.trigger.empty())
+        output << "  " << std::setw(trigger_width) << entry.trigger
+               << "  last: " << std::setw(last_width)
+               << (entry.last.empty() ? "--" : entry.last)
+               << "  next: " << (entry.next.empty() ? "--" : entry.next);
+      output << std::right << "\n";
+    }
+
+    stream << output.str() << std::flush;
   }
 
 
@@ -950,6 +1076,7 @@ namespace ryujin
     print_information(context, output);
     print_memory_statistics(output);
     print_timers(output);
+    print_tasks(context, output);
     print_throughput(context, output, final_time);
 
     /* Only output on rank 0: */

@@ -149,6 +149,8 @@ namespace ryujin
 
     void print_timers(std::ostream &stream);
 
+    void print_tasks(const TaskContext<Number> &context, std::ostream &stream);
+
     void print_throughput(const TaskContext<Number> &context,
                           std::ostream &stream,
                           bool final_time = false);

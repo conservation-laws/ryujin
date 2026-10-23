@@ -152,6 +152,20 @@ namespace ryujin
     };
 
     /**
+     * Status of an active task and its trigger.
+     */
+    struct Task {
+      std::string name;
+      std::string phase;
+      /* the condition of the trigger, empty if the task has none: */
+      std::string trigger;
+      std::string last;
+      std::string next;
+      /* progress towards the next firing, negative if not meaningful: */
+      double progress = -1.;
+    };
+
+    /**
      * A status message and the cycle and time at which it was issued.
      */
     struct Message {
@@ -188,7 +202,6 @@ namespace ryujin
     unsigned int n_ranks = 1;
     unsigned int last_output_cycle = 0;
     double last_output_time = 0.;
-    std::vector<std::string> tasks;
 
     //@}
     /**
@@ -200,12 +213,13 @@ namespace ryujin
 
     //@}
     /**
-     * @name Memory and timers
+     * @name Memory, timers, and tasks
      */
     //@{
 
     MinMaxAvg memory = {};
     std::vector<Timer> timers;
+    std::vector<Task> tasks;
 
     //@}
     /**
