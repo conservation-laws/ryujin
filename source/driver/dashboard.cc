@@ -10,7 +10,12 @@
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/terminal.hpp>
 
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <format>
@@ -438,11 +443,11 @@ namespace ryujin
     theme = make_palette(settings.color_scheme);
 
     /* Clear the screen if the terminal has been resized: */
-    const auto terminal_size = Terminal::Size();
-    const bool resized = terminal_size.dimx != terminal_width_ ||
-                         terminal_size.dimy != terminal_height_;
-    terminal_width_ = terminal_size.dimx;
-    terminal_height_ = terminal_size.dimy;
+    const auto [columns, lines] = terminal_size();
+    const bool resized =
+        columns != terminal_width_ || lines != terminal_height_;
+    terminal_width_ = columns;
+    terminal_height_ = lines;
 
     /* Limit the width of the dashboard on wide terminals: */
     const int terminal_columns = std::max(terminal_width_, 80);
@@ -985,13 +990,11 @@ namespace ryujin
     while (!condition_.wait_for(
         lock, twinkle_interval, [this] { return stop_; })) {
       /* Redraw the last snapshot right away if the terminal is resized: */
-      const auto terminal_size = Terminal::Size();
-      const bool resized = terminal_size.dimx != terminal_width_ ||
-                           terminal_size.dimy != terminal_height_;
+      const auto [columns, lines] = terminal_size();
+      const bool resized =
+          columns != terminal_width_ || lines != terminal_height_;
 
-      const auto output = resized ? render(data_, settings_) : twinkle();
-      if (!output.empty())
-        std::cout << output << std::flush;
+      write(resized ? render(data_, settings_) : twinkle());
     }
   }
 
@@ -1011,6 +1014,42 @@ namespace ryujin
   Dashboard::~Dashboard()
   {
     stop();
+    if (terminal_ >= 0)
+      ::close(terminal_);
+  }
+
+
+  std::pair<int, int> Dashboard::terminal_size() const
+  {
+    winsize size{};
+    if (terminal_ >= 0 && ::ioctl(terminal_, TIOCGWINSZ, &size) == 0 &&
+        size.ws_col > 0 && size.ws_row > 0)
+      return {size.ws_col, size.ws_row};
+
+    const auto fallback = Terminal::Size();
+    return {fallback.dimx, fallback.dimy};
+  }
+
+
+  void Dashboard::write(const std::string &output) const
+  {
+    if (terminal_ < 0) {
+      std::cout << output << std::flush;
+      return;
+    }
+
+    const char *data = output.data();
+    std::size_t remaining = output.size();
+    while (remaining > 0) {
+      const auto n = ::write(terminal_, data, remaining);
+      if (n < 0) {
+        if (errno == EINTR)
+          continue;
+        return;
+      }
+      data += n;
+      remaining -= static_cast<std::size_t>(n);
+    }
   }
 
 
@@ -1036,11 +1075,15 @@ namespace ryujin
     data_ = data;
     settings_ = settings;
 
-    std::cout << render(data_, settings_);
-    /* Continue with subsequent output below the final dashboard: */
-    if (data.final_time)
-      std::cout << "\n";
+    /* Open the terminal on the first call: */
+    if (!thread_.joinable() && terminal_ < 0)
+      terminal_ = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);
+
+    /* Write out everything that is still pending on stdout first: */
     std::cout << std::flush;
+
+    /* Continue with subsequent output below the final dashboard: */
+    write(render(data_, settings_) + (data.final_time ? "\n" : ""));
 
     if (!data.final_time && !thread_.joinable())
       thread_ = std::thread([this] { animate(); });

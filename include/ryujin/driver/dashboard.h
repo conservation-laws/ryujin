@@ -304,6 +304,16 @@ namespace ryujin
      */
     void stop();
 
+    /**
+     * Return the number of columns and rows of the terminal.
+     */
+    std::pair<int, int> terminal_size() const;
+
+    /**
+     * Write @p output to the terminal.
+     */
+    void write(const std::string &output) const;
+
     int terminal_width_ = 0;
     int terminal_height_ = 0;
 
@@ -324,6 +334,14 @@ namespace ryujin
     int width_ = 0;
     int height_ = 0;
     std::vector<std::pair<int, int>> sparkles_;
+
+    /*
+     * The terminal (/dev/tty), written to directly instead of through
+     * stdout. Under mpirun, stdout of rank 0 is forwarded by mpirun,
+     * which delays the output if all cores are busy. -1 if there is no
+     * controlling terminal, in which case we write to stdout:
+     */
+    int terminal_ = -1;
 
     /* Guards all of the above, and the output to the terminal: */
     std::mutex mutex_;
