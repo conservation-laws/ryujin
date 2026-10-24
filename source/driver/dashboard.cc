@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cmath>
@@ -435,6 +436,64 @@ namespace ryujin
 
       return canvas(std::move(c));
     }
+
+
+    /* A seven-segment display of value with four significant digits: */
+    Element digital(double value)
+    {
+      constexpr int w = 10;
+      constexpr int h = 24;
+      constexpr int y0 = 2;
+
+      /* The segments a to g as rectangles {x1, y1, x2, y2}: */
+      constexpr std::array<std::array<int, 4>, 7> segments = {{
+          {0, 0, w - 1, 1},
+          {w - 2, 0, w - 1, h / 2},
+          {w - 2, h / 2 - 1, w - 1, h - 1},
+          {0, h - 2, w - 1, h - 1},
+          {0, h / 2 - 1, 1, h - 1},
+          {0, 0, 1, h / 2},
+          {0, h / 2 - 1, w - 1, h / 2},
+      }};
+
+      /* The lit segments of the digits 0 to 9, one bit per segment: */
+      constexpr std::array<int, 10> digits = {
+          0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+
+      const double v = safe(value);
+      const int precision = v < 10. ? 3 : v < 100. ? 2 : v < 1000. ? 1 : 0;
+      auto string = std::format("{:.{}f}", v, precision);
+
+      /* Drop a decimal if rounding carries over into another digit: */
+      if (precision > 0 && string.size() > 5)
+        string = std::format("{:.{}f}", v, precision - 1);
+
+      int width = 0;
+      for (const char ch : string)
+        width += ch == '.' ? 4 : w + 4;
+      Canvas c(width - 4, 28);
+
+      int x0 = 0;
+      for (const char ch : string) {
+        if (ch == '.') {
+          c.DrawPointLine(x0, y0 + h - 2, x0 + 1, y0 + h - 2, theme.good);
+          c.DrawPointLine(x0, y0 + h - 1, x0 + 1, y0 + h - 1, theme.good);
+          x0 += 4;
+          continue;
+        }
+
+        for (int i = 0; i < 7; ++i) {
+          if ((digits[ch - '0'] >> i & 1) == 0)
+            continue;
+          const auto [x1, y1, x2, y2] = segments[i];
+          for (int y = y1; y <= y2; ++y)
+            c.DrawPointLine(x0 + x1, y0 + y, x0 + x2, y0 + y, theme.good);
+        }
+        x0 += w + 4;
+      }
+
+      return canvas(std::move(c));
+    }
   } // namespace
 
 
@@ -538,17 +597,24 @@ namespace ryujin
                                       : data.fudged_cpu_timings ? "CPU*"
                                                                 : "CPU ";
 
+    const bool dial =
+        settings.throughput_display == DashboardThroughputDisplay::speedometer;
+
     auto throughput = vbox({
-        hbox(
-            {filler(), speedometer(data.wall_m_dofs_per_sec, scale), filler()}),
         hbox({
-            text(" 0") | color(theme.muted),
+            filler(),
+            dial ? speedometer(data.wall_m_dofs_per_sec, scale)
+                 : digital(data.wall_m_dofs_per_sec),
+            filler(),
+        }),
+        hbox({
+            text(dial ? " 0" : "") | color(theme.muted),
             filler(),
             text(std::format("{:.2f}", data.wall_m_dofs_per_sec)) | bold |
                 color(theme.good),
             text(" MQ/s wall"),
             filler(),
-            text(std::format("{:g} ", scale)) | color(theme.muted),
+            text(dial ? std::format("{:g} ", scale) : "") | color(theme.muted),
         }),
         separatorLight() | color(theme.track),
         hbox({

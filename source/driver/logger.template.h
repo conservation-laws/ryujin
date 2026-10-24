@@ -96,6 +96,11 @@ namespace ryujin
                   dashboard_settings_.animation,
                   "Animation in the space around the terminal dashboard: "
                   "sparkle, none");
+
+    add_parameter("dashboard throughput display",
+                  dashboard_settings_.throughput_display,
+                  "Display of the wall throughput on the terminal dashboard: "
+                  "digital, speedometer");
 #endif
 
     debug_command_ = "";

@@ -96,6 +96,24 @@ namespace ryujin
      */
     sparkle,
   };
+
+
+  /**
+   * The display of the wall throughput on the Dashboard.
+   *
+   * @ingroup Driver
+   */
+  enum class DashboardThroughputDisplay : std::uint8_t {
+    /**
+     * A speedometer with a needle.
+     */
+    speedometer,
+
+    /**
+     * A plain seven-segment display.
+     */
+    digital,
+  };
 } // namespace ryujin
 
 
@@ -114,6 +132,11 @@ DECLARE_ENUM(ryujin::DashboardColorScheme,
 DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
                   {ryujin::DashboardAnimation::sparkle, "sparkle"}, ));
+
+DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
+             LIST({ryujin::DashboardThroughputDisplay::speedometer,
+                   "speedometer"},
+                  {ryujin::DashboardThroughputDisplay::digital, "digital"}, ));
 #endif
 
 namespace ryujin
@@ -156,6 +179,12 @@ namespace ryujin
      * The animation in the space around the dashboard.
      */
     DashboardAnimation animation = DashboardAnimation::sparkle;
+
+    /**
+     * The display of the wall throughput.
+     */
+    DashboardThroughputDisplay throughput_display =
+        DashboardThroughputDisplay::digital;
   };
 
 
