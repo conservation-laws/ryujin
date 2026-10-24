@@ -74,6 +74,7 @@ option(DEBUG_EXPENSIVE_BOUNDS_CHECK "Debug: enable debug code paths for addition
 option(DEBUG_OUTPUT "Debug: enable detailed time-step output" OFF)
 option(DEBUG_SANITIZER "Debug: enable address and UBSAN sanitizers for DEBUG build" OFF)
 option(DEBUG_SYMMETRY_CHECK "Debug: enable debug code paths that verify d_ij, c_ij, m_ij for (anti)symmetry" OFF)
+option(WITH_64BIT_OFFSETS "Use 64 bit offsets into the data arrays of sparse matrices (needed if nonzeros times components per MPI rank exceed 2^32)" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 
 option(WITH_DEAL_II_THREADS "Enable deal.II threading support" OFF)

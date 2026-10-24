@@ -18,6 +18,7 @@
 /* Compile-time parameters: */
 
 #cmakedefine DENORMALS_ARE_ZERO
+#cmakedefine WITH_64BIT_OFFSETS
 
 /* External packages: */
 
