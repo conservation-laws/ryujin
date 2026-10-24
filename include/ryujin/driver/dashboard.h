@@ -262,6 +262,9 @@ namespace ryujin
     double wall_m_dofs_per_sec = 0.;
     double cycles_per_second = 0.;
     double utilization = 0.;
+    /* The device and wall time since the last snapshot: */
+    double delta_device_time = 0.;
+    double delta_wall_time = 0.;
     double cpu_time_skew = 0.;
     double cpu_time_skew_fraction = 0.;
 

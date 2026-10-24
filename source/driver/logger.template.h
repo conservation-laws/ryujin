@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <driver/dashboard_text.h>
 #include <ryujin/base/computing_timer.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/version_info.h>
@@ -135,8 +136,8 @@ namespace ryujin
     print_parameters(context.base_name, logfile_);
 
     /*
-     * Record all status messages for the dashboard. Print them as usual
-     * unless the dashboard is shown, so that they do not scroll it away:
+     * Record all status messages for the dashboard. If the dashboard is
+     * not shown we simply print them as usual:
      */
 
     print_info_ = context.info;
@@ -192,12 +193,11 @@ namespace ryujin
         (context.wall_time >=
          last_terminal_output_ + terminal_update_interval_);
 
-    if (!(write_to_logfile || update_terminal))
-      return;
-
-    ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
-    print_cycle_statistics(context, /*logfile*/ write_to_logfile);
-    last_terminal_output_ = context.wall_time;
+    if (write_to_logfile || update_terminal) {
+      ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
+      print_cycle_statistics(context, /*logfile*/ write_to_logfile);
+      last_terminal_output_ = context.wall_time;
+    }
   }
 
 
@@ -207,7 +207,7 @@ namespace ryujin
 #if defined(DEBUG_OUTPUT)
     return false;
 #else
-    /* Only use terminal control sequences on an interactive terminal: */
+    /* Return whether we are running on an interactive terminal: */
     const auto mode = dashboard_settings_.mode;
     return mode == DashboardMode::on ||
            (mode == DashboardMode::automatic && isatty(STDOUT_FILENO));
@@ -230,6 +230,13 @@ namespace ryujin
   }
 
 
+  /*
+   * ---------------------------------------------------------------------------
+   * Internal methods:
+   * ---------------------------------------------------------------------------
+   */
+
+
   template <int dim, typename Number>
   void Logger<dim, Number>::print_debug_output()
   {
@@ -246,13 +253,6 @@ namespace ryujin
         std::cout << f.rdbuf();
     }
   }
-
-
-  /*
-   * ---------------------------------------------------------------------------
-   * Internal methods:
-   * ---------------------------------------------------------------------------
-   */
 
 
   template <int dim, typename Number>
@@ -455,38 +455,42 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Logger<dim, Number>::print_head(const std::string &header,
-                                       const std::string &secondary,
-                                       std::ostream &stream)
+  void Logger<dim, Number>::print_cycle_statistics(
+      const TaskContext<Number> &context,
+      bool write_to_logfile,
+      bool final_time)
   {
+    dashboard_data_.final_time = final_time;
+    collect_information(context);
+    collect_memory_statistics();
+    collect_timers();
+    collect_tasks(context);
+    collect_throughput(context, final_time);
+
+    /* Only output on rank 0: */
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
-    const int header_size = header.size();
-    const auto padded_header =
-        std::string(std::max(0, 34 - header_size) / 2, ' ') + header +
-        std::string(std::max(0, 35 - header_size) / 2, ' ');
+    const auto text = render_text(dashboard_data_);
 
-    const int secondary_size = secondary.size();
-    const auto padded_secondary =
-        std::string(std::max(0, 34 - secondary_size) / 2, ' ') + secondary +
-        std::string(std::max(0, 35 - secondary_size) / 2, ' ');
+    if (!interactive_terminal()) {
+      std::cout << text << std::flush;
+    } else {
+#if defined(WITH_FTXUI)
+      dashboard_.show(dashboard_data_, dashboard_settings_);
+#else
+      std::cout << "\033[2J\033[H" << text << std::flush;
+#endif
+    }
 
-    /* clang-format off */
-    stream << "\n";
-    stream << "    ####################################################\n";
-    stream << "    #########"     <<  padded_header   <<     "#########\n";
-    stream << "    #########"     << padded_secondary <<     "#########\n";
-    stream << "    ####################################################\n";
-    stream << std::endl;
-    /* clang-format on */
+    if (write_to_logfile)
+      logfile_ << "\n" << text << std::flush;
   }
 
 
   template <int dim, typename Number>
   void
-  Logger<dim, Number>::print_information(const TaskContext<Number> &context,
-                                         std::ostream &stream)
+  Logger<dim, Number>::collect_information(const TaskContext<Number> &context)
   {
     static const std::string backend_name = [] {
       const auto precision = [] {
@@ -519,6 +523,9 @@ namespace ryujin
 #endif
 
     auto &data = dashboard_data_;
+    data.cycle = context.cycle;
+    data.t = context.t;
+    data.t_final = context.t_final;
     data.hyperbolic_name = simulation_.hyperbolic_system().problem_name();
     data.parabolic_name = simulation_.parabolic_system().is_identity()
                               ? ""
@@ -532,164 +539,53 @@ namespace ryujin
     data.last_output_cycle = context.timer_cycle - 1;
     data.last_output_time =
         context.timer_granularity * (context.timer_cycle - 1);
-    stream << "Information: (HYP) "
-           << simulation_.hyperbolic_system().problem_name();
-    if (!simulation_.parabolic_system().is_identity()) {
-      stream << "\n             (PAR) "
-             << simulation_.parabolic_system().problem_name();
-    }
-    stream << "\n             [" << context.base_name << "] ";
-    if (mpi_ensemble_.n_ensembles() > 1) {
-      stream << mpi_ensemble_.n_ensembles() << " ensembles ";
-    }
-    stream << "with " << n_global_dofs_ << " Qdofs on "
-           << mpi_ensemble_.n_world_ranks() << " ranks "
-           << (threads.empty() ? "" : "/ " + threads + " ") //
-           << "<" << backend_name << ">\n";
-
-    stream << "             Last output cycle " //
-           << context.timer_cycle - 1           //
-           << " at t = "
-           << context.timer_granularity * (context.timer_cycle - 1) //
-           << "  [ tasks: ";
-
-    for (const auto *task : context.tasks)
-      stream << task->name() << (task == context.tasks.back() ? " " : ", ");
-
-    stream << "]\n";
   }
 
 
   template <int dim, typename Number>
-  void Logger<dim, Number>::print_memory_statistics(std::ostream &stream)
+  void Logger<dim, Number>::collect_memory_statistics()
   {
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
 
-    Utilities::MPI::MinMaxAvg data = Utilities::MPI::min_max_avg(
+    dashboard_data_.memory = Utilities::MPI::min_max_avg(
         stats.VmRSS / 1024., mpi_ensemble_.world_communicator());
-
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    dashboard_data_.memory = data;
-
-    std::ostringstream output;
-
-    unsigned int n =
-        dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
-
-    output << "\nMemory:      [MiB]"                          //
-           << std::setw(8) << data.min                        //
-           << " [p" << std::setw(n) << data.min_index << "] " //
-           << std::setw(8) << data.avg << " "                 //
-           << std::setw(8) << data.max                        //
-           << " [p" << std::setw(n) << data.max_index << "]"; //
-
-    stream << output.str() << std::endl;
   }
 
 
   template <int dim, typename Number>
-  void Logger<dim, Number>::print_timers(std::ostream &stream)
+  void Logger<dim, Number>::collect_timers()
   {
-    std::vector<std::ostringstream> output(ComputingTimer::timers().size());
+    const auto &communicator = mpi_ensemble_.world_communicator();
 
-    const auto equalize = [&]() {
-      const auto ptr =
-          std::max_element(output.begin(),
-                           output.end(),
-                           [](const auto &left, const auto &right) {
-                             return left.str().length() < right.str().length();
-                           });
-      const auto length = ptr->str().length();
-      for (auto &it : output)
-        it << std::string(length - it.str().length() + 1, ' ');
-    };
+    const double total_cpu_time =
+        Utilities::MPI::min_max_avg(
+            ComputingTimer::timer("time loop").cpu_time(), communicator)
+            .sum;
 
-    const auto print_wall_time = [&](auto &timer, auto &stream, auto &entry) {
-      const auto wall_time = Utilities::MPI::min_max_avg(
-          timer.wall_time(), mpi_ensemble_.world_communicator());
-      entry.wall_time = wall_time;
-
-      constexpr auto eps = std::numeric_limits<double>::epsilon();
-      /*
-       * Cut off at 99.9% to avoid silly percentages cluttering up the
-       * output.
-       */
-      const auto skew_negative = std::max(
-          100. * (wall_time.min - wall_time.avg) / wall_time.avg - eps, -99.9);
-      const auto skew_positive = std::min(
-          100. * (wall_time.max - wall_time.avg) / wall_time.avg + eps, 99.9);
-
-      stream << std::setprecision(2) << std::fixed << std::setw(9)
-             << wall_time.avg << "s [sk: " << std::setprecision(1)
-             << std::setw(5) << std::fixed << skew_negative << "%/"
-             << std::setw(4) << std::fixed << skew_positive << "%]";
-      unsigned int n =
-          dealii::Utilities::needed_digits(mpi_ensemble_.n_world_ranks());
-      stream << " [p" << std::setw(n) << wall_time.min_index << "/"
-             << wall_time.max_index << "]";
-    };
-
-    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
-        ComputingTimer::timer("time loop").cpu_time(),
-        mpi_ensemble_.world_communicator());
-    const double total_cpu_time = cpu_time_statistics.sum;
-
-    const auto print_cpu_time =
-        [&](auto &timer, auto &stream, auto &entry, bool percentage) {
-          const auto cpu_time = Utilities::MPI::min_max_avg(
-              timer.cpu_time(), mpi_ensemble_.world_communicator());
-          entry.cpu_time = cpu_time.sum;
-          entry.fraction = percentage ? cpu_time.sum / total_cpu_time : -1.;
-
-          stream << std::setprecision(2) << std::fixed << std::setw(12)
-                 << cpu_time.sum << "s ";
-
-          if (percentage)
-            stream << "(" << std::setprecision(1) << std::setw(4)
-                   << 100. * cpu_time.sum / total_cpu_time << "%)";
-        };
+    /* Percentages are only meaningful for the timers of the time loop: */
+    bool percentage = false;
 
     auto &timers = dashboard_data_.timers;
     timers.clear();
-
-    auto jt = output.begin();
-    for (auto &it : ComputingTimer::timers()) {
-      *jt++ << "  " << it.first;
-      timers.push_back({it.first});
+    for (const auto &[name, timer] : ComputingTimer::timers()) {
+      const double cpu_time =
+          Utilities::MPI::min_max_avg(timer.cpu_time(), communicator).sum;
+      timers.push_back({
+          .name = name,
+          .wall_time =
+              Utilities::MPI::min_max_avg(timer.wall_time(), communicator),
+          .cpu_time = cpu_time,
+          .fraction = percentage ? cpu_time / total_cpu_time : -1.,
+      });
+      if (name.starts_with("time loop"))
+        percentage = true;
     }
-    equalize();
-
-    jt = output.begin();
-    auto kt = timers.begin();
-    for (auto &it : ComputingTimer::timers())
-      print_wall_time(it.second, *jt++, *kt++);
-    equalize();
-
-    jt = output.begin();
-    kt = timers.begin();
-    bool compute_percentages = false;
-    for (auto &it : ComputingTimer::timers()) {
-      print_cpu_time(it.second, *jt++, *kt++, compute_percentages);
-      if (it.first.starts_with("time loop"))
-        compute_percentages = true;
-    }
-    equalize();
-
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    stream << std::endl << "Timer statistics:\n";
-    for (auto &it : output)
-      stream << it.str() << std::endl;
   }
 
 
   template <int dim, typename Number>
-  void Logger<dim, Number>::print_tasks(const TaskContext<Number> &context,
-                                        std::ostream &stream)
+  void Logger<dim, Number>::collect_tasks(const TaskContext<Number> &context)
   {
     const auto format_duration = [](double seconds) {
       const auto s =
@@ -787,50 +683,21 @@ namespace ryujin
 
       entry.progress = trigger.progress(context);
     }
-
-    /* Print a table with aligned columns: */
-
-    std::size_t name_width = 0;
-    std::size_t trigger_width = 0;
-    std::size_t last_width = 0;
-    for (const auto &entry : tasks) {
-      name_width = std::max(name_width, entry.name.length());
-      trigger_width = std::max(trigger_width, entry.trigger.length());
-      last_width = std::max(last_width, entry.last.length());
-    }
-
-    std::ostringstream output;
-    output << "\nTasks:\n";
-    for (const auto &entry : tasks) {
-      output << "  " << std::left << std::setw(name_width) << entry.name
-             << "  [" << std::setw(9) << entry.phase << "]";
-      if (!entry.trigger.empty())
-        output << "  " << std::setw(trigger_width) << entry.trigger
-               << "  last: " << std::setw(last_width)
-               << (entry.last.empty() ? "--" : entry.last)
-               << "  next: " << (entry.next.empty() ? "--" : entry.next);
-      output << std::right << "\n";
-    }
-
-    stream << output.str() << std::flush;
   }
 
 
   template <int dim, typename Number>
-  void Logger<dim, Number>::print_throughput(const TaskContext<Number> &context,
-                                             std::ostream &stream,
-                                             bool final_time)
+  void
+  Logger<dim, Number>::collect_throughput(const TaskContext<Number> &context,
+                                          bool final_time)
   {
-    const auto cycle = context.cycle;
-    const auto t = context.t;
-
     /* Update statistics: */
 
     {
       previous_ = current_;
 
-      current_.cycle = cycle;
-      current_.t = t;
+      current_.cycle = context.cycle;
+      current_.t = context.t;
 
       const auto wall_time_statistics = Utilities::MPI::min_max_avg(
           ComputingTimer::timer("time loop").wall_time(),
@@ -857,29 +724,60 @@ namespace ryujin
 
     /* Take averages: */
 
-    double delta_cycles = current_.cycle - previous_.cycle;
-    const double cycles_per_second =
-        delta_cycles / (current_.wall_time - previous_.wall_time);
-
-    const auto efficiency = simulation_.time_integrator().efficiency();
-    const auto n_dofs = static_cast<double>(n_global_dofs_);
-
-    double wall_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
-                                 (current_.wall_time - previous_.wall_time);
-
-    const double delta_time =
-        (current_.t - previous_.t) / (current_.cycle - previous_.cycle);
-    const double time_per_second =
-        (current_.t - previous_.t) / (current_.wall_time - previous_.wall_time);
+    const double delta_cycles = current_.cycle - previous_.cycle;
+    const double delta_wall_time = current_.wall_time - previous_.wall_time;
+    const double delta_q_dofs = delta_cycles *
+                                static_cast<double>(n_global_dofs_) *
+                                simulation_.time_integrator().efficiency();
 
     auto &data = dashboard_data_;
     data.device = have_separate_memory_spaces;
     data.n_devices = n_devices_;
-    data.wall_m_dofs_per_sec = wall_m_dofs_per_sec;
-    data.cycles_per_second = cycles_per_second;
-    data.tau = delta_time;
-    data.time_per_second = time_per_second;
+    data.wall_m_dofs_per_sec = delta_q_dofs / 1.e6 / delta_wall_time;
+    data.cycles_per_second = delta_cycles / delta_wall_time;
+    data.delta_wall_time = delta_wall_time;
+    data.tau = (current_.t - previous_.t) / delta_cycles;
+    data.time_per_second = (current_.t - previous_.t) / delta_wall_time;
     data.terminal_update_interval = terminal_update_interval_;
+
+    if constexpr (have_separate_memory_spaces) {
+      /* Statistics about GPU utilization: */
+
+      const double delta_device_time =
+          current_.device_time_sum - previous_.device_time_sum;
+
+      data.compute_m_dofs_per_sec = delta_q_dofs / 1.e6 / delta_device_time;
+      data.utilization = delta_device_time / (n_devices_ * delta_wall_time);
+      data.delta_device_time = delta_device_time;
+
+    } else {
+      /* Statistics about CPU utilization: */
+
+      /* Determine whether we fudge the CPU timings: */
+      const bool fudge_cpu_timings = terminal_correct_for_hyperthreading_ &&
+#if defined(WITH_OPENMP)
+                                     (omp_get_max_threads() == 2);
+#elif defined(WITH_DEAL_II_THREADS)
+                                     (MultithreadInfo::n_threads() == 2);
+#else
+                                     false;
+#endif
+
+      data.compute_m_dofs_per_sec =
+          (fudge_cpu_timings ? 2. : 1.) * delta_q_dofs / 1.e6 /
+          (current_.cpu_time_sum - previous_.cpu_time_sum);
+      data.fudged_cpu_timings = fudge_cpu_timings;
+
+      /* avoid printing small negative numbers: */
+      data.cpu_time_skew =
+          std::max(0.,
+                   (current_.cpu_time_max - current_.cpu_time_min - //
+                    previous_.cpu_time_max + previous_.cpu_time_min) /
+                       delta_cycles);
+      data.cpu_time_skew_fraction =
+          data.cpu_time_skew * delta_cycles /
+          (current_.cpu_time_avg - previous_.cpu_time_avg);
+    }
 
     const auto &hyperbolic_module = simulation_.hyperbolic_module();
     const auto &parabolic_module = simulation_.parabolic_module();
@@ -893,122 +791,10 @@ namespace ryujin
     data.corrections = {hyperbolic_module.n_corrections(),
                         parabolic_module.n_corrections()};
 
-    /* Print Jean-Luc and Martin metrics: */
-
-    std::ostringstream output;
-
-    /* clang-format off */
-    output << std::endl;
-
-    output << "Throughput:" << std::endl;
-
-    if constexpr (have_separate_memory_spaces) {
-      /* Write out some statistics about GPU utilization: */
-
-      const double delta_wall_time = current_.wall_time - previous_.wall_time;
-      const double delta_device_time =
-          current_.device_time_sum - previous_.device_time_sum;
-
-      const double utilization =
-          delta_device_time / (n_devices_ * delta_wall_time);
-
-      const double device_m_dofs_per_sec =
-          delta_cycles * n_dofs * efficiency / 1.e6 / delta_device_time;
-      data.compute_m_dofs_per_sec = device_m_dofs_per_sec;
-      data.utilization = utilization;
-      output << "  GPU : "
-             << std::setprecision(4) << std::fixed << device_m_dofs_per_sec
-             << " MQ/s in compute kernels (on "
-             << n_devices_ << (n_devices_ == 1 ? " device)" : " devices)")
-             << std::endl;
-
-      output << "        ["
-             << std::setprecision(2) << std::fixed << delta_device_time
-             << "s device / "
-             << std::setprecision(2) << std::fixed << delta_wall_time
-             << "s wall = "
-             << std::setprecision(1) << std::fixed << 100. * utilization
-             << "% utilization ]" << std::endl;
-
-    } else {
-      /* Write out some statistics about CPU utilization: */
-
-      double cpu_m_dofs_per_sec = delta_cycles * n_dofs * efficiency / 1.e6 /
-                                  (current_.cpu_time_sum - previous_.cpu_time_sum);
-
-      /* Determine whether we fudge the CPU timings: */
-      const bool fudge_cpu_timings = terminal_correct_for_hyperthreading_ &&
-#if defined(WITH_OPENMP)
-                                     (omp_get_max_threads() == 2);
-#elif defined(WITH_DEAL_II_THREADS)
-                                     (MultithreadInfo::n_threads() == 2);
-#else
-                                     false;
-#endif
-
-      if (fudge_cpu_timings)
-        cpu_m_dofs_per_sec *= 2.;
-      data.compute_m_dofs_per_sec = cpu_m_dofs_per_sec;
-      data.fudged_cpu_timings = fudge_cpu_timings;
-
-      double cpu_time_skew = (current_.cpu_time_max - current_.cpu_time_min - //
-                              previous_.cpu_time_max + previous_.cpu_time_min) /
-                             delta_cycles;
-      /* avoid printing small negative numbers: */
-      cpu_time_skew = std::max(0., cpu_time_skew);
-
-      const double cpu_time_skew_percentage =
-          cpu_time_skew * delta_cycles /
-          (current_.cpu_time_avg - previous_.cpu_time_avg);
-      data.cpu_time_skew = cpu_time_skew;
-      data.cpu_time_skew_fraction = cpu_time_skew_percentage;
-
-      output << "  "
-             << (fudge_cpu_timings ? "CPU*: " : "CPU : ")
-             << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
-             << " MQ/s  ("
-             << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
-             << " s/Qdof/substep)" << std::endl;
-
-      output << "        [cpu time skew: "
-             << std::setprecision(2) << std::scientific << cpu_time_skew
-             << "s/cycle ("
-             << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
-             << 100. * cpu_time_skew_percentage
-             << "%)]" << std::endl;
-    }
-
-    output << "  WALL: "
-           << std::setprecision(4) << std::fixed << wall_m_dofs_per_sec
-           << " MQ/s  ("
-           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/substep)  ("
-           << std::setprecision(2) << std::fixed << cycles_per_second
-           << " cycles/s)" << std::endl;
-
-    output << "        [ "
-           << simulation_.time_integrator().time_stepping_scheme_name()
-           << " with CFL = "
-           << std::setprecision(2) << std::fixed << simulation_.hyperbolic_module().cfl()
-           << " ("
-           << std::setprecision(0) << std::fixed << simulation_.hyperbolic_module().n_restarts()
-           << "/"
-           << std::setprecision(0) << std::fixed << simulation_.parabolic_module().n_restarts()
-           << " rsts) ("
-           << std::setprecision(0) << std::fixed << simulation_.hyperbolic_module().n_warnings()
-           << "/"
-           << std::setprecision(0) << std::fixed << simulation_.parabolic_module().n_warnings()
-           << " warn) ("
-           << std::setprecision(0) << std::fixed << simulation_.hyperbolic_module().n_corrections()
-           << "/"
-           << std::setprecision(0) << std::fixed << simulation_.parabolic_module().n_corrections()
-           << " corr) ]" << std::endl;
-
     data.solver_statistics.clear();
     if (!simulation_.parabolic_system().is_identity()) {
       std::ostringstream solver_statistics;
       parabolic_module.print_solver_statistics(solver_statistics);
-      output << solver_statistics.str();
 
       /* Strip the indentation and brackets of every line: */
       std::istringstream lines(solver_statistics.str());
@@ -1021,103 +807,11 @@ namespace ryujin
       }
     }
 
-    output << "        [ dt = "
-           << std::scientific << std::setprecision(2) << delta_time
-           << " ( "
-           << time_per_second
-           << " dt/s) ]" << std::endl;
-    /* clang-format on */
+    /* And estimate the remaining wall time: */
 
-    /* And print an ETA: */
-
-    time_per_second_exp_ = 0.8 * time_per_second_exp_ + 0.2 * time_per_second;
-    data.eta = std::max(context.t_final - t, Number(0.)) / time_per_second_exp_;
-    auto eta = static_cast<unsigned int>(data.eta);
-
-    output << "\n  ETA : ";
-
-    const unsigned int days = eta / (24 * 3600);
-    if (days > 0) {
-      output << days << " d  ";
-      eta %= 24 * 3600;
-    }
-
-    const unsigned int hours = eta / 3600;
-    if (hours > 0) {
-      output << hours << " h  ";
-      eta %= 3600;
-    }
-
-    const unsigned int minutes = eta / 60;
-    output << minutes << " min";
-
-    output << "   (terminal update every " //
-           << std::setprecision(2) << std::fixed << terminal_update_interval_
-           << "s)";
-
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    stream << output.str() << std::endl;
-  }
-
-
-  template <int dim, typename Number>
-  void Logger<dim, Number>::print_cycle_statistics(
-      const TaskContext<Number> &context,
-      bool write_to_logfile,
-      bool final_time)
-  {
-    const auto cycle = context.cycle;
-    const auto t = context.t;
-
-    std::ostringstream output;
-
-    /* Print header: */
-
-    std::ostringstream primary;
-    if (final_time) {
-      primary << "FINAL  (cycle " << Utilities::int_to_string(cycle, 6) << ")";
-    } else {
-      primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-              << "  (" << std::fixed << std::setprecision(1)     //
-              << t / context.t_final * 100 << "%)";
-    }
-
-    std::ostringstream secondary;
-    secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-
-    print_head(primary.str(), secondary.str(), output);
-
-    dashboard_data_.final_time = final_time;
-    dashboard_data_.cycle = cycle;
-    dashboard_data_.t = t;
-    dashboard_data_.t_final = context.t_final;
-
-    /* Print information and statistics: */
-
-    print_information(context, output);
-    print_memory_statistics(output);
-    print_timers(output);
-    print_tasks(context, output);
-    print_throughput(context, output, final_time);
-
-    /* Only output on rank 0: */
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    if (!interactive_terminal()) {
-      std::cout << output.str() << std::flush;
-    } else {
-#if defined(WITH_FTXUI)
-      dashboard_.show(dashboard_data_, dashboard_settings_);
-#else
-      std::cout << "\033[2J\033[H" << output.str() << std::flush;
-#endif
-    }
-
-    if (write_to_logfile) {
-      logfile_ << "\n" << output.str() << std::flush;
-    }
+    time_per_second_exp_ =
+        0.8 * time_per_second_exp_ + 0.2 * data.time_per_second;
+    data.eta = std::max(context.t_final - context.t, Number(0.)) /
+               time_per_second_exp_;
   }
 } // namespace ryujin

@@ -32,6 +32,7 @@ set(CORE_SOURCE_FILES
   discretization/offline_data.cc
   discretization/time_integrator.cc
   driver/checkpointing.cc
+  driver/dashboard_text.cc
   driver/environment.cc
   driver/equation.cc
   driver/equation_euler.cc
