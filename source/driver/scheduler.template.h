@@ -44,6 +44,13 @@ namespace ryujin
     t_final_ = Number(5.);
     add_parameter("final time", t_final_, "Final time");
 
+    max_cycles_ = 0;
+    add_parameter("max cycles",
+                  max_cycles_,
+                  "If set to a nonzero value the main loop is stopped after "
+                  "the given number of cycles (time steps), or when the "
+                  "final time is reached, whichever comes first");
+
     align_time_steps_ = false;
     add_parameter("align time steps",
                   align_time_steps_,
@@ -136,10 +143,12 @@ namespace ryujin
     for (context.cycle = 1;; ++context.cycle) {
 
       /*
-       * No time step follows once we have reached the final time, so the
-       * final pre_step phase still belongs to the last cycle:
+       * No time step follows once we have reached the final time or the
+       * maximal number of cycles, so the final pre_step phase still
+       * belongs to the last cycle:
        */
-      const bool final_time = context.t >= relax * t_final_;
+      const bool final_time = context.t >= relax * t_final_ ||
+                              (max_cycles_ != 0 && context.cycle > max_cycles_);
       if (final_time)
         --context.cycle;
 

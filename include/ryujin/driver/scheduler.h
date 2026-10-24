@@ -69,6 +69,7 @@ namespace ryujin
     std::string base_name_;
 
     Number t_final_;
+    unsigned int max_cycles_;
     bool align_time_steps_;
     Number timer_granularity_;
 
