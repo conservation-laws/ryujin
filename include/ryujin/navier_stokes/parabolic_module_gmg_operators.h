@@ -289,11 +289,17 @@ namespace ryujin
             for (unsigned int d = 0; d < dim; ++d)
               V_i[d] = dst.block(d).local_element(i);
 
-            /* replace normal component by source */
+            /*
+             * Replace normal component by the source scaled with m_i rho_i
+             * so that the normal component has the same scaling as the
+             * remaining operator.
+             */
+            const Number m_i = get_lumped_mass(Number(), i);
+            const Number rho_i = density_->local_element(i);
             V_i -= 1. * (V_i * normal) * normal;
             for (unsigned int d = 0; d < dim; ++d) {
               const auto src_d = src.block(d).local_element(i);
-              V_i += 1. * (src_d * normal[d]) * normal;
+              V_i += m_i * rho_i * (src_d * normal[d]) * normal;
             }
 
             for (unsigned int d = 0; d < dim; ++d)
@@ -334,8 +340,8 @@ namespace ryujin
 
         const auto body_invert = [&](auto sentinel, const unsigned int i) {
           using T = decltype(sentinel);
-          const auto m_i = lumped_mass_matrix.local_element(i);
-          const auto rho_i = density_->local_element(i);
+          const auto m_i = read_entry<T>(lumped_mass_matrix, i);
+          const auto rho_i = read_entry<T>(*density_, i);
           for (unsigned int d = 0; d < dim; ++d)
             write_entry(vector.block(d),
                         Number(1.) /
@@ -361,10 +367,12 @@ namespace ryujin
             for (unsigned int d = 0; d < dim; ++d)
               V_i[d] = vector.block(d).local_element(i);
 
-            /* replace normal component by 1. */
+            /* replace normal component by 1 / (m_i rho_i), see vmult(): */
+            const Number m_i = lumped_mass_matrix.local_element(i);
+            const Number rho_i = density_->local_element(i);
             V_i -= 1. * (V_i * normal) * normal;
             for (unsigned int d = 0; d < dim; ++d) {
-              V_i += 1. * (1. * normal[d]) * normal;
+              V_i += Number(1.) / (m_i * rho_i) * normal[d] * normal;
             }
 
             for (unsigned int d = 0; d < dim; ++d)

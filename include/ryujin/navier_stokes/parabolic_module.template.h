@@ -106,6 +106,13 @@ namespace ryujin
           "Minimal mesh level to be visited in the geometric multigrid "
           "cycle where the coarse grid solver (Chebyshev) is called");
 
+      gmg_reinitialization_interval_ = 1;
+      this->add_parameter(
+          "multigrid - reinitialization interval",
+          gmg_reinitialization_interval_,
+          "Reinitialize the level matrices and smoothers of the geometric "
+          "multigrid every n-th time step");
+
       tolerance_ = Number(1.0e-12);
       this->add_parameter(
           "tolerance", tolerance_, "Tolerance for linear solvers");
@@ -130,6 +137,10 @@ namespace ryujin
        * reset it to zero on prepare().
        */
       cycle_ = 0;
+
+      AssertThrow(gmg_reinitialization_interval_ > 0,
+                  dealii::ExcMessage("The multigrid reinitialization "
+                                     "interval must be positive."));
 
       const auto &discretization = offline_data_->discretization();
       AssertThrow(discretization.ansatz() == Ansatz::cg_q1,
@@ -408,11 +419,12 @@ namespace ryujin
 #endif
 
       /*
-       * Update MG matrices all 4 time steps; this is a balance because more
-       * refreshes will render the approximation better, at some additional
-       * cost.
+       * Update MG matrices every n-th time step; this is a balance because
+       * more refreshes will render the approximation better, at some
+       * additional cost.
        */
-      const bool reinitialize_gmg = (cycle_++ % 4 == 0);
+      const bool reinitialize_gmg =
+          (cycle_++ % gmg_reinitialization_interval_ == 0);
 
       /*
        * A boolean indicating that a restart is required.
@@ -552,6 +564,10 @@ namespace ryujin
         diagonal_matrix.reinit(
             lumped_mass_matrix_view, density_, affine_constraints);
 
+        if ((use_gmg_velocity_ || use_gmg_internal_energy_) && reinitialize_gmg)
+          mg_transfer_velocity_.interpolate_to_mg(
+              offline_data_->dof_handler(), level_density_, density_);
+
         if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               VelocityMatrix<dim, float, Number>,
@@ -562,8 +578,6 @@ namespace ryujin
 
           level_velocity_matrices_.resize(level_matrix_free_.min_level(),
                                           level_matrix_free_.max_level());
-          mg_transfer_velocity_.interpolate_to_mg(
-              offline_data_->dof_handler(), level_density_, density_);
 
           for (unsigned int level = level_matrix_free_.min_level();
                level <= level_matrix_free_.max_level();
@@ -810,11 +824,6 @@ namespace ryujin
         affine_constraints.set_zero(internal_energy_);
         affine_constraints.set_zero(internal_energy_rhs_);
 
-        /*
-         * Update MG matrices all 4 time steps; this is a balance because more
-         * refreshes will render the approximation better, at some additional
-         * cost.
-         */
         if (use_gmg_internal_energy_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               EnergyMatrix<dim, float, Number>,
