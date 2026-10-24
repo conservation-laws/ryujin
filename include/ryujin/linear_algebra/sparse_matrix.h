@@ -563,7 +563,7 @@ namespace ryujin
 
     data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_data",
-        sparsity_view.n_nonzero_elements() * n_components);
+        offset_type(sparsity_view.n_nonzero_elements()) * n_components);
 
     const std::size_t n_indices = sparsity.entries_to_be_sent().size();
 
@@ -573,7 +573,8 @@ namespace ryujin
     if constexpr (have_separate_memory_spaces) {
       const auto ghost_offset =
           sparsity_view.template ghost_offset<n_components>();
-      const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
+      const auto end_offset =
+          offset_type(sparsity_view.n_nonzero_elements()) * n_components;
 
       ghost_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
           "sparse_matrix_ghost_buffer", end_offset - ghost_offset);
@@ -646,7 +647,7 @@ namespace ryujin
      */
 
     const std::size_t n_data =
-        sparsity_view.n_nonzero_elements() * n_components;
+        offset_type(sparsity_view.n_nonzero_elements()) * n_components;
     const std::size_t n_exchange =
         n_components * sparsity_pattern_->entries_to_be_sent().size();
 
@@ -718,7 +719,8 @@ namespace ryujin
 
     const auto ghost_offset =
         sparsity_view.template ghost_offset<n_components>();
-    const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
+    const auto end_offset =
+        offset_type(sparsity_view.n_nonzero_elements()) * n_components;
     std::fill(data_host_.data() + ghost_offset,
               data_host_.data() + end_offset,
               Number{});
@@ -812,7 +814,8 @@ namespace ryujin
 
     const auto ghost_offset =
         sparsity_view.template ghost_offset<n_components>();
-    const auto end_offset = sparsity_view.n_nonzero_elements() * n_components;
+    const auto end_offset =
+        offset_type(sparsity_view.n_nonzero_elements()) * n_components;
 
     Number *const receive_pointer =
         on_host ? data_host_.data() + ghost_offset : ghost_buffer_host_.data();

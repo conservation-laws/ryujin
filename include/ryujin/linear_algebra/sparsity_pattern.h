@@ -16,6 +16,17 @@
 
 namespace ryujin
 {
+  /**
+   * Integer type for offsets into the data arrays of sparse matrices. The
+   * offsets range up to the number of nonzero entries times the number of
+   * components per MPI rank, which exceeds 2^32 for large problems.
+   */
+#ifdef WITH_64BIT_OFFSETS
+  using offset_type = std::size_t;
+#else
+  using offset_type = unsigned int;
+#endif
+
   template <int warp_size, typename MemorySpace = dealii::MemorySpace::Host>
   class SparsityPatternView;
 
@@ -313,7 +324,7 @@ namespace ryujin
      * matrix entry in the data array.
      */
     template <unsigned int n_components = 1>
-    DEAL_II_HOST_DEVICE unsigned int
+    DEAL_II_HOST_DEVICE offset_type
     offset(const unsigned int row,
            const unsigned int column_index,
            const unsigned int component = 0) const;
@@ -331,9 +342,8 @@ namespace ryujin
      * @pre row must be within the internal index range.
      */
     template <unsigned int n_components = 1>
-    DEAL_II_HOST_DEVICE unsigned int
-    offset_internal(const unsigned int row,
-                    const unsigned int column_index) const;
+    DEAL_II_HOST_DEVICE offset_type offset_internal(
+        const unsigned int row, const unsigned int column_index) const;
 
     /**
      * Given a row index, an index for the column (within [0,
@@ -341,7 +351,7 @@ namespace ryujin
      * *transposed* matrix entry in the data array.
      */
     template <unsigned int n_components = 1>
-    DEAL_II_HOST_DEVICE unsigned int
+    DEAL_II_HOST_DEVICE offset_type
     transposed_offset(const unsigned int row,
                       const unsigned int column_index,
                       const unsigned int component = 0) const;
@@ -368,7 +378,7 @@ namespace ryujin
      * matrix.
      */
     template <unsigned int n_components = 1>
-    DEAL_II_HOST_DEVICE unsigned int ghost_offset() const;
+    DEAL_II_HOST_DEVICE offset_type ghost_offset() const;
 
     //@}
     /**
@@ -635,7 +645,7 @@ namespace ryujin
 
   template <int warp_size, typename MemorySpace>
   template <unsigned int n_components>
-  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE offset_type
   SparsityPatternView<warp_size, MemorySpace>::offset(
       const unsigned int row,
       const unsigned int column_index,
@@ -651,19 +661,20 @@ namespace ryujin
     if (row < n_internal_dofs_) {
       const unsigned int scalar_offset =
           row_starts_(warp) + column_index * warp_size;
-      return scalar_offset * n_components + comp * warp_size + lane;
+      return offset_type(scalar_offset) * n_components + comp * warp_size +
+             lane;
 
     } else {
       const unsigned int scalar_offset = row_starts_(row) + column_index;
 
-      return scalar_offset * n_components + comp;
+      return offset_type(scalar_offset) * n_components + comp;
     }
   }
 
 
   template <int warp_size, typename MemorySpace>
   template <unsigned int n_components>
-  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE offset_type
   SparsityPatternView<warp_size, MemorySpace>::transposed_offset(
       const unsigned int row,
       const unsigned int column_index,
@@ -682,7 +693,7 @@ namespace ryujin
     // ... and reconstruct the proper index for a view with n_components:
     const unsigned int j = column_indices_(scalar_offset);
 
-    unsigned int transposed_offset = transposed_scalar_offset;
+    offset_type transposed_offset = transposed_scalar_offset;
     if constexpr (n_components > 1) {
       if (j < n_internal_dofs_) {
         transposed_offset = //
@@ -705,7 +716,7 @@ namespace ryujin
 
   template <int warp_size, typename MemorySpace>
   template <unsigned int n_components>
-  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE offset_type
   SparsityPatternView<warp_size, MemorySpace>::offset_internal(
       const unsigned int row, const unsigned int column_index) const
   {
@@ -719,7 +730,7 @@ namespace ryujin
     const unsigned int scalar_offset =
         row_starts_(warp) + column_index * warp_size;
 
-    return scalar_offset * n_components + lane;
+    return offset_type(scalar_offset) * n_components + lane;
   }
 
 
@@ -749,11 +760,11 @@ namespace ryujin
 
   template <int warp_size, typename MemorySpace>
   template <unsigned int n_components>
-  DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
+  DEAL_II_HOST_DEVICE_ALWAYS_INLINE offset_type
   SparsityPatternView<warp_size, MemorySpace>::ghost_offset() const
   {
     const auto scalar_offset = row_starts_(n_locally_owned_dofs_);
-    return scalar_offset * n_components;
+    return offset_type(scalar_offset) * n_components;
   }
 
 
