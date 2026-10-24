@@ -18,4 +18,14 @@ namespace ryujin
    * @ingroup Driver
    */
   std::string render_text(const DashboardData &data);
+
+
+  /**
+   * Return whether stdout reaches the controlling terminal, either
+   * directly or through the pseudo terminals of launchers, such as mpirun,
+   * that forward the output of their child processes.
+   *
+   * @ingroup Driver
+   */
+  bool stdout_reaches_terminal();
 } // namespace ryujin

@@ -35,7 +35,8 @@ namespace ryujin
    */
   enum class DashboardMode : std::uint8_t {
     /**
-     * Draw the dashboard if stdout is a terminal.
+     * Draw the dashboard if stdout reaches the terminal, directly or
+     * through mpirun.
      */
     automatic,
 

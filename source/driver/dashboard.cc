@@ -498,7 +498,7 @@ namespace ryujin
   {
     theme = make_palette(settings.color_scheme);
 
-    /* Clear the screen if the terminal has been resized: */
+    /* Check whether the terminal has been resized: */
     const auto [columns, lines] = terminal_size();
     const bool resized =
         columns != terminal_width_ || lines != terminal_height_;
@@ -955,11 +955,16 @@ namespace ryujin
       for (int x = 0; x < screen_width; ++x)
         stage_->screen.PixelAt(left + x, top + y) = image.PixelAt(x, y);
 
-    if (animation_)
+    /* Leave the screen around the final dashboard empty: */
+    if (animation_ && !data.final_time)
       animation_->draw(*stage_, data);
 
-    /* Redraw the whole terminal in place: */
-    std::string output = resized ? "\033[2J\033[H" : "\033[H";
+    /*
+     * Redraw the whole terminal in place, after clearing the screen if the
+     * terminal has been resized or for the final snapshot:
+     */
+    const bool clear = resized || data.final_time;
+    std::string output = clear ? "\033[2J\033[H" : "\033[H";
     output += stage_->screen.ToString();
 
     /* If the dashboard does not fit, clear whatever is left below: */

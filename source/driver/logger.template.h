@@ -24,8 +24,6 @@
 #include <set>
 #include <sstream>
 
-#include <unistd.h>
-
 #ifdef WITH_OPENMP
 #include "omp.h"
 #endif
@@ -66,9 +64,8 @@ namespace ryujin
     add_parameter("dashboard",
                   dashboard_settings_.mode,
                   "Draw the terminal dashboard that redraws the terminal in "
-                  "place: auto (if stdout is a terminal), on, off (print plain "
-                  "text instead). Under mpirun stdout is always a terminal, so "
-                  "set this to off when redirecting the output to a file.");
+                  "place: auto (if stdout reaches the terminal, also through "
+                  "mpirun), on, off (print plain text instead).");
 
     add_parameter("dashboard width",
                   dashboard_settings_.width,
@@ -215,7 +212,7 @@ namespace ryujin
     /* Return whether we are running on an interactive terminal: */
     const auto mode = dashboard_settings_.mode;
     return mode == DashboardMode::on ||
-           (mode == DashboardMode::automatic && isatty(STDOUT_FILENO));
+           (mode == DashboardMode::automatic && stdout_reaches_terminal());
 #endif
   }
 
