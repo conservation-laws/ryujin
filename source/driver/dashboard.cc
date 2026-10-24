@@ -208,26 +208,22 @@ namespace ryujin
     Palette theme = make_palette(DashboardColorScheme::ryujin);
 
 
-    /* Return the escape sequences that redraw the cells changed in after: */
-    std::string changes(const Screen &before, const Screen &after)
+    /* Return the escape sequences that redraw the changed cells: */
+    std::string changes(animation::Stage &stage)
     {
-      std::string output;
-      for (int y = 0; y < after.dimy(); ++y)
-        for (int x = 0; x < after.dimx(); ++x) {
-          const auto &old_pixel = before.PixelAt(x, y);
-          const auto &pixel = after.PixelAt(x, y);
-          if (pixel.character == old_pixel.character &&
-              pixel.foreground_color == old_pixel.foreground_color &&
-              pixel.background_color == old_pixel.background_color &&
-              pixel.bold == old_pixel.bold && pixel.dim == old_pixel.dim)
-            continue;
+      auto &changed = stage.changed;
+      std::ranges::sort(changed);
+      changed.erase(std::ranges::unique(changed).begin(), changed.end());
 
-          output += std::format("\033[{};{}H\033[0;", y + 1, x + 1) +
-                    (pixel.bold ? "1;" : "") + (pixel.dim ? "2;" : "") +
-                    pixel.foreground_color.Print(false) + ";" +
-                    pixel.background_color.Print(true) + "m" +
-                    (pixel.character.empty() ? " " : pixel.character);
-        }
+      std::string output;
+      for (const auto &[x, y] : changed) {
+        const auto &pixel = stage.screen.PixelAt(x, y);
+        output += std::format("\033[{};{}H\033[0;", y + 1, x + 1) +
+                  (pixel.bold ? "1;" : "") + (pixel.dim ? "2;" : "") +
+                  pixel.foreground_color.Print(false) + ";" +
+                  pixel.background_color.Print(true) + "m" +
+                  (pixel.character.empty() ? " " : pixel.character);
+      }
 
       /* Save and restore the cursor position (DECSC and DECRC): */
       return output.empty() ? "" : "\0337" + output + "\033[0m\0338";
@@ -998,9 +994,9 @@ namespace ryujin
     if (!animation_ || stage_->screen.dimy() > terminal_height_)
       return "";
 
-    const Screen before = stage_->screen;
+    stage_->changed.clear();
     animation_->step(*stage_, data_);
-    return changes(before, stage_->screen);
+    return changes(*stage_);
   }
 
 

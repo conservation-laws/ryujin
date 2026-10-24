@@ -95,7 +95,7 @@ namespace ryujin
     add_parameter("dashboard animation",
                   dashboard_settings_.animation,
                   "Animation in the space around the terminal dashboard: "
-                  "sparkle, none");
+                  "sparkle, matthias, none");
 
     add_parameter("dashboard throughput display",
                   dashboard_settings_.throughput_display,

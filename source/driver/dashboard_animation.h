@@ -12,6 +12,7 @@
 #include <ftxui/screen/screen.hpp>
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace ryujin::animation
@@ -29,9 +30,19 @@ namespace ryujin::animation
     /* The animation colors of the color scheme: */
     std::vector<ftxui::Color> colors;
 
+    /* The cells changed by the animation since the last step: */
+    std::vector<std::pair<int, int>> changed;
+
     bool free(int x, int y) const
     {
       return !dashboard.Contain(x, y);
+    }
+
+    /* Return the pixel at (x, y) and mark it as changed: */
+    ftxui::Pixel &pixel(int x, int y)
+    {
+      changed.emplace_back(x, y);
+      return screen.PixelAt(x, y);
     }
   };
 
@@ -52,7 +63,8 @@ namespace ryujin::animation
     virtual void draw(Stage &stage, const DashboardData &data) = 0;
 
     /**
-     * Advance the animation in between two snapshots.
+     * Advance the animation in between two snapshots. All changes to
+     * the stage have to go through Stage::pixel().
      */
     virtual void step(Stage &stage, const DashboardData &data) = 0;
   };

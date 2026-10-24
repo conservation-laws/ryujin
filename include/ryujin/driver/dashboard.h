@@ -95,6 +95,11 @@ namespace ryujin
      * Sparkles that twinkle in between two updates.
      */
     sparkle,
+
+    /**
+     * Snakes that roam around the dashboard and hunt for food.
+     */
+    matthias,
   };
 
 
@@ -131,7 +136,8 @@ DECLARE_ENUM(ryujin::DashboardColorScheme,
 
 DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
-                  {ryujin::DashboardAnimation::sparkle, "sparkle"}, ));
+                  {ryujin::DashboardAnimation::sparkle, "sparkle"},
+                  {ryujin::DashboardAnimation::matthias, "matthias"}, ));
 
 DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
              LIST({ryujin::DashboardThroughputDisplay::speedometer,
