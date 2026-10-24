@@ -260,6 +260,7 @@ namespace ryujin
       unsigned int gmg_smoother_degree_;
       unsigned int gmg_smoother_n_cg_iter_;
       unsigned int gmg_min_level_;
+      unsigned int gmg_reinitialization_interval_;
 
       //@}
       /**
