@@ -55,7 +55,8 @@ namespace ryujin
     void start(TaskContext<Number> &context) override;
 
     /**
-     * Record the MPI partition of the current mesh.
+     * Record the MPI partition of the current mesh. The first call starts
+     * the animation of the dashboard.
      */
     void prepare(TaskContext<Number> &context) override;
 
@@ -129,6 +130,8 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
+
+    bool interactive_terminal() const;
 
     void print_debug_output();
 

@@ -54,7 +54,10 @@ set(CORE_SOURCE_FILES
   )
 
 if(WITH_FTXUI)
-  list(APPEND CORE_SOURCE_FILES driver/dashboard.cc)
+  list(APPEND CORE_SOURCE_FILES
+    driver/dashboard.cc
+    driver/dashboard_animation.cc
+    )
 endif()
 
 set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS

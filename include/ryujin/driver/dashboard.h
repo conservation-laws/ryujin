@@ -13,12 +13,18 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <mutex>
-#include <random>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
+
+namespace ryujin::animation
+{
+  class Animation;
+  struct Stage;
+} // namespace ryujin::animation
 
 namespace ryujin
 {
@@ -72,7 +78,26 @@ namespace ryujin
      */
     monochrome,
   };
+
+
+  /**
+   * The animation in the space around the Dashboard.
+   *
+   * @ingroup Driver
+   */
+  enum class DashboardAnimation : std::uint8_t {
+    /**
+     * No animation.
+     */
+    none,
+
+    /**
+     * Sparkles that twinkle in between two updates.
+     */
+    sparkle,
+  };
 } // namespace ryujin
+
 
 #ifndef DOXYGEN
 DECLARE_ENUM(ryujin::DashboardMode,
@@ -85,6 +110,10 @@ DECLARE_ENUM(ryujin::DashboardColorScheme,
                   {ryujin::DashboardColorScheme::rainbow, "rainbow"},
                   {ryujin::DashboardColorScheme::tamu, "tamu"},
                   {ryujin::DashboardColorScheme::monochrome, "monochrome"}, ));
+
+DECLARE_ENUM(ryujin::DashboardAnimation,
+             LIST({ryujin::DashboardAnimation::none, "none"},
+                  {ryujin::DashboardAnimation::sparkle, "sparkle"}, ));
 #endif
 
 namespace ryujin
@@ -124,10 +153,9 @@ namespace ryujin
     DashboardColorScheme color_scheme = DashboardColorScheme::ryujin;
 
     /**
-     * Fill the space around the dashboard with sparkles that change with
-     * every update.
+     * The animation in the space around the dashboard.
      */
-    bool sparkles = true;
+    DashboardAnimation animation = DashboardAnimation::sparkle;
   };
 
 
@@ -262,19 +290,29 @@ namespace ryujin
   {
   public:
     /**
+     * Constructor.
+     */
+    Dashboard();
+
+    /**
      * Destructor. Stops the background thread.
      */
     ~Dashboard();
+
+    /**
+     * Start a background thread that plays the animation, on the whole
+     * terminal until the first call to show(). Call it before show().
+     */
+    void start(const DashboardSettings &settings);
 
     /**
      * Draw the snapshot @p data on the terminal with the dimensions,
      * placement and colors given by @p settings, and record it in the
      * throughput history.
      *
-     * The first call starts a background thread that redraws the last
-     * snapshot as soon as the terminal is resized, and that lets the
-     * sparkles twinkle in between two calls. The thread stops with the
-     * final snapshot (DashboardData::final_time).
+     * The background thread redraws the last snapshot as soon as the
+     * terminal is resized, and advances the animation in between two
+     * calls. It stops with the final snapshot (DashboardData::final_time).
      */
     void show(const DashboardData &data, const DashboardSettings &settings);
 
@@ -289,10 +327,16 @@ namespace ryujin
                        const DashboardSettings &settings);
 
     /**
-     * Return a string of ANSI escape sequences that replaces some of the
-     * sparkles of the last frame with new ones.
+     * Render a frame without the dashboard, in which the animation covers
+     * the whole terminal.
      */
-    std::string twinkle();
+    std::string render_animation();
+
+    /**
+     * Advance the animation of the last frame and return a string of ANSI
+     * escape sequences that redraws the cells it has changed.
+     */
+    std::string step();
 
     /**
      * The main loop of the background thread.
@@ -317,23 +361,18 @@ namespace ryujin
     int terminal_width_ = 0;
     int terminal_height_ = 0;
 
-    std::mt19937 random_engine_;
-
     std::deque<double> wall_history_;
     std::deque<double> compute_history_;
 
     /* The last snapshot, redrawn by the background thread on resize: */
     DashboardData data_;
     DashboardSettings settings_;
+    /* Whether there is no snapshot yet and the animation plays alone: */
+    bool animation_only_ = false;
 
-    /* The placement of the last frame and the positions of its sparkles: */
-    int columns_ = 0;
-    int rows_ = 0;
-    int left_ = 0;
-    int top_ = 0;
-    int width_ = 0;
-    int height_ = 0;
-    std::vector<std::pair<int, int>> sparkles_;
+    /* The last frame and its animation: */
+    std::unique_ptr<animation::Stage> stage_;
+    std::unique_ptr<animation::Animation> animation_;
 
     /*
      * The terminal (/dev/tty), written to directly instead of through

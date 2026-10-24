@@ -91,10 +91,10 @@ namespace ryujin
                   "Color scheme of the terminal dashboard: ryujin, rainbow, "
                   "tamu, monochrome");
 
-    add_parameter("dashboard sparkles",
-                  dashboard_settings_.sparkles,
-                  "Fill the space around the terminal dashboard with sparkles "
-                  "that change with every update.");
+    add_parameter("dashboard animation",
+                  dashboard_settings_.animation,
+                  "Animation in the space around the terminal dashboard: "
+                  "sparkle, none");
 #endif
 
     debug_command_ = "";
@@ -169,6 +169,15 @@ namespace ryujin
       n_global_dofs_ = dealii::Utilities::MPI::sum(
           simulation_.offline_data().dof_handler().n_dofs(),
           mpi_ensemble_.ensemble_leader_communicator());
+
+#if defined(WITH_FTXUI)
+    /* Play the animation from the start of the main loop on: */
+    if (!dashboard_active_ && mpi_ensemble_.world_rank() == 0 &&
+        interactive_terminal()) {
+      dashboard_.start(dashboard_settings_);
+      dashboard_active_ = true;
+    }
+#endif
   }
 
 
@@ -189,6 +198,20 @@ namespace ryujin
     ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
     print_cycle_statistics(context, /*logfile*/ write_to_logfile);
     last_terminal_output_ = context.wall_time;
+  }
+
+
+  template <int dim, typename Number>
+  bool Logger<dim, Number>::interactive_terminal() const
+  {
+#if defined(DEBUG_OUTPUT)
+    return false;
+#else
+    /* Only use terminal control sequences on an interactive terminal: */
+    const auto mode = dashboard_settings_.mode;
+    return mode == DashboardMode::on ||
+           (mode == DashboardMode::automatic && isatty(STDOUT_FILENO));
+#endif
   }
 
 
@@ -1083,22 +1106,11 @@ namespace ryujin
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
-#if defined(DEBUG_OUTPUT)
-    const bool interactive_terminal = false;
-#else
-    /* Only use terminal control sequences on an interactive terminal: */
-    const auto mode = dashboard_settings_.mode;
-    const bool interactive_terminal =
-        mode == DashboardMode::on ||
-        (mode == DashboardMode::automatic && isatty(STDOUT_FILENO));
-#endif
-
-    if (!interactive_terminal) {
+    if (!interactive_terminal()) {
       std::cout << output.str() << std::flush;
     } else {
 #if defined(WITH_FTXUI)
       dashboard_.show(dashboard_data_, dashboard_settings_);
-      dashboard_active_ = true;
 #else
       std::cout << "\033[2J\033[H" << output.str() << std::flush;
 #endif
