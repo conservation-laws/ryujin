@@ -32,6 +32,7 @@ set(CORE_SOURCE_FILES
   discretization/offline_data.cc
   discretization/time_integrator.cc
   driver/checkpointing.cc
+  driver/dashboard_text.cc
   driver/environment.cc
   driver/equation.cc
   driver/equation_euler.cc
@@ -54,7 +55,10 @@ set(CORE_SOURCE_FILES
   )
 
 if(WITH_FTXUI)
-  list(APPEND CORE_SOURCE_FILES driver/dashboard.cc)
+  list(APPEND CORE_SOURCE_FILES
+    driver/dashboard.cc
+    driver/dashboard_animation.cc
+    )
 endif()
 
 set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS

@@ -55,7 +55,8 @@ namespace ryujin
     void start(TaskContext<Number> &context) override;
 
     /**
-     * Record the MPI partition of the current mesh.
+     * Record the MPI partition of the current mesh. The first call starts
+     * the animation of the dashboard.
      */
     void prepare(TaskContext<Number> &context) override;
 
@@ -130,6 +131,8 @@ namespace ryujin
      */
     //@{
 
+    bool interactive_terminal() const;
+
     void print_debug_output();
 
     void print_parameters(const std::string &base_name, std::ostream &stream);
@@ -138,26 +141,20 @@ namespace ryujin
 
     void print_device_information();
 
-    void print_head(const std::string &header,
-                    const std::string &secondary,
-                    std::ostream &stream);
-
-    void print_information(const TaskContext<Number> &context,
-                           std::ostream &stream);
-
-    void print_memory_statistics(std::ostream &stream);
-
-    void print_timers(std::ostream &stream);
-
-    void print_tasks(const TaskContext<Number> &context, std::ostream &stream);
-
-    void print_throughput(const TaskContext<Number> &context,
-                          std::ostream &stream,
-                          bool final_time = false);
-
     void print_cycle_statistics(const TaskContext<Number> &context,
                                 bool write_to_logfile = false,
                                 bool final_time = false);
+
+    void collect_information(const TaskContext<Number> &context);
+
+    void collect_memory_statistics();
+
+    void collect_timers();
+
+    void collect_tasks(const TaskContext<Number> &context);
+
+    void collect_throughput(const TaskContext<Number> &context,
+                            bool final_time);
 
     //@}
   };

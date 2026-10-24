@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <driver/dashboard_animation.h>
 #include <ryujin/driver/dashboard.h>
 
 #include <ftxui/dom/canvas.hpp>
@@ -15,6 +16,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cmath>
@@ -52,7 +54,7 @@ namespace ryujin
       /* the background of bars and gauges: */
       Color track;
       std::vector<Color> segments;
-      std::vector<Color> sparkles;
+      std::vector<Color> animation;
       /* the color scale of the skew, from none to large: */
       std::vector<Color> heat;
     };
@@ -91,11 +93,11 @@ namespace ryujin
                          hex(0xb4f9f8),
                          hex(0xa9b1d6),
                          hex(0xc0caf5)},
-            .sparkles = {hex(0x7dcfff),
-                         hex(0x7aa2f7),
-                         hex(0x89ddff),
-                         hex(0xb4f9f8),
-                         hex(0xc0caf5)},
+            .animation = {hex(0x7dcfff),
+                          hex(0x7aa2f7),
+                          hex(0x89ddff),
+                          hex(0xb4f9f8),
+                          hex(0xc0caf5)},
             .heat = {hex(0x7aa2f7),
                      hex(0xe0af68),
                      hex(0xff9e64),
@@ -125,10 +127,10 @@ namespace ryujin
                          hex(0xff9e64),
                          hex(0x1dccec),
                          hex(0xbcc8f9)},
-            .sparkles = {hex(0x7dcfff),
-                         hex(0x729fff),
-                         hex(0xb993fe),
-                         hex(0xbcc8f9)},
+            .animation = {hex(0x7dcfff),
+                          hex(0x729fff),
+                          hex(0xb993fe),
+                          hex(0xbcc8f9)},
             .heat = {hex(0x9ed662), hex(0xe9b15f), hex(0xff6e89)},
         };
 
@@ -160,10 +162,10 @@ namespace ryujin
                          hex(0x4a4a4a),
                          hex(0xa87979),
                          hex(0xd9d9d9)},
-            .sparkles = {hex(0x966666),
-                         hex(0xc2a6a6),
-                         hex(0xdccccc),
-                         hex(0xffffff)},
+            .animation = {hex(0x966666),
+                          hex(0xc2a6a6),
+                          hex(0xdccccc),
+                          hex(0xffffff)},
             .heat = {hex(0x84ee53), hex(0xeebd53), hex(0xee5389)},
         };
 
@@ -190,10 +192,10 @@ namespace ryujin
                          hex(0xe4e4e4),
                          hex(0x949494),
                          hex(0x4e4e4e)},
-            .sparkles = {hex(0x6c6c6c),
-                         hex(0x9e9e9e),
-                         hex(0xd0d0d0),
-                         hex(0xffffff)},
+            .animation = {hex(0x6c6c6c),
+                          hex(0x9e9e9e),
+                          hex(0xd0d0d0),
+                          hex(0xffffff)},
             .heat = {hex(0xe4e4e4), hex(0xb2b2b2), hex(0xffffff)},
         };
       }
@@ -206,29 +208,25 @@ namespace ryujin
     Palette theme = make_palette(DashboardColorScheme::ryujin);
 
 
-    /*
-     * Sparkles:
-     */
-
-    const std::vector<std::string> sparkle_glyphs = {
-        "·", "·", "⋅", "+", "*", "⋆", "✦", "✧", "˚"};
-
-    /* The fraction of the free cells covered by sparkles: */
-    constexpr double sparkle_density = 0.02;
-
-    /* The interval in which the background thread twinkles: */
-    constexpr auto twinkle_interval = std::chrono::milliseconds(150);
-
-
-    /* Save and restore the cursor position (DECSC and DECRC): */
-    const std::string save_cursor = std::string("\033") + "7";
-    const std::string restore_cursor = std::string("\033") + "8";
-
-
-    /* Move the cursor to column x and row y (counting from zero): */
-    std::string move_to(int x, int y)
+    /* Return the escape sequences that redraw the changed cells: */
+    std::string changes(animation::Stage &stage)
     {
-      return std::format("\033[{};{}H", y + 1, x + 1);
+      auto &changed = stage.changed;
+      std::ranges::sort(changed);
+      changed.erase(std::ranges::unique(changed).begin(), changed.end());
+
+      std::string output;
+      for (const auto &[x, y] : changed) {
+        const auto &pixel = stage.screen.PixelAt(x, y);
+        output += std::format("\033[{};{}H\033[0;", y + 1, x + 1) +
+                  (pixel.bold ? "1;" : "") + (pixel.dim ? "2;" : "") +
+                  pixel.foreground_color.Print(false) + ";" +
+                  pixel.background_color.Print(true) + "m" +
+                  (pixel.character.empty() ? " " : pixel.character);
+      }
+
+      /* Save and restore the cursor position (DECSC and DECRC): */
+      return output.empty() ? "" : "\0337" + output + "\033[0m\0338";
     }
 
 
@@ -434,6 +432,64 @@ namespace ryujin
 
       return canvas(std::move(c));
     }
+
+
+    /* A seven-segment display of value with four significant digits: */
+    Element digital(double value)
+    {
+      constexpr int w = 10;
+      constexpr int h = 24;
+      constexpr int y0 = 2;
+
+      /* The segments a to g as rectangles {x1, y1, x2, y2}: */
+      constexpr std::array<std::array<int, 4>, 7> segments = {{
+          {0, 0, w - 1, 1},
+          {w - 2, 0, w - 1, h / 2},
+          {w - 2, h / 2 - 1, w - 1, h - 1},
+          {0, h - 2, w - 1, h - 1},
+          {0, h / 2 - 1, 1, h - 1},
+          {0, 0, 1, h / 2},
+          {0, h / 2 - 1, w - 1, h / 2},
+      }};
+
+      /* The lit segments of the digits 0 to 9, one bit per segment: */
+      constexpr std::array<int, 10> digits = {
+          0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+
+      const double v = safe(value);
+      const int precision = v < 10. ? 3 : v < 100. ? 2 : v < 1000. ? 1 : 0;
+      auto string = std::format("{:.{}f}", v, precision);
+
+      /* Drop a decimal if rounding carries over into another digit: */
+      if (precision > 0 && string.size() > 5)
+        string = std::format("{:.{}f}", v, precision - 1);
+
+      int width = 0;
+      for (const char ch : string)
+        width += ch == '.' ? 4 : w + 4;
+      Canvas c(width - 4, 28);
+
+      int x0 = 0;
+      for (const char ch : string) {
+        if (ch == '.') {
+          c.DrawPointLine(x0, y0 + h - 2, x0 + 1, y0 + h - 2, theme.good);
+          c.DrawPointLine(x0, y0 + h - 1, x0 + 1, y0 + h - 1, theme.good);
+          x0 += 4;
+          continue;
+        }
+
+        for (int i = 0; i < 7; ++i) {
+          if ((digits[ch - '0'] >> i & 1) == 0)
+            continue;
+          const auto [x1, y1, x2, y2] = segments[i];
+          for (int y = y1; y <= y2; ++y)
+            c.DrawPointLine(x0 + x1, y0 + y, x0 + x2, y0 + y, theme.good);
+        }
+        x0 += w + 4;
+      }
+
+      return canvas(std::move(c));
+    }
   } // namespace
 
 
@@ -442,7 +498,7 @@ namespace ryujin
   {
     theme = make_palette(settings.color_scheme);
 
-    /* Clear the screen if the terminal has been resized: */
+    /* Check whether the terminal has been resized: */
     const auto [columns, lines] = terminal_size();
     const bool resized =
         columns != terminal_width_ || lines != terminal_height_;
@@ -494,11 +550,11 @@ namespace ryujin
      */
 
     Elements information = {
-        hbox({label("Hyperbolic"), text(data.hyperbolic_name) | bold}),
+        hbox({label("hyperbolic"), text(data.hyperbolic_name) | bold}),
     };
     if (!data.parabolic_name.empty())
       information.push_back(
-          hbox({label("Parabolic"), text(data.parabolic_name) | bold}));
+          hbox({label("parabolic"), text(data.parabolic_name) | bold}));
 
     std::string ranks =
         std::format("{} rank{}", data.n_ranks, data.n_ranks == 1 ? "" : "s");
@@ -537,17 +593,24 @@ namespace ryujin
                                       : data.fudged_cpu_timings ? "CPU*"
                                                                 : "CPU ";
 
+    const bool dial =
+        settings.throughput_display == DashboardThroughputDisplay::speedometer;
+
     auto throughput = vbox({
-        hbox(
-            {filler(), speedometer(data.wall_m_dofs_per_sec, scale), filler()}),
         hbox({
-            text(" 0") | color(theme.muted),
+            filler(),
+            dial ? speedometer(data.wall_m_dofs_per_sec, scale)
+                 : digital(data.wall_m_dofs_per_sec),
+            filler(),
+        }),
+        hbox({
+            text(dial ? " 0" : "") | color(theme.muted),
             filler(),
             text(std::format("{:.2f}", data.wall_m_dofs_per_sec)) | bold |
                 color(theme.good),
             text(" MQ/s wall"),
             filler(),
-            text(std::format("{:g} ", scale)) | color(theme.muted),
+            text(dial ? std::format("{:g} ", scale) : "") | color(theme.muted),
         }),
         separatorLight() | color(theme.track),
         hbox({
@@ -884,47 +947,25 @@ namespace ryujin
         settings.center ? (terminal_columns - screen_width) / 2 : 0;
     const int top = settings.center ? (rows - height) / 2 : 0;
 
-    auto screen = Screen::Create(Dimension::Fixed(terminal_columns),
-                                 Dimension::Fixed(rows));
+    stage_ = std::make_unique<animation::Stage>(
+        Screen(terminal_columns, rows),
+        Box{left, left + screen_width - 1, top, top + height - 1},
+        theme.animation);
     for (int y = 0; y < height; ++y)
       for (int x = 0; x < screen_width; ++x)
-        screen.PixelAt(left + x, top + y) = image.PixelAt(x, y);
+        stage_->screen.PixelAt(left + x, top + y) = image.PixelAt(x, y);
 
-    /* Scatter sparkles over the space around the dashboard: */
+    /* Leave the screen around the final dashboard empty: */
+    if (animation_ && !data.final_time)
+      animation_->draw(*stage_, data);
 
-    columns_ = terminal_columns;
-    rows_ = rows;
-    left_ = left;
-    top_ = top;
-    width_ = screen_width;
-    height_ = height;
-    sparkles_.clear();
-
-    if (settings.sparkles) {
-      std::uniform_real_distribution<double> uniform(0., 1.);
-      std::uniform_int_distribution<std::size_t> glyph(
-          0, sparkle_glyphs.size() - 1);
-      std::uniform_int_distribution<std::size_t> shade(
-          0, theme.sparkles.size() - 1);
-
-      for (int y = 0; y < rows; ++y)
-        for (int x = 0; x < terminal_columns; ++x) {
-          const bool inside = x >= left && x < left + screen_width &&
-                              y >= top && y < top + height;
-          if (inside || uniform(random_engine_) >= sparkle_density)
-            continue;
-
-          sparkles_.emplace_back(x, y);
-          auto &pixel = screen.PixelAt(x, y);
-          pixel.character = sparkle_glyphs[glyph(random_engine_)];
-          pixel.foreground_color = theme.sparkles[shade(random_engine_)];
-          pixel.dim = uniform(random_engine_) < 0.5;
-        }
-    }
-
-    /* Redraw the whole terminal in place: */
-    std::string output = resized ? "\033[2J\033[H" : "\033[H";
-    output += screen.ToString();
+    /*
+     * Redraw the whole terminal in place, after clearing the screen if the
+     * terminal has been resized or for the final snapshot:
+     */
+    const bool clear = resized || data.final_time;
+    std::string output = clear ? "\033[2J\033[H" : "\033[H";
+    output += stage_->screen.ToString();
 
     /* If the dashboard does not fit, clear whatever is left below: */
     if (rows > terminal_height_)
@@ -934,67 +975,48 @@ namespace ryujin
   }
 
 
-  std::string Dashboard::twinkle()
+  std::string Dashboard::render_animation()
   {
-    /* Nothing to do without sparkles, or if the last frame has scrolled: */
-    if (!settings_.sparkles || sparkles_.empty() || rows_ > terminal_height_)
+    theme = make_palette(settings_.color_scheme);
+
+    const auto [columns, lines] = terminal_size();
+    terminal_width_ = columns;
+    terminal_height_ = lines;
+    /* A stage with an empty dashboard: */
+    stage_ = std::make_unique<animation::Stage>(
+        Screen(columns, lines), Box{0, -1, 0, -1}, theme.animation);
+
+    if (animation_)
+      animation_->draw(*stage_, data_);
+
+    return "\033[2J\033[H" + stage_->screen.ToString();
+  }
+
+
+  std::string Dashboard::step()
+  {
+    /* Nothing to do without animation, or if the last frame has scrolled: */
+    if (!animation_ || stage_->screen.dimy() > terminal_height_)
       return "";
 
-    const auto inside = [&](int x, int y) {
-      return x >= left_ && x < left_ + width_ && y >= top_ &&
-             y < top_ + height_;
-    };
-
-    std::uniform_real_distribution<double> uniform(0., 1.);
-    std::uniform_int_distribution<int> column(0, columns_ - 1);
-    std::uniform_int_distribution<int> row(0, rows_ - 1);
-    std::uniform_int_distribution<std::size_t> pick(0, sparkles_.size() - 1);
-    std::uniform_int_distribution<std::size_t> glyph(0,
-                                                     sparkle_glyphs.size() - 1);
-    std::uniform_int_distribution<std::size_t> shade(0,
-                                                     theme.sparkles.size() - 1);
-
-    std::string output = save_cursor;
-
-    /* Move about one in eight sparkles to a free cell: */
-    const auto n = std::max<std::size_t>(1, sparkles_.size() / 8);
-    for (std::size_t i = 0; i < n; ++i) {
-      auto &[x, y] = sparkles_[pick(random_engine_)];
-      output += move_to(x, y) + "\033[0m ";
-
-      for (int attempt = 0; attempt < 16; ++attempt) {
-        const int new_x = column(random_engine_);
-        const int new_y = row(random_engine_);
-        if (!inside(new_x, new_y) &&
-            std::ranges::find(sparkles_, std::pair{new_x, new_y}) ==
-                sparkles_.end()) {
-          x = new_x;
-          y = new_y;
-          break;
-        }
-      }
-
-      const auto &c = theme.sparkles[shade(random_engine_)];
-      output += move_to(x, y) + "\033[0;" +
-                (uniform(random_engine_) < 0.5 ? "2;" : "") + c.Print(false) +
-                "m" + sparkle_glyphs[glyph(random_engine_)];
-    }
-
-    return output + "\033[0m" + restore_cursor;
+    stage_->changed.clear();
+    animation_->step(*stage_, data_);
+    return changes(*stage_);
   }
 
 
   void Dashboard::animate()
   {
-    std::unique_lock lock(mutex_);
-    while (!condition_.wait_for(
-        lock, twinkle_interval, [this] { return stop_; })) {
-      /* Redraw the last snapshot right away if the terminal is resized: */
-      const auto [columns, lines] = terminal_size();
-      const bool resized =
-          columns != terminal_width_ || lines != terminal_height_;
+    constexpr auto interval = std::chrono::milliseconds(150);
 
-      write(resized ? render(data_, settings_) : twinkle());
+    std::unique_lock lock(mutex_);
+    while (!condition_.wait_for(lock, interval, [this] { return stop_; })) {
+      /* Redraw the last frame right away if the terminal is resized: */
+      const auto [columns, lines] = terminal_size();
+      if (columns == terminal_width_ && lines == terminal_height_)
+        write(step());
+      else
+        write(animation_only_ ? render_animation() : render(data_, settings_));
     }
   }
 
@@ -1002,13 +1024,16 @@ namespace ryujin
   void Dashboard::stop()
   {
     {
-      std::lock_guard lock(mutex_);
+      std::scoped_lock lock(mutex_);
       stop_ = true;
     }
     condition_.notify_all();
     if (thread_.joinable())
       thread_.join();
   }
+
+
+  Dashboard::Dashboard() = default;
 
 
   Dashboard::~Dashboard()
@@ -1053,6 +1078,23 @@ namespace ryujin
   }
 
 
+  void Dashboard::start(const DashboardSettings &settings)
+  {
+    std::scoped_lock lock(mutex_);
+
+    terminal_ = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);
+    settings_ = settings;
+    animation_ = animation::create(settings.animation);
+    animation_only_ = true;
+
+    /* Write out everything that is still pending on stdout first: */
+    std::cout << std::flush;
+    write(render_animation());
+
+    thread_ = std::thread([this] { animate(); });
+  }
+
+
   void Dashboard::show(const DashboardData &data,
                        const DashboardSettings &settings)
   {
@@ -1060,7 +1102,7 @@ namespace ryujin
     if (data.final_time)
       stop();
 
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
 
     /* Update the throughput history: */
 
@@ -1074,18 +1116,12 @@ namespace ryujin
 
     data_ = data;
     settings_ = settings;
-
-    /* Open the terminal on the first call: */
-    if (!thread_.joinable() && terminal_ < 0)
-      terminal_ = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);
+    animation_only_ = false;
 
     /* Write out everything that is still pending on stdout first: */
     std::cout << std::flush;
 
     /* Continue with subsequent output below the final dashboard: */
     write(render(data_, settings_) + (data.final_time ? "\n" : ""));
-
-    if (!data.final_time && !thread_.joinable())
-      thread_ = std::thread([this] { animate(); });
   }
 } // namespace ryujin
