@@ -475,15 +475,12 @@ namespace ryujin
 
     const auto text = render_text(dashboard_data_);
 
-    if (!interactive_terminal()) {
-      std::cout << text << std::flush;
-    } else {
 #if defined(WITH_FTXUI)
+    if (interactive_terminal())
       dashboard_.show(dashboard_data_, dashboard_settings_);
-#else
-      std::cout << "\033[2J\033[H" << text << std::flush;
+    else
 #endif
-    }
+      std::cout << "\033[2J\033[H" << text << std::flush;
 
     if (write_to_logfile)
       logfile_ << "\n" << text << std::flush;
