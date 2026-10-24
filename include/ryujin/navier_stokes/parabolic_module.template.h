@@ -552,6 +552,10 @@ namespace ryujin
         diagonal_matrix.reinit(
             lumped_mass_matrix_view, density_, affine_constraints);
 
+        if ((use_gmg_velocity_ || use_gmg_internal_energy_) && reinitialize_gmg)
+          mg_transfer_velocity_.interpolate_to_mg(
+              offline_data_->dof_handler(), level_density_, density_);
+
         if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               VelocityMatrix<dim, float, Number>,
@@ -562,8 +566,6 @@ namespace ryujin
 
           level_velocity_matrices_.resize(level_matrix_free_.min_level(),
                                           level_matrix_free_.max_level());
-          mg_transfer_velocity_.interpolate_to_mg(
-              offline_data_->dof_handler(), level_density_, density_);
 
           for (unsigned int level = level_matrix_free_.min_level();
                level <= level_matrix_free_.max_level();
