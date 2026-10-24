@@ -334,8 +334,8 @@ namespace ryujin
 
         const auto body_invert = [&](auto sentinel, const unsigned int i) {
           using T = decltype(sentinel);
-          const auto m_i = lumped_mass_matrix.local_element(i);
-          const auto rho_i = density_->local_element(i);
+          const auto m_i = read_entry<T>(lumped_mass_matrix, i);
+          const auto rho_i = read_entry<T>(*density_, i);
           for (unsigned int d = 0; d < dim; ++d)
             write_entry(vector.block(d),
                         Number(1.) /
