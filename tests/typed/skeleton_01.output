@@ -1,0 +1,24 @@
+dim = 1
+  HyperbolicDescription:       true
+  HyperbolicModuleDescription: true
+  ParabolicDescription:        true
+  problem name:          Skeleton
+  skeleton parameter:    2.5
+  problem dimension:     1
+  n precomputed values:  2
+dim = 2
+  HyperbolicDescription:       true
+  HyperbolicModuleDescription: true
+  ParabolicDescription:        true
+  problem name:          Skeleton
+  skeleton parameter:    2.5
+  problem dimension:     1
+  n precomputed values:  2
+dim = 3
+  HyperbolicDescription:       true
+  HyperbolicModuleDescription: true
+  ParabolicDescription:        true
+  problem name:          Skeleton
+  skeleton parameter:    2.5
+  problem dimension:     1
+  n precomputed values:  2
