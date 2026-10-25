@@ -24,6 +24,31 @@
 namespace ryujin
 {
   /**
+   * Populate dealii::ParameterAcceptor::prm with all parameters of the
+   * objects created by @p setup, and return the objects. The objects
+   * have to go out of scope before calling dealii::ParameterAcceptor::clear().
+   *
+   * @ingroup Driver
+   */
+  template <typename Setup>
+  auto populate_parameters(const Setup &setup)
+  {
+    auto &prm = dealii::ParameterAcceptor::prm;
+
+    /*
+     * Workaround: The Scheduler is constructed last and declares the
+     * "A - Scheduler" section last. Add an entry to the section so that it
+     * shows up first.
+     */
+    prm.enter_subsection("A - Scheduler");
+    prm.declare_entry("basename", "test");
+    prm.leave_subsection();
+
+    return setup();
+  }
+
+
+  /**
    * Write the default parameter file "default_parameters-<name>.prm", and,
    * if @p write_detailed_description is set, the parameter file
    * "default_parameters-<name>-description.prm" with the documentation of
@@ -50,16 +75,7 @@ namespace ryujin
     {
       auto &prm = dealii::ParameterAcceptor::prm;
 
-      /*
-       * Workaround: The Scheduler is constructed last and declares the
-       * "A - Scheduler" section last. Add an entry to the section so that it
-       * shows up first.
-       */
-      prm.enter_subsection("A - Scheduler");
-      prm.declare_entry("basename", "test");
-      prm.leave_subsection();
-
-      [[maybe_unused]] const auto objects = setup();
+      [[maybe_unused]] const auto objects = populate_parameters(setup);
 
       if (dealii::Utilities::MPI::this_mpi_process(MPI_COMM_SELF) == 0) {
         if (write_detailed_description)
@@ -186,6 +202,38 @@ namespace ryujin
     }
 
     /**
+     * Declare the parameters "dimension" and "equation" (see
+     * source/main.cc), set to this equation, and create the Simulation
+     * and the TaskComposition for the sole purpose of populating the
+     * ParameterAcceptor::prm object.
+     */
+    template <int dim>
+    static auto create_objects(const std::string &name)
+    {
+      std::string names;
+      for (const auto &[key, equation] : equations())
+        names += (names.empty() ? "" : "|") + key;
+
+      auto &prm = dealii::ParameterAcceptor::prm;
+      prm.enter_subsection("B - Equation");
+      prm.declare_entry("dimension",
+                        std::to_string(dim),
+                        dealii::Patterns::Integer(1, 3),
+                        "The spatial dimension");
+      prm.declare_entry("equation",
+                        name,
+                        dealii::Patterns::Selection(names),
+                        "The PDE system");
+      prm.leave_subsection();
+
+      struct Objects {
+        Simulation<HD, PD, dim, NUMBER, TI> simulation{MPI_COMM_SELF};
+        TaskComposition<dim, NUMBER> task_composition{simulation};
+      };
+      return std::make_unique<Objects>();
+    }
+
+    /**
      * Write the default parameter file(s) for dimension @p dim.
      */
     template <int dim>
@@ -197,29 +245,7 @@ namespace ryujin
       base_name += "-" + std::to_string(dim) + "d";
 
       write_parameter_files(base_name, write_detailed_description, [&name] {
-        /*
-         * The parameters "dimension" and "equation" (see source/main.cc), set
-         * to this equation:
-         */
-        auto &prm = dealii::ParameterAcceptor::prm;
-        prm.enter_subsection("B - Equation");
-        prm.declare_entry("dimension",
-                          std::to_string(dim),
-                          dealii::Patterns::Integer(),
-                          "The spatial dimension");
-        prm.declare_entry(
-            "equation", name, dealii::Patterns::Anything(), "The PDE system");
-        prm.leave_subsection();
-
-        /*
-         * Create temporary objects for the sole purpose of populating the
-         * ParameterAcceptor::prm object.
-         */
-        struct Objects {
-          Simulation<HD, PD, dim, NUMBER, TI> simulation{MPI_COMM_SELF};
-          TaskComposition<dim, NUMBER> task_composition{simulation};
-        };
-        return std::make_unique<Objects>();
+        return create_objects<dim>(name);
       });
     }
   };
