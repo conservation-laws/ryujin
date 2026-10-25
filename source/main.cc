@@ -7,6 +7,7 @@
 #include <ryujin/driver/environment.h>
 #include <ryujin/driver/equation.h>
 #include <ryujin/driver/parameter_editor.h>
+#include <ryujin/driver/splash_screen.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -79,14 +80,28 @@ int main(int argc, char *argv[])
    */
 
   /*
-   * Remove --edit and --editor from the argument list before handing off
-   * to MPI, Kokkos, PETSc, etc...
+   * Remove --edit, --editor, and --splash=<name> from the argument list
+   * before handing off to MPI, Kokkos, PETSc, etc...
    */
-  const auto end = std::remove_if(argv + 1, argv + argc, [](const char *arg) {
+  bool invoke_editor = false;
+  auto splash_screen = ryujin::SplashScreen::logo;
+  bool invalid_splash_screen = false;
+  const auto end = std::remove_if(argv + 1, argv + argc, [&](const char *arg) {
     const std::string_view option = arg;
-    return option == "--edit" || option == "--editor";
+    if (option == "--edit" || option == "--editor")
+      invoke_editor = true;
+    else if (option == "--splash=none")
+      splash_screen = ryujin::SplashScreen::none;
+    else if (option == "--splash=logo")
+      splash_screen = ryujin::SplashScreen::logo;
+    else if (option == "--splash=arcade")
+      splash_screen = ryujin::SplashScreen::arcade;
+    else if (option.starts_with("--splash="))
+      invalid_splash_screen = true;
+    else
+      return false;
+    return true;
   });
-  const bool invoke_editor = end != argv + argc;
   argc = static_cast<int>(end - argv);
 
   ryujin::Environment environment(argc, argv);
@@ -102,7 +117,17 @@ int main(int argc, char *argv[])
     if (is_root) {
       std::cerr << "[ERROR] Invalid number of parameters. At most one argument "
                 << "supported which has to be a parameter file (and the "
-                << "option --edit or --editor)." << std::endl;
+                << "options --edit or --editor, and --splash=<name>)."
+                << std::endl;
+    }
+    return 1;
+  }
+
+  if (invalid_splash_screen) {
+    if (is_root) {
+      std::cerr << "[ERROR] Invalid splash screen. Supported are "
+                << "--splash=none, --splash=logo, and --splash=arcade."
+                << std::endl;
     }
     return 1;
   }
@@ -168,6 +193,17 @@ int main(int argc, char *argv[])
     std::cout << "[INFO] dispatching to driver »" << selection.equation
               << "« with dim=" << selection.dimension << std::endl;
   }
+
+#if defined(WITH_FTXUI)
+  if (is_root)
+    ryujin::play_splash_screen(
+        selection.equation,
+        selection.dimension,
+        dealii::Utilities::MPI::n_mpi_processes(mpi_communicator),
+        splash_screen);
+#else
+  (void)splash_screen;
+#endif
 
   ryujin::equations()
       .at(selection.equation)

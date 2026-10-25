@@ -373,6 +373,15 @@
  * simulation. Before discarding unsaved changes the editor asks for a
  * confirmation.
  *
+ * <h3>Splash screen</h3>
+ *
+ * Before running the equation, main() shows a splash screen on rank 0,
+ * see play_splash_screen(), if stdout reaches an interactive terminal.
+ * The option <code>--splash=&lt;name&gt;</code> selects it: "logo" (the
+ * default) shows the logo, the name, and the copyright of ryujin, "arcade"
+ * plays an intro in the style of an arcade game of the eighties and waits
+ * for a key press, and "none" skips it.
+ *
  * <h3>Scheduler</h3>
  *
  * The Scheduler runs a list of tasks (see Interface::Task). The active
