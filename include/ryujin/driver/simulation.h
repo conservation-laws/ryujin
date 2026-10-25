@@ -239,7 +239,7 @@ namespace ryujin
       debug_poison_invalid_values(state_vector, *this->offline_data_);
 
       /* Prepare the state vector for time stepping. */
-      this->time_integrator_->prepare_state_vector(state_vector, context.t);
+      this->prepare_state_vector(state_vector, context.t);
     }
 
     /**
@@ -253,8 +253,7 @@ namespace ryujin
       context.tau = this->time_integrator_->step(
           state_vector, context.t, Number(0.), context.t_max - context.t);
 
-      this->time_integrator_->prepare_state_vector(state_vector,
-                                                   context.t + context.tau);
+      this->prepare_state_vector(state_vector, context.t + context.tau);
     }
 
     //@}

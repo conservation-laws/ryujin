@@ -126,7 +126,7 @@ namespace ryujin
       simulation_.interpolate_analytic_solution(analytic, t);
 
       /* Apply boundary conditions and precompute values for output: */
-      simulation_.time_integrator().prepare_state_vector(analytic, t);
+      simulation_.prepare_state_vector(analytic, t);
 
       schedule_output(analytic, name + "-analytic_solution", t, cycle);
     }
