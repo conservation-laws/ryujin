@@ -199,9 +199,13 @@ namespace ryujin
     mutable Kokkos::View<Number *, KokkosDefault> data_default_;
 
     /*
-     * Note: For the time being, let's assume MPI only operates on host
-     * memory. Meaning, when we populate exchange_buffer_default_ on the
-     * device, we will copy over to the host prior to sending.
+     * Note: Unless deal.II is configured with device-aware MPI
+     * (DEAL_II_MPI_WITH_DEVICE_SUPPORT) we assume that MPI only operates
+     * on host memory. Meaning, when we populate exchange_buffer_default_
+     * on the device, we will copy over to the host prior to sending, and
+     * receive ghost rows into ghost_buffer_host_. With device-aware MPI
+     * update_ghost_rows_on_memory_space() sends and receives directly
+     * from and into device memory.
      */
 
     mutable Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
@@ -570,6 +574,7 @@ namespace ryujin
     exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
         "sparse_matrix_exchange_buffer", n_components * n_indices);
 
+#ifndef DEAL_II_MPI_WITH_DEVICE_SUPPORT
     if constexpr (have_separate_memory_spaces) {
       const auto ghost_offset =
           sparsity_view.template ghost_offset<n_components>();
@@ -579,6 +584,7 @@ namespace ryujin
       ghost_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
           "sparse_matrix_ghost_buffer", end_offset - ghost_offset);
     }
+#endif
 
     /*
      * The matrix is resident on the host memory space only. Device
@@ -814,12 +820,28 @@ namespace ryujin
 
     const auto ghost_offset =
         sparsity_view.template ghost_offset<n_components>();
-    const auto end_offset =
+    [[maybe_unused]] const auto end_offset =
         offset_type(sparsity_view.n_nonzero_elements()) * n_components;
 
+#ifdef DEAL_II_MPI_WITH_DEVICE_SUPPORT
+    /*
+     * With device-aware MPI we send from and receive into the memory
+     * space directly. Make sure that no kernel is still accessing the
+     * ghost range before we post the receives:
+     */
+    if constexpr (!on_host)
+      typename MemorySpace::kokkos_space::execution_space{}.fence();
+
+    Number *const receive_pointer = on_host
+                                        ? data_host_.data() + ghost_offset
+                                        : data_default_.data() + ghost_offset;
+    Number *const send_pointer = on_host ? exchange_buffer_host_.data()
+                                         : exchange_buffer_default_.data();
+#else
     Number *const receive_pointer =
         on_host ? data_host_.data() + ghost_offset : ghost_buffer_host_.data();
     Number *const send_pointer = exchange_buffer_host_.data();
+#endif
 
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
       const auto receive_offset =
@@ -848,9 +870,11 @@ namespace ryujin
 
     populate_exchange_buffer_on_memory_space<MemorySpace>();
 
+#ifndef DEAL_II_MPI_WITH_DEVICE_SUPPORT
     if constexpr (!on_host)
       Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
                         /*src*/ exchange_buffer_default_);
+#endif
 
     for (unsigned int p = 0; p < send_targets.size(); ++p) {
       const auto send_offset =
@@ -886,6 +910,7 @@ namespace ryujin
         MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
     AssertThrowMPI(ierr);
 
+#ifndef DEAL_II_MPI_WITH_DEVICE_SUPPORT
     if constexpr (!on_host) {
       /* Copy the received ghost range back into device memory: */
       const auto ghost_range =
@@ -894,6 +919,7 @@ namespace ryujin
                                             std::size_t(end_offset)));
       Kokkos::deep_copy(/*dst*/ ghost_range, /*src*/ ghost_buffer_host_);
     }
+#endif
   }
 
 

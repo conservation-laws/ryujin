@@ -5,6 +5,8 @@
 
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
+#include <iostream>
+
 int main(int argc, char *argv[])
 {
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
