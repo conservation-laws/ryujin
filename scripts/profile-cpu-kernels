@@ -4,14 +4,6 @@
 ## Copyright (C) 2026 by the ryujin authors
 ##
 
-#
-# H E R E   B E   D R A G O N S
-#
-# This script was written together with Claude. If you find the spaghetti
-# code too horrible to read, feel free to delete it, rewrite it from
-# scratch, or print it out and set it on fire. Nobody will mourn it.
-#
-
 help_description = """
 This script collects hardware performance counters for individual host
 compute loops with likwid and reports the derived quantities that are of
