@@ -45,6 +45,7 @@ set(CORE_SOURCE_FILES
   driver/equation_scalar_conservation.cc
   driver/equation_shallow_water.cc
   driver/logger.cc
+  driver/parameter_editor.cc
   driver/parameter_model.cc
   driver/scheduler.cc
   geometries/geometry_library.cc
@@ -60,6 +61,7 @@ if(WITH_FTXUI)
     driver/dashboard.cc
     driver/dashboard_animation.cc
     driver/dashboard_theme.cc
+    driver/parameter_editor_ui.cc
     )
 endif()
 

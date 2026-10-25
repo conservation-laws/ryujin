@@ -211,8 +211,12 @@ if(WITH_FTXUI)
   set(FTXUI_QUIET ON CACHE BOOL "" FORCE)
   add_subdirectory(ftxui EXCLUDE_FROM_ALL)
   # The static FTXUI libraries end up in the shared library libryujin.so:
-  set_target_properties(screen dom PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  list(APPEND EXTERNAL_TARGETS "$<BUILD_INTERFACE:ftxui::dom>")
+  set_target_properties(screen dom component PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    )
+  list(APPEND EXTERNAL_TARGETS
+    "$<BUILD_INTERFACE:ftxui::dom>" "$<BUILD_INTERFACE:ftxui::component>"
+    )
 endif()
 
 if(WITH_GDAL)
