@@ -92,10 +92,22 @@ namespace ryujin
       //@{
 
       /**
+       * Prepare the state vector @p state_vector at time @p t for a time
+       * step, an output, or a mesh transfer: this function first calls
+       * ParabolicModule::prepare_state_vector() and afterwards
+       * HyperbolicModule::prepare_state_vector().
+       */
+      void prepare_state_vector(StateVector<Number> &state_vector,
+                                Number t) const
+      {
+        parabolic_module_->prepare_state_vector(state_vector, t);
+        hyperbolic_module_->prepare_state_vector(state_vector, t);
+      }
+
+      /**
        * Interpolate the analytic solution at time @p t into the state
        * vector @p analytic and populate precomputed values. In contrast to
-       * TimeIntegrator::prepare_state_vector() no boundary conditions are
-       * applied.
+       * prepare_state_vector() no boundary conditions are applied.
        */
       void interpolate_analytic_solution(StateVector<Number> &analytic,
                                          Number t) const

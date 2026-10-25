@@ -15,6 +15,9 @@
 
 namespace ryujin
 {
+  template <typename Description, int dim, typename Number>
+  class Postprocessor;
+
   namespace Interface
   {
     /**
@@ -64,10 +67,12 @@ namespace ryujin
       virtual ~Postprocessor() = default;
 
       /**
-       * A selection of quantities as returned by prepare(). The encoding
-       * of sections and operations is defined by the implementation.
+       * A selection of quantities as returned by prepare(). Only the
+       * typed Postprocessor reads and writes its contents.
        */
-      struct Selection {
+      class Selection
+      {
+      public:
         /**
          * Return the number of selected quantities.
          */
@@ -75,6 +80,10 @@ namespace ryujin
         {
           return static_cast<unsigned int>(quantities.size());
         }
+
+      private:
+        template <typename, int, typename>
+        friend class ryujin::Postprocessor;
 
         /**
          * The components to extract: every selected component, and the

@@ -10,6 +10,7 @@
 #include <ryujin/base/mpi_ensemble_container.h>
 #include <ryujin/concept/hyperbolic_description.h>
 #include <ryujin/concept/parabolic_description.h>
+#include <ryujin/concept/time_integrator.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/discretization/time_integrator.h>
@@ -25,7 +26,8 @@ namespace ryujin
 {
   /**
    * The Simulation constructs the core objects of a simulation for a given
-   * pairing of a hyperbolic and a parabolic description.
+   * pairing of a hyperbolic and a parabolic description, and the time
+   * integrator @p TI, which defaults to the TimeIntegrator of ryujin.
    *
    * In addition to the objects stored in Interface::Simulation it owns
    * the per-ensemble containers of the hyperbolic system, the parabolic
@@ -37,9 +39,14 @@ namespace ryujin
    *
    * @ingroup Driver
    */
-  template <typename HD, typename PD, int dim, typename Number = double>
+  template <typename HD,
+            typename PD,
+            int dim,
+            typename Number = double,
+            template <int, typename> class TI = TimeIntegrator>
     requires Concept::HyperbolicDescription<HD, dim, Number> &&
-             Concept::ParabolicDescription<PD, HD, dim, Number>
+             Concept::ParabolicDescription<PD, HD, dim, Number> &&
+             Concept::TimeIntegrator<TI<dim, Number>, dim, Number>
   class Simulation final : public Interface::Simulation<dim, Number>
   {
   public:
@@ -127,13 +134,13 @@ namespace ryujin
                                             initial_values,
                                             "/G - ParabolicModule");
 
-      this->time_integrator_ = std::make_unique<TimeIntegrator<dim, Number>>(
-          mpi_ensemble,
-          hyperbolic_system,
-          parabolic_system,
-          *this->hyperbolic_module_,
-          *this->parabolic_module_,
-          "/H - TimeIntegrator");
+      this->time_integrator_ =
+          std::make_unique<TI<dim, Number>>(mpi_ensemble,
+                                            hyperbolic_system,
+                                            parabolic_system,
+                                            *this->hyperbolic_module_,
+                                            *this->parabolic_module_,
+                                            "/H - TimeIntegrator");
 
       this->postprocessor_ =
           std::make_unique<Postprocessor<HD, dim, Number>>(offline_data,
@@ -232,7 +239,7 @@ namespace ryujin
       debug_poison_invalid_values(state_vector, *this->offline_data_);
 
       /* Prepare the state vector for time stepping. */
-      this->time_integrator_->prepare_state_vector(state_vector, context.t);
+      this->prepare_state_vector(state_vector, context.t);
     }
 
     /**
@@ -246,8 +253,7 @@ namespace ryujin
       context.tau = this->time_integrator_->step(
           state_vector, context.t, Number(0.), context.t_max - context.t);
 
-      this->time_integrator_->prepare_state_vector(state_vector,
-                                                   context.t + context.tau);
+      this->prepare_state_vector(state_vector, context.t + context.tau);
     }
 
     //@}

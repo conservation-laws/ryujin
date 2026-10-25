@@ -49,14 +49,6 @@ namespace ryujin
       //@{
 
       /**
-       * Preprocess a given state vector @p state_vector at time @p t for
-       * time stepping. It has to be called prior to step() to ensure that
-       * precomputed values are in place.
-       */
-      virtual void prepare_state_vector(StateVector<Number> &state_vector,
-                                        Number t) const = 0;
-
-      /**
        * Given a reference to a previous state vector @p state_vector at
        * time @p t perform a time step (and store the result in @p
        * state_vector). The function returns the time step size tau with
@@ -67,7 +59,7 @@ namespace ryujin
        * equal to @p tau_max.
        *
        * @pre The @p state_vector has to be prepared with
-       * prepare_state_vector() prior to calling step().
+       * Simulation::prepare_state_vector() prior to calling step().
        */
       virtual Number
       step(StateVector<Number> &state_vector,

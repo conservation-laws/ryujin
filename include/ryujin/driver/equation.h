@@ -116,15 +116,18 @@ namespace ryujin
 
   /**
    * Register the equation that pairs the hyperbolic description @p HD
-   * with the parabolic description @p PD under the given name. An
-   * equation is registered with a constant at namespace scope:
+   * with the parabolic description @p PD and the time integrator @p TI
+   * under the given name. An equation is registered with a constant at
+   * namespace scope:
    * @code
    * const EquationRegistration<HD, PD> registration("equation");
    * @endcode
    *
    * @ingroup Driver
    */
-  template <typename HD, typename PD = StubParabolicDescription>
+  template <typename HD,
+            typename PD = StubParabolicDescription,
+            template <int, typename> class TI = TimeIntegrator>
   class EquationRegistration final
   {
   public:
@@ -174,7 +177,7 @@ namespace ryujin
     static void run_simulation(const std::string &parameter_file,
                                const MPI_Comm &mpi_comm)
     {
-      Simulation<HD, PD, dim, NUMBER> simulation(mpi_comm);
+      Simulation<HD, PD, dim, NUMBER, TI> simulation(mpi_comm);
       TaskComposition<dim, NUMBER> task_composition(simulation);
 
       dealii::ParameterAcceptor::initialize(parameter_file);
@@ -213,7 +216,7 @@ namespace ryujin
          * ParameterAcceptor::prm object.
          */
         struct Objects {
-          Simulation<HD, PD, dim, NUMBER> simulation{MPI_COMM_SELF};
+          Simulation<HD, PD, dim, NUMBER, TI> simulation{MPI_COMM_SELF};
           TaskComposition<dim, NUMBER> task_composition{simulation};
         };
         return std::make_unique<Objects>();
