@@ -67,12 +67,6 @@ public:
     hyperbolic_module_.set_cfl(Number(0.2));
   }
 
-  void prepare_state_vector(StateVector<Number> &state_vector,
-                            Number t) const override
-  {
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
-  }
-
   Number step(StateVector<Number> &state_vector,
               Number t,
               Number tau,
