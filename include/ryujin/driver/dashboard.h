@@ -264,8 +264,6 @@ namespace ryujin
     double n_global_dofs = 0.;
     unsigned int n_ensembles = 1;
     unsigned int n_ranks = 1;
-    unsigned int last_output_cycle = 0;
-    double last_output_time = 0.;
 
     //@}
     /**

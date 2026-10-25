@@ -535,9 +535,6 @@ namespace ryujin
     data.n_global_dofs = n_global_dofs_;
     data.n_ensembles = mpi_ensemble_.n_ensembles();
     data.n_ranks = mpi_ensemble_.n_world_ranks();
-    data.last_output_cycle = context.timer_cycle - 1;
-    data.last_output_time =
-        context.timer_granularity * (context.timer_cycle - 1);
   }
 
 

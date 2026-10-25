@@ -572,12 +572,6 @@ namespace ryujin
     information.push_back(hbox({label("parallel"), text(ranks)}));
     information.push_back(
         hbox({label("backend"), chip(data.backend, theme.highlight)}));
-    information.push_back(hbox({
-        label("output"),
-        text(std::format("cycle {} at t = {:.4g}",
-                         data.last_output_cycle,
-                         data.last_output_time)),
-    }));
 
     /*
      * Throughput speedometer

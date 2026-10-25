@@ -103,8 +103,7 @@ namespace ryujin
              << (data.threads.empty() ? "" : "/ " + data.threads + " ") << "<"
              << data.backend << ">\n";
 
-      stream << "             Last output cycle " << data.last_output_cycle
-             << " at t = " << data.last_output_time << "  [ tasks: ";
+      stream << "             [ tasks: ";
       for (const auto &task : data.tasks)
         stream << task.name << (&task == &data.tasks.back() ? " " : ", ");
       stream << "]\n";
