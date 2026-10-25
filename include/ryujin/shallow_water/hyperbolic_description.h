@@ -30,6 +30,10 @@ namespace ryujin
     struct HyperbolicDescription {
       using HyperbolicSystem = ShallowWater::HyperbolicSystem;
 
+      template <int dim, typename Number>
+      using InitialValues =
+          ryujin::InitialValues<HyperbolicSystem, dim, Number>;
+
       template <typename ScalarNumber = double>
       using Indicator = ShallowWater::Indicator<ScalarNumber>;
 

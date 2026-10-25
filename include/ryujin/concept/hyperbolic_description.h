@@ -27,6 +27,10 @@ namespace ryujin
     template <typename HD>
     using system_type = typename HD::HyperbolicSystem;
 
+    template <typename HD, int dim, typename Number>
+    using initial_values_type =
+        typename HD::template InitialValues<dim, Number>;
+
     template <typename HD, typename Number>
     using indicator_type = typename HD::template Indicator<scalar_type<Number>>;
 

@@ -21,6 +21,7 @@
 
 #include <limits>
 #include <ostream>
+#include <type_traits>
 #include <utility>
 
 namespace ryujin
@@ -50,6 +51,9 @@ namespace ryujin
 
     using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
+    using InitialValues =
+        typename HyperbolicDescription::template InitialValues<dim, Number>;
+
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
     using Indicator =
@@ -73,6 +77,16 @@ namespace ryujin
 
     using initial_precomputed_type = typename View::initial_precomputed_type;
 
+    static_assert(
+        std::is_same_v<typename InitialValues::state_type, state_type>,
+        "The InitialValues must produce states of the hyperbolic system.");
+
+    static_assert(
+        std::is_same_v<typename InitialValues::initial_precomputed_type,
+                       initial_precomputed_type>,
+        "The InitialValues must produce initial precomputed values "
+        "of the hyperbolic system.");
+
     //@}
     /**
      * @name Constructor and setup
@@ -82,12 +96,11 @@ namespace ryujin
     /**
      * Constructor
      */
-    HyperbolicModule(
-        const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
-        const HyperbolicSystem &hyperbolic_system,
-        const InitialValues<HyperbolicSystem, dim, Number> &initial_values,
-        const std::string &subsection = "/HyperbolicModule");
+    HyperbolicModule(const MPIEnsemble &mpi_ensemble,
+                     const OfflineData<dim, Number> &offline_data,
+                     const HyperbolicSystem &hyperbolic_system,
+                     const InitialValues &initial_values,
+                     const std::string &subsection = "/HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @p prepare() allocates temporary
@@ -301,8 +314,7 @@ namespace ryujin
 
     dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::ObserverPointer<const InitialValues<HyperbolicSystem, dim, Number>>
-        initial_values_;
+    dealii::ObserverPointer<const InitialValues> initial_values_;
 
     MultiComponentVector<Number> initial_precomputed_;
 

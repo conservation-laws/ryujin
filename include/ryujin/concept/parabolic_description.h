@@ -7,10 +7,10 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
+#include <ryujin/concept/hyperbolic_description.h>
 #include <ryujin/concept/parabolic_system.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
-#include <ryujin/typed/initial_values.h>
 
 #include <concepts>
 #include <string>
@@ -40,13 +40,12 @@ namespace ryujin
         ParabolicSystem<typename T::ParabolicSystem> &&
         std::derived_from<parabolic_module_type<T, HD, dim, Number>,
                           Interface::ParabolicModule<dim, Number>> &&
-        std::constructible_from<
-            parabolic_module_type<T, HD, dim, Number>,
-            const MPIEnsemble &,
-            const OfflineData<dim, Number> &,
-            const typename HD::HyperbolicSystem &,
-            const typename T::ParabolicSystem &,
-            const InitialValues<typename HD::HyperbolicSystem, dim, Number> &,
-            const std::string &>;
+        std::constructible_from<parabolic_module_type<T, HD, dim, Number>,
+                                const MPIEnsemble &,
+                                const OfflineData<dim, Number> &,
+                                const typename HD::HyperbolicSystem &,
+                                const typename T::ParabolicSystem &,
+                                const initial_values_type<HD, dim, Number> &,
+                                const std::string &>;
   } // namespace Concept
 } // namespace ryujin

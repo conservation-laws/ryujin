@@ -40,6 +40,10 @@ namespace ryujin
         typename Interface::ParabolicModule<dim, Number>::StageWeights;
 
     using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+
+    using InitialValues =
+        typename HyperbolicDescription::template InitialValues<dim, Number>;
+
     using ParabolicSystem = StubParabolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
@@ -53,13 +57,12 @@ namespace ryujin
     /**
      * Constructor.
      */
-    StubParabolicModule(
-        const MPIEnsemble & /*mpi_ensemble*/,
-        const OfflineData<dim, Number> & /*offline_data*/,
-        const HyperbolicSystem & /*hyperbolic_system*/,
-        const ParabolicSystem & /*parabolic_system*/,
-        const InitialValues<HyperbolicSystem, dim, Number> & /*initial_values*/,
-        const std::string &subsection = "StubParabolicModule")
+    StubParabolicModule(const MPIEnsemble & /*mpi_ensemble*/,
+                        const OfflineData<dim, Number> & /*offline_data*/,
+                        const HyperbolicSystem & /*hyperbolic_system*/,
+                        const ParabolicSystem & /*parabolic_system*/,
+                        const InitialValues & /*initial_values*/,
+                        const std::string &subsection = "StubParabolicModule")
         : Interface::ParabolicModule<dim, Number>(subsection)
     {
     }

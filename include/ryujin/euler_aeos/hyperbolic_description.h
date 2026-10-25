@@ -30,6 +30,10 @@ namespace ryujin
     struct HyperbolicDescription {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
 
+      template <int dim, typename Number>
+      using InitialValues =
+          ryujin::InitialValues<HyperbolicSystem, dim, Number>;
+
       template <typename ScalarNumber = double>
       using Indicator = EulerAEOS::Indicator<ScalarNumber>;
 

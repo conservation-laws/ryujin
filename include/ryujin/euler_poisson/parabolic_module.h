@@ -148,6 +148,9 @@ namespace ryujin
 
       using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
+      using InitialValues =
+          typename HyperbolicDescription::template InitialValues<dim, Number>;
+
       using View = typename HyperbolicSystem::template View<dim, Number>;
 
       using ParabolicSystem = EulerPoisson::ParabolicSystem;
@@ -170,13 +173,12 @@ namespace ryujin
       /**
        * Constructor.
        */
-      ParabolicModule(
-          const MPIEnsemble &mpi_ensemle,
-          const OfflineData<dim, Number> &offline_data,
-          const HyperbolicSystem &hyperbolic_system,
-          const ParabolicSystem &parabolic_system,
-          const InitialValues<HyperbolicSystem, dim, Number> &initial_values,
-          const std::string &subsection = "/ParabolicModule");
+      ParabolicModule(const MPIEnsemble &mpi_ensemle,
+                      const OfflineData<dim, Number> &offline_data,
+                      const HyperbolicSystem &hyperbolic_system,
+                      const ParabolicSystem &parabolic_system,
+                      const InitialValues &initial_values,
+                      const std::string &subsection = "/ParabolicModule");
 
       /**
        * Prepare time stepping. A call to @p prepare() allocates temporary
@@ -293,9 +295,7 @@ namespace ryujin
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
       dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
           offline_data_;
-      dealii::ObserverPointer<
-          const ryujin::InitialValues<HyperbolicSystem, dim, Number>>
-          initial_values_;
+      dealii::ObserverPointer<const InitialValues> initial_values_;
 
       std::vector<std::unique_ptr<ElectrostaticConfiguration<dim, Number>>>
           electrostatic_configuration_list_;
