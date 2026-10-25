@@ -45,6 +45,7 @@ set(CORE_SOURCE_FILES
   driver/equation_scalar_conservation.cc
   driver/equation_shallow_water.cc
   driver/logger.cc
+  driver/parameter_model.cc
   driver/scheduler.cc
   geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc
