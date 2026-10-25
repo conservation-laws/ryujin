@@ -242,6 +242,14 @@ namespace ryujin
                << std::setprecision(1) << std::fixed << 100. * data.utilization
                << "% utilization ]" << std::endl;
 
+        output << "        [device time skew: "
+               << std::setprecision(2) << std::scientific << data.device_time_skew
+               << "s/cycle ("
+               << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
+               << 100. * data.device_time_skew_fraction
+               << "%) [p" << data.device_time_min_index
+               << "/" << data.device_time_max_index << "]]" << std::endl;
+
       } else {
         /* Write out some statistics about CPU utilization: */
 

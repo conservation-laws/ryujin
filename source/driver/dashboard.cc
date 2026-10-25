@@ -728,6 +728,19 @@ namespace ryujin
                            data.n_devices == 1 ? "" : "s")) |
               color(theme.muted),
       }));
+      const auto skew =
+          std::clamp(safe(data.device_time_skew_fraction), 0., 1.);
+      stepping.push_back(hbox({
+          label("gpu skew"),
+          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
+              size(WIDTH, EQUAL, 24),
+          text(std::format(" {:5.1f}%", 100. * skew)) | bold,
+          text(std::format("  ({:.2e} s/cycle) [p{}/{}]",
+                           data.device_time_skew,
+                           data.device_time_min_index,
+                           data.device_time_max_index)) |
+              color(theme.muted),
+      }));
     } else {
       const auto skew = std::clamp(safe(data.cpu_time_skew_fraction), 0., 1.);
       stepping.push_back(hbox({

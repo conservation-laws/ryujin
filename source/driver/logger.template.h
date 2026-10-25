@@ -715,6 +715,13 @@ namespace ryujin
         const auto device_time_statistics = Utilities::MPI::min_max_avg(
             DeviceTimer::seconds(), mpi_ensemble_.world_communicator());
         current_.device_time_sum = device_time_statistics.sum;
+        current_.device_time_avg = device_time_statistics.avg;
+        current_.device_time_min = device_time_statistics.min;
+        current_.device_time_max = device_time_statistics.max;
+        dashboard_data_.device_time_min_index =
+            device_time_statistics.min_index;
+        dashboard_data_.device_time_max_index =
+            device_time_statistics.max_index;
       }
     }
 
@@ -748,6 +755,16 @@ namespace ryujin
       data.compute_m_dofs_per_sec = delta_q_dofs / 1.e6 / delta_device_time;
       data.utilization = delta_device_time / (n_devices_ * delta_wall_time);
       data.delta_device_time = delta_device_time;
+
+      /* avoid printing small negative numbers: */
+      data.device_time_skew =
+          std::max(0.,
+                   (current_.device_time_max - current_.device_time_min - //
+                    previous_.device_time_max + previous_.device_time_min) /
+                       delta_cycles);
+      data.device_time_skew_fraction =
+          data.device_time_skew * delta_cycles /
+          (current_.device_time_avg - previous_.device_time_avg);
 
     } else {
       /* Statistics about CPU utilization: */
