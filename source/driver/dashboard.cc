@@ -614,6 +614,7 @@ namespace ryujin
         label("parallel"),
         text(ranks),
         filler(),
+        text("backend ") | color(theme.caption),
         chip(data.backend, theme.highlight),
     }));
 
