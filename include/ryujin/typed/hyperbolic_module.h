@@ -9,6 +9,7 @@
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/concept/hyperbolic_description.h>
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
@@ -34,7 +35,7 @@ namespace ryujin
    *
    * @ingroup Typed
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <typename HD, int dim, typename Number = double>
   class HyperbolicModule final : public Interface::HyperbolicModule<dim, Number>
   {
   public:
@@ -49,20 +50,17 @@ namespace ryujin
     using StageWeights =
         typename Interface::HyperbolicModule<dim, Number>::StageWeights;
 
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using HyperbolicSystem = typename HD::HyperbolicSystem;
 
-    using InitialValues =
-        typename HyperbolicDescription::template InitialValues<dim, Number>;
+    using InitialValues = typename HD::template InitialValues<dim, Number>;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using Indicator =
-        typename HyperbolicDescription::template Indicator<Number>;
+    using Indicator = typename HD::template Indicator<Number>;
 
-    using Limiter = typename HyperbolicDescription::template Limiter<Number>;
+    using Limiter = typename HD::template Limiter<Number>;
 
-    using WaveSpeedEstimator =
-        typename HyperbolicDescription::template WaveSpeedEstimator<Number>;
+    using WaveSpeedEstimator = typename HD::template WaveSpeedEstimator<Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
@@ -76,6 +74,11 @@ namespace ryujin
         View::n_initial_precomputed_values;
 
     using initial_precomputed_type = typename View::initial_precomputed_type;
+
+    static_assert(
+        Concept::HyperbolicModuleDescription<HD, dim, Number>,
+        "The hyperbolic description must provide a hyperbolic system, an "
+        "indicator, a limiter, and a wave speed estimator.");
 
     static_assert(
         std::is_same_v<typename InitialValues::state_type, state_type>,

@@ -6,15 +6,20 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/concept/hyperbolic_system.h>
 #include <ryujin/concept/indicator.h>
 #include <ryujin/concept/limiter.h>
 #include <ryujin/concept/wave_speed_estimator.h>
+#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_module.h>
+#include <ryujin/interface/initial_values.h>
+#include <ryujin/interface/parabolic_system.h>
 
 #include <deal.II/base/vectorization.h>
 
 #include <concepts>
+#include <string>
 
 namespace ryujin
 {
@@ -50,8 +55,8 @@ namespace ryujin
 
 
     /**
-     * The members of a hyperbolic description HD with hyperbolic system
-     * System for one number type, which is scalar or vectorized.
+     * The compute kernels of a hyperbolic description HD with hyperbolic
+     * system System for one number type, which is scalar or vectorized.
      *
      * @ingroup Concepts
      */
@@ -64,17 +69,50 @@ namespace ryujin
 
 
     /**
-     * A hyperbolic description: a hyperbolic system with an indicator, a
-     * limiter, and a wave speed estimator, for scalar and vectorized
-     * numbers, and a hyperbolic module that the TimeIntegrator can use.
+     * A hyperbolic description used by the typed HyperbolicModule: a
+     * hyperbolic system with an indicator, a limiter, and a wave speed
+     * estimator, for scalar and vectorized numbers.
+     *
+     * @ingroup Concepts
+     */
+    template <typename HD, int dim, typename Number>
+    concept HyperbolicModuleDescription =
+        HyperbolicKernels<HD, system_type<HD>, dim, Number> &&
+        HyperbolicKernels<HD, system_type<HD>, dim, vectorized_type<Number>>;
+
+
+    /**
+     * A hyperbolic description used by the Simulation: a hyperbolic
+     * system for scalar and vectorized numbers, the initial values, a
+     * limiter for the SolutionTransfer, and a hyperbolic module with the
+     * constructor signature that the Simulation uses.
+     *
+     * The compute kernels of the hyperbolic module are not part of this
+     * concept. A description whose hyperbolic module is the typed
+     * HyperbolicModule additionally satisfies HyperbolicModuleDescription.
      *
      * @ingroup Concepts
      */
     template <typename HD, int dim, typename Number>
     concept HyperbolicDescription =
-        HyperbolicKernels<HD, system_type<HD>, dim, Number> &&
-        HyperbolicKernels<HD, system_type<HD>, dim, vectorized_type<Number>> &&
+        HyperbolicSystem<system_type<HD>, dim, Number> &&
+        HyperbolicSystem<system_type<HD>, dim, vectorized_type<Number>> &&
+        std::derived_from<initial_values_type<HD, dim, Number>,
+                          Interface::InitialValues<dim, Number>> &&
+        std::constructible_from<initial_values_type<HD, dim, Number>,
+                                const MPIEnsemble &,
+                                const OfflineData<dim, Number> &,
+                                const system_type<HD> &,
+                                const Interface::ParabolicSystem &,
+                                const std::string &> &&
+        Limiter<limiter_type<HD, Number>, system_type<HD>, dim, Number> &&
         std::derived_from<hyperbolic_module_type<HD, dim, Number>,
-                          Interface::HyperbolicModule<dim, Number>>;
+                          Interface::HyperbolicModule<dim, Number>> &&
+        std::constructible_from<hyperbolic_module_type<HD, dim, Number>,
+                                const MPIEnsemble &,
+                                const OfflineData<dim, Number> &,
+                                const system_type<HD> &,
+                                const initial_values_type<HD, dim, Number> &,
+                                const std::string &>;
   } // namespace Concept
 } // namespace ryujin
