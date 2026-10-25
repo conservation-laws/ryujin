@@ -569,9 +569,12 @@ namespace ryujin
         text(format_si(data.n_global_dofs)) | bold,
         text("Qdofs"),
     }));
-    information.push_back(hbox({label("parallel"), text(ranks)}));
-    information.push_back(
-        hbox({label("backend"), chip(data.backend, theme.highlight)}));
+    information.push_back(hbox({
+        label("parallel"),
+        text(ranks),
+        filler(),
+        chip(data.backend, theme.highlight),
+    }));
 
     /*
      * Throughput speedometer
