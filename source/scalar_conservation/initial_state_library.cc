@@ -17,7 +17,7 @@ namespace ryujin
     template <int dim, typename Number>
     auto defaults()
     {
-      using L = InitialStateLibrary<HyperbolicDescription, dim, Number>;
+      using L = InitialStateLibrary<HyperbolicSystem, dim, Number>;
       return std::vector<typename L::Creator>{
           L::template creator<Function<dim, Number>>(),
           L::template creator<Uniform<dim, Number>>(),
@@ -26,25 +26,22 @@ namespace ryujin
   } // namespace ScalarConservation
 
   template <>
-  auto InitialStateLibrary<ScalarConservation::HyperbolicDescription,
-                           1,
-                           NUMBER>::defaults() -> std::vector<Creator>
+  auto InitialStateLibrary<ScalarConservation::HyperbolicSystem, 1, NUMBER>::
+      defaults() -> std::vector<Creator>
   {
     return ScalarConservation::defaults<1, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<ScalarConservation::HyperbolicDescription,
-                           2,
-                           NUMBER>::defaults() -> std::vector<Creator>
+  auto InitialStateLibrary<ScalarConservation::HyperbolicSystem, 2, NUMBER>::
+      defaults() -> std::vector<Creator>
   {
     return ScalarConservation::defaults<2, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<ScalarConservation::HyperbolicDescription,
-                           3,
-                           NUMBER>::defaults() -> std::vector<Creator>
+  auto InitialStateLibrary<ScalarConservation::HyperbolicSystem, 3, NUMBER>::
+      defaults() -> std::vector<Creator>
   {
     return ScalarConservation::defaults<3, NUMBER>();
   }
@@ -52,15 +49,15 @@ namespace ryujin
   /* instantiations */
 
   template class Library<
-      InitialState<ScalarConservation::HyperbolicDescription, 1, NUMBER>,
+      InitialState<ScalarConservation::HyperbolicSystem, 1, NUMBER>,
       const ScalarConservation::HyperbolicSystem &,
       const std::string &>;
   template class Library<
-      InitialState<ScalarConservation::HyperbolicDescription, 2, NUMBER>,
+      InitialState<ScalarConservation::HyperbolicSystem, 2, NUMBER>,
       const ScalarConservation::HyperbolicSystem &,
       const std::string &>;
   template class Library<
-      InitialState<ScalarConservation::HyperbolicDescription, 3, NUMBER>,
+      InitialState<ScalarConservation::HyperbolicSystem, 3, NUMBER>,
       const ScalarConservation::HyperbolicSystem &,
       const std::string &>;
 } // namespace ryujin

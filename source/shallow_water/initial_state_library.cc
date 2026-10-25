@@ -11,41 +11,44 @@
 namespace ryujin
 {
   template <>
-  auto InitialStateLibrary<ShallowWater::HyperbolicDescription, 1, NUMBER>::
-      defaults() -> std::vector<Creator>
+  auto
+  InitialStateLibrary<ShallowWater::HyperbolicSystem, 1, NUMBER>::defaults()
+      -> std::vector<Creator>
   {
     return ShallowWaterInitialStates::
-        defaults<ShallowWater::HyperbolicDescription, 1, NUMBER>();
+        defaults<ShallowWater::HyperbolicSystem, 1, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<ShallowWater::HyperbolicDescription, 2, NUMBER>::
-      defaults() -> std::vector<Creator>
+  auto
+  InitialStateLibrary<ShallowWater::HyperbolicSystem, 2, NUMBER>::defaults()
+      -> std::vector<Creator>
   {
     return ShallowWaterInitialStates::
-        defaults<ShallowWater::HyperbolicDescription, 2, NUMBER>();
+        defaults<ShallowWater::HyperbolicSystem, 2, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<ShallowWater::HyperbolicDescription, 3, NUMBER>::
-      defaults() -> std::vector<Creator>
+  auto
+  InitialStateLibrary<ShallowWater::HyperbolicSystem, 3, NUMBER>::defaults()
+      -> std::vector<Creator>
   {
     return ShallowWaterInitialStates::
-        defaults<ShallowWater::HyperbolicDescription, 3, NUMBER>();
+        defaults<ShallowWater::HyperbolicSystem, 3, NUMBER>();
   }
 
   /* instantiations */
 
   template class Library<
-      InitialState<ShallowWater::HyperbolicDescription, 1, NUMBER>,
+      InitialState<ShallowWater::HyperbolicSystem, 1, NUMBER>,
       const ShallowWater::HyperbolicSystem &,
       const std::string &>;
   template class Library<
-      InitialState<ShallowWater::HyperbolicDescription, 2, NUMBER>,
+      InitialState<ShallowWater::HyperbolicSystem, 2, NUMBER>,
       const ShallowWater::HyperbolicSystem &,
       const std::string &>;
   template class Library<
-      InitialState<ShallowWater::HyperbolicDescription, 3, NUMBER>,
+      InitialState<ShallowWater::HyperbolicSystem, 3, NUMBER>,
       const ShallowWater::HyperbolicSystem &,
       const std::string &>;
 } // namespace ryujin

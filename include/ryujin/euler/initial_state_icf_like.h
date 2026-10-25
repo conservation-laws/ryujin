@@ -25,11 +25,10 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Description, int dim, typename Number>
-    class ICFLike : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class ICFLike : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
       using state_type_1d =
@@ -37,7 +36,7 @@ namespace ryujin
 
       ICFLike(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<Description, dim, Number>("icf like", subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("icf like", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;

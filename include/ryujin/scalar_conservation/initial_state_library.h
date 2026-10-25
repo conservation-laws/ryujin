@@ -6,7 +6,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/scalar_conservation/hyperbolic_description.h>
+#include <ryujin/scalar_conservation/hyperbolic_system.h>
 #include <ryujin/typed/initial_state.h>
 
 #include <string>
@@ -16,28 +16,25 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   template <>
-  auto InitialStateLibrary<ScalarConservation::HyperbolicDescription,
-                           1,
-                           NUMBER>::defaults() -> std::vector<Creator>;
+  auto InitialStateLibrary<ScalarConservation::HyperbolicSystem, 1, NUMBER>::
+      defaults() -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<ScalarConservation::HyperbolicDescription,
-                           2,
-                           NUMBER>::defaults() -> std::vector<Creator>;
+  auto InitialStateLibrary<ScalarConservation::HyperbolicSystem, 2, NUMBER>::
+      defaults() -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<ScalarConservation::HyperbolicDescription,
-                           3,
-                           NUMBER>::defaults() -> std::vector<Creator>;
+  auto InitialStateLibrary<ScalarConservation::HyperbolicSystem, 3, NUMBER>::
+      defaults() -> std::vector<Creator>;
 
   extern template class Library<
-      InitialState<ScalarConservation::HyperbolicDescription, 1, NUMBER>,
+      InitialState<ScalarConservation::HyperbolicSystem, 1, NUMBER>,
       const ScalarConservation::HyperbolicSystem &,
       const std::string &>;
   extern template class Library<
-      InitialState<ScalarConservation::HyperbolicDescription, 2, NUMBER>,
+      InitialState<ScalarConservation::HyperbolicSystem, 2, NUMBER>,
       const ScalarConservation::HyperbolicSystem &,
       const std::string &>;
   extern template class Library<
-      InitialState<ScalarConservation::HyperbolicDescription, 3, NUMBER>,
+      InitialState<ScalarConservation::HyperbolicSystem, 3, NUMBER>,
       const ScalarConservation::HyperbolicSystem &,
       const std::string &>;
 #endif

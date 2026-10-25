@@ -13,15 +13,13 @@ namespace ryujin
 {
   namespace ScalarConservation
   {
-    struct HyperbolicDescription;
-
     /**
      * Uniform initial state defined by a given primitive state.
      *
      * @ingroup ScalarConservationEquations
      */
     template <int dim, typename Number>
-    class Uniform : public InitialState<HyperbolicDescription, dim, Number>
+    class Uniform : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
       using View = HyperbolicSystemView<dim, Number>;
@@ -29,8 +27,7 @@ namespace ryujin
 
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<HyperbolicDescription, dim, Number>("uniform",
-                                                             subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("uniform", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_[0] = 1.0;

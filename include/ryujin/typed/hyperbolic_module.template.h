@@ -39,12 +39,12 @@ namespace ryujin
     }
   } // namespace
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  HyperbolicModule<HyperbolicDescription, dim, Number>::HyperbolicModule(
+  template <typename HD, int dim, typename Number>
+  HyperbolicModule<HD, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
+      const InitialValues &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : Interface::HyperbolicModule<dim, Number>(
             problem_dimension, n_precomputed_values, subsection)
@@ -60,8 +60,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void HyperbolicModule<HyperbolicDescription, dim, Number>::prepare()
+  template <typename HD, int dim, typename Number>
+  void HyperbolicModule<HD, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout
@@ -153,9 +153,8 @@ namespace ryujin
    * state vector component. The ParabolicModule itself has to ensure
    * proper setup during prepare_state_vector() and solve().
    */
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void
-  HyperbolicModule<HyperbolicDescription, dim, Number>::reinit_state_vector(
+  template <typename HD, int dim, typename Number>
+  void HyperbolicModule<HD, dim, Number>::reinit_state_vector(
       StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT
@@ -187,9 +186,8 @@ namespace ryujin
    */
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void
-  HyperbolicModule<HyperbolicDescription, dim, Number>::prepare_state_vector(
+  template <typename HD, int dim, typename Number>
+  void HyperbolicModule<HD, dim, Number>::prepare_state_vector(
       StateVector<Number> &state_vector, Number t) const
   {
 #ifdef DEBUG_OUTPUT
@@ -227,9 +225,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void
-  HyperbolicModule<HyperbolicDescription, dim, Number>::fill_precomputed_values(
+  template <typename HD, int dim, typename Number>
+  void HyperbolicModule<HD, dim, Number>::fill_precomputed_values(
       StateVector<Number> &state_vector) const
   {
 #ifdef DEBUG_OUTPUT
@@ -251,11 +248,10 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
+  template <typename HD, int dim, typename Number>
   template <typename MemorySpace>
-  void HyperbolicModule<HyperbolicDescription, dim, Number>::
-      apply_boundary_conditions(MultiComponentVector<Number> &U,
-                                const Number t) const
+  void HyperbolicModule<HD, dim, Number>::apply_boundary_conditions(
+      MultiComponentVector<Number> &U, const Number t) const
   {
     constexpr auto n_comp = problem_dimension;
 
@@ -405,9 +401,8 @@ namespace ryujin
   } // namespace
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  Number
-  HyperbolicModule<HyperbolicDescription, dim, Number>::forward_euler_step(
+  template <typename HD, int dim, typename Number>
+  Number HyperbolicModule<HD, dim, Number>::forward_euler_step(
       const StateVector<Number> &old_state_vector,
       StageVectors stage_state_vectors,
       StageWeights stage_weights,
@@ -464,10 +459,9 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
+  template <typename HD, int dim, typename Number>
   template <int stages>
-  Number
-  HyperbolicModule<HyperbolicDescription, dim, Number>::forward_euler_step(
+  Number HyperbolicModule<HD, dim, Number>::forward_euler_step(
       const StateVector<Number> &old_state_vector,
       StageVectors stage_state_vectors,
       StageWeights stage_weights,

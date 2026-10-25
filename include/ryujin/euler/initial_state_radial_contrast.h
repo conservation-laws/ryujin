@@ -26,11 +26,10 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Description, int dim, typename Number>
-    class RadialContrast : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class RadialContrast : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
       using state_type_1d =
@@ -38,8 +37,8 @@ namespace ryujin
 
       RadialContrast(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)
-          : InitialState<Description, dim, Number>("radial contrast",
-                                                   subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("radial contrast",
+                                                        subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         primitive_inner_[0] = 1.4;

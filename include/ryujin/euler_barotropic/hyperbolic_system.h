@@ -48,7 +48,7 @@ namespace ryujin
      *
      * @ingroup EulerBarotropicEquations
      */
-    class HyperbolicSystem final : public Interface::HyperbolicSystem
+    class HyperbolicSystem : public Interface::HyperbolicSystem
     {
     public:
       /**

@@ -20,17 +20,16 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <typename Description, int dim, typename Number>
-    class Contrast : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class Contrast : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
-          : InitialState<Description, dim, Number>("contrast", subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("contrast", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         primitive_left_[0] = 1.;

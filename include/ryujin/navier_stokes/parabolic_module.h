@@ -131,6 +131,9 @@ namespace ryujin
 
       using HyperbolicSystem = Euler::HyperbolicSystem;
 
+      using InitialValues =
+          typename HyperbolicDescription::template InitialValues<dim, Number>;
+
       using View = Euler::HyperbolicSystemView<dim, Number>;
 
       using ParabolicSystem = NavierStokes::ParabolicSystem;
@@ -157,8 +160,7 @@ namespace ryujin
                       const OfflineData<dim, Number> &offline_data,
                       const HyperbolicSystem &hyperbolic_system,
                       const ParabolicSystem &parabolic_system,
-                      const InitialValues<HyperbolicDescription, dim, Number>
-                          &initial_values,
+                      const InitialValues &initial_values,
                       const std::string &subsection = "ParabolicModule");
 
       /**
@@ -278,9 +280,7 @@ namespace ryujin
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
       dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
           offline_data_;
-      dealii::ObserverPointer<
-          const ryujin::InitialValues<HyperbolicDescription, dim, Number>>
-          initial_values_;
+      dealii::ObserverPointer<const InitialValues> initial_values_;
 
       mutable unsigned int cycle_;
       mutable double n_iterations_velocity_;

@@ -80,6 +80,8 @@ namespace ryujin
                  const dealii::Tensor<1, dim, Number> &c_ij,
                  const dealii::types::boundary_id id,
                  typename V::state_type (&get_dirichlet_data)(),
+                 dealii::Tensor<1, dim, Number> (&transform)(
+                     const dealii::Tensor<1, dim, Number> &),
                  const unsigned int i,
                  const unsigned int *js) {
           {
@@ -102,6 +104,9 @@ namespace ryujin
           } -> std::same_as<typename V::state_type>;
           {
             view.from_primitive_state(U)
+          } -> std::same_as<typename V::state_type>;
+          {
+            view.apply_galilei_transform(U, transform)
           } -> std::same_as<typename V::state_type>;
         } &&
         (!V::have_high_order_flux ||

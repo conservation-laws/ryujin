@@ -32,6 +32,10 @@ namespace ryujin
     struct HyperbolicDescription {
       using HyperbolicSystem = EulerBarotropic::HyperbolicSystem;
 
+      template <int dim, typename Number>
+      using InitialValues =
+          ryujin::InitialValues<HyperbolicSystem, dim, Number>;
+
       template <typename ScalarNumber = double>
       using Indicator = EulerBarotropic::Indicator<ScalarNumber>;
 

@@ -23,18 +23,17 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Description, int dim, typename Number>
-    class IsentropicVortex : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class IsentropicVortex : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       IsentropicVortex(const HyperbolicSystem &hyperbolic_system,
                        const std::string subsection)
-          : InitialState<Description, dim, Number>("isentropic vortex",
-                                                   subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("isentropic vortex",
+                                                        subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;

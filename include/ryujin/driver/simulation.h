@@ -49,6 +49,7 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename HD::HyperbolicSystem;
+    using InitialValues = typename HD::template InitialValues<dim, Number>;
     using ParabolicSystem = typename PD::ParabolicSystem;
     using HyperbolicModule =
         typename HD::template HyperbolicModule<dim, Number>;
@@ -97,16 +98,15 @@ namespace ryujin
           mpi_ensemble, *this->discretization_, "/D - OfflineData");
       const auto &offline_data = *this->offline_data_;
 
-      initial_values_container_ = std::make_unique<
-          MPIEnsembleContainer<InitialValues<HD, dim, Number>>>(
-          mpi_ensemble,
-          "/E - InitialValues",
-          mpi_ensemble,
-          offline_data,
-          hyperbolic_system,
-          parabolic_system);
-      const InitialValues<HD, dim, Number> &initial_values =
-          initial_values_container_->get();
+      initial_values_container_ =
+          std::make_unique<MPIEnsembleContainer<InitialValues>>(
+              mpi_ensemble,
+              "/E - InitialValues",
+              mpi_ensemble,
+              offline_data,
+              hyperbolic_system,
+              parabolic_system);
+      const InitialValues &initial_values = initial_values_container_->get();
       this->initial_values_ = &initial_values;
 
       auto hyperbolic_module =
@@ -262,7 +262,7 @@ namespace ryujin
         hyperbolic_system_container_;
     std::unique_ptr<MPIEnsembleContainer<ParabolicSystem>>
         parabolic_system_container_;
-    std::unique_ptr<MPIEnsembleContainer<InitialValues<HD, dim, Number>>>
+    std::unique_ptr<MPIEnsembleContainer<InitialValues>>
         initial_values_container_;
 
     //@}

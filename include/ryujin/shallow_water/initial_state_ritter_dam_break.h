@@ -20,18 +20,17 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <typename Description, int dim, typename Number>
-    class RitterDamBreak : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class RitterDamBreak : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       RitterDamBreak(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
-          : InitialState<Description, dim, Number>("ritter dam break",
-                                                   subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("ritter dam break",
+                                                        subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(

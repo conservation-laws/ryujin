@@ -6,7 +6,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/euler_barotropic/hyperbolic_description.h>
+#include <ryujin/euler_barotropic/hyperbolic_system.h>
 #include <ryujin/typed/initial_state.h>
 
 #include <string>
@@ -16,25 +16,28 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   template <>
-  auto InitialStateLibrary<EulerBarotropic::HyperbolicDescription, 1, NUMBER>::
-      defaults() -> std::vector<Creator>;
+  auto
+  InitialStateLibrary<EulerBarotropic::HyperbolicSystem, 1, NUMBER>::defaults()
+      -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<EulerBarotropic::HyperbolicDescription, 2, NUMBER>::
-      defaults() -> std::vector<Creator>;
+  auto
+  InitialStateLibrary<EulerBarotropic::HyperbolicSystem, 2, NUMBER>::defaults()
+      -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<EulerBarotropic::HyperbolicDescription, 3, NUMBER>::
-      defaults() -> std::vector<Creator>;
+  auto
+  InitialStateLibrary<EulerBarotropic::HyperbolicSystem, 3, NUMBER>::defaults()
+      -> std::vector<Creator>;
 
   extern template class Library<
-      InitialState<EulerBarotropic::HyperbolicDescription, 1, NUMBER>,
+      InitialState<EulerBarotropic::HyperbolicSystem, 1, NUMBER>,
       const EulerBarotropic::HyperbolicSystem &,
       const std::string &>;
   extern template class Library<
-      InitialState<EulerBarotropic::HyperbolicDescription, 2, NUMBER>,
+      InitialState<EulerBarotropic::HyperbolicSystem, 2, NUMBER>,
       const EulerBarotropic::HyperbolicSystem &,
       const std::string &>;
   extern template class Library<
-      InitialState<EulerBarotropic::HyperbolicDescription, 3, NUMBER>,
+      InitialState<EulerBarotropic::HyperbolicSystem, 3, NUMBER>,
       const EulerBarotropic::HyperbolicSystem &,
       const std::string &>;
 #endif

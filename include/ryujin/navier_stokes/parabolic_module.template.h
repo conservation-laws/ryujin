@@ -34,7 +34,7 @@ namespace ryujin
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
-        const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
+        const InitialValues &initial_values,
         const std::string &subsection /*= "ParabolicModule"*/)
         : Interface::ParabolicModule<dim, Number>(subsection)
         , mpi_ensemble_(mpi_ensemble)

@@ -1,0 +1,48 @@
+dim = 1
+  Description:
+    HyperbolicDescription:       true
+    ParabolicDescription:        true
+    HyperbolicModuleDescription: false
+  FirstDescription:
+    HyperbolicModuleDescription: true
+  SecondDescription:
+    HyperbolicModuleDescription: true
+  Simulation:
+    main parameter:              2.5
+    subordinate parameter:       2.5
+    number of state names:       1
+    module precomputed values:   2
+    first stage precomputed:     2
+    second stage precomputed:    3
+dim = 2
+  Description:
+    HyperbolicDescription:       true
+    ParabolicDescription:        true
+    HyperbolicModuleDescription: false
+  FirstDescription:
+    HyperbolicModuleDescription: true
+  SecondDescription:
+    HyperbolicModuleDescription: true
+  Simulation:
+    main parameter:              2.5
+    subordinate parameter:       2.5
+    number of state names:       1
+    module precomputed values:   2
+    first stage precomputed:     2
+    second stage precomputed:    3
+dim = 3
+  Description:
+    HyperbolicDescription:       true
+    ParabolicDescription:        true
+    HyperbolicModuleDescription: false
+  FirstDescription:
+    HyperbolicModuleDescription: true
+  SecondDescription:
+    HyperbolicModuleDescription: true
+  Simulation:
+    main parameter:              2.5
+    subordinate parameter:       2.5
+    number of state names:       1
+    module precomputed values:   2
+    first stage precomputed:     2
+    second stage precomputed:    3
