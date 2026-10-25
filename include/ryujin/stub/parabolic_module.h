@@ -97,18 +97,12 @@ namespace ryujin
     }
 
     /**
-     * This function preprocesses a given state vector @p U in preparation
-     * for a high order IMEX time step. This function exists because some
-     * time stepping variants have to precompute quantities before we can
-     * perform an IMEX step. In addition, this function is called whenever
-     * we perform a mesh transfer or output operation.
+     * The identity has no state to prepare.
      */
     void prepare_state_vector(StateVector<Number> & /*state_vector*/,
                               Number /*t*/) const override
     {
-      Assert(false,
-             dealii::ExcMessage("The parabolic system is the identity. This "
-                                "function should have never been called."));
+      // do nothing
     }
 
     /**
