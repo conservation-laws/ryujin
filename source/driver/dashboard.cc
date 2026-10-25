@@ -8,6 +8,7 @@
 
 #include <ftxui/dom/canvas.hpp>
 #include <ftxui/dom/elements.hpp>
+#include <ftxui/dom/node.hpp>
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/terminal.hpp>
 
@@ -315,6 +316,46 @@ namespace ryujin
     Element chip(const std::string &name, Color foreground)
     {
       return text(" " + name + " ") | color(foreground) | bgcolor(theme.track);
+    }
+
+
+    /*
+     * Limit the natural height of an element to `height` rows, but let it
+     * grow into all the space that is available:
+     */
+    class AtMost : public Node
+    {
+    public:
+      AtMost(Element child, int height)
+          : Node({std::move(child)})
+          , height_(height)
+      {
+      }
+
+      void ComputeRequirement() override
+      {
+        Node::ComputeRequirement();
+        requirement_.min_y = std::min(requirement_.min_y, height_);
+        requirement_.flex_grow_y = 1;
+        requirement_.flex_shrink_y = 1;
+      }
+
+      void SetBox(Box box) override
+      {
+        Node::SetBox(box);
+        children_[0]->SetBox(box);
+      }
+
+    private:
+      int height_;
+    };
+
+
+    Decorator at_most(int height)
+    {
+      return [height](Element child) {
+        return std::make_shared<AtMost>(std::move(child), height);
+      };
     }
 
 
@@ -670,7 +711,7 @@ namespace ryujin
       message_lines.push_back(text("no messages") | color(theme.muted));
 
     auto messages = vbox(std::move(message_lines)) |
-                    focusPositionRelative(0.f, 1.f) | yframe;
+                    focusPositionRelative(0.f, 1.f) | yframe | at_most(5);
 
     /*
      * Time stepping

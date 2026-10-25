@@ -144,7 +144,7 @@ namespace ryujin
 
     print_info_ = context.info;
     context.info = [this, &context](const std::string &message) {
-      constexpr std::size_t n_messages = 5;
+      constexpr std::size_t n_messages = 100;
       auto &messages = dashboard_data_.messages;
       messages.push_back({message, context.cycle, context.t});
       if (messages.size() > n_messages)
