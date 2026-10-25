@@ -111,6 +111,9 @@ namespace ryujin
       double cpu_time_max = 0.;
       double wall_time = 0.;
       double device_time_sum = 0.;
+      double device_time_avg = 0.;
+      double device_time_min = 0.;
+      double device_time_max = 0.;
     } previous_, current_;
 
     double time_per_second_exp_;

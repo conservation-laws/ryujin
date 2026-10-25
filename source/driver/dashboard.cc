@@ -8,6 +8,7 @@
 
 #include <ftxui/dom/canvas.hpp>
 #include <ftxui/dom/elements.hpp>
+#include <ftxui/dom/node.hpp>
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/terminal.hpp>
 
@@ -318,6 +319,46 @@ namespace ryujin
     }
 
 
+    /*
+     * Limit the natural height of an element to `height` rows, but let it
+     * grow into all the space that is available:
+     */
+    class AtMost : public Node
+    {
+    public:
+      AtMost(Element child, int height)
+          : Node({std::move(child)})
+          , height_(height)
+      {
+      }
+
+      void ComputeRequirement() override
+      {
+        Node::ComputeRequirement();
+        requirement_.min_y = std::min(requirement_.min_y, height_);
+        requirement_.flex_grow_y = 1;
+        requirement_.flex_shrink_y = 1;
+      }
+
+      void SetBox(Box box) override
+      {
+        Node::SetBox(box);
+        children_[0]->SetBox(box);
+      }
+
+    private:
+      int height_;
+    };
+
+
+    Decorator at_most(int height)
+    {
+      return [height](Element child) {
+        return std::make_shared<AtMost>(std::move(child), height);
+      };
+    }
+
+
     Element bar(double fraction, Color begin, Color end)
     {
       return gauge(float(std::clamp(safe(fraction), 0., 1.))) |
@@ -569,14 +610,12 @@ namespace ryujin
         text(format_si(data.n_global_dofs)) | bold,
         text("Qdofs"),
     }));
-    information.push_back(hbox({label("parallel"), text(ranks)}));
-    information.push_back(
-        hbox({label("backend"), chip(data.backend, theme.highlight)}));
     information.push_back(hbox({
-        label("output"),
-        text(std::format("cycle {} at t = {:.4g}",
-                         data.last_output_cycle,
-                         data.last_output_time)),
+        label("parallel"),
+        text(ranks),
+        filler(),
+        text("backend ") | color(theme.caption),
+        chip(data.backend, theme.highlight),
     }));
 
     /*
@@ -673,7 +712,7 @@ namespace ryujin
       message_lines.push_back(text("no messages") | color(theme.muted));
 
     auto messages = vbox(std::move(message_lines)) |
-                    focusPositionRelative(0.f, 1.f) | yframe;
+                    focusPositionRelative(0.f, 1.f) | yframe | at_most(5);
 
     /*
      * Time stepping
@@ -726,6 +765,19 @@ namespace ryujin
           text(std::format("  on {} device{}",
                            data.n_devices,
                            data.n_devices == 1 ? "" : "s")) |
+              color(theme.muted),
+      }));
+      const auto skew =
+          std::clamp(safe(data.device_time_skew_fraction), 0., 1.);
+      stepping.push_back(hbox({
+          label("gpu skew"),
+          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
+              size(WIDTH, EQUAL, 24),
+          text(std::format(" {:5.1f}%", 100. * skew)) | bold,
+          text(std::format("  ({:.2e} s/cycle) [p{}/{}]",
+                           data.device_time_skew,
+                           data.device_time_min_index,
+                           data.device_time_max_index)) |
               color(theme.muted),
       }));
     } else {

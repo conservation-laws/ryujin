@@ -264,8 +264,6 @@ namespace ryujin
     double n_global_dofs = 0.;
     unsigned int n_ensembles = 1;
     unsigned int n_ranks = 1;
-    unsigned int last_output_cycle = 0;
-    double last_output_time = 0.;
 
     //@}
     /**
@@ -303,6 +301,12 @@ namespace ryujin
     double delta_wall_time = 0.;
     double cpu_time_skew = 0.;
     double cpu_time_skew_fraction = 0.;
+    /* The skew of the device time over all ranks, and the ranks with the
+     * smallest and largest accumulated device time: */
+    double device_time_skew = 0.;
+    double device_time_skew_fraction = 0.;
+    unsigned int device_time_min_index = 0;
+    unsigned int device_time_max_index = 0;
 
     std::string time_stepping_scheme;
     double cfl = 0.;

@@ -144,7 +144,7 @@ namespace ryujin
 
     print_info_ = context.info;
     context.info = [this, &context](const std::string &message) {
-      constexpr std::size_t n_messages = 5;
+      constexpr std::size_t n_messages = 100;
       auto &messages = dashboard_data_.messages;
       messages.push_back({message, context.cycle, context.t});
       if (messages.size() > n_messages)
@@ -535,9 +535,6 @@ namespace ryujin
     data.n_global_dofs = n_global_dofs_;
     data.n_ensembles = mpi_ensemble_.n_ensembles();
     data.n_ranks = mpi_ensemble_.n_world_ranks();
-    data.last_output_cycle = context.timer_cycle - 1;
-    data.last_output_time =
-        context.timer_granularity * (context.timer_cycle - 1);
   }
 
 
@@ -715,6 +712,13 @@ namespace ryujin
         const auto device_time_statistics = Utilities::MPI::min_max_avg(
             DeviceTimer::seconds(), mpi_ensemble_.world_communicator());
         current_.device_time_sum = device_time_statistics.sum;
+        current_.device_time_avg = device_time_statistics.avg;
+        current_.device_time_min = device_time_statistics.min;
+        current_.device_time_max = device_time_statistics.max;
+        dashboard_data_.device_time_min_index =
+            device_time_statistics.min_index;
+        dashboard_data_.device_time_max_index =
+            device_time_statistics.max_index;
       }
     }
 
@@ -748,6 +752,16 @@ namespace ryujin
       data.compute_m_dofs_per_sec = delta_q_dofs / 1.e6 / delta_device_time;
       data.utilization = delta_device_time / (n_devices_ * delta_wall_time);
       data.delta_device_time = delta_device_time;
+
+      /* avoid printing small negative numbers: */
+      data.device_time_skew =
+          std::max(0.,
+                   (current_.device_time_max - current_.device_time_min - //
+                    previous_.device_time_max + previous_.device_time_min) /
+                       delta_cycles);
+      data.device_time_skew_fraction =
+          data.device_time_skew * delta_cycles /
+          (current_.device_time_avg - previous_.device_time_avg);
 
     } else {
       /* Statistics about CPU utilization: */
