@@ -41,7 +41,7 @@ namespace ryujin
      *
      * @ingroup ScalarConservationEquations
      */
-    class HyperbolicSystem final : public Interface::HyperbolicSystem
+    class HyperbolicSystem : public Interface::HyperbolicSystem
     {
     public:
       /**

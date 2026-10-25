@@ -41,7 +41,7 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    class HyperbolicSystem final : public Interface::HyperbolicSystem
+    class HyperbolicSystem : public Interface::HyperbolicSystem
     {
     public:
       /**
