@@ -15,6 +15,7 @@
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/initial_values.h>
 #include <ryujin/interface/parabolic_system.h>
+#include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <deal.II/base/vectorization.h>
 
@@ -85,7 +86,8 @@ namespace ryujin
      * A hyperbolic description used by the Simulation: a hyperbolic
      * system for scalar and vectorized numbers, the initial values, a
      * limiter for the SolutionTransfer, and a hyperbolic module with the
-     * constructor signature that the Simulation uses.
+     * constructor signature that the Simulation uses and the precomputed
+     * initial values for the Postprocessor.
      *
      * The compute kernels of the hyperbolic module are not part of this
      * concept. A description whose hyperbolic module is the typed
@@ -113,6 +115,11 @@ namespace ryujin
                                 const OfflineData<dim, Number> &,
                                 const system_type<HD> &,
                                 const initial_values_type<HD, dim, Number> &,
-                                const std::string &>;
+                                const std::string &> &&
+        requires(const hyperbolic_module_type<HD, dim, Number> &module) {
+          {
+            module.initial_precomputed()
+          } -> std::same_as<const MultiComponentVector<Number> &>;
+        };
   } // namespace Concept
 } // namespace ryujin
