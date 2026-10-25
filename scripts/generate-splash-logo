@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+##
+## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+## Copyright (C) 2026 by the ryujin authors
+##
+
+help_description = """
+This script generates source/driver/splash_screen_logo.h, the logo of the
+splash screen, from doc/logo.png: the dragon is cut out of the background
+of the image and framed by a thin outline of the darker background,
+cropped, scaled to a height of 64 pixels, and stored with a palette of at
+most 62 colors.
+
+Example usage (requires Pillow):
+
+  scripts/generate-splash-logo
+"""
+
+import argparse
+import os
+
+from PIL import Image, ImageDraw, ImageFilter
+
+HEIGHT = 64
+DIGITS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+TRANSPARENT = "."
+
+
+def dragon_mask(image):
+    """
+    The dragon is cream, gray, and red, the background is a dark green:
+    """
+    mask = Image.new("L", image.size, 0)
+    pixels, values = image.load(), mask.load()
+    for y in range(image.height):
+        for x in range(image.width):
+            r, g, b = pixels[x, y]
+            luminance = 0.3 * r + 0.59 * g + 0.11 * b
+            if (r - g > -4 and luminance > 75) or r > g + 40:
+                values[x, y] = 255
+    mask = mask.filter(ImageFilter.MedianFilter(3))
+
+    # Fill the holes, i.e., the background not connected to the border:
+    filled = mask.copy()
+    border = [(x, y) for x in range(mask.width) for y in (0, mask.height - 1)]
+    border += [(x, y) for x in (0, mask.width - 1) for y in range(mask.height)]
+    values = filled.load()
+    for seed in border:
+        if values[seed] == 0:
+            ImageDraw.floodfill(filled, seed, 128, thresh=0)
+    return filled.point(lambda v: 0 if v == 128 else 255)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=help_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--input", default="doc/logo.png")
+    parser.add_argument("--output", default="source/driver/splash_screen_logo.h")
+    args = parser.parse_args()
+
+    image = Image.open(args.input).convert("RGB")
+    mask = dragon_mask(image)
+
+    # Crop to the dragon, with a margin for the outline:
+    box = mask.filter(ImageFilter.MaxFilter(5)).getbbox()
+    image, mask = image.crop(box), mask.crop(box)
+
+    width = round(image.width * HEIGHT / image.height)
+    image = image.resize((width, HEIGHT), Image.LANCZOS)
+    mask = mask.resize((width, HEIGHT), Image.LANCZOS).point(
+        lambda v: 255 if v >= 128 else 0
+    )
+
+    # A thin outline of the original background around the dragon:
+    opaque = mask.filter(ImageFilter.MaxFilter(3))
+
+    palette = image.quantize(
+        colors=len(DIGITS), method=Image.Quantize.FASTOCTREE, kmeans=3
+    )
+    colors = palette.getpalette()
+    indices = palette.load()
+    visible = opaque.load()
+
+    used = sorted(
+        {
+            indices[x, y]
+            for y in range(HEIGHT)
+            for x in range(width)
+            if visible[x, y]
+        }
+    )
+    digit = {index: DIGITS[i] for i, index in enumerate(used)}
+
+    rows = [
+        "".join(
+            digit[indices[x, y]] if visible[x, y] else TRANSPARENT
+            for x in range(width)
+        )
+        for y in range(HEIGHT)
+    ]
+    entries = [
+        "0x{:02x}{:02x}{:02x}".format(*colors[3 * index : 3 * index + 3])
+        for index in used
+    ]
+
+    with open(args.output, "w") as output:
+        output.write(
+            "//\n"
+            "// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n"
+            "// Copyright (C) 2026 by the ryujin authors\n"
+            "//\n"
+            "\n"
+            "/*\n"
+            " * Generated from doc/logo.png by scripts/generate-splash-logo,\n"
+            " * do not edit.\n"
+            " */\n"
+            "\n"
+            "#pragma once\n"
+            "\n"
+            "#include <array>\n"
+            "#include <cstdint>\n"
+            "#include <string_view>\n"
+            "\n"
+            "namespace ryujin::splash\n"
+            "{\n"
+            "  /*\n"
+            "   * The logo in %dx%d pixels, one character of [0-9a-zA-Z] per\n"
+            "   * pixel indexing the palette, and '%s' for a transparent pixel:\n"
+            "   */\n"
+            "\n"
+            "  // clang-format off\n" % (width, HEIGHT, TRANSPARENT)
+        )
+        output.write(
+            "  constexpr std::array<std::uint32_t, %d> logo_palette = {\n"
+            % len(entries)
+        )
+        for i in range(0, len(entries), 6):
+            output.write("    " + ", ".join(entries[i : i + 6]) + ",\n")
+        output.write("  };\n\n")
+        output.write(
+            "  constexpr std::array<std::string_view, %d> logo_pixels = {\n" % HEIGHT
+        )
+        for row in rows:
+            output.write('    "' + row + '",\n')
+        output.write("  };\n  // clang-format on\n} // namespace ryujin::splash\n")
+
+
+if __name__ == "__main__":
+    main()

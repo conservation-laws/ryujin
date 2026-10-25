@@ -62,6 +62,7 @@ if(WITH_FTXUI)
     driver/dashboard_animation.cc
     driver/dashboard_theme.cc
     driver/parameter_editor_ui.cc
+    driver/splash_screen.cc
     )
 endif()
 
