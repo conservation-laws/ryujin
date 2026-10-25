@@ -34,29 +34,29 @@ namespace ryujin
     /**
      * The built-in initial states.
      */
-    template <typename HyperbolicDescription, int dim, typename Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
     auto defaults()
     {
-      using HD = HyperbolicDescription;
-      using L = InitialStateLibrary<HD, dim, Number>;
+      using HS = HyperbolicSystem;
+      using L = InitialStateLibrary<HS, dim, Number>;
       return std::vector<typename L::Creator>{
-          L::template creator<AstroJet<HD, dim, Number>>(),
-          L::template creator<BeckerSolution<HD, dim, Number>>(),
-          L::template creator<Contrast<HD, dim, Number>>(),
-          L::template creator<ExactRiemannSolution<HD, dim, Number>>(),
-          L::template creator<FourStateContrast<HD, dim, Number>>(),
-          L::template creator<Function<HD, dim, Number>>(),
-          L::template creator<ICFLike<HD, dim, Number>>(),
-          L::template creator<IsentropicVortex<HD, dim, Number>>(),
-          L::template creator<LeBlanc<HD, dim, Number>>(),
-          L::template creator<Noh<HD, dim, Number>>(),
-          L::template creator<RadialContrast<HD, dim, Number>>(),
-          L::template creator<RampUp<HD, dim, Number>>(),
-          L::template creator<Rarefaction<HD, dim, Number>>(),
-          L::template creator<ShockFront<HD, dim, Number>>(),
-          L::template creator<SmoothWave<HD, dim, Number>>(),
-          L::template creator<ThreeStateContrast<HD, dim, Number>>(),
-          L::template creator<Uniform<HD, dim, Number>>(),
+          L::template creator<AstroJet<HS, dim, Number>>(),
+          L::template creator<BeckerSolution<HS, dim, Number>>(),
+          L::template creator<Contrast<HS, dim, Number>>(),
+          L::template creator<ExactRiemannSolution<HS, dim, Number>>(),
+          L::template creator<FourStateContrast<HS, dim, Number>>(),
+          L::template creator<Function<HS, dim, Number>>(),
+          L::template creator<ICFLike<HS, dim, Number>>(),
+          L::template creator<IsentropicVortex<HS, dim, Number>>(),
+          L::template creator<LeBlanc<HS, dim, Number>>(),
+          L::template creator<Noh<HS, dim, Number>>(),
+          L::template creator<RadialContrast<HS, dim, Number>>(),
+          L::template creator<RampUp<HS, dim, Number>>(),
+          L::template creator<Rarefaction<HS, dim, Number>>(),
+          L::template creator<ShockFront<HS, dim, Number>>(),
+          L::template creator<SmoothWave<HS, dim, Number>>(),
+          L::template creator<ThreeStateContrast<HS, dim, Number>>(),
+          L::template creator<Uniform<HS, dim, Number>>(),
       };
     }
   } // namespace EulerInitialStates

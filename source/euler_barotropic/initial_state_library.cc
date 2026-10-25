@@ -9,41 +9,44 @@
 namespace ryujin
 {
   template <>
-  auto InitialStateLibrary<EulerBarotropic::HyperbolicDescription, 1, NUMBER>::
-      defaults() -> std::vector<Creator>
+  auto
+  InitialStateLibrary<EulerBarotropic::HyperbolicSystem, 1, NUMBER>::defaults()
+      -> std::vector<Creator>
   {
     return EulerInitialStates::
-        defaults<EulerBarotropic::HyperbolicDescription, 1, NUMBER>();
+        defaults<EulerBarotropic::HyperbolicSystem, 1, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<EulerBarotropic::HyperbolicDescription, 2, NUMBER>::
-      defaults() -> std::vector<Creator>
+  auto
+  InitialStateLibrary<EulerBarotropic::HyperbolicSystem, 2, NUMBER>::defaults()
+      -> std::vector<Creator>
   {
     return EulerInitialStates::
-        defaults<EulerBarotropic::HyperbolicDescription, 2, NUMBER>();
+        defaults<EulerBarotropic::HyperbolicSystem, 2, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<EulerBarotropic::HyperbolicDescription, 3, NUMBER>::
-      defaults() -> std::vector<Creator>
+  auto
+  InitialStateLibrary<EulerBarotropic::HyperbolicSystem, 3, NUMBER>::defaults()
+      -> std::vector<Creator>
   {
     return EulerInitialStates::
-        defaults<EulerBarotropic::HyperbolicDescription, 3, NUMBER>();
+        defaults<EulerBarotropic::HyperbolicSystem, 3, NUMBER>();
   }
 
   /* instantiations */
 
   template class Library<
-      InitialState<EulerBarotropic::HyperbolicDescription, 1, NUMBER>,
+      InitialState<EulerBarotropic::HyperbolicSystem, 1, NUMBER>,
       const EulerBarotropic::HyperbolicSystem &,
       const std::string &>;
   template class Library<
-      InitialState<EulerBarotropic::HyperbolicDescription, 2, NUMBER>,
+      InitialState<EulerBarotropic::HyperbolicSystem, 2, NUMBER>,
       const EulerBarotropic::HyperbolicSystem &,
       const std::string &>;
   template class Library<
-      InitialState<EulerBarotropic::HyperbolicDescription, 3, NUMBER>,
+      InitialState<EulerBarotropic::HyperbolicSystem, 3, NUMBER>,
       const EulerBarotropic::HyperbolicSystem &,
       const std::string &>;
 } // namespace ryujin

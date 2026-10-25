@@ -21,16 +21,15 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <typename Description, int dim, typename Number>
-    class HouTest : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class HouTest : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       HouTest(const HyperbolicSystem &hyperbolic_system, const std::string s)
-          : InitialState<Description, dim, Number>("hou test", s)
+          : InitialState<HyperbolicSystem, dim, Number>("hou test", s)
           , hyperbolic_system(hyperbolic_system)
       {
         depth_ = 35;
@@ -60,7 +59,7 @@ namespace ryujin
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
-          typename InitialState<Description, dim, Number>::
+          typename InitialState<HyperbolicSystem, dim, Number>::
               initial_precomputed_type final
       {
         /* Compute bathymetry: */

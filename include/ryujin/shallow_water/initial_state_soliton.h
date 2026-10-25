@@ -19,17 +19,16 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <typename Description, int dim, typename Number>
-    class Soliton : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class Soliton : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       Soliton(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<Description, dim, Number>("soliton", subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("soliton", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         depth_ = 1;

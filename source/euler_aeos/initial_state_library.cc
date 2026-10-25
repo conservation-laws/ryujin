@@ -9,44 +9,38 @@
 namespace ryujin
 {
   template <>
-  auto
-  InitialStateLibrary<EulerAEOS::HyperbolicDescription, 1, NUMBER>::defaults()
+  auto InitialStateLibrary<EulerAEOS::HyperbolicSystem, 1, NUMBER>::defaults()
       -> std::vector<Creator>
   {
     return EulerInitialStates::
-        defaults<EulerAEOS::HyperbolicDescription, 1, NUMBER>();
+        defaults<EulerAEOS::HyperbolicSystem, 1, NUMBER>();
   }
 
   template <>
-  auto
-  InitialStateLibrary<EulerAEOS::HyperbolicDescription, 2, NUMBER>::defaults()
+  auto InitialStateLibrary<EulerAEOS::HyperbolicSystem, 2, NUMBER>::defaults()
       -> std::vector<Creator>
   {
     return EulerInitialStates::
-        defaults<EulerAEOS::HyperbolicDescription, 2, NUMBER>();
+        defaults<EulerAEOS::HyperbolicSystem, 2, NUMBER>();
   }
 
   template <>
-  auto
-  InitialStateLibrary<EulerAEOS::HyperbolicDescription, 3, NUMBER>::defaults()
+  auto InitialStateLibrary<EulerAEOS::HyperbolicSystem, 3, NUMBER>::defaults()
       -> std::vector<Creator>
   {
     return EulerInitialStates::
-        defaults<EulerAEOS::HyperbolicDescription, 3, NUMBER>();
+        defaults<EulerAEOS::HyperbolicSystem, 3, NUMBER>();
   }
 
   /* instantiations */
 
-  template class Library<
-      InitialState<EulerAEOS::HyperbolicDescription, 1, NUMBER>,
-      const EulerAEOS::HyperbolicSystem &,
-      const std::string &>;
-  template class Library<
-      InitialState<EulerAEOS::HyperbolicDescription, 2, NUMBER>,
-      const EulerAEOS::HyperbolicSystem &,
-      const std::string &>;
-  template class Library<
-      InitialState<EulerAEOS::HyperbolicDescription, 3, NUMBER>,
-      const EulerAEOS::HyperbolicSystem &,
-      const std::string &>;
+  template class Library<InitialState<EulerAEOS::HyperbolicSystem, 1, NUMBER>,
+                         const EulerAEOS::HyperbolicSystem &,
+                         const std::string &>;
+  template class Library<InitialState<EulerAEOS::HyperbolicSystem, 2, NUMBER>,
+                         const EulerAEOS::HyperbolicSystem &,
+                         const std::string &>;
+  template class Library<InitialState<EulerAEOS::HyperbolicSystem, 3, NUMBER>,
+                         const EulerAEOS::HyperbolicSystem &,
+                         const std::string &>;
 } // namespace ryujin

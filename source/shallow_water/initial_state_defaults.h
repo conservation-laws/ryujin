@@ -33,25 +33,25 @@ namespace ryujin
     /**
      * The built-in initial states.
      */
-    template <typename HyperbolicDescription, int dim, typename Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
     auto defaults()
     {
-      using HD = HyperbolicDescription;
-      using L = InitialStateLibrary<HD, dim, Number>;
+      using HS = HyperbolicSystem;
+      using L = InitialStateLibrary<HS, dim, Number>;
       return std::vector<typename L::Creator>{
-          L::template creator<Contrast<HD, dim, Number>>(),
-          L::template creator<FlowOverBump<HD, dim, Number>>(),
-          L::template creator<Function<HD, dim, Number>>(),
-          L::template creator<GeoTIFF<HD, dim, Number>>(),
-          L::template creator<HouTest<HD, dim, Number>>(),
-          L::template creator<Paraboloid<HD, dim, Number>>(),
-          L::template creator<RitterDamBreak<HD, dim, Number>>(),
-          L::template creator<SlopingFriction<HD, dim, Number>>(),
-          L::template creator<SmoothVortex<HD, dim, Number>>(),
-          L::template creator<ThreeBumpsDamBreak<HD, dim, Number>>(),
-          L::template creator<Uniform<HD, dim, Number>>(),
-          L::template creator<TankExperiments<HD, dim, Number>>(),
-          L::template creator<Soliton<HD, dim, Number>>(),
+          L::template creator<Contrast<HS, dim, Number>>(),
+          L::template creator<FlowOverBump<HS, dim, Number>>(),
+          L::template creator<Function<HS, dim, Number>>(),
+          L::template creator<GeoTIFF<HS, dim, Number>>(),
+          L::template creator<HouTest<HS, dim, Number>>(),
+          L::template creator<Paraboloid<HS, dim, Number>>(),
+          L::template creator<RitterDamBreak<HS, dim, Number>>(),
+          L::template creator<SlopingFriction<HS, dim, Number>>(),
+          L::template creator<SmoothVortex<HS, dim, Number>>(),
+          L::template creator<ThreeBumpsDamBreak<HS, dim, Number>>(),
+          L::template creator<Uniform<HS, dim, Number>>(),
+          L::template creator<TankExperiments<HS, dim, Number>>(),
+          L::template creator<Soliton<HS, dim, Number>>(),
       };
     }
   } // namespace ShallowWaterInitialStates

@@ -53,13 +53,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    StubParabolicModule(const MPIEnsemble & /*mpi_ensemble*/,
-                        const OfflineData<dim, Number> & /*offline_data*/,
-                        const HyperbolicSystem & /*hyperbolic_system*/,
-                        const ParabolicSystem & /*parabolic_system*/,
-                        const InitialValues<HyperbolicDescription, dim, Number>
-                            & /*initial_values*/,
-                        const std::string &subsection = "StubParabolicModule")
+    StubParabolicModule(
+        const MPIEnsemble & /*mpi_ensemble*/,
+        const OfflineData<dim, Number> & /*offline_data*/,
+        const HyperbolicSystem & /*hyperbolic_system*/,
+        const ParabolicSystem & /*parabolic_system*/,
+        const InitialValues<HyperbolicSystem, dim, Number> & /*initial_values*/,
+        const std::string &subsection = "StubParabolicModule")
         : Interface::ParabolicModule<dim, Number>(subsection)
     {
     }

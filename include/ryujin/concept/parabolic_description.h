@@ -40,12 +40,13 @@ namespace ryujin
         ParabolicSystem<typename T::ParabolicSystem> &&
         std::derived_from<parabolic_module_type<T, HD, dim, Number>,
                           Interface::ParabolicModule<dim, Number>> &&
-        std::constructible_from<parabolic_module_type<T, HD, dim, Number>,
-                                const MPIEnsemble &,
-                                const OfflineData<dim, Number> &,
-                                const typename HD::HyperbolicSystem &,
-                                const typename T::ParabolicSystem &,
-                                const InitialValues<HD, dim, Number> &,
-                                const std::string &>;
+        std::constructible_from<
+            parabolic_module_type<T, HD, dim, Number>,
+            const MPIEnsemble &,
+            const OfflineData<dim, Number> &,
+            const typename HD::HyperbolicSystem &,
+            const typename T::ParabolicSystem &,
+            const InitialValues<typename HD::HyperbolicSystem, dim, Number> &,
+            const std::string &>;
   } // namespace Concept
 } // namespace ryujin

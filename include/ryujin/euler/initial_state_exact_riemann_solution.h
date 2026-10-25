@@ -41,8 +41,9 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Description, int dim, typename Number>
-    class ExactRiemannSolution : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class ExactRiemannSolution
+        : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
       /**
@@ -50,7 +51,6 @@ namespace ryujin
        */
       //@{
 
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
@@ -77,8 +77,8 @@ namespace ryujin
 
       ExactRiemannSolution(const HyperbolicSystem &hyperbolic_system,
                            const std::string subsection)
-          : InitialState<Description, dim, Number>("exact riemann solution",
-                                                   subsection)
+          : InitialState<HyperbolicSystem, dim, Number>(
+                "exact riemann solution", subsection)
           , hyperbolic_system_(hyperbolic_system)
           , riemann_solver_(subsection +
                             "/exact riemann solution/riemann solver")

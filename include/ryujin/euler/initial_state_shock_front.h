@@ -24,17 +24,17 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Description, int dim, typename Number>
-    class ShockFront : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class ShockFront : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
-          : InitialState<Description, dim, Number>("shock front", subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("shock front",
+                                                        subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;

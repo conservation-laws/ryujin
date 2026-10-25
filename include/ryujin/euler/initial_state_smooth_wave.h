@@ -24,11 +24,10 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <typename Description, int dim, typename Number>
-    class SmoothWave : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class SmoothWave : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
       using state_type_1d =
@@ -38,7 +37,8 @@ namespace ryujin
 
       SmoothWave(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
-          : InitialState<Description, dim, Number>("smooth wave", subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("smooth wave",
+                                                        subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         density_ref_ = 1.;

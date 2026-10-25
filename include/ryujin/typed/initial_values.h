@@ -38,7 +38,7 @@ namespace ryujin
    *
    * @ingroup Typed
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <typename HyperbolicSystem, int dim, typename Number = double>
   class InitialValues final : public Interface::InitialValues<dim, Number>
   {
   public:
@@ -46,8 +46,6 @@ namespace ryujin
      * @name Typedefs and constexpr constants
      */
     //@{
-
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
@@ -155,8 +153,7 @@ namespace ryujin
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 
-    std::vector<
-        std::unique_ptr<InitialState<HyperbolicDescription, dim, Number>>>
+    std::vector<std::unique_ptr<InitialState<HyperbolicSystem, dim, Number>>>
         initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &, Number)>

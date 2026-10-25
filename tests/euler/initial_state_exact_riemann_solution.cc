@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
   std::cout << std::scientific;
 
   std::cout << "Calling default constructor..." << std::endl;
-  ExactRiemannSolution<HyperbolicDescription, dim, double> initial_state(
+  ExactRiemannSolution<HyperbolicSystem, dim, double> initial_state(
       hyperbolic_system, "");
 
   {

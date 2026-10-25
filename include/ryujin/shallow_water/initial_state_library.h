@@ -8,7 +8,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/shallow_water/hyperbolic_description.h>
+#include <ryujin/shallow_water/hyperbolic_system.h>
 #include <ryujin/typed/initial_state.h>
 
 #include <string>
@@ -18,25 +18,28 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   template <>
-  auto InitialStateLibrary<ShallowWater::HyperbolicDescription, 1, NUMBER>::
-      defaults() -> std::vector<Creator>;
+  auto
+  InitialStateLibrary<ShallowWater::HyperbolicSystem, 1, NUMBER>::defaults()
+      -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<ShallowWater::HyperbolicDescription, 2, NUMBER>::
-      defaults() -> std::vector<Creator>;
+  auto
+  InitialStateLibrary<ShallowWater::HyperbolicSystem, 2, NUMBER>::defaults()
+      -> std::vector<Creator>;
   template <>
-  auto InitialStateLibrary<ShallowWater::HyperbolicDescription, 3, NUMBER>::
-      defaults() -> std::vector<Creator>;
+  auto
+  InitialStateLibrary<ShallowWater::HyperbolicSystem, 3, NUMBER>::defaults()
+      -> std::vector<Creator>;
 
   extern template class Library<
-      InitialState<ShallowWater::HyperbolicDescription, 1, NUMBER>,
+      InitialState<ShallowWater::HyperbolicSystem, 1, NUMBER>,
       const ShallowWater::HyperbolicSystem &,
       const std::string &>;
   extern template class Library<
-      InitialState<ShallowWater::HyperbolicDescription, 2, NUMBER>,
+      InitialState<ShallowWater::HyperbolicSystem, 2, NUMBER>,
       const ShallowWater::HyperbolicSystem &,
       const std::string &>;
   extern template class Library<
-      InitialState<ShallowWater::HyperbolicDescription, 3, NUMBER>,
+      InitialState<ShallowWater::HyperbolicSystem, 3, NUMBER>,
       const ShallowWater::HyperbolicSystem &,
       const std::string &>;
 #endif

@@ -98,14 +98,14 @@ namespace ryujin
       const auto &offline_data = *this->offline_data_;
 
       initial_values_container_ = std::make_unique<
-          MPIEnsembleContainer<InitialValues<HD, dim, Number>>>(
+          MPIEnsembleContainer<InitialValues<HyperbolicSystem, dim, Number>>>(
           mpi_ensemble,
           "/E - InitialValues",
           mpi_ensemble,
           offline_data,
           hyperbolic_system,
           parabolic_system);
-      const InitialValues<HD, dim, Number> &initial_values =
+      const InitialValues<HyperbolicSystem, dim, Number> &initial_values =
           initial_values_container_->get();
       this->initial_values_ = &initial_values;
 
@@ -262,7 +262,8 @@ namespace ryujin
         hyperbolic_system_container_;
     std::unique_ptr<MPIEnsembleContainer<ParabolicSystem>>
         parabolic_system_container_;
-    std::unique_ptr<MPIEnsembleContainer<InitialValues<HD, dim, Number>>>
+    std::unique_ptr<
+        MPIEnsembleContainer<InitialValues<HyperbolicSystem, dim, Number>>>
         initial_values_container_;
 
     //@}

@@ -9,38 +9,35 @@
 namespace ryujin
 {
   template <>
-  auto InitialStateLibrary<Euler::HyperbolicDescription, 1, NUMBER>::defaults()
+  auto InitialStateLibrary<Euler::HyperbolicSystem, 1, NUMBER>::defaults()
       -> std::vector<Creator>
   {
-    return EulerInitialStates::
-        defaults<Euler::HyperbolicDescription, 1, NUMBER>();
+    return EulerInitialStates::defaults<Euler::HyperbolicSystem, 1, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<Euler::HyperbolicDescription, 2, NUMBER>::defaults()
+  auto InitialStateLibrary<Euler::HyperbolicSystem, 2, NUMBER>::defaults()
       -> std::vector<Creator>
   {
-    return EulerInitialStates::
-        defaults<Euler::HyperbolicDescription, 2, NUMBER>();
+    return EulerInitialStates::defaults<Euler::HyperbolicSystem, 2, NUMBER>();
   }
 
   template <>
-  auto InitialStateLibrary<Euler::HyperbolicDescription, 3, NUMBER>::defaults()
+  auto InitialStateLibrary<Euler::HyperbolicSystem, 3, NUMBER>::defaults()
       -> std::vector<Creator>
   {
-    return EulerInitialStates::
-        defaults<Euler::HyperbolicDescription, 3, NUMBER>();
+    return EulerInitialStates::defaults<Euler::HyperbolicSystem, 3, NUMBER>();
   }
 
   /* instantiations */
 
-  template class Library<InitialState<Euler::HyperbolicDescription, 1, NUMBER>,
+  template class Library<InitialState<Euler::HyperbolicSystem, 1, NUMBER>,
                          const Euler::HyperbolicSystem &,
                          const std::string &>;
-  template class Library<InitialState<Euler::HyperbolicDescription, 2, NUMBER>,
+  template class Library<InitialState<Euler::HyperbolicSystem, 2, NUMBER>,
                          const Euler::HyperbolicSystem &,
                          const std::string &>;
-  template class Library<InitialState<Euler::HyperbolicDescription, 3, NUMBER>,
+  template class Library<InitialState<Euler::HyperbolicSystem, 3, NUMBER>,
                          const Euler::HyperbolicSystem &,
                          const std::string &>;
 } // namespace ryujin

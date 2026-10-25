@@ -23,18 +23,17 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <typename Description, int dim, typename Number>
-    class GeoTIFF : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class GeoTIFF : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
 
       GeoTIFF(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<Description, dim, Number>("geotiff", subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("geotiff", subsection)
           , hyperbolic_system_(hyperbolic_system)
           , geotiff_reader_(subsection + "/geotiff")
       {
@@ -82,7 +81,7 @@ namespace ryujin
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
-          typename InitialState<Description, dim, Number>::
+          typename InitialState<HyperbolicSystem, dim, Number>::
               initial_precomputed_type final
       {
         /* Compute bathymetry: */

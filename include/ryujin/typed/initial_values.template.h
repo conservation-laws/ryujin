@@ -16,8 +16,8 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  InitialValues<HyperbolicDescription, dim, Number>::InitialValues(
+  template <typename HyperbolicSystem, int dim, typename Number>
+  InitialValues<HyperbolicSystem, dim, Number>::InitialValues(
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
@@ -30,12 +30,12 @@ namespace ryujin
       , parabolic_system_(&parabolic_system)
   {
     this->parse_parameters_call_back.connect(
-        std::bind(&InitialValues<HyperbolicDescription, dim, Number>::
+        std::bind(&InitialValues<HyperbolicSystem, dim, Number>::
                       parse_parameters_callback,
                   this));
 
     initial_state_list_ =
-        InitialStateLibrary<HyperbolicDescription, dim, Number>::create(
+        InitialStateLibrary<HyperbolicSystem, dim, Number>::create(
             *hyperbolic_system_, subsection);
 
     configuration_ = "uniform";
@@ -45,7 +45,7 @@ namespace ryujin
         "The initial state configuration. Valid names are given by "
         "any of the subsections defined below.",
         this->prm,
-        InitialStateLibrary<HyperbolicDescription, dim, Number>::selection(
+        InitialStateLibrary<HyperbolicSystem, dim, Number>::selection(
             initial_state_list_));
 
     initial_direction_[0] = 1.;
@@ -176,9 +176,8 @@ namespace ryujin
   } // namespace
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void
-  InitialValues<HyperbolicDescription, dim, Number>::parse_parameters_callback()
+  template <typename HyperbolicSystem, int dim, typename Number>
+  void InitialValues<HyperbolicSystem, dim, Number>::parse_parameters_callback()
   {
     /* First, let's normalize the direction: */
 
@@ -190,7 +189,7 @@ namespace ryujin
 
     {
       auto &initial_state =
-          InitialStateLibrary<HyperbolicDescription, dim, Number>::select(
+          InitialStateLibrary<HyperbolicSystem, dim, Number>::select(
               initial_state_list_, configuration_);
 
       initial_state_ = [this, &initial_state](const dealii::Point<dim> &point,
@@ -237,10 +236,10 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  auto InitialValues<HyperbolicDescription, dim, Number>::
-      interpolate_hyperbolic_vector(Number t) const
-      -> MultiComponentVector<Number>
+  template <typename HyperbolicSystem, int dim, typename Number>
+  auto
+  InitialValues<HyperbolicSystem, dim, Number>::interpolate_hyperbolic_vector(
+      Number t) const -> MultiComponentVector<Number>
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::"
@@ -277,8 +276,8 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  auto InitialValues<HyperbolicDescription, dim, Number>::
+  template <typename HyperbolicSystem, int dim, typename Number>
+  auto InitialValues<HyperbolicSystem, dim, Number>::
       interpolate_initial_precomputed_vector() const
       -> MultiComponentVector<Number>
   {

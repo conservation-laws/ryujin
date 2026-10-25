@@ -28,11 +28,10 @@ namespace ryujin
    *
    * @ingroup Typed
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <typename HyperbolicSystem, int dim, typename Number = double>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
     using state_type = typename View::state_type;
@@ -85,14 +84,14 @@ namespace ryujin
 
   /**
    * The library of initial states: a registry of all initial states that
-   * InitialValues can select by name, for a given @p HyperbolicDescription,
+   * InitialValues can select by name, for a given @p HyperbolicSystem,
    * dimension @p dim, and number type @p Number.
    *
    * @ingroup Typed
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <typename HyperbolicSystem, int dim, typename Number = double>
   using InitialStateLibrary =
-      Library<InitialState<HyperbolicDescription, dim, Number>,
-              const typename HyperbolicDescription::HyperbolicSystem &,
+      Library<InitialState<HyperbolicSystem, dim, Number>,
+              const HyperbolicSystem &,
               const std::string &>;
 } // namespace ryujin

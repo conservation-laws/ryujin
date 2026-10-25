@@ -44,7 +44,7 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
-      const InitialValues<HyperbolicDescription, dim, Number> &initial_values,
+      const InitialValues<HyperbolicSystem, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : Interface::HyperbolicModule<dim, Number>(
             problem_dimension, n_precomputed_values, subsection)

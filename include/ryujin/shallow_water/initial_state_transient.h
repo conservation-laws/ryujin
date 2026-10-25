@@ -19,18 +19,17 @@ namespace ryujin
      *
      * @ingroup ShallowWaterEquations
      */
-    template <typename Description, int dim, typename Number>
-    class TankExperiments : public InitialState<Description, dim, Number>
+    template <typename HyperbolicSystem, int dim, typename Number>
+    class TankExperiments : public InitialState<HyperbolicSystem, dim, Number>
     {
     public:
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
       using View = typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename View::state_type;
 
       TankExperiments(const HyperbolicSystem &hyperbolic_system,
                       const std::string subsection)
-          : InitialState<Description, dim, Number>("transient experiments",
-                                                   subsection)
+          : InitialState<HyperbolicSystem, dim, Number>("transient experiments",
+                                                        subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(
@@ -77,7 +76,7 @@ namespace ryujin
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
-          typename InitialState<Description, dim, Number>::
+          typename InitialState<HyperbolicSystem, dim, Number>::
               initial_precomputed_type final
       {
         /* Compute bathymetry: */
