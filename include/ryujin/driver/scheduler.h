@@ -66,13 +66,19 @@ namespace ryujin
      */
     //@{
 
+    /** The base name of all output files. */
     std::string base_name_;
 
+    /** The final simulation time. */
     Number t_final_;
+    /** The maximal number of cycles, zero for no limit. */
     unsigned int max_cycles_;
+    /** Shorten time steps to reach every timer tick exactly. */
     bool align_time_steps_;
+    /** The simulation time between two timer ticks. */
     Number timer_granularity_;
 
+    /** The names of the selectable tasks to run, in order. */
     std::vector<std::string> task_names_;
 
     //@}
@@ -81,16 +87,18 @@ namespace ryujin
      */
     //@{
 
+    /** The MPI communicator. */
     const MPI_Comm mpi_comm_;
 
+    /** The tasks that always run, the primary task first. */
     const std::vector<Task *> required_;
+    /** The tasks that can be chosen with the parameter "tasks". */
     const std::vector<Task *> selectable_;
 
+    /** The printer of the status messages. */
     std::function<void(const std::string &)> info_;
 
-    /**
-     * The active tasks in the order of execution.
-     */
+    /** The active tasks in the order of execution. */
     std::vector<Task *> tasks_;
 
     //@}

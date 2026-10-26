@@ -44,9 +44,10 @@ namespace ryujin
     //@{
 
     /**
-     * Resume from the last checkpoint (if "resume" is set): load the
-     * mesh with the attached state vector, restore the current time and
-     * timer cycle, and the internal state of all active tasks.
+     * Resume from the last checkpoint (if "resume" is set to true):
+     *
+     * load the mesh with the attached state vector, restore the current
+     * time and timer cycle, and the internal state of all active tasks.
      */
     void start(TaskContext<Number> &context) override;
 

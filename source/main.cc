@@ -6,27 +6,23 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/driver/environment.h>
 #include <ryujin/driver/equation.h>
+#include <ryujin/driver/parameter_editor.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/utilities.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 namespace
 {
   /**
-   * The Dave error message
-   */
-  const std::string dave =
-      "\nDave, this conversation can serve no purpose anymore. Goodbye.\n\n";
-
-
-  /**
-   * The run time parameters "dimension" and "equation" that select the
-   * equation to run.
+   * A small struct to query the run time parameters "dimension" and
+   * "equation" that select the equation to run.
    *
    * When starting up the ryujin executable we are faced with the following
    * difficulties:
@@ -45,17 +41,16 @@ namespace
    * end
    * ```
    * and then run the equation with the given name for the given dimension.
-   *
-   * @note The object has to stay alive while the equation runs: the
-   * equation parses the complete parameter file again with
-   * dealii::ParameterAcceptor::initialize(), which requires the two
-   * parameters to be declared.
    */
   struct EquationSelection final : dealii::ParameterAcceptor {
     EquationSelection()
         : ParameterAcceptor("B - Equation")
     {
-      add_parameter("dimension", dimension, "The spatial dimension");
+      add_parameter("dimension",
+                    dimension,
+                    "The spatial dimension",
+                    this->prm,
+                    dealii::Patterns::Integer(1, 3));
 
       std::string names;
       for (const auto &[name, equation] : ryujin::equations())
@@ -69,7 +64,7 @@ namespace
                     dealii::Patterns::Selection(names));
     }
 
-    int dimension = 0;
+    int dimension = 1;
     std::string equation;
   };
 } // namespace
@@ -83,6 +78,17 @@ int main(int argc, char *argv[])
    * "equation", and run the selected equation.
    */
 
+  /*
+   * Remove --edit and --editor from the argument list before handing off
+   * to MPI, Kokkos, PETSc, etc...
+   */
+  const auto end = std::remove_if(argv + 1, argv + argc, [](const char *arg) {
+    const std::string_view option = arg;
+    return option == "--edit" || option == "--editor";
+  });
+  const bool invoke_editor = end != argv + argc;
+  argc = static_cast<int>(end - argv);
+
   ryujin::Environment environment(argc, argv);
   const MPI_Comm mpi_communicator = environment.mpi_communicator();
   const bool is_root =
@@ -94,28 +100,50 @@ int main(int argc, char *argv[])
 
   if (argc > 2) {
     if (is_root) {
-      std::cout << "[ERROR] Invalid number of parameters. At most one argument "
-                << "supported which has to be a parameter file." << std::endl;
+      std::cerr << "[ERROR] Invalid number of parameters. At most one argument "
+                << "supported which has to be a parameter file (and the "
+                << "option --edit or --editor)." << std::endl;
     }
     return 1;
   }
 
-  const auto executable_name = std::filesystem::path(argv[0]).filename();
-  std::string parameter_file = executable_name.string() + ".prm";
+  const bool default_file = argc == 1;
+  const std::string parameter_file =
+      default_file ? std::filesystem::path(argv[0]).filename().string() + ".prm"
+                   : std::string(argv[1]);
+  const bool file_exists = std::filesystem::exists(parameter_file);
 
-  if (argc == 2) {
-    parameter_file = argv[1];
-
-    if (!std::filesystem::exists(parameter_file)) {
-      if (is_root) {
-        std::cout << "[ERROR] The specified parameter file »" << parameter_file
-                  << "« does not exist." << std::endl;
-      }
-      return 1;
+  if (!file_exists && !default_file && !invoke_editor) {
+    if (is_root) {
+      std::cerr << "[ERROR] The specified parameter file »" << parameter_file
+                << "« does not exist." << std::endl;
     }
+    return 1;
   }
 
-  if (!std::filesystem::exists(parameter_file)) {
+  /*
+   * Open the parameter editor if requested, or if there is no parameter
+   * file and we are running on an interactive terminal:
+   */
+
+  const bool editor_available =
+      ryujin::parameter_editor_available(mpi_communicator);
+
+  if (invoke_editor && !editor_available) {
+    if (is_root) {
+      std::cerr << "[ERROR] The parameter editor requires an interactive "
+                << "terminal, a serial run, and ryujin compiled with FTXUI."
+                << std::endl;
+    }
+    return 1;
+  }
+
+  if (invoke_editor || (editor_available && !file_exists)) {
+    ryujin::edit_parameter_file(parameter_file);
+    return 0;
+  }
+
+  if (!file_exists) {
     if (is_root) {
       std::cout << "[INFO] Default parameter file »" << parameter_file
                 << "« not found.\n[INFO] Creating template parameter files for "
@@ -135,12 +163,6 @@ int main(int argc, char *argv[])
       "",
       /* skip undefined */ true,
       /* assert entries present */ false);
-
-  AssertThrow(selection.dimension >= 1 && selection.dimension <= 3,
-              dealii::ExcMessage(dave +
-                                 "The dimension parameter needs to be "
-                                 "either 1, 2, or 3, but we encountered »" +
-                                 std::to_string(selection.dimension) + "«\n"));
 
   if (is_root) {
     std::cout << "[INFO] dispatching to driver »" << selection.equation

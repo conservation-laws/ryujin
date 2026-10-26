@@ -20,9 +20,35 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 namespace ryujin
 {
+  /**
+   * Populate dealii::ParameterAcceptor::prm with all parameters of the
+   * objects created by @p setup, and return the objects. The objects have
+   * to go out of scope before calling dealii::ParameterAcceptor::clear().
+   *
+   * @ingroup Driver
+   */
+  template <typename Setup>
+  auto populate_parameters(const Setup &setup)
+  {
+    auto &prm = dealii::ParameterAcceptor::prm;
+
+    /*
+     * Workaround: The Scheduler is constructed last and declares the "A -
+     * Scheduler" section last. Add an entry to the section so that it
+     * shows up first.
+     */
+    prm.enter_subsection("A - Scheduler");
+    prm.declare_entry("basename", "test");
+    prm.leave_subsection();
+
+    return setup();
+  }
+
+
   /**
    * Write the default parameter file "default_parameters-<name>.prm", and,
    * if @p write_detailed_description is set, the parameter file
@@ -50,16 +76,7 @@ namespace ryujin
     {
       auto &prm = dealii::ParameterAcceptor::prm;
 
-      /*
-       * Workaround: The Scheduler is constructed last and declares the
-       * "A - Scheduler" section last. Add an entry to the section so that it
-       * shows up first.
-       */
-      prm.enter_subsection("A - Scheduler");
-      prm.declare_entry("basename", "test");
-      prm.leave_subsection();
-
-      [[maybe_unused]] const auto objects = setup();
+      [[maybe_unused]] const auto objects = populate_parameters(setup);
 
       if (dealii::Utilities::MPI::this_mpi_process(MPI_COMM_SELF) == 0) {
         if (write_detailed_description)
@@ -102,6 +119,14 @@ namespace ryujin
      * dimensions.
      */
     std::function<void()> create_parameter_files;
+
+    /**
+     * Populate dealii::ParameterAcceptor::prm with all parameters of the
+     * equation for dimension @p dim, call @p f, and clear the
+     * ParameterAcceptor afterwards.
+     */
+    std::function<void(int dim, const std::function<void()> &f)>
+        with_parameters;
   };
 
 
@@ -139,19 +164,9 @@ namespace ryujin
       const auto run = [](int dim,
                           const std::string &parameter_file,
                           const MPI_Comm &mpi_communicator) {
-        switch (dim) {
-        case 1:
-          run_simulation<1>(parameter_file, mpi_communicator);
-          break;
-        case 2:
-          run_simulation<2>(parameter_file, mpi_communicator);
-          break;
-        case 3:
-          run_simulation<3>(parameter_file, mpi_communicator);
-          break;
-        default:
-          AssertThrow(false, dealii::ExcInternalError());
-        }
+        dispatch(dim, [&](auto d) {
+          run_simulation<d.value>(parameter_file, mpi_communicator);
+        });
       };
 
       const auto create_parameter_files = [name] {
@@ -160,7 +175,12 @@ namespace ryujin
         create_parameter_file<3>(name, false);
       };
 
-      const Equation equation{run, create_parameter_files};
+      const auto with_parameters = [name](int dim,
+                                          const std::function<void()> &f) {
+        dispatch(dim, [&](auto d) { call_with_parameters<d.value>(name, f); });
+      };
+
+      const Equation equation{run, create_parameter_files, with_parameters};
 
       const bool inserted = equations().emplace(name, equation).second;
       AssertThrow(inserted,
@@ -169,6 +189,26 @@ namespace ryujin
     }
 
   private:
+    /**
+     * Call @p f with std::integral_constant<int, dim> for the run time
+     * dimension @p dim.
+     */
+    template <typename F>
+    static auto dispatch(int dim, const F &f)
+    {
+      switch (dim) {
+      case 1:
+        return f(std::integral_constant<int, 1>{});
+      case 2:
+        return f(std::integral_constant<int, 2>{});
+      case 3:
+        return f(std::integral_constant<int, 3>{});
+      default:
+        AssertThrow(false, dealii::ExcInternalError());
+        __builtin_unreachable();
+      }
+    }
+
     /**
      * Construct the Simulation and the TaskComposition for dimension
      * @p dim, initialize all parameters from @p parameter_file, and run.
@@ -186,6 +226,38 @@ namespace ryujin
     }
 
     /**
+     * Declare the parameters "dimension" and "equation" (see
+     * source/main.cc), set to this equation, and create the Simulation
+     * and the TaskComposition for the sole purpose of populating the
+     * ParameterAcceptor::prm object.
+     */
+    template <int dim>
+    static auto create_objects(const std::string &name)
+    {
+      std::string names;
+      for (const auto &[key, equation] : equations())
+        names += (names.empty() ? "" : "|") + key;
+
+      auto &prm = dealii::ParameterAcceptor::prm;
+      prm.enter_subsection("B - Equation");
+      prm.declare_entry("dimension",
+                        std::to_string(dim),
+                        dealii::Patterns::Integer(1, 3),
+                        "The spatial dimension");
+      prm.declare_entry("equation",
+                        name,
+                        dealii::Patterns::Selection(names),
+                        "The PDE system");
+      prm.leave_subsection();
+
+      struct Objects {
+        Simulation<HD, PD, dim, NUMBER, TI> simulation{MPI_COMM_SELF};
+        TaskComposition<dim, NUMBER> task_composition{simulation};
+      };
+      return std::make_unique<Objects>();
+    }
+
+    /**
      * Write the default parameter file(s) for dimension @p dim.
      */
     template <int dim>
@@ -197,30 +269,29 @@ namespace ryujin
       base_name += "-" + std::to_string(dim) + "d";
 
       write_parameter_files(base_name, write_detailed_description, [&name] {
-        /*
-         * The parameters "dimension" and "equation" (see source/main.cc), set
-         * to this equation:
-         */
-        auto &prm = dealii::ParameterAcceptor::prm;
-        prm.enter_subsection("B - Equation");
-        prm.declare_entry("dimension",
-                          std::to_string(dim),
-                          dealii::Patterns::Integer(),
-                          "The spatial dimension");
-        prm.declare_entry(
-            "equation", name, dealii::Patterns::Anything(), "The PDE system");
-        prm.leave_subsection();
-
-        /*
-         * Create temporary objects for the sole purpose of populating the
-         * ParameterAcceptor::prm object.
-         */
-        struct Objects {
-          Simulation<HD, PD, dim, NUMBER, TI> simulation{MPI_COMM_SELF};
-          TaskComposition<dim, NUMBER> task_composition{simulation};
-        };
-        return std::make_unique<Objects>();
+        return create_objects<dim>(name);
       });
+    }
+
+    /**
+     * Call @p f with all parameters for dimension @p dim, see
+     * Equation::with_parameters.
+     */
+    template <int dim>
+    static void call_with_parameters(const std::string &name,
+                                     const std::function<void()> &f)
+    {
+      {
+        [[maybe_unused]] const auto objects =
+            populate_parameters([&name] { return create_objects<dim>(name); });
+
+        f();
+
+        // all objects have to go out of scope, see
+        // https://github.com/dealii/dealii/issues/15111
+      }
+
+      dealii::ParameterAcceptor::clear();
     }
   };
 } // namespace ryujin

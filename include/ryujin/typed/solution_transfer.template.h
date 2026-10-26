@@ -33,7 +33,7 @@ namespace ryujin
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
       : Interface::SolutionTransfer<dim, Number>(subsection)
-      , limiter_(hyperbolic_system, subsection + "/mass transfer limiter")
+      , limiter_(hyperbolic_system, subsection + "/limiter")
       , mpi_ensemble_(mpi_ensemble)
       , discretization_(&discretization)
       , offline_data_(&offline_data)

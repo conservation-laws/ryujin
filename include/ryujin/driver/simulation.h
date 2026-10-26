@@ -159,11 +159,12 @@ namespace ryujin
     }
 
     /**
-     * Destructor. Destroys all objects in the reverse order of
-     * construction because the objects observe each other.
+     * Destructor.
      */
     ~Simulation() override
     {
+      // Destroy all objects in reverse order:
+
       this->state_vector_ = StateVector<Number>();
       this->solution_transfer_.reset();
       this->postprocessor_.reset();
@@ -188,8 +189,7 @@ namespace ryujin
     //@{
 
     /**
-     * Prepare the discretization and the state vector for the current
-     * mesh.
+     * Prepare the discretization and the state vector for the current mesh.
      *
      * If no triangulation has been created (or loaded from a checkpoint) yet,
      * create the mesh. If a state vector is attached to the triangulation
@@ -266,8 +266,10 @@ namespace ryujin
 
     std::unique_ptr<MPIEnsembleContainer<HyperbolicSystem>>
         hyperbolic_system_container_;
+
     std::unique_ptr<MPIEnsembleContainer<ParabolicSystem>>
         parabolic_system_container_;
+
     std::unique_ptr<MPIEnsembleContainer<InitialValues>>
         initial_values_container_;
 

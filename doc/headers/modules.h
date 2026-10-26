@@ -302,14 +302,15 @@
  * EquationRegistration<HD, PD> at namespace scope in
  * <code>source/driver/equation_*.cc</code>. Its constructor runs during
  * static initialization and inserts an Equation under the given name into
- * the map returned by equations(). An Equation holds two std::function
+ * the map returned by equations(). An Equation holds three std::function
  * objects, so that main() (<code>source/main.cc</code>) can call them
  * without knowing HD, PD, or the dimension. main() reads the run time
  * parameters "dimension" and "equation", looks up the equation, and calls
  * Equation::run, which switches over the dimension and constructs the
  * Simulation and the TaskComposition. If the parameter file does not
- * exist, main() instead calls Equation::create_parameter_files of every
- * registered equation:
+ * exist, main() instead opens the parameter editor (see below) in a
+ * serial run on an interactive terminal, and otherwise calls
+ * Equation::create_parameter_files of every registered equation:
  *
  * @dot
  digraph G
@@ -353,6 +354,20 @@
  * Only EquationRegistration and the Simulation depend on HD and PD. The
  * TaskComposition and all tasks use the Simulation through
  * Interface::Simulation and are compiled once per dimension.
+ *
+ * <h3>Parameter editor</h3>
+ *
+ * With <code>ryujin --edit [file]</code> (or <code>--editor</code>), or if
+ * the parameter file does not exist in a serial run on an interactive
+ * terminal, main() calls edit_parameter_file(). Without a parameter file it
+ * starts from the first equation in 2D. Equation::with_parameters constructs
+ * the Simulation and the TaskComposition to declare all parameters, which
+ * the editor shows in a terminal editor (ParameterModel,
+ * run_parameter_editor()) with the colors and the animation of the
+ * Dashboard, as configured in the subsection "M - Logger". Changing the
+ * equation or the dimension opens the editor again for the new equation,
+ * keeping all values that still apply. "save and exit" writes the parameter
+ * file, "save and run" writes it and runs the simulation.
  *
  * <h3>Scheduler</h3>
  *

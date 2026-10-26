@@ -4,6 +4,7 @@
 //
 
 #include <driver/dashboard_animation.h>
+#include <driver/dashboard_theme.h>
 #include <ryujin/driver/dashboard.h>
 
 #include <ftxui/dom/canvas.hpp>
@@ -28,187 +29,10 @@
 namespace ryujin
 {
   using namespace ftxui;
+  using namespace dashboard;
 
   namespace
   {
-    /*
-     * Palette:
-     */
-
-    struct Palette {
-      /* header badge and its text: */
-      Color badge;
-      Color badge_ink;
-      /* text on light backgrounds: */
-      Color ink;
-      /* panel titles and the header border: */
-      Color accent;
-      /* chips, bars, and the "running" badge: */
-      Color highlight;
-      /* labels and captions: */
-      Color caption;
-      Color good;
-      Color warn;
-      Color bad;
-      /* secondary text and panel borders: */
-      Color muted;
-      /* the background of bars and gauges: */
-      Color track;
-      std::vector<Color> segments;
-      std::vector<Color> animation;
-      /* the color scale of the skew, from none to large: */
-      std::vector<Color> heat;
-    };
-
-
-    Color hex(std::uint32_t rgb)
-    {
-      return Color::RGB((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
-    }
-
-
-    Palette make_palette(DashboardColorScheme scheme)
-    {
-      switch (scheme) {
-      case DashboardColorScheme::ryujin:
-        /* Shades of blue, and yellow, orange and red for the skew: */
-        return {
-            .badge = hex(0x7aa2f7),
-            .badge_ink = hex(0x1a1b26),
-            .ink = hex(0x1a1b26),
-            .accent = hex(0x7aa2f7),
-            .highlight = hex(0x2ac3de),
-            .caption = hex(0x7dcfff),
-            .good = hex(0xb4f9f8),
-            .warn = hex(0x89ddff),
-            .bad = hex(0xc0caf5),
-            .muted = hex(0x565f89),
-            .track = hex(0x292e42),
-            .segments = {hex(0x7aa2f7),
-                         hex(0x2ac3de),
-                         hex(0x3d59a1),
-                         hex(0x7dcfff),
-                         hex(0x0db9d7),
-                         hex(0x89ddff),
-                         hex(0x394b70),
-                         hex(0xb4f9f8),
-                         hex(0xa9b1d6),
-                         hex(0xc0caf5)},
-            .animation = {hex(0x7dcfff),
-                          hex(0x7aa2f7),
-                          hex(0x89ddff),
-                          hex(0xb4f9f8),
-                          hex(0xc0caf5)},
-            .heat = {hex(0x7aa2f7),
-                     hex(0xe0af68),
-                     hex(0xff9e64),
-                     hex(0xf7768e)},
-        };
-
-      case DashboardColorScheme::rainbow:
-        return {
-            .badge = hex(0x729fff),
-            .badge_ink = hex(0x1a1b26),
-            .ink = hex(0x1a1b26),
-            .accent = hex(0x729fff),
-            .highlight = hex(0xb993fe),
-            .caption = hex(0x7dcfff),
-            .good = hex(0x9ed662),
-            .warn = hex(0xe9b15f),
-            .bad = hex(0xff6e89),
-            .muted = hex(0x565f89),
-            .track = hex(0x292e42),
-            .segments = {hex(0x729fff),
-                         hex(0x9ed662),
-                         hex(0xe9b15f),
-                         hex(0xb993fe),
-                         hex(0x7dcfff),
-                         hex(0xff6e89),
-                         hex(0x6be2cf),
-                         hex(0xff9e64),
-                         hex(0x1dccec),
-                         hex(0xbcc8f9)},
-            .animation = {hex(0x7dcfff),
-                          hex(0x729fff),
-                          hex(0xb993fe),
-                          hex(0xbcc8f9)},
-            .heat = {hex(0x9ed662), hex(0xe9b15f), hex(0xff6e89)},
-        };
-
-      case DashboardColorScheme::tamu:
-        /*
-         * Aggie Maroon (#500000), white, and the neutrals of the Texas
-         * A&M brand. Text uses tints of Aggie Maroon that are readable on
-         * a dark terminal:
-         */
-        return {
-            .badge = hex(0x500000),
-            .badge_ink = hex(0xffffff),
-            .ink = hex(0x202020),
-            .accent = hex(0x966666),
-            .highlight = hex(0xc2a6a6),
-            .caption = hex(0xdccccc),
-            .good = hex(0x84ee53),
-            .warn = hex(0xeebd53),
-            .bad = hex(0xee5389),
-            .muted = hex(0x707070),
-            .track = hex(0x3e3e3e),
-            .segments = {hex(0x500000),
-                         hex(0x966666),
-                         hex(0x707070),
-                         hex(0xc2a6a6),
-                         hex(0xb0b0b0),
-                         hex(0x733232),
-                         hex(0xdccccc),
-                         hex(0x4a4a4a),
-                         hex(0xa87979),
-                         hex(0xd9d9d9)},
-            .animation = {hex(0x966666),
-                          hex(0xc2a6a6),
-                          hex(0xdccccc),
-                          hex(0xffffff)},
-            .heat = {hex(0x84ee53), hex(0xeebd53), hex(0xee5389)},
-        };
-
-      case DashboardColorScheme::monochrome:
-        return {
-            .badge = hex(0xd0d0d0),
-            .badge_ink = hex(0x1c1c1c),
-            .ink = hex(0x1c1c1c),
-            .accent = hex(0xbcbcbc),
-            .highlight = hex(0x9e9e9e),
-            .caption = hex(0xd0d0d0),
-            .good = hex(0xe4e4e4),
-            .warn = hex(0xb2b2b2),
-            .bad = hex(0xffffff),
-            .muted = hex(0x6c6c6c),
-            .track = hex(0x303030),
-            .segments = {hex(0xeeeeee),
-                         hex(0xbcbcbc),
-                         hex(0x8a8a8a),
-                         hex(0x5f5f5f),
-                         hex(0xd0d0d0),
-                         hex(0xa8a8a8),
-                         hex(0x767676),
-                         hex(0xe4e4e4),
-                         hex(0x949494),
-                         hex(0x4e4e4e)},
-            .animation = {hex(0x6c6c6c),
-                          hex(0x9e9e9e),
-                          hex(0xd0d0d0),
-                          hex(0xffffff)},
-            .heat = {hex(0xe4e4e4), hex(0xb2b2b2), hex(0xffffff)},
-        };
-      }
-
-      __builtin_unreachable();
-    }
-
-
-    /* The palette of the current call to Dashboard::render(): */
-    Palette theme = make_palette(DashboardColorScheme::ryujin);
-
-
     /* Return the escape sequences that redraw the changed cells: */
     std::string changes(animation::Stage &stage)
     {
@@ -239,9 +63,10 @@ namespace ryujin
     Color heat(double x)
     {
       const auto &stops = theme.heat;
-      x = std::clamp(x, 0., 1.) * double(stops.size() - 1);
+      x = std::clamp(x, 0., 1.) * static_cast<double>(stops.size() - 1);
       const auto i = std::min(static_cast<std::size_t>(x), stops.size() - 2);
-      return Color::Interpolate(float(x - double(i)), stops[i], stops[i + 1]);
+      const auto t = static_cast<float>(x - static_cast<double>(i));
+      return Color::Interpolate(t, stops[i], stops[i + 1]);
     }
 
 
@@ -299,26 +124,6 @@ namespace ryujin
      * Elements:
      */
 
-    Element panel(const std::string &title, Element content)
-    {
-      return window(text(" " + title + " ") | bold | color(theme.accent),
-                    content | color(Color::Default)) |
-             color(theme.muted);
-    }
-
-
-    Element label(const std::string &name)
-    {
-      return text(name) | color(theme.caption) | size(WIDTH, EQUAL, 11);
-    }
-
-
-    Element chip(const std::string &name, Color foreground)
-    {
-      return text(" " + name + " ") | color(foreground) | bgcolor(theme.track);
-    }
-
-
     /*
      * Limit the natural height of an element to `height` rows, but let it
      * grow into all the space that is available:
@@ -361,7 +166,7 @@ namespace ryujin
 
     Element bar(double fraction, Color begin, Color end)
     {
-      return gauge(float(std::clamp(safe(fraction), 0., 1.))) |
+      return gauge(static_cast<float>(std::clamp(safe(fraction), 0., 1.))) |
              color(LinearGradient(begin, end)) | bgcolor(theme.track);
     }
 
@@ -385,10 +190,11 @@ namespace ryujin
       for (auto it = history.end() - n; it != history.end(); ++it) {
         const double level =
             range > 0. ? std::clamp((safe(*it) - min) / range, 0., 1.) : 0.5;
-        const auto index = std::clamp(int(std::round(level * 7.)), 0, 7);
-        elements.push_back(
-            text(blocks[index]) |
-            color(Color::Interpolate(float(level), theme.muted, c)));
+        const auto index =
+            std::clamp(static_cast<int>(std::round(level * 7.)), 0, 7);
+        const auto t = static_cast<float>(level);
+        elements.push_back(text(blocks[index]) |
+                           color(Color::Interpolate(t, theme.muted, c)));
       }
 
       return hbox(std::move(elements));
@@ -400,7 +206,8 @@ namespace ryujin
     range_bar(const DashboardData::MinMaxAvg &v, double scale, int width)
     {
       const auto position = [&](double value) {
-        return std::clamp(int(value / scale * (width - 1)), 0, width - 1);
+        const auto column = static_cast<int>(value / scale * (width - 1));
+        return std::clamp(column, 0, width - 1);
       };
 
       const auto min = position(v.min);
@@ -438,18 +245,18 @@ namespace ryujin
 
       const auto point = [&](double s, double r) {
         const double phi = pi * (1. - s);
-        return std::pair{int(std::round(cx + r * std::cos(phi))),
-                         int(std::round(cy - r * std::sin(phi)))};
+        return std::pair{static_cast<int>(std::round(cx + r * std::cos(phi))),
+                         static_cast<int>(std::round(cy - r * std::sin(phi)))};
       };
 
       /* The dial: */
       constexpr int n_steps = 160;
       for (int i = 0; i <= n_steps; ++i) {
-        const double s = double(i) / n_steps;
+        const double s = static_cast<double>(i) / n_steps;
+        const auto t = static_cast<float>(s);
         const auto dial =
-            s <= fraction
-                ? Color::Interpolate(float(s), theme.highlight, theme.good)
-                : theme.muted;
+            s <= fraction ? Color::Interpolate(t, theme.highlight, theme.good)
+                          : theme.muted;
         for (const double r : {radius, radius - 1, radius - 2}) {
           const auto [x, y] = point(s, r);
           c.DrawPoint(x, y, true, dial);
@@ -563,8 +370,7 @@ namespace ryujin
 
     auto header = vbox({
         hbox({
-            text("  ryujin  ") | bold | color(theme.badge_ink) |
-                bgcolor(theme.badge),
+            badge(),
             text(" "),
             data.final_time ? text(" FINAL ") | bold | color(theme.ink) |
                                   bgcolor(theme.good)
@@ -681,8 +487,8 @@ namespace ryujin
       const auto n = std::min<std::size_t>(width, wall_history_.size());
       for (std::size_t i = 0; i < n; ++i) {
         const double value = wall_history_[wall_history_.size() - n + i];
-        values[width - n + i] =
-            std::clamp(int(std::round(value / scale * height)), 0, height);
+        const auto level = static_cast<int>(std::round(value / scale * height));
+        values[width - n + i] = std::clamp(level, 0, height);
       }
       return values;
     };
@@ -771,8 +577,8 @@ namespace ryujin
           std::clamp(safe(data.device_time_skew_fraction), 0., 1.);
       stepping.push_back(hbox({
           label("gpu skew"),
-          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
-              size(WIDTH, EQUAL, 24),
+          gauge(static_cast<float>(skew)) | color(heat(4. * skew)) |
+              bgcolor(theme.track) | size(WIDTH, EQUAL, 24),
           text(std::format(" {:5.1f}%", 100. * skew)) | bold,
           text(std::format("  ({:.2e} s/cycle) [p{}/{}]",
                            data.device_time_skew,
@@ -784,8 +590,8 @@ namespace ryujin
       const auto skew = std::clamp(safe(data.cpu_time_skew_fraction), 0., 1.);
       stepping.push_back(hbox({
           label("cpu skew"),
-          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
-              size(WIDTH, EQUAL, 24),
+          gauge(static_cast<float>(skew)) | color(heat(4. * skew)) |
+              bgcolor(theme.track) | size(WIDTH, EQUAL, 24),
           text(std::format(" {:5.1f}%", 100. * skew)) | bold,
           text(std::format("  ({:.2e} s/cycle)", data.cpu_time_skew)) |
               color(theme.muted),
@@ -858,15 +664,16 @@ namespace ryujin
       if (timer.fraction >= 0.) {
         const auto c = theme.segments[n_segment++ % theme.segments.size()];
         const auto fraction = std::clamp(safe(timer.fraction), 0., 1.);
-        const int n = std::min(int(std::round(fraction * composition_width)),
-                               composition_width - used);
+        const auto length =
+            static_cast<int>(std::round(fraction * composition_width));
+        const int n = std::min(length, composition_width - used);
         if (n > 0) {
           composition.push_back(text(std::string(n, ' ')) | bgcolor(c));
           used += n;
         }
         marker = text("■ ") | color(c);
-        share = gauge(float(fraction)) | color(c) | bgcolor(theme.track) |
-                size(WIDTH, EQUAL, 20);
+        share = gauge(static_cast<float>(fraction)) | color(c) |
+                bgcolor(theme.track) | size(WIDTH, EQUAL, 20);
         percentage = text(std::format(" {:5.1f}%", 100. * fraction));
       }
 
@@ -921,8 +728,9 @@ namespace ryujin
 
       Element progress = text("");
       if (task.progress >= 0.)
-        progress = gauge(float(task.progress)) | color(theme.highlight) |
-                   bgcolor(theme.track) | size(WIDTH, EQUAL, 16);
+        progress = gauge(static_cast<float>(task.progress)) |
+                   color(theme.highlight) | bgcolor(theme.track) |
+                   size(WIDTH, EQUAL, 16);
 
       task_table.push_back({
           text(task.name) | bold,

@@ -70,8 +70,8 @@ namespace ryujin::animation
         if (sparkles_.empty())
           return;
 
-        /* Move about one in eight sparkles to a free cell: */
-        const auto n = std::max<std::size_t>(1, sparkles_.size() / 8);
+        /* Move about one in sixteen sparkles to a free cell: */
+        const auto n = std::max<std::size_t>(1, sparkles_.size() / 16);
         for (std::size_t i = 0; i < n; ++i) {
           auto &[x, y] = sparkles_[pick(sparkles_.size())];
           stage.pixel(x, y) = ftxui::Pixel();
@@ -154,7 +154,7 @@ namespace ryujin::animation
         for (int y = 0; y < height_; ++y)
           for (int x = 0; x < width_; ++x)
             area += stage.free(x, y);
-        max_snakes_ = area < 200 ? 0 : std::clamp(area / 600, 1, 16);
+        max_snakes_ = area < 200 ? 0 : std::clamp(area / 300, 2, 32);
         max_food_ = std::min(area / 150, 64);
 
         for (const auto &snake : snakes_)
@@ -223,7 +223,8 @@ namespace ryujin::animation
          * how much room each of them leaves within a small horizon:
          */
         const Cell head = snake.body.front();
-        const int horizon = int(std::min(snake.body.size(), max_length)) + 4;
+        const int horizon =
+            static_cast<int>(std::min(snake.body.size(), max_length)) + 4;
 
         std::array<Option, 3> options;
         std::size_t n = 0;
@@ -233,7 +234,9 @@ namespace ryujin::animation
           const Cell next = neighbor(head, direction);
           if (!vacant(stage, next))
             continue;
-          options[n] = {direction, next, room(stage, next, horizon)};
+          options[n] = {.direction = direction,
+                        .cell = next,
+                        .room = room(stage, next, horizon)};
           most_room = std::max(most_room, options[n].room);
           ++n;
         }
@@ -347,7 +350,7 @@ namespace ryujin::animation
       {
         if (const auto start = random_empty_cell(stage)) {
           snakes_.push_back(Snake{.body = {*start},
-                                  .direction = int(pick(4)),
+                                  .direction = static_cast<int>(pick(4)),
                                   .growth = 4,
                                   .color = pick(stage.colors.size())});
           cell(*start) = occupied;
@@ -358,7 +361,8 @@ namespace ryujin::animation
       void spawn_food(Stage &stage)
       {
         if (const auto where = random_empty_cell(stage)) {
-          food_.push_back(Food{*where, pick(stage.colors.size())});
+          food_.push_back(
+              Food{.cell = *where, .color = pick(stage.colors.size())});
           cell(*where) = morsel;
           paint(stage, *where, "◦", food_.back().color);
         }
@@ -367,7 +371,8 @@ namespace ryujin::animation
       std::optional<Cell> random_empty_cell(const Stage &stage)
       {
         for (int attempt = 0; attempt < 16; ++attempt) {
-          const Cell candidate{int(pick(width_)), int(pick(height_))};
+          const Cell candidate{static_cast<int>(pick(width_)),
+                               static_cast<int>(pick(height_))};
           if (stage.free(candidate.first, candidate.second) &&
               cell(candidate) == empty)
             return candidate;
@@ -380,14 +385,16 @@ namespace ryujin::animation
       {
         for (const Cell &segment : snake.body) {
           cell(segment) = empty;
-          particles_.push_back({segment, 2 + int(pick(4))});
+          particles_.push_back(
+              {.cell = segment, .lifetime = 2 + static_cast<int>(pick(4))});
           sparkle(stage, segment);
 
-          const Cell spark{segment.first + int(pick(3)) - 1,
-                           segment.second + int(pick(3)) - 1};
+          const Cell spark{segment.first + static_cast<int>(pick(3)) - 1,
+                           segment.second + static_cast<int>(pick(3)) - 1};
           if (chance(0.5) && vacant(stage, wrap(spark)) &&
               cell(wrap(spark)) == empty) {
-            particles_.push_back({wrap(spark), 1 + int(pick(3))});
+            particles_.push_back({.cell = wrap(spark),
+                                  .lifetime = 1 + static_cast<int>(pick(3))});
             sparkle(stage, wrap(spark));
           }
         }
@@ -461,17 +468,17 @@ namespace ryujin::animation
 
       std::uint8_t &cell(Cell c)
       {
-        return cells_[std::size_t(c.second) * width_ + c.first];
+        return cells_[static_cast<std::size_t>(c.second) * width_ + c.first];
       }
 
       std::uint8_t cell(Cell c) const
       {
-        return cells_[std::size_t(c.second) * width_ + c.first];
+        return cells_[static_cast<std::size_t>(c.second) * width_ + c.first];
       }
 
       std::uint32_t &visited(Cell c)
       {
-        return visited_[std::size_t(c.second) * width_ + c.first];
+        return visited_[static_cast<std::size_t>(c.second) * width_ + c.first];
       }
 
       int width_ = 0;
