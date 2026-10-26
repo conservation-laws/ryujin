@@ -366,8 +366,21 @@
  * run_parameter_editor()) with the colors and the animation of the
  * Dashboard, as configured in the subsection "M - Logger". Changing the
  * equation or the dimension opens the editor again for the new equation,
- * keeping all values that still apply. "save and exit" writes the parameter
- * file, "save and run" writes it and runs the simulation.
+ * keeping all values that still apply. "save" writes the parameter file,
+ * "save as" writes it under a new name and continues with that file,
+ * "load" opens the editor again with the values of a different parameter
+ * file, and "quit" leaves the editor (and ryujin) without running the
+ * simulation. Before discarding unsaved changes the editor asks for a
+ * confirmation.
+ *
+ * <h3>Splash screen</h3>
+ *
+ * Before running the equation, main() shows a splash screen on rank 0,
+ * see play_splash_screen(), if stdout reaches an interactive terminal.
+ * The option <code>--splash=&lt;name&gt;</code> selects it: "logo" (the
+ * default) shows the logo, the name, and the copyright of ryujin, "arcade"
+ * plays an intro in the style of an arcade game of the eighties and waits
+ * for a key press, and "none" skips it.
  *
  * <h3>Scheduler</h3>
  *

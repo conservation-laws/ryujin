@@ -61,12 +61,23 @@ namespace ryujin::dashboard
   extern Palette theme;
 
 
-  /** The "ryujin" badge of the header. */
-  ftxui::Element badge();
+  /**
+   * The badge of the header, "ryujin vX.Y.Z <git revision>", or only
+   * "ryujin" if @p with_version is false.
+   */
+  ftxui::Element badge(bool with_version = true);
 
 
   /** A panel with a title. */
   ftxui::Element panel(const std::string &title, ftxui::Element content);
+
+
+  /** A caption. */
+  ftxui::Element caption(const std::string &text);
+
+
+  /** A secondary text. */
+  ftxui::Element muted(const std::string &text);
 
 
   /** A caption of fixed width in front of a value. */
@@ -75,4 +86,8 @@ namespace ryujin::dashboard
 
   /** A short text on the track color. */
   ftxui::Element chip(const std::string &name, ftxui::Color foreground);
+
+
+  /** Place @p element at the offset (@p left, @p top) of the screen. */
+  ftxui::Element place(ftxui::Element element, int left, int top);
 } // namespace ryujin::dashboard

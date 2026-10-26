@@ -19,14 +19,11 @@
 
 #include <algorithm>
 #include <chrono>
-#include <condition_variable>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <memory>
-#include <mutex>
+#include <optional>
 #include <sstream>
-#include <stop_token>
 #include <thread>
 
 namespace ryujin
@@ -36,278 +33,134 @@ namespace ryujin
 
   namespace
   {
-    /*
-     * The animation behind the editor:
-     */
-
-    class Backdrop
+    /* The animation behind the editor, outside of the editor window: */
+    class Backdrop : public Node
     {
     public:
+      /* Start at the initial position, the center: */
+      Backdrop()
+      {
+        position_.postpone();
+      }
+
+      /* Take over the size, location, colors, and animation of @p settings: */
       void configure(const DashboardSettings &settings)
       {
-        if (!animation_ || settings.color_scheme != settings_.color_scheme ||
-            settings.animation != settings_.animation) {
-          theme = make_palette(settings.color_scheme);
-          animation_ = animation::create(settings.animation);
+        settings_ = settings;
+        theme = make_palette(settings.color_scheme);
+        animation_ = animation::create(settings.animation);
+        stage_.reset();
+      }
+
+      /* Size and place @p window on the terminal as configured: */
+      Element place(Element window)
+      {
+        const auto [columns, rows] = Terminal::Size();
+        const int width =
+            settings_.width == 0
+                ? columns
+                : std::min(columns, std::max<int>(settings_.width, 80));
+
+        window |= size(WIDTH, EQUAL, width);
+        if (settings_.height > 0)
+          window |= size(HEIGHT, EQUAL, std::min<int>(settings_.height, rows));
+        window |= size(HEIGHT, LESS_THAN, rows);
+
+        const int height = Dimension::Fit(window, true).dimy;
+        const auto [left, top] = position_.offset(
+            settings_.location, columns - width, rows - height);
+        if (const Box box{left, left + width - 1, top, top + height - 1};
+            box != window_) {
+          window_ = box;
           stage_.reset();
         }
-        settings_ = settings;
+
+        return dashboard::place(std::move(window) | clear_under, left, top);
       }
 
-      const DashboardSettings &settings() const
-      {
-        return settings_;
-      }
-
-      /* The cells covered by the editor, from the last frame: */
-      Box &window()
-      {
-        return window_;
-      }
-
+      /* Advance the animation, and move while there is no input: */
       void step()
       {
-        if (!animation_ || !stage_)
-          return;
-        stage_->dashboard = window_;
-        stage_->changed.clear();
-        animation_->step(*stage_, data_);
+        position_.move(settings_.location);
+        if (animation_ && stage_) {
+          stage_->changed.clear();
+          animation_->step(*stage_);
+        }
       }
 
-      void render(Screen &screen, const Box &box)
+      /* Postpone the next move of the screen saver: */
+      void postpone()
       {
-        const int width = box.x_max - box.x_min + 1;
-        const int height = box.y_max - box.y_min + 1;
-        if (width <= 0 || height <= 0)
-          return;
+        position_.postpone();
+      }
 
-        if (!stage_ || stage_->screen.dimx() != width ||
-            stage_->screen.dimy() != height) {
-          stage_ = std::make_unique<animation::Stage>(
-              Screen(width, height), window_, theme.animation);
+      /* Draw the animation on the whole screen: */
+      void Render(Screen &screen) override
+      {
+        if (!stage_ || stage_->screen.dimx() != screen.dimx() ||
+            stage_->screen.dimy() != screen.dimy()) {
+          stage_.emplace(Screen(screen.dimx(), screen.dimy()), window_);
           if (animation_)
-            animation_->draw(*stage_, data_);
+            animation_->draw(*stage_);
         }
 
-        for (int y = 0; y < height; ++y)
-          for (int x = 0; x < width; ++x)
-            screen.PixelAt(box.x_min + x, box.y_min + y) =
-                stage_->screen.PixelAt(x, y);
+        for (int y = 0; y < screen.dimy(); ++y)
+          for (int x = 0; x < screen.dimx(); ++x)
+            screen.PixelAt(x, y) = stage_->screen.PixelAt(x, y);
       }
 
     private:
       DashboardSettings settings_;
+      DashboardPosition position_;
+      Box window_;
       std::unique_ptr<animation::Animation> animation_;
-      std::unique_ptr<animation::Stage> stage_;
-      Box window_ = {0, -1, 0, -1};
-      /* The animations do not use the data: */
-      DashboardData data_;
+      std::optional<animation::Stage> stage_;
     };
 
 
-    class BackdropNode final : public Node
+    /* A button or a choice, highlighted if @p on: */
+    Element toggle(const std::string &label, bool on)
     {
-    public:
-      explicit BackdropNode(Backdrop &backdrop)
-          : backdrop_(backdrop)
-      {
-      }
-
-      void ComputeRequirement() override
-      {
-        requirement_ = {};
-        requirement_.flex_grow_x = 1;
-        requirement_.flex_grow_y = 1;
-        requirement_.flex_shrink_x = 1;
-        requirement_.flex_shrink_y = 1;
-      }
-
-      void Render(Screen &screen) override
-      {
-        backdrop_.render(screen, box_);
-      }
-
-    private:
-      Backdrop &backdrop_;
-    };
-
-
-    /*
-     * Place @p document on the backdrop with the width, the height and
-     * the placement of the dashboard settings, at most the size of the
-     * terminal.
-     */
-    Element compose(Backdrop &backdrop, Element document)
-    {
-      const auto &settings = backdrop.settings();
-      const auto terminal = Terminal::Size();
-
-      const int width =
-          settings.width == 0
-              ? terminal.dimx
-              : std::min(terminal.dimx, std::max<int>(settings.width, 80));
-      document = std::move(document) | size(WIDTH, EQUAL, width);
-
-      const int height = std::min<int>(terminal.dimy, settings.height);
-      if (height > 0)
-        document = std::move(document) | size(HEIGHT, EQUAL, height);
-
-      document = std::move(document) | size(HEIGHT, LESS_THAN, terminal.dimy) |
-                 clear_under | reflect(backdrop.window());
-      if (settings.center)
-        document = center(std::move(document));
-      else
-        document = vbox({hbox({std::move(document), filler()}), filler()});
-
-      return dbox({std::make_shared<BackdropNode>(backdrop), document});
+      auto element = text(" " + label + " ");
+      if (on)
+        return element | bold | color(theme.ink) | bgcolor(theme.highlight);
+      return element | color(theme.caption) | bgcolor(theme.track);
     }
 
 
-    /*
-     * Run the event loop of @p screen. Advance the animation every 150
-     * milliseconds, and hand all events that @p component does not handle
-     * to @p fallback.
-     */
-    void loop(ScreenInteractive &screen,
-              Component component,
-              Backdrop &backdrop,
-              std::function<bool(Event)> fallback)
-    {
-      class Impl : public ComponentBase
-      {
-      public:
-        Impl(Component child,
-             Backdrop &backdrop,
-             std::function<bool(Event)> fallback)
-            : backdrop_(backdrop)
-            , fallback_(std::move(fallback))
-        {
-          Add(std::move(child));
-        }
-
-        bool OnEvent(Event event) override
-        {
-          if (event == Event::Custom) {
-            backdrop_.step();
-            return true;
-          }
-          return ComponentBase::OnEvent(event) || fallback_(event);
-        }
-
-      private:
-        Backdrop &backdrop_;
-        std::function<bool(Event)> fallback_;
-      };
-
-      std::mutex mutex;
-      std::condition_variable_any condition;
-      std::jthread ticker([&](std::stop_token token) {
-        std::unique_lock lock(mutex);
-        while (!condition.wait_for(
-            lock, token, std::chrono::milliseconds(150), [&token] {
-              return token.stop_requested();
-            }))
-          screen.PostEvent(Event::Custom);
-      });
-
-      screen.Loop(std::make_shared<Impl>(component, backdrop, fallback));
-
-      ticker.request_stop();
-    }
-
-
-    /*
-     * Elements and components:
-     */
-
-    Element header(const std::string &title, Elements right)
-    {
-      Elements elements = {
-          badge(),
-          text(" "),
-          text(" " + title + " ") | color(theme.ink) | bgcolor(theme.highlight),
-          filler(),
-      };
-      for (auto &element : right)
-        elements.push_back(std::move(element));
-      elements.push_back(text(" "));
-
-      return borderRounded(hbox(std::move(elements)) | color(Color::Default)) |
-             color(theme.accent);
-    }
-
-
+    /* A button @p name that calls @p on_click: */
     Component button(const std::string &name, std::function<void()> on_click)
     {
       ButtonOption option;
       option.label = name;
       option.on_click = std::move(on_click);
       option.transform = [](const EntryState &state) {
-        auto element = text(" " + state.label + " ");
-        if (state.focused)
-          return element | bold | color(theme.ink) | bgcolor(theme.highlight);
-        return element | color(theme.caption) | bgcolor(theme.track);
+        return toggle(state.label, state.focused);
       };
       return Button(option);
     }
 
 
-    /*
-     * A single line input that leaves the arrow keys up and down to the
-     * container, so that they always move to the previous or next entry:
-     */
-    Component single_line(Component input)
+    /* A single line input that leaves the arrow keys up and down alone: */
+    class SingleLine : public ComponentBase
     {
-      class Impl : public ComponentBase
+    public:
+      /* Wrap the input component @p input: */
+      explicit SingleLine(Component input)
       {
-      public:
-        explicit Impl(Component input)
-        {
-          Add(std::move(input));
-        }
+        Add(std::move(input));
+      }
 
-        bool OnEvent(Event event) override
-        {
-          if (event == Event::ArrowUp || event == Event::ArrowDown)
-            return false;
-          return ComponentBase::OnEvent(event);
-        }
-      };
-
-      return std::make_shared<Impl>(std::move(input));
-    }
+      /* Hand up and down to the container, everything else to the input: */
+      bool OnEvent(Event event) override
+      {
+        return event != Event::ArrowUp && event != Event::ArrowDown &&
+               ComponentBase::OnEvent(event);
+      }
+    };
 
 
-    /*
-     * A horizontal choice of a few entries, such as "on" and "off", with
-     * the selected entry highlighted:
-     */
-    MenuOption choice_option()
-    {
-      MenuOption option = MenuOption::Horizontal();
-      option.entries_option.transform = [](const EntryState &state) {
-        auto element = text(" " + state.label + " ");
-        if (state.active)
-          element |= bold | color(theme.ink) | bgcolor(theme.highlight);
-        else
-          element |= color(theme.caption) | bgcolor(theme.track);
-        return element;
-      };
-      option.elements_infix = [] { return text(""); };
-      return option;
-    }
-
-
-    Element hints(const std::string &keys)
-    {
-      return text(" " + keys) | color(theme.muted);
-    }
-
-
-    /*
-     * Read the settings of the dashboard from the subsection
-     * "M - Logger", if present:
-     */
+    /* Read the dashboard settings from the subsection "M - Logger": */
     DashboardSettings read_settings(const ParameterModel &model)
     {
       DashboardSettings settings;
@@ -326,17 +179,14 @@ namespace ryujin
 
       read("dashboard width", settings.width);
       read("dashboard height", settings.height);
-      read("dashboard center", settings.center);
+      read("dashboard location", settings.location);
       read("dashboard color scheme", settings.color_scheme);
       read("dashboard animation", settings.animation);
       return settings;
     }
 
 
-    /*
-     * Write the values of @p model to @p parameter_file, the sections in
-     * use only. Return whether the file has been written:
-     */
+    /* Write the sections of @p model in use to @p parameter_file: */
     bool write(const ParameterModel &model, const std::string &parameter_file)
     {
       auto &prm = dealii::ParameterAcceptor::prm;
@@ -352,73 +202,43 @@ namespace ryujin
     }
 
 
-    std::string join(const std::vector<std::string> &path)
-    {
-      std::string result;
-      for (const auto &name : path)
-        result += (result.empty() ? "" : " / ") + name;
-      return result;
-    }
-
-
-    const char *kind_name(ParameterModel::Entry::Kind kind)
-    {
-      static const char *const names[] = {
-          "bool", "selection", "integer", "number", "text"};
-      return names[static_cast<int>(kind)];
-    }
-
-
-    /* The width of the names: the longest name, within [12, 36]: */
-    int name_width(const ParameterModel &model)
-    {
-      std::size_t width = 0;
-      for (const auto &entry : model.entries())
-        width = std::max(width, entry.name.size());
-      return std::clamp<int>(width, 12, 36);
-    }
-
-
-    /*
-     * The parameter editor:
-     */
-
-    class Editor
+    /* The parameter editor: */
+    class Editor : public ComponentBase
     {
     public:
       using Entry = ParameterModel::Entry;
       using Kind = Entry::Kind;
 
-      Editor(ParameterModel &model, EditorSession &session)
+      /* Build all components for the sections and entries of @p model: */
+      Editor(ParameterModel &model,
+             EditorSession &session,
+             ScreenInteractive &screen)
           : model_(model)
           , session_(session)
-          , screen_(ScreenInteractive::FullscreenAlternateScreen())
-          , selected_(model.entries().size(), 0)
+          , screen_(screen)
+          , selected_(model.entries().size())
           , rows_(model.entries().size())
-          , name_width_(name_width(model))
       {
-        backdrop_.configure(read_settings(model_));
-      }
+        backdrop_->configure(read_settings(model_));
 
-      EditorOutcome run()
-      {
-        const auto &sections = model_.sections();
+        for (const auto &entry : model_.entries())
+          name_width_ = std::max<int>(name_width_, entry.name.size());
+        name_width_ = std::min(name_width_, 36);
 
         Components pages;
-        for (std::size_t i = 0; i < sections.size(); ++i) {
-          const auto &section = sections[i];
+        for (const auto &section : model_.sections()) {
           if (section.path == session_.section)
-            section_ = static_cast<int>(i);
+            section_ = static_cast<int>(labels_.size());
 
-          std::string label(2 * (section.path.size() - 1), ' ');
-          label += section.path.empty() ? "(top level)" : section.path.back();
-          labels_.push_back(label);
+          const auto &path = section.path;
+          labels_.push_back(path.empty()
+                                ? "(top level)"
+                                : std::string(2 * path.size() - 2, ' ') +
+                                      path.back());
 
           Components rows;
-          for (const auto index : section.entries) {
-            rows_[index] = row(index);
-            rows.push_back(rows_[index]);
-          }
+          for (const auto index : section.entries)
+            rows.push_back(rows_[index] = row(index));
           pages.push_back(Container::Vertical(std::move(rows)));
         }
 
@@ -449,33 +269,29 @@ namespace ryujin
             element |= bold;
           return element;
         };
-        auto menu = Menu(option);
-        auto tab = Container::Tab(std::move(pages), &section_);
+        menu_ = Menu(option);
+        tab_ = Container::Tab(std::move(pages), &section_);
 
         CheckboxOption show_all = CheckboxOption::Simple();
         show_all.label = "show all sections";
         show_all.checked = &session_.show_all;
         show_all.on_change = [this] { refresh(); };
 
-        auto buttons = Container::Horizontal({
-            button("load", [this] { open_file_dialog("load", &Editor::load); }),
-            button("save", [this] { save(); }),
-            button("save as",
-                   [this] { open_file_dialog("save as", &Editor::save_as); }),
+        buttons_ = Container::Horizontal({
+            button("load", open("load", &Editor::load)),
+            button("save", [this] { save(session_.parameter_file); }),
+            button("save as", open("save as", &Editor::save_as)),
             button("quit", [this] { discard(EditorOutcome::quit); }),
             Checkbox(show_all) | Renderer([](Element checkbox) {
               return hbox({text("   "), std::move(checkbox)});
             }),
         });
 
-        auto layout = Container::Vertical({
-            Container::Horizontal({menu, tab}),
-            buttons,
-        });
-
-        auto renderer = Renderer(layout, [this, menu, tab, buttons] {
-          return render(menu, tab, buttons);
-        });
+        auto main = Renderer(Container::Vertical({
+                                 Container::Horizontal({menu_, tab_}),
+                                 buttons_,
+                             }),
+                             [this] { return render(); });
 
         auto dialog = Container::Horizontal({
             button("discard changes", [this] { exit(pending_); }),
@@ -516,40 +332,46 @@ namespace ryujin
                      bgcolor(Color::Black);
             });
 
-        auto component = Modal(Modal(renderer, confirmation, &confirm_),
-                               file_dialog,
-                               &file_dialog_);
+        Add(main | Modal(confirmation, &confirm_) |
+            Modal(file_dialog, &file_dialog_));
+      }
 
-        /* Escape returns to the sections first, and quits from there: */
-        loop(screen_, component, backdrop_, [this, menu](const Event &event) {
-          if (event == Event::CtrlS && !file_dialog_ && !confirm_)
-            save();
-          else if (event == Event::CtrlA) {
-            session_.show_all = !session_.show_all;
-            refresh();
-          } else if (event == Event::Escape && confirm_)
-            confirm_ = false;
-          else if (event == Event::Escape && file_dialog_)
-            file_dialog_ = false;
-          else if (event == Event::Escape && !menu->Focused())
-            menu->TakeFocus();
-          else if (event == Event::Escape)
-            discard(EditorOutcome::quit);
-          else
-            return false;
+      /* Animate on ticks, and handle the shortcuts the children leave: */
+      bool OnEvent(Event event) override
+      {
+        if (event == Event::Custom) {
+          backdrop_->step();
           return true;
-        });
+        }
 
+        backdrop_->postpone();
+        if (ComponentBase::OnEvent(event))
+          return true;
+
+        if (event == Event::CtrlS && !file_dialog_ && !confirm_)
+          save(session_.parameter_file);
+        else if (event == Event::CtrlA) {
+          session_.show_all = !session_.show_all;
+          refresh();
+        } else if (event == Event::Escape && (confirm_ || file_dialog_))
+          confirm_ = file_dialog_ = false;
+        else if (event == Event::Escape && !menu_->Focused())
+          menu_->TakeFocus();
+        else if (event == Event::Escape)
+          discard(EditorOutcome::quit);
+        else
+          return false;
+        return true;
+      }
+
+      /* How the editor has been left: */
+      EditorOutcome outcome() const
+      {
         return outcome_;
       }
 
     private:
-      /*
-       * Update the list of sections in the menu: all sections with
-       * "show all", and otherwise only the sections in use. Stay on the
-       * current section, or move to its closest enclosing section in the
-       * menu:
-       */
+      /* Update the sections in the menu, and stay as close as possible: */
       void refresh()
       {
         const auto &sections = model_.sections();
@@ -570,26 +392,22 @@ namespace ryujin
         if (it == visible_.end())
           it = visible_.begin();
 
-        menu_index_ = static_cast<int>(it - visible_.begin());
-        menu_focus_ = menu_index_;
+        menu_index_ = menu_focus_ = static_cast<int>(it - visible_.begin());
         section_ = static_cast<int>(*it);
       }
 
-      /* The editor row of entry @p index: */
+      /* The row of entry @p index: marker, name, widget, and validity: */
       Component row(std::size_t index)
       {
         auto widget = this->widget(index);
         return Renderer(widget, [this, index, widget] {
           const auto &entry = model_.entries()[index];
-
-          auto name = text(entry.name) | size(WIDTH, EQUAL, name_width_);
-          name = entry.value == entry.default_value
-                     ? std::move(name) | color(theme.caption)
-                     : std::move(name) | bold;
+          const bool changed = entry.value != entry.default_value;
 
           return hbox({
               text(entry.modified() ? "● " : "  ") | color(theme.highlight),
-              name,
+              (changed ? text(entry.name) | bold : caption(entry.name)) |
+                  size(WIDTH, EQUAL, name_width_),
               text(" "),
               widget->Render() | flex,
               text(entry.valid() ? "  " : " ✗") | color(theme.bad),
@@ -597,22 +415,31 @@ namespace ryujin
         });
       }
 
-      /* The input component of entry @p index: */
+      /* The input component of entry @p index, depending on its kind: */
       Component widget(std::size_t index)
       {
         auto &entry = model_.entries()[index];
 
+        const auto on_change = [this, index] {
+          auto &entry = model_.entries()[index];
+          if (entry.kind == Kind::boolean || entry.kind == Kind::selection)
+            entry.value = entry.choices.at(selected_[index]);
+          changed(entry);
+        };
+
         switch (entry.kind) {
         case Kind::boolean: {
+          static const std::vector<std::string> on_off = {"on", "off"};
           selected_[index] = entry.value == "true" ? 0 : 1;
-          MenuOption option = choice_option();
-          option.entries = &on_off_;
+
+          MenuOption option = MenuOption::Horizontal();
+          option.entries = &on_off;
           option.selected = &selected_[index];
-          option.on_change = [this, index] {
-            auto &entry = model_.entries()[index];
-            entry.value = entry.choices[selected_[index]];
-            changed(index);
+          option.on_change = on_change;
+          option.entries_option.transform = [](const EntryState &state) {
+            return toggle(state.label, state.active);
           };
+          option.elements_infix = [] { return text(""); };
           return Menu(option);
         }
 
@@ -624,11 +451,7 @@ namespace ryujin
           option.radiobox.entries = &entry.choices;
           option.radiobox.selected = &selected_[index];
           option.radiobox.focused_entry = selected_[index];
-          option.radiobox.on_change = [this, index] {
-            auto &entry = model_.entries()[index];
-            entry.value = entry.choices.at(selected_[index]);
-            changed(index);
-          };
+          option.radiobox.on_change = on_change;
           option.transform = [](bool open, Element checkbox, Element radiobox) {
             if (!open)
               return checkbox;
@@ -649,95 +472,84 @@ namespace ryujin
           option.content = &entry.value;
           option.cursor_position = static_cast<int>(entry.value.size());
           option.multiline = false;
-          option.on_change = [this, index] {
-            filter(model_.entries()[index]);
-            changed(index);
-          };
+          option.on_change = on_change;
           option.transform = [](InputState state) {
-            if (state.focused)
-              return state.element | bgcolor(theme.track);
-            return state.element;
+            return state.focused ? state.element | bgcolor(theme.track)
+                                 : state.element;
           };
-          return single_line(Input(option));
+          return std::make_shared<SingleLine>(Input(option));
         }
         }
 
         __builtin_unreachable();
       }
 
-      /* Drop all characters a number cannot contain: */
-      static void filter(Entry &entry)
+      /* Filter numbers, and update everything that depends on @p entry: */
+      void changed(Entry &entry)
       {
-        if (entry.kind != Kind::integer && entry.kind != Kind::floating)
-          return;
-
-        const std::string allowed =
-            entry.kind == Kind::integer ? "0123456789+-" : "0123456789+-.eE";
-        std::erase_if(entry.value, [&allowed](char c) {
-          return allowed.find(c) == std::string::npos;
-        });
-      }
-
-      void changed(std::size_t index)
-      {
-        const auto &entry = model_.entries()[index];
         status_.clear();
 
-        if (entry.section == std::vector<std::string>{"M - Logger"})
-          backdrop_.configure(read_settings(model_));
+        if (entry.kind == Kind::integer || entry.kind == Kind::floating) {
+          const std::string_view allowed =
+              entry.kind == Kind::integer ? "0123456789+-" : "0123456789+-.eE";
+          std::erase_if(entry.value, [&](char c) {
+            return allowed.find(c) == std::string_view::npos;
+          });
+        }
 
-        /* A selection may change the sections in use: */
+        if (entry.section == std::vector<std::string>{"M - Logger"})
+          backdrop_->configure(read_settings(model_));
+
         if (entry.kind == Kind::selection)
           refresh();
 
-        /* A different equation or dimension declares other parameters: */
         if (entry.section == std::vector<std::string>{"B - Equation"} &&
             (entry.name == "equation" || entry.name == "dimension") &&
             entry.modified() && entry.valid())
           exit(EditorOutcome::rebuild);
       }
 
+      /* Show @p message in the status line, in green if @p good: */
       void report(std::string message, bool good = false)
       {
         status_ = std::move(message);
         status_good_ = good;
       }
 
-      void open_file_dialog(std::string title, void (Editor::*action)())
+      /* The button action that opens the file dialog for @p action: */
+      std::function<void()> open(std::string title, void (Editor::*action)())
       {
-        file_title_ = std::move(title);
-        file_action_ = action;
-        file_name_ = session_.parameter_file;
-        file_cursor_ = static_cast<int>(file_name_.size());
-        file_dialog_ = true;
+        return [this, title, action] {
+          file_title_ = title;
+          file_action_ = action;
+          file_name_ = session_.parameter_file;
+          file_cursor_ = static_cast<int>(file_name_.size());
+          file_dialog_ = true;
+        };
       }
 
+      /* Load the parameter file of the file dialog: */
       void load()
       {
         file_dialog_ = false;
-        if (!std::filesystem::exists(file_name_)) {
+        if (std::filesystem::exists(file_name_))
+          discard(EditorOutcome::load);
+        else
           report("The parameter file »" + file_name_ + "« does not exist.");
-          return;
-        }
-        discard(EditorOutcome::load);
       }
 
-      void save()
-      {
-        write_to(session_.parameter_file);
-      }
-
+      /* Save to the parameter file of the file dialog: */
       void save_as()
       {
         if (file_name_.empty())
           return;
         file_dialog_ = false;
-        if (write_to(file_name_))
+        if (save(file_name_))
           session_.parameter_file = file_name_;
       }
 
-      /* Write the parameters to @p parameter_file, the changes are saved: */
-      bool write_to(const std::string &parameter_file)
+      /* Write @p parameter_file, return whether it has been written: */
+      bool save(const std::string &parameter_file)
       {
         if (model_.n_invalid() > 0) {
           report("Fix the invalid entries (✗) before saving.");
@@ -756,8 +568,7 @@ namespace ryujin
         return true;
       }
 
-      /* Exit with @p outcome, after a confirmation if there are unsaved
-       * changes: */
+      /* Exit with @p outcome, after confirming to drop unsaved changes: */
       void discard(EditorOutcome outcome)
       {
         pending_ = outcome;
@@ -767,6 +578,7 @@ namespace ryujin
           exit(outcome);
       }
 
+      /* Exit with @p outcome right away: */
       void exit(EditorOutcome outcome)
       {
         if (outcome == EditorOutcome::rebuild)
@@ -779,10 +591,12 @@ namespace ryujin
         screen_.Exit();
       }
 
+      /* The documentation of the active row of the section shown: */
       Element documentation() const
       {
-        /* The active row of the section shown, also while the menu has
-         * the focus: */
+        static const char *const kinds[] = {
+            "bool", "selection", "integer", "number", "text"};
+
         const auto &indices = model_.sections().at(section_).entries;
         const auto it =
             std::ranges::find_if(indices, [this](std::size_t index) {
@@ -796,42 +610,43 @@ namespace ryujin
             hbox({
                 text(entry.name) | bold,
                 text("  "),
-                chip(kind_name(entry.kind), theme.highlight),
+                chip(kinds[static_cast<int>(entry.kind)], theme.highlight),
             }),
             paragraph(entry.documentation.empty() ? "(no documentation)"
                                                   : entry.documentation),
             hbox({label("pattern"),
                   paragraph(entry.pattern_description) | color(theme.muted)}),
-            hbox({label("default"),
-                  text(entry.default_value) | color(theme.muted)}),
+            hbox({label("default"), muted(entry.default_value)}),
         });
       }
 
-      Element render(const Component &menu,
-                     const Component &tab,
-                     const Component &buttons)
+      /* The editor window on the backdrop: */
+      Element render()
       {
-        const auto invalid = model_.n_invalid();
-
-        const auto equation = model_.find({"B - Equation"}, "equation");
-        const auto dimension = model_.find({"B - Equation"}, "dimension");
-
-        Elements right;
-        if (equation != nullptr && dimension != nullptr) {
-          right.push_back(text("equation ") | color(theme.caption));
-          right.push_back(text(equation->value) | bold);
-          right.push_back(text("   dimension ") | color(theme.caption));
-          right.push_back(text(dimension->value) | bold);
-        }
-        right.push_back(text("   file ") | color(theme.caption));
-        right.push_back(text(session_.parameter_file) | bold);
+        Elements header = {
+            badge(false),
+            text(" "),
+            text(" parameters ") | color(theme.ink) | bgcolor(theme.highlight),
+            filler(),
+        };
+        for (const auto name : {"equation", "dimension"})
+          if (const auto entry = model_.find({"B - Equation"}, name)) {
+            header.push_back(caption(std::format("{} ", name)));
+            header.push_back(text(entry->value + "   ") | bold);
+          }
+        header.push_back(caption("file "));
+        header.push_back(text(session_.parameter_file + " ") | bold);
 
         const auto &section = model_.sections().at(section_);
-        Element entries = tab->Render();
-        if (section.entries.empty())
-          entries = text("This section has no parameters of its own.") |
-                    color(theme.muted);
+        std::string path;
+        for (const auto &name : section.path)
+          path += (path.empty() ? "" : " / ") + name;
 
+        Element entries = tab_->Render();
+        if (section.entries.empty())
+          entries = muted("This section has no parameters of its own.");
+
+        const auto invalid = model_.n_invalid();
         Element status = text("");
         if (!status_.empty())
           status = text(status_ + " ") |
@@ -844,80 +659,78 @@ namespace ryujin
         else if (session_.modified || model_.modified())
           status = text("unsaved changes ") | color(theme.warn);
 
-        /* Fit the height to the sections in the menu: */
-        const auto height = static_cast<int>(visible_.size()) + 2 /* borders */;
-
         auto document = vbox({
-            header("parameters", std::move(right)),
+            borderRounded(hbox(std::move(header)) | color(Color::Default)) |
+                color(theme.accent),
             hbox({
                 panel("sections",
-                      menu->Render() | vscroll_indicator | frame | flex) |
+                      menu_->Render() | vscroll_indicator | frame | flex) |
                     size(WIDTH, EQUAL, 32),
-                panel(join(section.path),
+                panel(path,
                       std::move(entries) | vscroll_indicator | frame | flex) |
                     flex,
-            }) | size(HEIGHT, GREATER_THAN, height) |
+            }) | /* Fit the height to the sections in the menu: */
+                size(HEIGHT, GREATER_THAN, int(visible_.size()) + 2) |
                 flex,
             panel("documentation", documentation()) | size(HEIGHT, EQUAL, 13),
-            hbox({
-                text(" "),
-                buttons->Render(),
-                filler(),
-                std::move(status),
-            }),
-            hints("arrows: move   enter: select   esc: back/quit   "
+            hbox({text(" "), buttons_->Render(), filler(), std::move(status)}),
+            muted(" arrows: move   enter: select   esc: back/quit   "
                   "ctrl-s: save   ctrl-a: all sections"),
         });
 
-        return compose(backdrop_, std::move(document));
+        return dbox({backdrop_, backdrop_->place(std::move(document))});
       }
 
       ParameterModel &model_;
       EditorSession &session_;
-      ScreenInteractive screen_;
-      Backdrop backdrop_;
+      ScreenInteractive &screen_;
+      std::shared_ptr<Backdrop> backdrop_ = std::make_shared<Backdrop>();
 
-      /* The selected choice of all booleans and selections: */
+      Component menu_;
+      Component tab_;
+      Component buttons_;
+
       std::vector<int> selected_;
-      /* The editor rows of all entries: */
       Components rows_;
-      const std::vector<std::string> on_off_ = {"on", "off"};
+      int name_width_ = 12;
 
-      /* The labels of all sections: */
       std::vector<std::string> labels_;
-      /* The sections in the menu, and their labels: */
       std::vector<std::size_t> visible_;
       std::vector<std::string> menu_labels_;
-      /* The selected entry of the menu, and the entry with the cursor: */
       int menu_index_ = 0;
       int menu_focus_ = 0;
-      /* The section shown, an index into ParameterModel::sections(): */
       int section_ = 0;
-      const int name_width_;
 
       std::string status_;
       bool status_good_ = false;
 
-      /* The confirmation to discard the unsaved changes, and the outcome
-       * to exit with: */
       bool confirm_ = false;
       EditorOutcome pending_ = EditorOutcome::quit;
+      EditorOutcome outcome_ = EditorOutcome::quit;
 
-      /* The dialogs "load" and "save as" for a file name: */
       bool file_dialog_ = false;
       std::string file_title_;
       void (Editor::*file_action_)() = nullptr;
       std::string file_name_;
       int file_cursor_ = 0;
-      EditorOutcome outcome_ = EditorOutcome::quit;
     };
   } // namespace
 
 
+  /* Run the editor on the full screen until it is left: */
   EditorOutcome run_parameter_editor(ParameterModel &model,
                                      EditorSession &session)
   {
-    Editor editor(model, session);
-    return editor.run();
+    auto screen = ScreenInteractive::FullscreenAlternateScreen();
+    auto editor = std::make_shared<Editor>(model, session, screen);
+
+    /* Advance the animation every 150 milliseconds: */
+    std::jthread ticker([&screen](std::stop_token token) {
+      for (; !token.stop_requested(); screen.PostEvent(Event::Custom))
+        std::this_thread::sleep_for(std::chrono::milliseconds(150));
+    });
+
+    screen.Loop(editor);
+    return editor->outcome();
   }
 } // namespace ryujin

@@ -28,4 +28,12 @@ namespace ryujin
     stream << "###" << std::endl;
     /* clang-format on */
   }
+
+
+  std::string version_string()
+  {
+    const std::string revision = RYUJIN_GIT_SHORTREV;
+    return std::string("ryujin v") + RYUJIN_VERSION +
+           (revision.empty() ? "" : " " + revision);
+  }
 } // namespace ryujin

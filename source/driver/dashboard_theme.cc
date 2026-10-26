@@ -4,7 +4,9 @@
 //
 
 #include <driver/dashboard_theme.h>
+#include <ryujin/base/version_info.h>
 
+#include <string>
 #include <utility>
 
 namespace ryujin::dashboard
@@ -162,9 +164,10 @@ namespace ryujin::dashboard
   Palette theme = make_palette(DashboardColorScheme::ryujin);
 
 
-  Element badge()
+  Element badge(bool with_version)
   {
-    return text("  ryujin  ") | bold | color(theme.badge_ink) |
+    const std::string name = with_version ? version_string() : "ryujin";
+    return text("  " + name + "  ") | bold | color(theme.badge_ink) |
            bgcolor(theme.badge);
   }
 
@@ -177,14 +180,35 @@ namespace ryujin::dashboard
   }
 
 
+  Element caption(const std::string &text)
+  {
+    return ftxui::text(text) | color(theme.caption);
+  }
+
+
+  Element muted(const std::string &text)
+  {
+    return ftxui::text(text) | color(theme.muted);
+  }
+
+
   Element label(const std::string &name)
   {
-    return text(name) | color(theme.caption) | size(WIDTH, EQUAL, 11);
+    return caption(name) | size(WIDTH, EQUAL, 11);
   }
 
 
   Element chip(const std::string &name, Color foreground)
   {
     return text(" " + name + " ") | color(foreground) | bgcolor(theme.track);
+  }
+
+
+  Element place(Element element, int left, int top)
+  {
+    return vbox({
+        emptyElement() | size(HEIGHT, EQUAL, top),
+        hbox({emptyElement() | size(WIDTH, EQUAL, left), std::move(element)}),
+    });
   }
 } // namespace ryujin::dashboard

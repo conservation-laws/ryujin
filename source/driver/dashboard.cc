@@ -5,6 +5,7 @@
 
 #include <driver/dashboard_animation.h>
 #include <driver/dashboard_theme.h>
+#include <ryujin/base/version_info.h>
 #include <ryujin/driver/dashboard.h>
 
 #include <ftxui/dom/canvas.hpp>
@@ -13,18 +14,18 @@
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/terminal.hpp>
 
-#include <fcntl.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
 
 #include <algorithm>
 #include <array>
-#include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <format>
 #include <iostream>
 #include <numbers>
+#include <random>
+#include <ranges>
 
 namespace ryujin
 {
@@ -91,12 +92,10 @@ namespace ryujin
 
     std::string format_si(double value)
     {
-      if (value >= 1.e9)
-        return std::format("{:.2f} G", value / 1.e9);
-      if (value >= 1.e6)
-        return std::format("{:.2f} M", value / 1.e6);
-      if (value >= 1.e3)
-        return std::format("{:.2f} k", value / 1.e3);
+      for (const auto &[unit, prefix] :
+           {std::pair{1.e9, 'G'}, {1.e6, 'M'}, {1.e3, 'k'}})
+        if (value >= unit)
+          return std::format("{:.2f} {}", value / unit, prefix);
       return std::format("{:.0f} ", value);
     }
 
@@ -107,7 +106,7 @@ namespace ryujin
       if (!(value > 0.) || !std::isfinite(value))
         return 1.;
       const double magnitude = std::pow(10., std::floor(std::log10(value)));
-      for (const double step : {1., 1.5, 2., 2.5, 3., 4., 5., 6., 8., 10.})
+      for (const double step : {1., 1.5, 2., 2.5, 3., 4., 5., 6., 8.})
         if (step * magnitude >= value)
           return step * magnitude;
       return 10. * magnitude;
@@ -156,18 +155,26 @@ namespace ryujin
     };
 
 
-    Decorator at_most(int height)
+    /* A gauge of @p fraction in [0, 1]: */
+    Element bar(double fraction, Decorator style)
     {
-      return [height](Element child) {
-        return std::make_shared<AtMost>(std::move(child), height);
-      };
+      return gauge(static_cast<float>(std::clamp(safe(fraction), 0., 1.))) |
+             style | bgcolor(theme.track);
     }
 
 
-    Element bar(double fraction, Color begin, Color end)
+    /* A labeled gauge of @p fraction, the percentage, and @p details: */
+    Element meter(const std::string &name,
+                  double fraction,
+                  Decorator style,
+                  const std::string &details)
     {
-      return gauge(static_cast<float>(std::clamp(safe(fraction), 0., 1.))) |
-             color(LinearGradient(begin, end)) | bgcolor(theme.track);
+      return hbox({
+          label(name),
+          bar(fraction, std::move(style)) | size(WIDTH, EQUAL, 24),
+          text(std::format(" {:5.1f}%", 100. * fraction)) | bold,
+          muted(details),
+      });
     }
 
 
@@ -178,25 +185,18 @@ namespace ryujin
           "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"};
 
       const auto n = std::min<int>(width, history.size());
-      const auto [min_it, max_it] =
-          std::minmax_element(history.end() - n, history.end());
-      const double min = *min_it;
-      const double range = std::max(*max_it - min, 1.e-3 * *max_it);
+      const auto [min, max] =
+          std::ranges::minmax(std::views::drop(history, history.size() - n));
+      const double range = std::max(max - min, 1.e-3 * max);
 
-      Elements elements;
-      if (n < width)
-        elements.push_back(text(std::string(width - n, ' ')));
-
+      Elements elements = {text(std::string(width - n, ' '))};
       for (auto it = history.end() - n; it != history.end(); ++it) {
         const double level =
-            range > 0. ? std::clamp((safe(*it) - min) / range, 0., 1.) : 0.5;
-        const auto index =
-            std::clamp(static_cast<int>(std::round(level * 7.)), 0, 7);
-        const auto t = static_cast<float>(level);
-        elements.push_back(text(blocks[index]) |
-                           color(Color::Interpolate(t, theme.muted, c)));
+            range > 0. ? std::clamp((*it - min) / range, 0., 1.) : 0.5;
+        elements.push_back(
+            text(blocks[static_cast<int>(std::round(level * 7.))]) |
+            color(Color::Interpolate(float(level), theme.muted, c)));
       }
-
       return hbox(std::move(elements));
     }
 
@@ -210,18 +210,14 @@ namespace ryujin
         return std::clamp(column, 0, width - 1);
       };
 
-      const auto min = position(v.min);
-      const auto max = position(v.max);
-      const auto avg = position(v.avg);
-
       Elements elements;
       for (int i = 0; i < width; ++i) {
-        if (i == avg)
+        if (i == position(v.avg))
           elements.push_back(text("◆") | color(theme.warn));
-        else if (i >= min && i <= max)
-          elements.push_back(text("━") | color(theme.accent));
-        else if (i < min)
+        else if (i < position(v.min))
           elements.push_back(text("━") | color(theme.muted));
+        else if (i <= position(v.max))
+          elements.push_back(text("━") | color(theme.accent));
         else
           elements.push_back(text("─") | color(theme.track));
       }
@@ -232,31 +228,27 @@ namespace ryujin
     /* A speedometer with a needle pointing at value in [0, scale]: */
     Element speedometer(double value, double scale)
     {
-      constexpr int width = 58;
-      constexpr int height = 28;
       constexpr int cx = 29;
       constexpr int cy = 27;
       constexpr int radius = 25;
-      constexpr double pi = std::numbers::pi;
 
       const double fraction = std::clamp(safe(value) / scale, 0., 1.);
 
-      Canvas c(width, height);
+      Canvas c(58, 28);
 
       const auto point = [&](double s, double r) {
-        const double phi = pi * (1. - s);
+        const double phi = std::numbers::pi * (1. - s);
         return std::pair{static_cast<int>(std::round(cx + r * std::cos(phi))),
                          static_cast<int>(std::round(cy - r * std::sin(phi)))};
       };
 
       /* The dial: */
-      constexpr int n_steps = 160;
-      for (int i = 0; i <= n_steps; ++i) {
-        const double s = static_cast<double>(i) / n_steps;
-        const auto t = static_cast<float>(s);
+      for (int i = 0; i <= 160; ++i) {
+        const double s = i / 160.;
         const auto dial =
-            s <= fraction ? Color::Interpolate(t, theme.highlight, theme.good)
-                          : theme.muted;
+            s <= fraction
+                ? Color::Interpolate(float(s), theme.highlight, theme.good)
+                : theme.muted;
         for (const double r : {radius, radius - 1, radius - 2}) {
           const auto [x, y] = point(s, r);
           c.DrawPoint(x, y, true, dial);
@@ -265,11 +257,10 @@ namespace ryujin
 
       /* Ticks: */
       for (int i = 0; i <= 10; ++i) {
-        const double s = i / 10.;
-        const auto [x1, y1] = point(s, radius - 5);
-        const auto [x2, y2] = point(s, i % 5 == 0 ? radius - 9 : radius - 7);
-        c.DrawPointLine(
-            x1, y1, x2, y2, i % 5 == 0 ? theme.caption : theme.muted);
+        const bool major = i % 5 == 0;
+        const auto [x1, y1] = point(i / 10., radius - 5);
+        const auto [x2, y2] = point(i / 10., major ? radius - 9 : radius - 7);
+        c.DrawPointLine(x1, y1, x2, y2, major ? theme.caption : theme.muted);
       }
 
       /* The needle: */
@@ -312,584 +303,464 @@ namespace ryujin
       if (precision > 0 && string.size() > 5)
         string = std::format("{:.{}f}", v, precision - 1);
 
-      int width = 0;
+      const auto advance = [](char ch) { return ch == '.' ? 4 : w + 4; };
+      int width = -4;
       for (const char ch : string)
-        width += ch == '.' ? 4 : w + 4;
-      Canvas c(width - 4, 28);
+        width += advance(ch);
+      Canvas c(width, 28);
 
+      /* Fill the rectangle {x1, y1, x2, y2} at the offset (x0, y0): */
       int x0 = 0;
-      for (const char ch : string) {
-        if (ch == '.') {
-          c.DrawPointLine(x0, y0 + h - 2, x0 + 1, y0 + h - 2, theme.good);
-          c.DrawPointLine(x0, y0 + h - 1, x0 + 1, y0 + h - 1, theme.good);
-          x0 += 4;
-          continue;
-        }
+      const auto fill = [&](int x1, int y1, int x2, int y2) {
+        for (int y = y1; y <= y2; ++y)
+          c.DrawPointLine(x0 + x1, y0 + y, x0 + x2, y0 + y, theme.good);
+      };
 
-        for (int i = 0; i < 7; ++i) {
-          if ((digits[ch - '0'] >> i & 1) == 0)
-            continue;
-          const auto [x1, y1, x2, y2] = segments[i];
-          for (int y = y1; y <= y2; ++y)
-            c.DrawPointLine(x0 + x1, y0 + y, x0 + x2, y0 + y, theme.good);
-        }
-        x0 += w + 4;
+      for (const char ch : string) {
+        if (ch == '.')
+          fill(0, h - 2, 1, h - 1);
+        else
+          for (int i = 0; i < 7; ++i)
+            if ((digits[ch - '0'] >> i & 1) != 0)
+              std::apply(fill, segments[i]);
+        x0 += advance(ch);
       }
 
       return canvas(std::move(c));
     }
-  } // namespace
 
 
-  std::string Dashboard::render(const DashboardData &data,
-                                const DashboardSettings &settings)
-  {
-    theme = make_palette(settings.color_scheme);
-
-    /* Check whether the terminal has been resized: */
-    const auto [columns, lines] = terminal_size();
-    const bool resized =
-        columns != terminal_width_ || lines != terminal_height_;
-    terminal_width_ = columns;
-    terminal_height_ = lines;
-
-    /* Limit the width of the dashboard on wide terminals: */
-    const int terminal_columns = std::max(terminal_width_, 80);
-    const int screen_width =
-        settings.width == 0
-            ? terminal_columns
-            : std::min(terminal_columns, std::max<int>(settings.width, 80));
-
-    /*
-     * Header: cycle, time, and progress
-     */
-
-    /* The last time step may overshoot the final time: */
-    const double progress =
-        data.t_final > 0. ? std::clamp(data.t / data.t_final, 0., 1.) : 0.;
-
-    auto header = vbox({
-        hbox({
-            badge(),
-            text(" "),
-            data.final_time ? text(" FINAL ") | bold | color(theme.ink) |
-                                  bgcolor(theme.good)
-                            : text(" running ") | color(theme.ink) |
-                                  bgcolor(theme.highlight),
-            text("   cycle ") | color(theme.caption),
-            text(std::format("{}", data.cycle)) | bold,
-            text("   t = ") | color(theme.caption),
-            text(std::format("{:.8f}", data.t)) | bold,
-            text(std::format(" / {:.4g}", data.t_final)) | color(theme.muted),
-            filler(),
-            text("ETA ") | color(theme.caption),
-            text(format_duration(data.eta)) | bold,
-            text(" "),
-        }),
-        hbox({
-            bar(progress, theme.highlight, theme.good) | flex,
-            text(std::format(" {:5.1f}% ", 100. * progress)) | bold,
-        }),
-    });
-
-    /*
-     * Information
-     */
-
-    Elements information = {
-        hbox({label("hyperbolic"), text(data.hyperbolic_name) | bold}),
-    };
-    if (!data.parabolic_name.empty())
-      information.push_back(
-          hbox({label("parabolic"), text(data.parabolic_name) | bold}));
-
-    std::string ranks =
-        std::format("{} rank{}", data.n_ranks, data.n_ranks == 1 ? "" : "s");
-    if (!data.threads.empty())
-      ranks += " × " + data.threads;
-    if (data.n_ensembles > 1)
-      ranks += std::format(" ({} ensembles)", data.n_ensembles);
-
-    information.push_back(hbox({label("run"), text(data.base_name)}));
-    information.push_back(hbox({
-        label("size"),
-        text(format_si(data.n_global_dofs)) | bold,
-        text("Qdofs"),
-    }));
-    information.push_back(hbox({
-        label("parallel"),
-        text(ranks),
-        filler(),
-        text("backend ") | color(theme.caption),
-        chip(data.backend, theme.highlight),
-    }));
-
-    /*
-     * Throughput speedometer
-     */
-
-    /* Scale with the recent samples to forget the warm-up phase: */
-    const auto recent = std::min<std::size_t>(wall_history_.size(), 32);
-    const double scale =
-        nice_scale(1.1 * *std::max_element(wall_history_.end() - recent,
-                                           wall_history_.end()));
-
-    const std::string compute_label = data.device               ? "GPU "
-                                      : data.fudged_cpu_timings ? "CPU*"
-                                                                : "CPU ";
-
-    const bool dial =
-        settings.throughput_display == DashboardThroughputDisplay::speedometer;
-
-    auto throughput = vbox({
-        hbox({
-            filler(),
-            dial ? speedometer(data.wall_m_dofs_per_sec, scale)
-                 : digital(data.wall_m_dofs_per_sec),
-            filler(),
-        }),
-        hbox({
-            text(dial ? " 0" : "") | color(theme.muted),
-            filler(),
-            text(std::format("{:.2f}", data.wall_m_dofs_per_sec)) | bold |
-                color(theme.good),
-            text(" MQ/s wall"),
-            filler(),
-            text(dial ? std::format("{:g} ", scale) : "") | color(theme.muted),
-        }),
-        separatorLight() | color(theme.track),
-        hbox({
-            text(compute_label) | color(theme.caption),
-            text(std::format(" {:9.3f} MQ/s ", data.compute_m_dofs_per_sec)),
-            filler(),
-            sparkline(compute_history_, 14, theme.highlight),
-        }),
-        hbox({
-            text("WALL") | color(theme.caption),
-            text(std::format(" {:9.3f} MQ/s ", data.wall_m_dofs_per_sec)),
-            filler(),
-            sparkline(wall_history_, 14, theme.good),
-        }),
-        hbox({
-            text("rate") | color(theme.caption),
-            text(std::format(" {:9.2f} cycles/s", data.cycles_per_second)),
-        }),
-    });
-
-    /*
-     * Throughput history: an area chart of the most recent wall
-     * throughput samples, one sample per half cell
-     */
-
-    auto history_graph = [this, scale](int width, int height) {
-      /* A negative value leaves the column empty: */
-      std::vector<int> values(width, -1);
-      const auto n = std::min<std::size_t>(width, wall_history_.size());
-      for (std::size_t i = 0; i < n; ++i) {
-        const double value = wall_history_[wall_history_.size() - n + i];
-        const auto level = static_cast<int>(std::round(value / scale * height));
-        values[width - n + i] = std::clamp(level, 0, height);
-      }
-      return values;
-    };
-
-    auto history = hbox({
-        vbox({
-            text(std::format("{:g}", scale)) | color(theme.muted),
-            filler(),
-            text("0") | color(theme.muted),
-        }) | size(WIDTH, EQUAL, 5),
-        graph(std::move(history_graph)) | color(theme.good) | flex,
-    });
-
-    /*
-     * Messages: the most recent status messages, scrolled to the newest
-     */
-
-    Elements message_lines;
-    for (const auto &message : data.messages)
-      message_lines.push_back(
-          hbox({
-              text(std::format("{:>6} ", message.cycle)) | color(theme.muted),
-              text(message.text),
-          }) |
-          flex_shrink);
-    if (message_lines.empty())
-      message_lines.push_back(text("no messages") | color(theme.muted));
-
-    auto messages = vbox(std::move(message_lines)) |
-                    focusPositionRelative(0.f, 1.f) | yframe | at_most(5);
-
-    /*
-     * Time stepping
-     */
-
-    const auto counter = [](const std::string &name, const auto &n) {
+    /* The restarts, warnings, or corrections of the two modules: */
+    Element counter(const std::string &name, std::array<unsigned int, 2> n)
+    {
       const auto c = [](unsigned int k) {
-        return k == 0 ? text("0") | color(theme.muted)
-                      : text(std::to_string(k)) | bold |
-                            color(k < 10 ? theme.warn : theme.bad);
+        if (k == 0)
+          return muted("0");
+        return text(std::to_string(k)) | bold |
+               color(k < 10 ? theme.warn : theme.bad);
       };
-      return hbox({
-          text(name + " ") | color(theme.caption),
-          c(n[0]),
-          text("/") | color(theme.muted),
-          c(n[1]),
-          text("   "),
-      });
-    };
-
-    Elements stepping = {
-        hbox({
-            label("scheme"),
-            chip(data.time_stepping_scheme, theme.good),
-            text("  CFL ") | color(theme.caption),
-            text(std::format("{:.2f}", data.cfl)) | bold,
-        }),
-        hbox({
-            label("tau"),
-            text(std::format("{:.3e}", data.tau)) | bold,
-            text(std::format("   ({:.3e} t/s)", data.time_per_second)) |
-                color(theme.muted),
-        }),
-        hbox({
-            label("events"),
-            counter("restarts", data.restarts),
-            counter("warnings", data.warnings),
-            counter("corrections", data.corrections),
-        }),
-    };
-
-    for (const auto &line : data.solver_statistics)
-      stepping.push_back(hbox({label("solver"), text(line)}));
-
-    if (data.device) {
-      stepping.push_back(hbox({
-          label("GPU util"),
-          bar(data.utilization, theme.bad, theme.good) | size(WIDTH, EQUAL, 24),
-          text(std::format(" {:5.1f}%", 100. * data.utilization)) | bold,
-          text(std::format("  on {} device{}",
-                           data.n_devices,
-                           data.n_devices == 1 ? "" : "s")) |
-              color(theme.muted),
-      }));
-      const auto skew =
-          std::clamp(safe(data.device_time_skew_fraction), 0., 1.);
-      stepping.push_back(hbox({
-          label("gpu skew"),
-          gauge(static_cast<float>(skew)) | color(heat(4. * skew)) |
-              bgcolor(theme.track) | size(WIDTH, EQUAL, 24),
-          text(std::format(" {:5.1f}%", 100. * skew)) | bold,
-          text(std::format("  ({:.2e} s/cycle) [p{}/{}]",
-                           data.device_time_skew,
-                           data.device_time_min_index,
-                           data.device_time_max_index)) |
-              color(theme.muted),
-      }));
-    } else {
-      const auto skew = std::clamp(safe(data.cpu_time_skew_fraction), 0., 1.);
-      stepping.push_back(hbox({
-          label("cpu skew"),
-          gauge(static_cast<float>(skew)) | color(heat(4. * skew)) |
-              bgcolor(theme.track) | size(WIDTH, EQUAL, 24),
-          text(std::format(" {:5.1f}%", 100. * skew)) | bold,
-          text(std::format("  ({:.2e} s/cycle)", data.cpu_time_skew)) |
-              color(theme.muted),
-      }));
+      return hbox(
+          {caption(name + " "), c(n[0]), muted("/"), c(n[1]), text("   ")});
     }
 
-    /*
-     * Memory
-     */
 
-    const auto &memory = data.memory;
-    auto memory_panel = vbox({
-        hbox({
-            text("min ") | color(theme.caption),
-            text(std::format("{:9.1f}", memory.min)),
-            text(std::format(" [p{}]", memory.min_index)) | color(theme.muted),
-        }),
-        hbox({
-            text("avg ") | color(theme.caption),
-            text(std::format("{:9.1f}", memory.avg)) | bold,
-        }),
-        hbox({
-            text("max ") | color(theme.caption),
-            text(std::format("{:9.1f}", memory.max)),
-            text(std::format(" [p{}]", memory.max_index)) | color(theme.muted),
-        }),
-        range_bar(memory, nice_scale(memory.max), 32),
-        hbox({
-            text("0") | color(theme.muted),
-            filler(),
-            text(std::format("{:g} MiB", nice_scale(memory.max))) |
-                color(theme.muted),
-        }),
-    });
+    /* The dashboard for the snapshot @p data, @p width columns wide: */
+    Element document(const DashboardData &data,
+                     const std::deque<double> &wall_history,
+                     const std::deque<double> &compute_history,
+                     DashboardThroughputDisplay display,
+                     int width)
+    {
+      /*
+       * Header: cycle, time, and progress
+       */
 
-    /*
-     * Timers: a stacked colorbar of the time loop and a table
-     */
+      /* The last time step may overshoot the final time: */
+      const double progress =
+          data.t_final > 0. ? std::clamp(data.t / data.t_final, 0., 1.) : 0.;
 
-    const int composition_width = screen_width - 4;
-    Elements composition;
-    std::vector<std::vector<Element>> table = {{
-        text(" "),
-        text("timer") | bold | flex_shrink,
-        text("wall avg ") | bold | align_right,
-        text(" skew -/+ ") | bold | align_right,
-        text(" ranks ") | bold,
-        text("cpu sum ") | bold | align_right,
-        text("share") | bold,
-        text(""),
-    }};
+      auto header = vbox({
+          hbox({
+              /* The version is also shown in the footer: */
+              badge(width >= 100),
+              text(" "),
+              data.final_time ? text(" FINAL ") | bold | color(theme.ink) |
+                                    bgcolor(theme.good)
+                              : text(" running ") | color(theme.ink) |
+                                    bgcolor(theme.highlight),
+              caption("   cycle "),
+              text(std::format("{}", data.cycle)) | bold,
+              caption("   t = "),
+              text(std::format("{:.8f}", data.t)) | bold,
+              muted(std::format(" / {:.4g}", data.t_final)),
+              filler(),
+              caption("ETA "),
+              text(format_duration(data.eta)) | bold,
+              text(" "),
+          }),
+          hbox({
+              bar(progress,
+                  color(LinearGradient(theme.highlight, theme.good))) |
+                  flex,
+              text(std::format(" {:5.1f}% ", 100. * progress)) | bold,
+          }),
+      });
 
-    int used = 0;
-    unsigned int n_segment = 0;
-    for (const auto &timer : data.timers) {
-      const auto &wall = timer.wall_time;
-      const double skew_negative =
-          wall.avg > 0.
-              ? std::max(100. * (wall.min - wall.avg) / wall.avg, -99.9)
-              : 0.;
-      const double skew_positive =
-          wall.avg > 0.
-              ? std::min(100. * (wall.max - wall.avg) / wall.avg, 99.9)
-              : 0.;
+      /*
+       * Information
+       */
 
-      Element marker = text(" ");
-      Element share = text("");
-      Element percentage = text("");
+      Elements information = {
+          hbox({label("hyperbolic"), text(data.hyperbolic_name) | bold}),
+      };
+      if (!data.parabolic_name.empty())
+        information.push_back(
+            hbox({label("parabolic"), text(data.parabolic_name) | bold}));
 
-      if (timer.fraction >= 0.) {
-        const auto c = theme.segments[n_segment++ % theme.segments.size()];
-        const auto fraction = std::clamp(safe(timer.fraction), 0., 1.);
-        const auto length =
-            static_cast<int>(std::round(fraction * composition_width));
-        const int n = std::min(length, composition_width - used);
-        if (n > 0) {
-          composition.push_back(text(std::string(n, ' ')) | bgcolor(c));
-          used += n;
+      std::string ranks =
+          std::format("{} rank{}", data.n_ranks, data.n_ranks == 1 ? "" : "s");
+      if (!data.threads.empty())
+        ranks += " × " + data.threads;
+      if (data.n_ensembles > 1)
+        ranks += std::format(" ({} ensembles)", data.n_ensembles);
+
+      information.push_back(hbox({label("run"), text(data.base_name)}));
+      information.push_back(hbox({
+          label("size"),
+          text(format_si(data.n_global_dofs)) | bold,
+          text("Qdofs"),
+      }));
+      information.push_back(hbox({
+          label("parallel"),
+          text(ranks),
+          filler(),
+          caption("backend "),
+          chip(data.backend, theme.highlight),
+      }));
+
+      /*
+       * Throughput
+       */
+
+      /* Scale with the recent samples to forget the warm-up phase: */
+      const auto recent = std::min<std::size_t>(wall_history.size(), 32);
+      const double scale =
+          nice_scale(1.1 * *std::max_element(wall_history.end() - recent,
+                                             wall_history.end()));
+
+      const bool dial = display == DashboardThroughputDisplay::speedometer;
+
+      auto throughput = vbox({
+          hbox({
+              filler(),
+              dial ? speedometer(data.wall_m_dofs_per_sec, scale)
+                   : digital(data.wall_m_dofs_per_sec),
+              filler(),
+          }),
+          hbox({
+              muted(dial ? " 0" : ""),
+              filler(),
+              text(std::format("{:.2f}", data.wall_m_dofs_per_sec)) | bold |
+                  color(theme.good),
+              text(" MQ/s wall"),
+              filler(),
+              muted(dial ? std::format("{:g} ", scale) : ""),
+          }),
+          separatorLight() | color(theme.track),
+          hbox({
+              caption(data.device               ? "GPU "
+                      : data.fudged_cpu_timings ? "CPU*"
+                                                : "CPU "),
+              text(std::format(" {:9.3f} MQ/s ", data.compute_m_dofs_per_sec)),
+              filler(),
+              sparkline(compute_history, 14, theme.highlight),
+          }),
+          hbox({
+              caption("WALL"),
+              text(std::format(" {:9.3f} MQ/s ", data.wall_m_dofs_per_sec)),
+              filler(),
+              sparkline(wall_history, 14, theme.good),
+          }),
+          hbox({
+              caption("rate"),
+              text(std::format(" {:9.2f} cycles/s", data.cycles_per_second)),
+          }),
+      });
+
+      /*
+       * Throughput history: an area chart of the most recent wall
+       * throughput samples, one sample per half cell
+       */
+
+      auto history_graph = [&wall_history, scale](int width, int height) {
+        /* A negative value leaves the column empty: */
+        std::vector<int> values(width, -1);
+        const auto n = std::min<std::size_t>(width, wall_history.size());
+        for (std::size_t i = 0; i < n; ++i) {
+          const double value = wall_history[wall_history.size() - n + i];
+          const auto level =
+              static_cast<int>(std::round(value / scale * height));
+          values[width - n + i] = std::clamp(level, 0, height);
         }
-        marker = text("■ ") | color(c);
-        share = gauge(static_cast<float>(fraction)) | color(c) |
-                bgcolor(theme.track) | size(WIDTH, EQUAL, 20);
-        percentage = text(std::format(" {:5.1f}%", 100. * fraction));
+        return values;
+      };
+
+      auto history = hbox({
+          vbox({muted(std::format("{:g}", scale)), filler(), muted("0")}) |
+              size(WIDTH, EQUAL, 5),
+          graph(std::move(history_graph)) | color(theme.good) | flex,
+      });
+
+      /*
+       * Messages: the most recent status messages, scrolled to the newest
+       */
+
+      Elements message_lines;
+      for (const auto &message : data.messages)
+        message_lines.push_back(hbox({
+                                    muted(std::format("{:>6} ", message.cycle)),
+                                    text(message.text),
+                                }) |
+                                flex_shrink);
+      if (message_lines.empty())
+        message_lines.push_back(muted("no messages"));
+
+      auto messages =
+          std::make_shared<AtMost>(vbox(std::move(message_lines)) |
+                                       focusPositionRelative(0.f, 1.f) | yframe,
+                                   5);
+
+      /*
+       * Time stepping
+       */
+
+      Elements stepping = {
+          hbox({
+              label("scheme"),
+              chip(data.time_stepping_scheme, theme.good),
+              caption("  CFL "),
+              text(std::format("{:.2f}", data.cfl)) | bold,
+          }),
+          hbox({
+              label("tau"),
+              text(std::format("{:.3e}", data.tau)) | bold,
+              muted(std::format("   ({:.3e} t/s)", data.time_per_second)),
+          }),
+          hbox({
+              label("events"),
+              counter("restarts", data.restarts),
+              counter("warnings", data.warnings),
+              counter("corrections", data.corrections),
+          }),
+      };
+
+      for (const auto &line : data.solver_statistics)
+        stepping.push_back(hbox({label("solver"), text(line)}));
+
+      if (data.device) {
+        stepping.push_back(meter("GPU util",
+                                 data.utilization,
+                                 color(LinearGradient(theme.bad, theme.good)),
+                                 std::format("  on {} device{}",
+                                             data.n_devices,
+                                             data.n_devices == 1 ? "" : "s")));
+        const auto skew =
+            std::clamp(safe(data.device_time_skew_fraction), 0., 1.);
+        stepping.push_back(meter("gpu skew",
+                                 skew,
+                                 color(heat(4. * skew)),
+                                 std::format("  ({:.2e} s/cycle) [p{}/{}]",
+                                             data.device_time_skew,
+                                             data.device_time_min_index,
+                                             data.device_time_max_index)));
+      } else {
+        const auto skew = std::clamp(safe(data.cpu_time_skew_fraction), 0., 1.);
+        stepping.push_back(
+            meter("cpu skew",
+                  skew,
+                  color(heat(4. * skew)),
+                  std::format("  ({:.2e} s/cycle)", data.cpu_time_skew)));
       }
 
-      /* Every timer of the time loop is a "time step": */
-      std::string name = timer.name;
-      if (name.starts_with("time step "))
-        name.erase(0, 10);
+      /*
+       * Memory
+       */
 
-      table.push_back({
-          marker,
-          /* Truncate the name first if the terminal is too narrow: */
-          text(name + "  ") | flex_shrink,
-          text(std::format("{:.2f}s ", wall.avg)) | align_right,
-          text(
-              std::format(" {:5.1f}/{:4.1f}% ", skew_negative, skew_positive)) |
-              color(heat(std::max(-skew_negative, skew_positive) / 25.)) |
-              align_right,
-          text(std::format(" p{}/p{} ", wall.min_index, wall.max_index)) |
-              color(theme.muted),
-          text(std::format("{:.2f}s ", timer.cpu_time)) | align_right,
-          share,
-          percentage,
+      const auto &memory = data.memory;
+      auto memory_panel = vbox({
+          hbox({
+              caption("min "),
+              text(std::format("{:9.1f}", memory.min)),
+              muted(std::format(" [p{}]", memory.min_index)),
+          }),
+          hbox({caption("avg "),
+                text(std::format("{:9.1f}", memory.avg)) | bold}),
+          hbox({
+              caption("max "),
+              text(std::format("{:9.1f}", memory.max)),
+              muted(std::format(" [p{}]", memory.max_index)),
+          }),
+          range_bar(memory, nice_scale(memory.max), 32),
+          hbox({
+              muted("0"),
+              filler(),
+              muted(std::format("{:g} MiB", nice_scale(memory.max))),
+          }),
       });
-    }
 
-    if (used < composition_width)
+      /*
+       * Timers: a stacked colorbar of the time loop and a table
+       */
+
+      const int composition_width = width - 4;
+      Elements composition;
+      std::vector<Elements> timer_table = {{
+          text(" "),
+          text("timer") | bold | flex_shrink,
+          text("wall avg ") | bold | align_right,
+          text(" skew -/+ ") | bold | align_right,
+          text(" ranks ") | bold,
+          text("cpu sum ") | bold | align_right,
+          text("share") | bold,
+          text(""),
+      }};
+
+      int used = 0;
+      std::size_t n_segment = 0;
+      for (const auto &timer : data.timers) {
+        const auto &wall = timer.wall_time;
+        const auto skew = [&wall](double value) {
+          if (!(wall.avg > 0.))
+            return 0.;
+          return std::clamp(100. * (value / wall.avg - 1.), -99.9, 99.9);
+        };
+        const double skew_negative = skew(wall.min);
+        const double skew_positive = skew(wall.max);
+
+        Element marker = text(" ");
+        Element share = text("");
+        Element percentage = text("");
+
+        if (timer.fraction >= 0.) {
+          const auto c = theme.segments[n_segment++ % theme.segments.size()];
+          const auto fraction = std::clamp(safe(timer.fraction), 0., 1.);
+          const int n = std::min(
+              static_cast<int>(std::round(fraction * composition_width)),
+              composition_width - used);
+          if (n > 0) {
+            composition.push_back(text(std::string(n, ' ')) | bgcolor(c));
+            used += n;
+          }
+          marker = text("■ ") | color(c);
+          share = bar(fraction, color(c)) | size(WIDTH, EQUAL, 20);
+          percentage = text(std::format(" {:5.1f}%", 100. * fraction));
+        }
+
+        /* Every timer of the time loop is a "time step": */
+        std::string name = timer.name;
+        if (name.starts_with("time step "))
+          name.erase(0, 10);
+
+        timer_table.push_back({
+            marker,
+            /* Truncate the name first if the terminal is too narrow: */
+            text(name + "  ") | flex_shrink,
+            text(std::format("{:.2f}s ", wall.avg)) | align_right,
+            text(std::format(
+                " {:5.1f}/{:4.1f}% ", skew_negative, skew_positive)) |
+                color(heat(std::max(-skew_negative, skew_positive) / 25.)) |
+                align_right,
+            muted(std::format(" p{}/p{} ", wall.min_index, wall.max_index)),
+            text(std::format("{:.2f}s ", timer.cpu_time)) | align_right,
+            share,
+            percentage,
+        });
+      }
+
       composition.push_back(text(std::string(composition_width - used, ' ')) |
                             bgcolor(theme.track));
 
-    auto timers = vbox({
-        hbox(std::move(composition)),
-        text(""),
-        gridbox(std::move(table)),
-    });
+      /*
+       * Tasks: the trigger of every task, when it fired last, and when it
+       * fires next
+       */
 
-    /*
-     * Tasks: the trigger of every task, when it fired last, and when it
-     * fires next
-     */
+      std::vector<Elements> task_table = {{
+          text("task") | bold,
+          text("  phase") | bold,
+          text("  trigger") | bold,
+          text("  last fired") | bold | flex_shrink,
+          text("  ") | bold,
+          text(" next") | bold,
+      }};
 
-    std::vector<std::vector<Element>> task_table = {{
-        text("task") | bold,
-        text("  phase") | bold,
-        text("  trigger") | bold,
-        text("  last fired") | bold | flex_shrink,
-        text("  ") | bold,
-        text(" next") | bold,
-    }};
+      for (const auto &task : data.tasks) {
+        task_table.push_back({
+            text(task.name) | bold,
+            hbox({text("  "), chip(task.phase, theme.highlight)}),
+            task.trigger.empty() ? muted("  --") : caption("  " + task.trigger),
+            (task.last.empty() ? muted("  --") : text("  " + task.last)) |
+                flex_shrink,
+            hbox({
+                text("  "),
+                task.progress < 0.
+                    ? text("")
+                    : bar(task.progress, color(theme.highlight)) |
+                          size(WIDTH, EQUAL, 16),
+            }),
+            task.next.empty() ? muted(" --")
+                              : text(" " + task.next) | color(theme.good),
+        });
+      }
 
-    for (const auto &task : data.tasks) {
-      const bool triggered = !task.trigger.empty();
+      /*
+       * Assemble the dashboard:
+       */
 
-      Element progress = text("");
-      if (task.progress >= 0.)
-        progress = gauge(static_cast<float>(task.progress)) |
-                   color(theme.highlight) | bgcolor(theme.track) |
-                   size(WIDTH, EQUAL, 16);
-
-      task_table.push_back({
-          text(task.name) | bold,
-          hbox({text("  "), chip(task.phase, theme.highlight)}),
-          text("  " + (triggered ? task.trigger : "--")) |
-              color(triggered ? theme.caption : theme.muted),
-          text("  " + (task.last.empty() ? "--" : task.last)) |
-              color(task.last.empty() ? theme.muted : Color::Default) |
-              flex_shrink,
-          hbox({text("  "), progress}),
-          text(" " + (task.next.empty() ? "--" : task.next)) |
-              color(task.next.empty() ? theme.muted : theme.good),
+      return vbox({
+          borderRounded(header | color(Color::Default)) | color(theme.accent),
+          hbox({
+              vbox({
+                  panel("simulation", vbox(std::move(information))),
+                  hbox({
+                      panel("wall throughput history [MQ/s]", history) | flex,
+                      panel("messages", messages) | flex,
+                  }) | yflex,
+                  panel("time stepping", vbox(std::move(stepping))),
+              }) | flex,
+              vbox({
+                  panel("throughput", throughput),
+                  panel("memory [MiB]", memory_panel) | yflex,
+              }) | size(WIDTH, EQUAL, 36),
+          }),
+          panel("timers",
+                vbox({
+                    hbox(std::move(composition)),
+                    text(""),
+                    gridbox(std::move(timer_table)),
+                })),
+          panel("tasks", gridbox(std::move(task_table))),
+          hbox({
+              muted(" terminal update every "),
+              caption(std::format("{:.2f}s", data.terminal_update_interval)),
+              filler(),
+              muted(version_string() + " "),
+          }),
       });
     }
+  } // namespace
 
-    /*
-     * Footer
-     */
 
-    auto footer = hbox({
-        text(" terminal update every ") | color(theme.muted),
-        text(std::format("{:.2f}s", data.terminal_update_interval)) |
-            color(theme.caption),
-    });
-
-    /*
-     * Assemble the dashboard:
-     */
-
-    auto document = vbox({
-        borderRounded(header | color(Color::Default)) | color(theme.accent),
-        hbox({
-            vbox({
-                panel("simulation", vbox(std::move(information))),
-                hbox({
-                    panel("wall throughput history [MQ/s]", history) | flex,
-                    panel("messages", messages) | flex,
-                }) | yflex,
-                panel("time stepping", vbox(std::move(stepping))),
-            }) | flex,
-            vbox({
-                panel("throughput", throughput),
-                panel("memory [MiB]", memory_panel) | yflex,
-            }) | size(WIDTH, EQUAL, 36),
-        }),
-        panel("timers", timers),
-        panel("tasks", gridbox(std::move(task_table))),
-        footer,
-    });
-
-    /*
-     * Render the dashboard with its natural height, or stretched to fill
-     * the terminal up to the maximal height:
-     */
-
-    auto dashboard = document | size(WIDTH, EQUAL, screen_width);
-    int height = Dimension::Fit(dashboard, true).dimy;
-    if (settings.height > 0)
-      height = std::max(
-          height,
-          std::min(static_cast<int>(settings.height), terminal_height_));
-
-    auto image = Screen::Create(Dimension::Fixed(screen_width),
-                                Dimension::Fixed(height));
-    Render(image, dashboard | size(HEIGHT, EQUAL, height));
-
-    /*
-     * Place the dashboard on a screen that covers the whole terminal (or
-     * more if the dashboard does not fit):
-     */
-
-    const int rows = std::max(height, terminal_height_);
-    const int left =
-        settings.center ? (terminal_columns - screen_width) / 2 : 0;
-    const int top = settings.center ? (rows - height) / 2 : 0;
-
-    stage_ = std::make_unique<animation::Stage>(
-        Screen(terminal_columns, rows),
-        Box{left, left + screen_width - 1, top, top + height - 1},
-        theme.animation);
-    for (int y = 0; y < height; ++y)
-      for (int x = 0; x < screen_width; ++x)
-        stage_->screen.PixelAt(left + x, top + y) = image.PixelAt(x, y);
-
-    /* Leave the screen around the final dashboard empty: */
-    if (animation_ && !data.final_time)
-      animation_->draw(*stage_, data);
-
-    /*
-     * Redraw the whole terminal in place, after clearing the screen if the
-     * terminal has been resized or for the final snapshot:
-     */
-    const bool clear = resized || data.final_time;
-    std::string output = clear ? "\033[2J\033[H" : "\033[H";
-    output += stage_->screen.ToString();
-
-    /* If the dashboard does not fit, clear whatever is left below: */
-    if (rows > terminal_height_)
-      output += "\n\033[J";
-
-    return output;
+  std::pair<int, int> DashboardPosition::offset(DashboardLocation location,
+                                                int free_columns,
+                                                int free_rows) const
+  {
+    const auto [x, y] =
+        location == DashboardLocation::top_left ? std::pair{0., 0.}
+        : location == DashboardLocation::center ? std::pair{.5, .5}
+                                                : fractions_;
+    return {static_cast<int>(x * free_columns),
+            static_cast<int>(y * free_rows)};
   }
 
 
-  std::string Dashboard::render_animation()
+  bool DashboardPosition::move(DashboardLocation location)
   {
-    theme = make_palette(settings_.color_scheme);
+    if (location != DashboardLocation::screen_saver ||
+        std::chrono::steady_clock::now() < next_move_)
+      return false;
 
-    const auto [columns, lines] = terminal_size();
-    terminal_width_ = columns;
-    terminal_height_ = lines;
-    /* A stage with an empty dashboard: */
-    stage_ = std::make_unique<animation::Stage>(
-        Screen(columns, lines), Box{0, -1, 0, -1}, theme.animation);
-
-    if (animation_)
-      animation_->draw(*stage_, data_);
-
-    return "\033[2J\033[H" + stage_->screen.ToString();
+    static std::mt19937 random{std::random_device{}()};
+    std::uniform_real_distribution<double> uniform;
+    fractions_ = {uniform(random), uniform(random)};
+    postpone();
+    return true;
   }
 
 
-  std::string Dashboard::step()
+  void DashboardPosition::postpone()
   {
-    /* Nothing to do without animation, or if the last frame has scrolled: */
-    if (!animation_ || stage_->screen.dimy() > terminal_height_)
-      return "";
-
-    stage_->changed.clear();
-    animation_->step(*stage_, data_);
-    return changes(*stage_);
-  }
-
-
-  void Dashboard::animate()
-  {
-    constexpr auto interval = std::chrono::milliseconds(150);
-
-    std::unique_lock lock(mutex_);
-    while (!condition_.wait_for(lock, interval, [this] { return stop_; })) {
-      /* Redraw the last frame right away if the terminal is resized: */
-      const auto [columns, lines] = terminal_size();
-      if (columns == terminal_width_ && lines == terminal_height_)
-        write(step());
-      else
-        write(animation_only_ ? render_animation() : render(data_, settings_));
-    }
-  }
-
-
-  void Dashboard::stop()
-  {
-    {
-      std::scoped_lock lock(mutex_);
-      stop_ = true;
-    }
-    condition_.notify_all();
-    if (thread_.joinable())
-      thread_.join();
+    next_move_ = std::chrono::steady_clock::now() + std::chrono::seconds(10);
   }
 
 
@@ -898,17 +769,137 @@ namespace ryujin
 
   Dashboard::~Dashboard()
   {
-    stop();
-    if (terminal_ >= 0)
-      ::close(terminal_);
+    /* Stop the background thread: */
+    thread_ = {};
+    if (terminal_ != nullptr)
+      std::fclose(terminal_);
+  }
+
+
+  void Dashboard::start(const DashboardSettings &settings)
+  {
+    std::scoped_lock lock(mutex_);
+
+    terminal_ = std::fopen("/dev/tty", "we");
+    settings_ = settings;
+    theme = make_palette(settings.color_scheme);
+    animation_ = animation::create(settings.animation);
+    write(render());
+
+    thread_ = std::jthread([this](std::stop_token token) {
+      std::condition_variable_any wakeup;
+      std::unique_lock lock(mutex_);
+      while (!wakeup.wait_for(
+          lock, token, std::chrono::milliseconds(150), [&token] {
+            return token.stop_requested();
+          })) {
+        /*
+         * Redraw the last frame right away if the terminal is resized, or
+         * if the dashboard moves. Otherwise advance the animation, unless
+         * the last frame has scrolled:
+         */
+        const auto size = terminal_size();
+        if (size != terminal_size_ ||
+            (data_ && position_.move(settings_.location))) {
+          write(render());
+        } else if (animation_ && stage_->screen.dimy() <= size.second) {
+          stage_->changed.clear();
+          animation_->step(*stage_);
+          write(changes(*stage_));
+        }
+      }
+    });
+  }
+
+
+  void Dashboard::show(const DashboardData &data)
+  {
+    /* No more updates after the final snapshot: */
+    if (data.final_time)
+      thread_ = {};
+
+    std::scoped_lock lock(mutex_);
+
+    wall_history_.push_back(safe(data.wall_m_dofs_per_sec));
+    compute_history_.push_back(safe(data.compute_m_dofs_per_sec));
+    if (wall_history_.size() > 512) {
+      wall_history_.pop_front();
+      compute_history_.pop_front();
+    }
+
+    data_ = data;
+    position_.move(settings_.location);
+
+    /* Continue with subsequent output below the final dashboard: */
+    write(render() + (data.final_time ? "\n" : ""));
+  }
+
+
+  std::string Dashboard::render()
+  {
+    const auto [columns, lines] = terminal_size();
+    const bool final_time = data_ && data_->final_time;
+
+    /* Clear the screen if the terminal has been resized, and at the end: */
+    const bool clear =
+        std::pair{columns, lines} != terminal_size_ || final_time;
+    terminal_size_ = {columns, lines};
+
+    if (!data_) {
+      /* A stage without dashboard: */
+      stage_ = std::make_unique<animation::Stage>(Screen(columns, lines),
+                                                  Box{0, -1, 0, -1});
+    } else {
+      /* Limit the width of the dashboard on wide terminals: */
+      const int terminal_columns = std::max(columns, 80);
+      const int width =
+          settings_.width == 0
+              ? terminal_columns
+              : std::min(terminal_columns, std::max<int>(settings_.width, 80));
+      auto element = document(*data_,
+                              wall_history_,
+                              compute_history_,
+                              settings_.throughput_display,
+                              width) |
+                     size(WIDTH, EQUAL, width);
+
+      /* The natural height, stretched up to the maximal height: */
+      const int height = std::max(Dimension::Fit(element, true).dimy,
+                                  std::min<int>(settings_.height, lines));
+
+      /* Cover the whole terminal, or more if the dashboard does not fit: */
+      const int rows = std::max(height, lines);
+      const auto [left, top] = position_.offset(
+          settings_.location, terminal_columns - width, rows - height);
+
+      stage_ = std::make_unique<animation::Stage>(
+          Screen(terminal_columns, rows),
+          Box{left, left + width - 1, top, top + height - 1});
+      Render(stage_->screen,
+             place(element | size(HEIGHT, EQUAL, height), left, top));
+    }
+
+    /* Leave the screen around the final dashboard empty: */
+    if (animation_ && !final_time)
+      animation_->draw(*stage_);
+
+    std::string output = clear ? "\033[2J\033[H" : "\033[H";
+    output += stage_->screen.ToString();
+
+    /* If the dashboard does not fit, clear whatever is left below: */
+    if (stage_->screen.dimy() > lines)
+      output += "\n\033[J";
+
+    return output;
   }
 
 
   std::pair<int, int> Dashboard::terminal_size() const
   {
     winsize size{};
-    if (terminal_ >= 0 && ::ioctl(terminal_, TIOCGWINSZ, &size) == 0 &&
-        size.ws_col > 0 && size.ws_row > 0)
+    if (terminal_ != nullptr &&
+        ::ioctl(fileno(terminal_), TIOCGWINSZ, &size) == 0 && size.ws_col > 0 &&
+        size.ws_row > 0)
       return {size.ws_col, size.ws_row};
 
     const auto fallback = Terminal::Size();
@@ -918,70 +909,11 @@ namespace ryujin
 
   void Dashboard::write(const std::string &output) const
   {
-    if (terminal_ < 0) {
-      std::cout << output << std::flush;
-      return;
-    }
-
-    const char *data = output.data();
-    std::size_t remaining = output.size();
-    while (remaining > 0) {
-      const auto n = ::write(terminal_, data, remaining);
-      if (n < 0) {
-        if (errno == EINTR)
-          continue;
-        return;
-      }
-      data += n;
-      remaining -= static_cast<std::size_t>(n);
-    }
-  }
-
-
-  void Dashboard::start(const DashboardSettings &settings)
-  {
-    std::scoped_lock lock(mutex_);
-
-    terminal_ = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);
-    settings_ = settings;
-    animation_ = animation::create(settings.animation);
-    animation_only_ = true;
-
-    /* Write out everything that is still pending on stdout first: */
-    std::cout << std::flush;
-    write(render_animation());
-
-    thread_ = std::thread([this] { animate(); });
-  }
-
-
-  void Dashboard::show(const DashboardData &data,
-                       const DashboardSettings &settings)
-  {
-    /* No more updates after the final snapshot: */
-    if (data.final_time)
-      stop();
-
-    std::scoped_lock lock(mutex_);
-
-    /* Update the throughput history: */
-
-    constexpr std::size_t history_size = 512;
-    wall_history_.push_back(safe(data.wall_m_dofs_per_sec));
-    compute_history_.push_back(safe(data.compute_m_dofs_per_sec));
-    if (wall_history_.size() > history_size) {
-      wall_history_.pop_front();
-      compute_history_.pop_front();
-    }
-
-    data_ = data;
-    settings_ = settings;
-    animation_only_ = false;
-
     /* Write out everything that is still pending on stdout first: */
     std::cout << std::flush;
 
-    /* Continue with subsequent output below the final dashboard: */
-    write(render(data_, settings_) + (data.final_time ? "\n" : ""));
+    const auto stream = terminal_ != nullptr ? terminal_ : stdout;
+    std::fwrite(output.data(), 1, output.size(), stream);
+    std::fflush(stream);
   }
 } // namespace ryujin

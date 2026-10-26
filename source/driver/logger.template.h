@@ -80,9 +80,12 @@ namespace ryujin
                   "this height. Setting the height to zero keeps the natural "
                   "height of the dashboard.");
 
-    add_parameter("dashboard center",
-                  dashboard_settings_.center,
-                  "Center the terminal dashboard horizontally and vertically.");
+    add_parameter(
+        "dashboard location",
+        dashboard_settings_.location,
+        "Location of the terminal dashboard: top left, center, "
+        "screen saver (move to a random position every ten seconds, in "
+        "the parameter editor only while there is no input).");
 
     add_parameter("dashboard color scheme",
                   dashboard_settings_.color_scheme,
@@ -477,7 +480,7 @@ namespace ryujin
 
 #if defined(WITH_FTXUI)
     if (interactive_terminal())
-      dashboard_.show(dashboard_data_, dashboard_settings_);
+      dashboard_.show(dashboard_data_);
     else
 #endif
       std::cout << "\033[2J\033[H" << text << std::flush;
