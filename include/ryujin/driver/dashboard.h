@@ -10,6 +10,7 @@
 #include <deal.II/base/mpi.h>
 
 #include <array>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -49,6 +50,29 @@ namespace ryujin
      * Never draw the dashboard, print plain text instead.
      */
     off,
+  };
+
+
+  /**
+   * The location of the Dashboard in the terminal.
+   *
+   * @ingroup Driver
+   */
+  enum class DashboardLocation : std::uint8_t {
+    /**
+     * The top left corner of the terminal.
+     */
+    top_left,
+
+    /**
+     * The center of the terminal.
+     */
+    center,
+
+    /**
+     * A random position that changes every ten seconds.
+     */
+    screen_saver,
   };
 
 
@@ -129,6 +153,11 @@ DECLARE_ENUM(ryujin::DashboardMode,
                   {ryujin::DashboardMode::on, "on"},
                   {ryujin::DashboardMode::off, "off"}, ));
 
+DECLARE_ENUM(ryujin::DashboardLocation,
+             LIST({ryujin::DashboardLocation::top_left, "top left"},
+                  {ryujin::DashboardLocation::center, "center"},
+                  {ryujin::DashboardLocation::screen_saver, "screen saver"}, ));
+
 DECLARE_ENUM(ryujin::DashboardColorScheme,
              LIST({ryujin::DashboardColorScheme::ryujin, "ryujin"},
                   {ryujin::DashboardColorScheme::rainbow, "rainbow"},
@@ -192,6 +221,43 @@ namespace ryujin
      */
     DashboardThroughputDisplay throughput_display =
         DashboardThroughputDisplay::digital;
+  };
+
+
+  /**
+   * The position of the Dashboard, or of the parameter editor, in the
+   * terminal. For DashboardLocation::screen_saver the position changes
+   * to a random one every ten seconds.
+   *
+   * @ingroup Driver
+   */
+  class DashboardPosition
+  {
+  public:
+    /**
+     * Return the offset (left, top) of a window at @p location, with
+     * @p free_columns and @p free_rows of free space around it.
+     */
+    std::pair<int, int>
+    offset(DashboardLocation location, int free_columns, int free_rows) const;
+
+    /**
+     * For DashboardLocation::screen_saver, change to a new random
+     * position if the last change, or the last call to postpone(), is
+     * ten seconds ago. Return whether the position has changed.
+     */
+    bool move(DashboardLocation location);
+
+    /**
+     * Postpone the next change of the position by ten seconds.
+     */
+    void postpone();
+
+  private:
+    /** The fractions of the free space to the left and above. */
+    std::pair<double, double> fractions_ = {0.5, 0.5};
+    /** When the position changes next. */
+    std::chrono::steady_clock::time_point next_move_;
   };
 
 

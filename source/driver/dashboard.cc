@@ -26,6 +26,7 @@
 #include <format>
 #include <iostream>
 #include <numbers>
+#include <random>
 
 namespace ryujin
 {
@@ -340,6 +341,39 @@ namespace ryujin
       return canvas(std::move(c));
     }
   } // namespace
+
+
+  std::pair<int, int> DashboardPosition::offset(DashboardLocation location,
+                                                int free_columns,
+                                                int free_rows) const
+  {
+    const auto [x, y] =
+        location == DashboardLocation::top_left ? std::pair{0., 0.}
+        : location == DashboardLocation::center ? std::pair{.5, .5}
+                                                : fractions_;
+    return {static_cast<int>(x * free_columns),
+            static_cast<int>(y * free_rows)};
+  }
+
+
+  bool DashboardPosition::move(DashboardLocation location)
+  {
+    if (location != DashboardLocation::screen_saver ||
+        std::chrono::steady_clock::now() < next_move_)
+      return false;
+
+    static std::mt19937 random{std::random_device{}()};
+    std::uniform_real_distribution<double> uniform;
+    fractions_ = {uniform(random), uniform(random)};
+    postpone();
+    return true;
+  }
+
+
+  void DashboardPosition::postpone()
+  {
+    next_move_ = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  }
 
 
   std::string Dashboard::render(const DashboardData &data,
