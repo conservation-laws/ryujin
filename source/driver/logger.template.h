@@ -84,7 +84,8 @@ namespace ryujin
         "dashboard location",
         dashboard_settings_.location,
         "Location of the terminal dashboard: top left, center, "
-        "screen saver (move to a random position every ten seconds).");
+        "screen saver (move to a random position every ten seconds, in "
+        "the parameter editor only while there is no input).");
 
     add_parameter("dashboard color scheme",
                   dashboard_settings_.color_scheme,

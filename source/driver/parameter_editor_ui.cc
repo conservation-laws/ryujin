@@ -43,6 +43,12 @@ namespace ryujin
     class Backdrop
     {
     public:
+      Backdrop()
+      {
+        /* Start at the initial position: */
+        position_.postpone();
+      }
+
       void configure(const DashboardSettings &settings)
       {
         if (!animation_ || settings.color_scheme != settings_.color_scheme ||
@@ -59,14 +65,24 @@ namespace ryujin
         return settings_;
       }
 
-      /* The cells covered by the editor, from the last frame: */
-      Box &window()
+      /* The position of the editor, moved only while there is no input: */
+      DashboardPosition &position()
       {
-        return window_;
+        return position_;
+      }
+
+      /* Place the editor on the cells @p window: */
+      void place(const Box &window)
+      {
+        if (window == window_)
+          return;
+        window_ = window;
+        stage_.reset();
       }
 
       void step()
       {
+        position_.move(settings_.location);
         if (!animation_ || !stage_)
           return;
         stage_->dashboard = window_;
@@ -99,6 +115,7 @@ namespace ryujin
       DashboardSettings settings_;
       std::unique_ptr<animation::Animation> animation_;
       std::unique_ptr<animation::Stage> stage_;
+      DashboardPosition position_;
       Box window_ = {0, -1, 0, -1};
       /* The animations do not use the data: */
       DashboardData data_;
@@ -153,12 +170,22 @@ namespace ryujin
         document = std::move(document) | size(HEIGHT, EQUAL, height);
 
       document = std::move(document) | size(HEIGHT, LESS_THAN, terminal.dimy) |
-                 clear_under | reflect(backdrop.window());
-      /* Keep the editor in place for DashboardLocation::screen_saver: */
-      if (settings.location != DashboardLocation::top_left)
-        document = center(std::move(document));
-      else
-        document = vbox({hbox({std::move(document), filler()}), filler()});
+                 clear_under;
+
+      const int rows = Dimension::Fit(document, true).dimy;
+      const auto [left, top] = backdrop.position().offset(
+          settings.location, terminal.dimx - width, terminal.dimy - rows);
+      backdrop.place({left, left + width - 1, top, top + rows - 1});
+
+      document = vbox({
+          emptyElement() | size(HEIGHT, EQUAL, top),
+          hbox({
+              emptyElement() | size(WIDTH, EQUAL, left),
+              std::move(document),
+              filler(),
+          }),
+          filler(),
+      });
 
       return dbox({std::make_shared<BackdropNode>(backdrop), document});
     }
@@ -192,6 +219,7 @@ namespace ryujin
             backdrop_.step();
             return true;
           }
+          backdrop_.position().postpone();
           return ComponentBase::OnEvent(event) || fallback_(event);
         }
 
