@@ -61,8 +61,11 @@ namespace ryujin::dashboard
   extern Palette theme;
 
 
-  /** The "ryujin" badge of the header. */
-  ftxui::Element badge();
+  /**
+   * The badge of the header, "ryujin vX.Y.Z <git revision>", or only
+   * "ryujin" if @p with_version is false.
+   */
+  ftxui::Element badge(bool with_version = true);
 
 
   /** A panel with a title. */

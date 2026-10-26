@@ -4,7 +4,9 @@
 //
 
 #include <driver/dashboard_theme.h>
+#include <ryujin/base/version_info.h>
 
+#include <string>
 #include <utility>
 
 namespace ryujin::dashboard
@@ -162,9 +164,10 @@ namespace ryujin::dashboard
   Palette theme = make_palette(DashboardColorScheme::ryujin);
 
 
-  Element badge()
+  Element badge(bool with_version)
   {
-    return text("  ryujin  ") | bold | color(theme.badge_ink) |
+    const std::string name = with_version ? version_string() : "ryujin";
+    return text("  " + name + "  ") | bold | color(theme.badge_ink) |
            bgcolor(theme.badge);
   }
 

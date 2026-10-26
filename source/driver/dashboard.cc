@@ -5,6 +5,7 @@
 
 #include <driver/dashboard_animation.h>
 #include <driver/dashboard_theme.h>
+#include <ryujin/base/version_info.h>
 #include <ryujin/driver/dashboard.h>
 
 #include <ftxui/dom/canvas.hpp>
@@ -370,7 +371,8 @@ namespace ryujin
 
     auto header = vbox({
         hbox({
-            badge(),
+            /* The version is also shown in the footer: */
+            badge(screen_width >= 100),
             text(" "),
             data.final_time ? text(" FINAL ") | bold | color(theme.ink) |
                                   bgcolor(theme.good)
@@ -754,6 +756,8 @@ namespace ryujin
         text(" terminal update every ") | color(theme.muted),
         text(std::format("{:.2f}s", data.terminal_update_interval)) |
             color(theme.caption),
+        filler(),
+        text(version_string() + " ") | color(theme.muted),
     });
 
     /*

@@ -223,7 +223,7 @@ namespace ryujin
     Element header(const std::string &title, Elements right)
     {
       Elements elements = {
-          badge(),
+          badge(false),
           text(" "),
           text(" " + title + " ") | color(theme.ink) | bgcolor(theme.highlight),
           filler(),
