@@ -24,21 +24,23 @@ namespace ryujin::animation
    * @ingroup Driver
    */
   struct Stage {
+    /** The cells of the whole terminal. */
     ftxui::Screen screen;
-    /* The cells covered by the dashboard: */
+    /** The cells covered by the dashboard. */
     ftxui::Box dashboard;
-    /* The animation colors of the color scheme: */
+    /** The animation colors of the color scheme. */
     std::vector<ftxui::Color> colors;
 
-    /* The cells changed by the animation since the last step: */
+    /** The cells changed by the animation since the last step. */
     std::vector<std::pair<int, int>> changed;
 
+    /** Return whether the cell (x, y) is outside of the dashboard. */
     bool free(int x, int y) const
     {
       return !dashboard.Contain(x, y);
     }
 
-    /* Return the pixel at (x, y) and mark it as changed: */
+    /** Return the pixel at (x, y) and mark it as changed. */
     ftxui::Pixel &pixel(int x, int y)
     {
       changed.emplace_back(x, y);
@@ -55,11 +57,10 @@ namespace ryujin::animation
   class Animation
   {
   public:
+    /** Destructor. */
     virtual ~Animation() = default;
 
-    /**
-     * Fill the free cells of a freshly rendered stage.
-     */
+    /** Fill the free cells of a freshly rendered stage. */
     virtual void draw(Stage &stage, const DashboardData &data) = 0;
 
     /**
@@ -70,9 +71,6 @@ namespace ryujin::animation
   };
 
 
-  /**
-   * Return the animation @p kind, or a null pointer for
-   * DashboardAnimation::none.
-   */
+  /** Return the animation @p kind, null for DashboardAnimation::none. */
   std::unique_ptr<Animation> create(DashboardAnimation kind);
 } // namespace ryujin::animation

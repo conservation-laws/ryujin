@@ -63,9 +63,10 @@ namespace ryujin
     Color heat(double x)
     {
       const auto &stops = theme.heat;
-      x = std::clamp(x, 0., 1.) * double(stops.size() - 1);
+      x = std::clamp(x, 0., 1.) * static_cast<double>(stops.size() - 1);
       const auto i = std::min(static_cast<std::size_t>(x), stops.size() - 2);
-      return Color::Interpolate(float(x - double(i)), stops[i], stops[i + 1]);
+      const auto t = static_cast<float>(x - static_cast<double>(i));
+      return Color::Interpolate(t, stops[i], stops[i + 1]);
     }
 
 
@@ -165,7 +166,7 @@ namespace ryujin
 
     Element bar(double fraction, Color begin, Color end)
     {
-      return gauge(float(std::clamp(safe(fraction), 0., 1.))) |
+      return gauge(static_cast<float>(std::clamp(safe(fraction), 0., 1.))) |
              color(LinearGradient(begin, end)) | bgcolor(theme.track);
     }
 
@@ -189,10 +190,11 @@ namespace ryujin
       for (auto it = history.end() - n; it != history.end(); ++it) {
         const double level =
             range > 0. ? std::clamp((safe(*it) - min) / range, 0., 1.) : 0.5;
-        const auto index = std::clamp(int(std::round(level * 7.)), 0, 7);
-        elements.push_back(
-            text(blocks[index]) |
-            color(Color::Interpolate(float(level), theme.muted, c)));
+        const auto index =
+            std::clamp(static_cast<int>(std::round(level * 7.)), 0, 7);
+        const auto t = static_cast<float>(level);
+        elements.push_back(text(blocks[index]) |
+                           color(Color::Interpolate(t, theme.muted, c)));
       }
 
       return hbox(std::move(elements));
@@ -204,7 +206,8 @@ namespace ryujin
     range_bar(const DashboardData::MinMaxAvg &v, double scale, int width)
     {
       const auto position = [&](double value) {
-        return std::clamp(int(value / scale * (width - 1)), 0, width - 1);
+        const auto column = static_cast<int>(value / scale * (width - 1));
+        return std::clamp(column, 0, width - 1);
       };
 
       const auto min = position(v.min);
@@ -242,18 +245,18 @@ namespace ryujin
 
       const auto point = [&](double s, double r) {
         const double phi = pi * (1. - s);
-        return std::pair{int(std::round(cx + r * std::cos(phi))),
-                         int(std::round(cy - r * std::sin(phi)))};
+        return std::pair{static_cast<int>(std::round(cx + r * std::cos(phi))),
+                         static_cast<int>(std::round(cy - r * std::sin(phi)))};
       };
 
       /* The dial: */
       constexpr int n_steps = 160;
       for (int i = 0; i <= n_steps; ++i) {
-        const double s = double(i) / n_steps;
+        const double s = static_cast<double>(i) / n_steps;
+        const auto t = static_cast<float>(s);
         const auto dial =
-            s <= fraction
-                ? Color::Interpolate(float(s), theme.highlight, theme.good)
-                : theme.muted;
+            s <= fraction ? Color::Interpolate(t, theme.highlight, theme.good)
+                          : theme.muted;
         for (const double r : {radius, radius - 1, radius - 2}) {
           const auto [x, y] = point(s, r);
           c.DrawPoint(x, y, true, dial);
@@ -484,8 +487,8 @@ namespace ryujin
       const auto n = std::min<std::size_t>(width, wall_history_.size());
       for (std::size_t i = 0; i < n; ++i) {
         const double value = wall_history_[wall_history_.size() - n + i];
-        values[width - n + i] =
-            std::clamp(int(std::round(value / scale * height)), 0, height);
+        const auto level = static_cast<int>(std::round(value / scale * height));
+        values[width - n + i] = std::clamp(level, 0, height);
       }
       return values;
     };
@@ -574,8 +577,8 @@ namespace ryujin
           std::clamp(safe(data.device_time_skew_fraction), 0., 1.);
       stepping.push_back(hbox({
           label("gpu skew"),
-          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
-              size(WIDTH, EQUAL, 24),
+          gauge(static_cast<float>(skew)) | color(heat(4. * skew)) |
+              bgcolor(theme.track) | size(WIDTH, EQUAL, 24),
           text(std::format(" {:5.1f}%", 100. * skew)) | bold,
           text(std::format("  ({:.2e} s/cycle) [p{}/{}]",
                            data.device_time_skew,
@@ -587,8 +590,8 @@ namespace ryujin
       const auto skew = std::clamp(safe(data.cpu_time_skew_fraction), 0., 1.);
       stepping.push_back(hbox({
           label("cpu skew"),
-          gauge(float(skew)) | color(heat(4. * skew)) | bgcolor(theme.track) |
-              size(WIDTH, EQUAL, 24),
+          gauge(static_cast<float>(skew)) | color(heat(4. * skew)) |
+              bgcolor(theme.track) | size(WIDTH, EQUAL, 24),
           text(std::format(" {:5.1f}%", 100. * skew)) | bold,
           text(std::format("  ({:.2e} s/cycle)", data.cpu_time_skew)) |
               color(theme.muted),
@@ -661,15 +664,16 @@ namespace ryujin
       if (timer.fraction >= 0.) {
         const auto c = theme.segments[n_segment++ % theme.segments.size()];
         const auto fraction = std::clamp(safe(timer.fraction), 0., 1.);
-        const int n = std::min(int(std::round(fraction * composition_width)),
-                               composition_width - used);
+        const auto length =
+            static_cast<int>(std::round(fraction * composition_width));
+        const int n = std::min(length, composition_width - used);
         if (n > 0) {
           composition.push_back(text(std::string(n, ' ')) | bgcolor(c));
           used += n;
         }
         marker = text("■ ") | color(c);
-        share = gauge(float(fraction)) | color(c) | bgcolor(theme.track) |
-                size(WIDTH, EQUAL, 20);
+        share = gauge(static_cast<float>(fraction)) | color(c) |
+                bgcolor(theme.track) | size(WIDTH, EQUAL, 20);
         percentage = text(std::format(" {:5.1f}%", 100. * fraction));
       }
 
@@ -724,8 +728,9 @@ namespace ryujin
 
       Element progress = text("");
       if (task.progress >= 0.)
-        progress = gauge(float(task.progress)) | color(theme.highlight) |
-                   bgcolor(theme.track) | size(WIDTH, EQUAL, 16);
+        progress = gauge(static_cast<float>(task.progress)) |
+                   color(theme.highlight) | bgcolor(theme.track) |
+                   size(WIDTH, EQUAL, 16);
 
       task_table.push_back({
           text(task.name) | bold,

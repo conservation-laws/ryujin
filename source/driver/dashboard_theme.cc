@@ -5,6 +5,8 @@
 
 #include <driver/dashboard_theme.h>
 
+#include <utility>
+
 namespace ryujin::dashboard
 {
   using namespace ftxui;
@@ -170,7 +172,7 @@ namespace ryujin::dashboard
   Element panel(const std::string &title, Element content)
   {
     return window(text(" " + title + " ") | bold | color(theme.accent),
-                  content | color(Color::Default)) |
+                  std::move(content) | color(Color::Default)) |
            color(theme.muted);
   }
 

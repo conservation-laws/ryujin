@@ -26,8 +26,8 @@ namespace ryujin
 {
   /**
    * Populate dealii::ParameterAcceptor::prm with all parameters of the
-   * objects created by @p setup, and return the objects. The objects
-   * have to go out of scope before calling dealii::ParameterAcceptor::clear().
+   * objects created by @p setup, and return the objects. The objects have
+   * to go out of scope before calling dealii::ParameterAcceptor::clear().
    *
    * @ingroup Driver
    */
@@ -37,8 +37,8 @@ namespace ryujin
     auto &prm = dealii::ParameterAcceptor::prm;
 
     /*
-     * Workaround: The Scheduler is constructed last and declares the
-     * "A - Scheduler" section last. Add an entry to the section so that it
+     * Workaround: The Scheduler is constructed last and declares the "A -
+     * Scheduler" section last. Add an entry to the section so that it
      * shows up first.
      */
     prm.enter_subsection("A - Scheduler");

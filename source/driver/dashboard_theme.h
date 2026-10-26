@@ -22,64 +22,57 @@ namespace ryujin::dashboard
    * @ingroup Driver
    */
   struct Palette {
-    /* header badge and its text: */
+    /** The background of the header badge. */
     ftxui::Color badge;
+    /** The text of the header badge. */
     ftxui::Color badge_ink;
-    /* text on light backgrounds: */
+    /** Text on light backgrounds. */
     ftxui::Color ink;
-    /* panel titles and the header border: */
+    /** Panel titles and the header border. */
     ftxui::Color accent;
-    /* chips, bars, and the "running" badge: */
+    /** Chips, bars, and the "running" badge. */
     ftxui::Color highlight;
-    /* labels and captions: */
+    /** Labels and captions. */
     ftxui::Color caption;
+    /** Good values and states. */
     ftxui::Color good;
+    /** Values and states that need attention. */
     ftxui::Color warn;
+    /** Bad values, errors, and invalid entries. */
     ftxui::Color bad;
-    /* secondary text and panel borders: */
+    /** Secondary text and panel borders. */
     ftxui::Color muted;
-    /* the background of bars and gauges: */
+    /** The background of bars and gauges. */
     ftxui::Color track;
+    /** The colors of the timers in the composition bar. */
     std::vector<ftxui::Color> segments;
+    /** The colors of the animation around the dashboard. */
     std::vector<ftxui::Color> animation;
-    /* the color scale of the skew, from none to large: */
+    /** The color scale of the skew, from none to large. */
     std::vector<ftxui::Color> heat;
   };
 
 
-  /**
-   * Return the palette of the color scheme @p scheme.
-   */
+  /** Return the palette of the color scheme @p scheme. */
   Palette make_palette(DashboardColorScheme scheme);
 
 
-  /**
-   * The palette used by the elements below, set by the Dashboard and the
-   * parameter editor before rendering.
-   */
+  /** The palette of the elements below, set before rendering. */
   extern Palette theme;
 
 
-  /**
-   * The "ryujin" badge of the header.
-   */
+  /** The "ryujin" badge of the header. */
   ftxui::Element badge();
 
 
-  /**
-   * A panel with a title.
-   */
+  /** A panel with a title. */
   ftxui::Element panel(const std::string &title, ftxui::Element content);
 
 
-  /**
-   * A caption of fixed width in front of a value.
-   */
+  /** A caption of fixed width in front of a value. */
   ftxui::Element label(const std::string &name);
 
 
-  /**
-   * A short text on the track color.
-   */
+  /** A short text on the track color. */
   ftxui::Element chip(const std::string &name, ftxui::Color foreground);
 } // namespace ryujin::dashboard

@@ -138,11 +138,6 @@ namespace ryujin
       std::unique_ptr<Discretization<dim>> discretization_;
       std::unique_ptr<OfflineData<dim, Number>> offline_data_;
 
-      /**
-       * The systems and the initial values exist once per MPI ensemble.
-       * A derived class owns them in MPIEnsembleContainer objects; the
-       * pointers refer to the instance of the current ensemble.
-       */
       const HyperbolicSystem *hyperbolic_system_ = nullptr;
       const ParabolicSystem *parabolic_system_ = nullptr;
       const InitialValues<dim, Number> *initial_values_ = nullptr;
