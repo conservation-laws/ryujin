@@ -1,5 +1,5 @@
 //
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception or LGPL-2.1-or-later
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception OR LGPL-2.1-or-later
 // Copyright (C) 2007 - 2022 by Martin Kronbichler
 // Copyright (C) 2008 - 2022 by David Wells
 // Copyright (C) 2020 - 2026 by the ryujin authors
