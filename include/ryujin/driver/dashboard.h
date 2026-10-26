@@ -65,7 +65,7 @@ namespace ryujin
     ryujin,
 
     /**
-     * A colorful variant of the ryujin colors.
+     * Saturated colors of the full spectrum.
      */
     rainbow,
 
