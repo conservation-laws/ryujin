@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
       return entry;
     };
 
-    print(*get("M - Logger", "dashboard center"));
+    print(*get("M - Logger", "dashboard location"));
     print(*get("M - Logger", "dashboard color scheme"));
     print(*get("M - Logger", "dashboard width"));
     print(*get("H - TimeIntegrator", "time stepping scheme"));
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
               << ", modified: " << model.modified() << std::endl;
 
     /* Change values: */
-    get("M - Logger", "dashboard center")->value = "false";
+    get("M - Logger", "dashboard location")->value = "top left";
     get("M - Logger", "dashboard color scheme")->value = "tamu";
     get("H - TimeIntegrator", "cfl max")->value = "0.25";
     get("A - Scheduler", "basename")->value = "my test";
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     /* Read the values back in with a fresh model: */
     ParameterModel result(prm);
     for (const auto &[section, name] :
-         {std::pair{"M - Logger", "dashboard center"},
+         {std::pair{"M - Logger", "dashboard location"},
           std::pair{"M - Logger", "dashboard color scheme"},
           std::pair{"H - TimeIntegrator", "cfl max"},
           std::pair{"A - Scheduler", "basename"}})

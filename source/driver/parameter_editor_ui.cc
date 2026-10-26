@@ -154,7 +154,8 @@ namespace ryujin
 
       document = std::move(document) | size(HEIGHT, LESS_THAN, terminal.dimy) |
                  clear_under | reflect(backdrop.window());
-      if (settings.center)
+      /* Keep the editor in place for DashboardLocation::screen_saver: */
+      if (settings.location != DashboardLocation::top_left)
         document = center(std::move(document));
       else
         document = vbox({hbox({std::move(document), filler()}), filler()});
@@ -326,7 +327,7 @@ namespace ryujin
 
       read("dashboard width", settings.width);
       read("dashboard height", settings.height);
-      read("dashboard center", settings.center);
+      read("dashboard location", settings.location);
       read("dashboard color scheme", settings.color_scheme);
       read("dashboard animation", settings.animation);
       return settings;

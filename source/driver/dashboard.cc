@@ -841,9 +841,11 @@ namespace ryujin
      */
 
     const int rows = std::max(height, terminal_height_);
-    const int left =
-        settings.center ? (terminal_columns - screen_width) / 2 : 0;
-    const int top = settings.center ? (rows - height) / 2 : 0;
+    const int free_columns = terminal_columns - screen_width;
+    const int free_rows = rows - height;
+
+    const auto [left, top] =
+        position_.offset(settings.location, free_columns, free_rows);
 
     stage_ = std::make_unique<animation::Stage>(
         Screen(terminal_columns, rows),
@@ -909,12 +911,20 @@ namespace ryujin
 
     std::unique_lock lock(mutex_);
     while (!condition_.wait_for(lock, interval, [this] { return stop_; })) {
-      /* Redraw the last frame right away if the terminal is resized: */
+      /*
+       * Redraw the last frame right away if the terminal is resized, or
+       * if the dashboard moves:
+       */
       const auto [columns, lines] = terminal_size();
-      if (columns == terminal_width_ && lines == terminal_height_)
-        write(step());
+      const bool resized =
+          columns != terminal_width_ || lines != terminal_height_;
+      if (animation_only_ && resized)
+        write(render_animation());
+      else if (!animation_only_ &&
+               (resized || position_.move(settings_.location)))
+        write(render(data_, settings_));
       else
-        write(animation_only_ ? render_animation() : render(data_, settings_));
+        write(step());
     }
   }
 
@@ -1015,6 +1025,7 @@ namespace ryujin
     data_ = data;
     settings_ = settings;
     animation_only_ = false;
+    position_.move(settings_.location);
 
     /* Write out everything that is still pending on stdout first: */
     std::cout << std::flush;

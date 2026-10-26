@@ -202,9 +202,9 @@ namespace ryujin
     unsigned int height = 0;
 
     /**
-     * Center the dashboard in the terminal.
+     * The location of the dashboard in the terminal.
      */
-    bool center = true;
+    DashboardLocation location = DashboardLocation::center;
 
     /**
      * The color scheme.
@@ -468,8 +468,9 @@ namespace ryujin
      * throughput history.
      *
      * The background thread redraws the last snapshot as soon as the
-     * terminal is resized, and advances the animation in between two
-     * calls. It stops with the final snapshot (DashboardData::final_time).
+     * terminal is resized or the dashboard moves, and advances the
+     * animation in between two calls. It stops with the final snapshot
+     * (DashboardData::final_time).
      */
     void show(const DashboardData &data, const DashboardSettings &settings);
 
@@ -529,6 +530,9 @@ namespace ryujin
     DashboardData data_;
     /** The settings of the last snapshot. */
     DashboardSettings settings_;
+
+    /** The position of the dashboard in the terminal. */
+    DashboardPosition position_;
 
     /** Whether there is no snapshot yet and the animation plays alone. */
     bool animation_only_ = false;
