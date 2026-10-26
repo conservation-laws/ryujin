@@ -446,7 +446,8 @@ namespace ryujin
 
         if (t > start_ + 0.5f) {
           const float s = std::clamp((t - start_ - 0.5f) / 0.8f, 0.f, 1.f);
-          const float r = std::hypot(canvas_.width(), canvas_.height()) / 2;
+          const float r =
+              std::hypot(float(canvas_.width()), float(canvas_.height())) / 2;
           canvas_.iris(canvas_.width() / 2.f,
                        canvas_.height() / 2.f,
                        r * std::pow(1.f - s, 1.5f));

@@ -92,7 +92,7 @@ namespace ryujin
 
     std::string format_si(double value)
     {
-      for (const auto [unit, prefix] :
+      for (const auto &[unit, prefix] :
            {std::pair{1.e9, 'G'}, {1.e6, 'M'}, {1.e3, 'k'}})
         if (value >= unit)
           return std::format("{:.2f} {}", value / unit, prefix);
