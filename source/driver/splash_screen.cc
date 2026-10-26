@@ -712,7 +712,9 @@ namespace ryujin
           canvas_.disc(x - dx * (2.f + i) + nx * (2.f + 0.6f * i),
                        y - dy * (2.f + i) + ny * (2.f + 0.6f * i),
                        1.3f,
-                       [](float, float) { return RGB{230, 40, 40}; });
+                       [](float, float) {
+                         return RGB{230, 40, 40};
+                       });
         canvas_.line(x + nx * 3.f,
                      y + ny * 3.f,
                      x - dx * 5.f + nx * 7.f,

@@ -8,7 +8,6 @@
 #include <ryujin/driver/dashboard.h>
 
 #include <ftxui/screen/box.hpp>
-#include <ftxui/screen/color.hpp>
 #include <ftxui/screen/screen.hpp>
 
 #include <memory>
@@ -28,11 +27,8 @@ namespace ryujin::animation
     ftxui::Screen screen;
     /** The cells covered by the dashboard. */
     ftxui::Box dashboard;
-    /** The animation colors of the color scheme. */
-    std::vector<ftxui::Color> colors;
-
     /** The cells changed by the animation since the last step. */
-    std::vector<std::pair<int, int>> changed;
+    std::vector<std::pair<int, int>> changed = {};
 
     /** Return whether the cell (x, y) is outside of the dashboard. */
     bool free(int x, int y) const
@@ -40,34 +36,34 @@ namespace ryujin::animation
       return !dashboard.Contain(x, y);
     }
 
-    /** Return the pixel at (x, y) and mark it as changed. */
+    /** Clear the pixel at (x, y), mark it as changed, and return it. */
     ftxui::Pixel &pixel(int x, int y)
     {
       changed.emplace_back(x, y);
-      return screen.PixelAt(x, y);
+      return screen.PixelAt(x, y) = ftxui::Pixel();
     }
   };
 
 
   /**
-   * An animation in the space around the Dashboard.
+   * An animation in the space around the Dashboard, in the animation
+   * colors of dashboard::theme.
    *
    * @ingroup Driver
    */
   class Animation
   {
   public:
-    /** Destructor. */
     virtual ~Animation() = default;
 
     /** Fill the free cells of a freshly rendered stage. */
-    virtual void draw(Stage &stage, const DashboardData &data) = 0;
+    virtual void draw(Stage &stage) = 0;
 
     /**
-     * Advance the animation in between two snapshots. All changes to
-     * the stage have to go through Stage::pixel().
+     * Advance the animation. All changes to the stage have to go through
+     * Stage::pixel().
      */
-    virtual void step(Stage &stage, const DashboardData &data) = 0;
+    virtual void step(Stage &stage) = 0;
   };
 
 

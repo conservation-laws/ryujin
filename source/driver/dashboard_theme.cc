@@ -180,14 +180,35 @@ namespace ryujin::dashboard
   }
 
 
+  Element caption(const std::string &text)
+  {
+    return ftxui::text(text) | color(theme.caption);
+  }
+
+
+  Element muted(const std::string &text)
+  {
+    return ftxui::text(text) | color(theme.muted);
+  }
+
+
   Element label(const std::string &name)
   {
-    return text(name) | color(theme.caption) | size(WIDTH, EQUAL, 11);
+    return caption(name) | size(WIDTH, EQUAL, 11);
   }
 
 
   Element chip(const std::string &name, Color foreground)
   {
     return text(" " + name + " ") | color(foreground) | bgcolor(theme.track);
+  }
+
+
+  Element place(Element element, int left, int top)
+  {
+    return vbox({
+        emptyElement() | size(HEIGHT, EQUAL, top),
+        hbox({emptyElement() | size(WIDTH, EQUAL, left), std::move(element)}),
+    });
   }
 } // namespace ryujin::dashboard

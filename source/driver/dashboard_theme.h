@@ -72,10 +72,22 @@ namespace ryujin::dashboard
   ftxui::Element panel(const std::string &title, ftxui::Element content);
 
 
+  /** A caption. */
+  ftxui::Element caption(const std::string &text);
+
+
+  /** A secondary text. */
+  ftxui::Element muted(const std::string &text);
+
+
   /** A caption of fixed width in front of a value. */
   ftxui::Element label(const std::string &name);
 
 
   /** A short text on the track color. */
   ftxui::Element chip(const std::string &name, ftxui::Color foreground);
+
+
+  /** Place @p element at the offset (@p left, @p top) of the screen. */
+  ftxui::Element place(ftxui::Element element, int left, int top);
 } // namespace ryujin::dashboard

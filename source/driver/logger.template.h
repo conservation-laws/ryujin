@@ -480,7 +480,7 @@ namespace ryujin
 
 #if defined(WITH_FTXUI)
     if (interactive_terminal())
-      dashboard_.show(dashboard_data_, dashboard_settings_);
+      dashboard_.show(dashboard_data_);
     else
 #endif
       std::cout << "\033[2J\033[H" << text << std::flush;

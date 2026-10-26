@@ -11,11 +11,12 @@
 
 #include <array>
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
+#include <cstdio>
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -439,16 +440,13 @@ namespace ryujin
   /**
    * A terminal dashboard for the cycle statistics recorded in a
    * DashboardData snapshot. The dashboard keeps a short history of
-   * the throughput between calls to render().
+   * the throughput.
    *
    * @ingroup Driver
    */
   class Dashboard
   {
   public:
-    /**
-     * Constructor.
-     */
     Dashboard();
 
     /**
@@ -458,13 +456,12 @@ namespace ryujin
 
     /**
      * Start a background thread that plays the animation, on the whole
-     * terminal until the first call to show(). Call it before show().
+     * terminal until the first call to show().
      */
     void start(const DashboardSettings &settings);
 
     /**
-     * Draw the snapshot @p data on the terminal with the dimensions,
-     * placement and colors given by @p settings, and record it in the
+     * Draw the snapshot @p data on the terminal and record it in the
      * throughput history.
      *
      * The background thread redraws the last snapshot as soon as the
@@ -472,34 +469,15 @@ namespace ryujin
      * animation in between two calls. It stops with the final snapshot
      * (DashboardData::final_time).
      */
-    void show(const DashboardData &data, const DashboardSettings &settings);
+    void show(const DashboardData &data);
 
   private:
     /**
-     * Render the snapshot @p data into a string of ANSI escape sequences
-     * that redraws the whole terminal in place. The terminal size is
-     * queried on every call; if it has changed the screen is cleared
-     * first.
+     * Render the last snapshot, or only the animation if there is none
+     * yet, into a string of ANSI escape sequences that redraws the whole
+     * terminal in place.
      */
-    std::string render(const DashboardData &data,
-                       const DashboardSettings &settings);
-
-    /**
-     * Render a frame without the dashboard, in which the animation covers
-     * the whole terminal.
-     */
-    std::string render_animation();
-
-    /**
-     * Advance the animation of the last frame and return a string of ANSI
-     * escape sequences that redraws the cells it has changed.
-     */
-    std::string step();
-
-    /**
-     * The main loop of the background thread.
-     */
-    void animate();
+    std::string render();
 
     /**
      * Stop the background thread.
@@ -516,27 +494,21 @@ namespace ryujin
      */
     void write(const std::string &output) const;
 
-    /** The terminal width of the last frame. */
-    int terminal_width_ = 0;
-    /** The terminal height of the last frame. */
-    int terminal_height_ = 0;
+    /** The settings given to start(). */
+    DashboardSettings settings_;
+    /** The last snapshot, redrawn by the background thread. */
+    std::optional<DashboardData> data_;
 
     /** The recent wall throughput, oldest first. */
     std::deque<double> wall_history_;
     /** The recent compute throughput, oldest first. */
     std::deque<double> compute_history_;
 
-    /** The last snapshot, redrawn by the background thread on resize. */
-    DashboardData data_;
-    /** The settings of the last snapshot. */
-    DashboardSettings settings_;
-
     /** The position of the dashboard in the terminal. */
     DashboardPosition position_;
 
-    /** Whether there is no snapshot yet and the animation plays alone. */
-    bool animation_only_ = false;
-
+    /** The terminal size of the last frame. */
+    std::pair<int, int> terminal_size_;
     /** The last frame. */
     std::unique_ptr<animation::Stage> stage_;
     /** The animation of the last frame. */
@@ -545,18 +517,14 @@ namespace ryujin
     /**
      * The terminal (/dev/tty), written to directly instead of through
      * stdout. Under mpirun, stdout of rank 0 is forwarded by mpirun,
-     * which delays the output if all cores are busy. -1 if there is no
+     * which delays the output if all cores are busy. Null if there is no
      * controlling terminal, in which case we write to stdout.
      */
-    int terminal_ = -1;
+    std::FILE *terminal_ = nullptr;
 
     /** Guards all of the above, and the output to the terminal. */
     std::mutex mutex_;
-    /** Wakes the background thread when it shall stop. */
-    std::condition_variable condition_;
     /** The background thread that plays the animation. */
-    std::thread thread_;
-    /** Whether the background thread shall stop. */
-    bool stop_ = false;
+    std::jthread thread_;
   };
 } // namespace ryujin
