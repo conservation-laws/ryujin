@@ -366,8 +366,12 @@
  * run_parameter_editor()) with the colors and the animation of the
  * Dashboard, as configured in the subsection "M - Logger". Changing the
  * equation or the dimension opens the editor again for the new equation,
- * keeping all values that still apply. "save and exit" writes the parameter
- * file, "save and run" writes it and runs the simulation.
+ * keeping all values that still apply. "save" writes the parameter file,
+ * "save as" writes it under a new name and continues with that file,
+ * "load" opens the editor again with the values of a different parameter
+ * file, and "quit" leaves the editor (and ryujin) without running the
+ * simulation. Before discarding unsaved changes the editor asks for a
+ * confirmation.
  *
  * <h3>Scheduler</h3>
  *
