@@ -74,7 +74,7 @@ endif()
 set(RYUJIN_DEAL_II_DIR "@deal.II_DIR@")
 
 if(NOT DEAL_II_PROJECT_CONFIG_INCLUDED)
-  find_package(deal.II "@DEAL_II_PACKAGE_VERSION@" REQUIRED
+  find_package(deal.II "@RYUJIN_DEAL_II_VERSION@" REQUIRED
     HINTS ${RYUJIN_DEAL_II_DIR}
     )
 endif()
