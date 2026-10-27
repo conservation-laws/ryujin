@@ -68,6 +68,16 @@ endforeach()
 # Version and configuration files:
 #
 
+#
+# find_package() only accepts a version of the form major[.minor[.patch
+# [.tweak]]]. Strip suffixes such as "-pre" or "-rc1" from the deal.II
+# package version:
+#
+
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*"
+  RYUJIN_DEAL_II_VERSION "${DEAL_II_PACKAGE_VERSION}"
+  )
+
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
   ${_build_config_dir}/ryujinConfigVersion.cmake
