@@ -12,15 +12,8 @@
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/string.hpp>
 
-#include <fcntl.h>
-#include <poll.h>
-#include <sys/ioctl.h>
-#include <termios.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <array>
-#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <csignal>
@@ -1002,72 +995,15 @@ namespace ryujin
     constexpr std::string_view enter = "\033[?1049h\033[?25l\033[2J";
     constexpr std::string_view leave = "\033[0m\033[?25h\033[?1049l";
 
-    int terminal = -1;
-
-    /* The mode of stdin, if it is a terminal in single key mode: */
-    std::optional<termios> input_mode;
-
-    /*
-     * Read single keys from stdin if it is the terminal and we are in its
-     * foreground. Return whether we may wait for a key press at all:
-     */
-    bool read_single_keys()
-    {
-      if (!::isatty(STDIN_FILENO))
-        return true;
-
-      termios mode = {};
-      if (::tcgetpgrp(STDIN_FILENO) != ::getpgrp() ||
-          ::tcgetattr(STDIN_FILENO, &mode) != 0)
-        return false;
-
-      input_mode = mode;
-      mode.c_lflag &= ~(ICANON | ECHO);
-      mode.c_cc[VMIN] = 1;
-      mode.c_cc[VTIME] = 0;
-      ::tcsetattr(STDIN_FILENO, TCSANOW, &mode);
-      return true;
-    }
-
-    /* Restore the mode of stdin, and discard the keys not read: */
-    void restore_input()
-    {
-      if (input_mode)
-        ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &*input_mode);
-    }
-
-    /*
-     * Return whether a key has been pressed, or there is no more input.
-     * Under mpirun, stdin is a pipe that receives whole lines:
-     */
-    bool key_pressed()
-    {
-      pollfd input = {STDIN_FILENO, POLLIN, 0};
-      if (::poll(&input, 1, 0) <= 0)
-        return false;
-
-      std::array<char, 64> buffer;
-      [[maybe_unused]] const auto n =
-          ::read(STDIN_FILENO, buffer.data(), buffer.size());
-      return true;
-    }
-
-    void write_all(std::string_view output)
-    {
-      while (!output.empty()) {
-        const auto n = ::write(terminal, output.data(), output.size());
-        if (n < 0 && errno != EINTR)
-          return;
-        output.remove_prefix(std::max<ssize_t>(n, 0));
-      }
-    }
+    /* The terminal and the keyboard of the intro, for restore(): */
+    const terminal::Output *output = nullptr;
+    const terminal::Keyboard *keyboard = nullptr;
 
     /* Leave the alternate screen if interrupted: */
     void restore(int signal)
     {
-      restore_input();
-      [[maybe_unused]] const auto n =
-          ::write(terminal, leave.data(), leave.size());
+      keyboard->restore();
+      output->write(leave);
       std::signal(signal, SIG_DFL);
       std::raise(signal);
     }
@@ -1188,7 +1124,8 @@ namespace ryujin
 
 
     /* The intro of SplashScreen::arcade: */
-    void play_arcade(const std::string &equation,
+    void play_arcade(const terminal::Output &tty,
+                     const std::string &equation,
                      int dim,
                      unsigned int n_ranks,
                      int columns,
@@ -1199,10 +1136,12 @@ namespace ryujin
       Intro intro(columns, rows, stage, n_ranks);
 
       std::cout << std::flush;
+      const terminal::Keyboard keys;
+      output = &tty;
+      keyboard = &keys;
       const auto previous_int = std::signal(SIGINT, restore);
       const auto previous_term = std::signal(SIGTERM, restore);
-      const bool wait = read_single_keys();
-      write_all(enter);
+      tty.write(enter);
 
       using clock = std::chrono::steady_clock;
       const auto start = clock::now();
@@ -1212,16 +1151,18 @@ namespace ryujin
         if (intro.finished(t))
           break;
         /* Show "PRESS START" for a moment, also for an early key press: */
-        if (t > Intro::press_start && (!wait || key_pressed()))
+        if (t > Intro::press_start && (!keys.may_wait() || keys.key_pressed()))
           intro.start(std::max(t, Intro::press_start + 0.6f));
-        write_all("\033[H" + intro.frame(t).ToString());
+        tty.write("\033[H" + intro.frame(t).ToString());
         std::this_thread::sleep_until(next + std::chrono::milliseconds(50));
       }
 
-      restore_input();
-      write_all(leave);
+      keys.restore();
+      tty.write(leave);
       std::signal(SIGINT, previous_int);
       std::signal(SIGTERM, previous_term);
+      output = nullptr;
+      keyboard = nullptr;
     }
   } // namespace
 
@@ -1235,15 +1176,15 @@ namespace ryujin
         !terminal::stdout_reaches_terminal())
       return;
 
-    terminal = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);
-    winsize size{};
-    if (terminal >= 0 && ::ioctl(terminal, TIOCGWINSZ, &size) == 0 &&
-        size.ws_col >= 80) {
-      if (splash_screen == SplashScreen::logo)
-        play_logo(equation, dim, n_ranks, size.ws_col, size.ws_row);
-      else if (size.ws_row >= 24)
-        play_arcade(equation, dim, n_ranks, size.ws_col, size.ws_row);
-    }
-    ::close(terminal);
+    const terminal::Output tty;
+    const auto size = tty.size();
+    if (!tty.controlling_terminal() || !size || size->first < 80)
+      return;
+
+    const auto [columns, rows] = *size;
+    if (splash_screen == SplashScreen::logo)
+      play_logo(equation, dim, n_ranks, columns, rows);
+    else if (rows >= 24)
+      play_arcade(tty, equation, dim, n_ranks, columns, rows);
   }
 } // namespace ryujin
