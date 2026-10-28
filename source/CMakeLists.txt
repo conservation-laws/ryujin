@@ -67,6 +67,10 @@ if(WITH_FTXUI)
     )
 endif()
 
+if(WITH_MINIAUDIO)
+  list(APPEND CORE_SOURCE_FILES driver/arcade_music.cc)
+endif()
+
 set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
@@ -80,6 +84,14 @@ target_include_directories(object_core PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 deal_ii_setup_target(object_core)
+
+if(WITH_MINIAUDIO)
+  # Do not apply our warning flags to the miniaudio header:
+  target_include_directories(object_core SYSTEM PRIVATE
+    ${MINIAUDIO_INCLUDE_DIR}
+    )
+endif()
+
 target_link_libraries(object_core ${EXTERNAL_TARGETS})
 
 #
