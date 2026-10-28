@@ -5,6 +5,7 @@
 
 #include <driver/dashboard_animation.h>
 #include <driver/dashboard_theme.h>
+#include <ryujin/base/random.h>
 
 #include <algorithm>
 #include <array>
@@ -22,7 +23,7 @@ namespace ryujin::animation
   {
     using Cell = std::pair<int, int>;
 
-    std::mt19937 random;
+    auto random = seeded_mersenne_twister();
 
     /* Return a random number in [0, n): */
     int pick(std::size_t n)
