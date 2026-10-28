@@ -85,6 +85,8 @@ namespace ryujin
         if (animation_ && stage_) {
           stage_->changed.clear();
           animation_->step(*stage_);
+          if (stage_->redraw)
+            stage_.reset();
         }
       }
 

@@ -802,7 +802,7 @@ namespace ryujin
         } else if (animation_ && stage_->screen.dimy() <= size.second) {
           stage_->changed.clear();
           animation_->step(*stage_);
-          write(changes(*stage_));
+          write(stage_->redraw ? render() : changes(*stage_));
         }
       }
     });
