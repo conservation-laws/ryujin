@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 
     print(*get("M - Logger", "dashboard location"));
     print(*get("M - Logger", "dashboard color scheme"));
-    print(*get("M - Logger", "dashboard width"));
+    print(*get("M - Logger", "dashboard max width"));
     print(*get("H - TimeIntegrator", "time stepping scheme"));
     print(*get("H - TimeIntegrator", "cfl max"));
     print(*get("A - Scheduler", "basename"));
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     get("H - TimeIntegrator", "cfl max")->value = "0.25";
     get("A - Scheduler", "basename")->value = "my test";
 
-    const auto invalid = get("M - Logger", "dashboard width");
+    const auto invalid = get("M - Logger", "dashboard max width");
     invalid->value = "wide";
     print(*invalid);
     std::cout << "invalid: " << model.n_invalid()
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
                              "  set geometry = cylindr\n"
                              "end\n"
                              "subsection M - Logger\n"
-                             "  set dashboard width = wide # a comment\n"
+                             "  set dashboard max width = wide # a comment\n"
                              "  set unknown entry   = 1\n"
                              "end\n"
                              "subsection H - TimeIntegrator\n"
@@ -139,12 +139,12 @@ int main(int argc, char *argv[])
 
     ParameterModel strict(prm);
     strict.assign(values, /* keep invalid */ false);
-    print(*strict.find({"M - Logger"}, "dashboard width"));
+    print(*strict.find({"M - Logger"}, "dashboard max width"));
     print(*strict.find({"H - TimeIntegrator"}, "cfl max"));
 
     ParameterModel lenient(prm);
     lenient.assign(values);
-    print(*lenient.find({"M - Logger"}, "dashboard width"));
+    print(*lenient.find({"M - Logger"}, "dashboard max width"));
     std::cout << lenient.find({"C - Discretization"}, "geometry")->value
               << std::endl;
     std::cout << "modified: " << lenient.modified() << std::endl;

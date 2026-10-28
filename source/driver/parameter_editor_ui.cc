@@ -177,8 +177,8 @@ namespace ryujin
         }
       };
 
-      read("dashboard width", settings.width);
-      read("dashboard height", settings.height);
+      read("dashboard max width", settings.width);
+      read("dashboard max height", settings.height);
       read("dashboard location", settings.location);
       read("dashboard color scheme", settings.color_scheme);
       read("dashboard animation", settings.animation);
