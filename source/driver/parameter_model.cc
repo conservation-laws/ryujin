@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <ranges>
 #include <sstream>
 #include <utility>
 
@@ -43,8 +42,14 @@ namespace ryujin
       choices = choices.substr(0, choices.rfind(" ]"));
 
       std::vector<std::string> result;
-      for (const auto choice : std::views::split(choices, '|'))
-        result.emplace_back(choice.begin(), choice.end());
+      std::size_t pos = 0;
+      for (;;) {
+        const auto next = choices.find('|', pos);
+        result.emplace_back(choices.substr(pos, next - pos));
+        if (next == std::string::npos)
+          break;
+        pos = next + 1;
+      }
       return result;
     }
 
@@ -167,7 +172,11 @@ namespace ryujin
       sections_.emplace_back().path = path;
 
       std::vector<std::pair<std::string, const ptree *>> subsections;
-      for (const auto &[name, child] : node) {
+      for (const auto &it : node) {
+        /* No structured binding: GCC 11 treats it as type-dependent
+         * inside this generic lambda. */
+        const auto &name = it.first;
+        const ptree &child = it.second;
         if (!is_entry(child)) {
           subsections.emplace_back(name, &child);
           continue;
