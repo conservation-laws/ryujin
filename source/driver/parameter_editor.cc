@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <driver/terminal.h>
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/driver/equation.h>
 #include <ryujin/driver/parameter_editor.h>
@@ -10,8 +11,6 @@
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>
-
-#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -94,7 +93,7 @@ namespace ryujin
   {
 #if defined(WITH_FTXUI)
     return dealii::Utilities::MPI::n_mpi_processes(mpi_communicator) == 1 &&
-           ::isatty(STDIN_FILENO) && ::isatty(STDOUT_FILENO);
+           terminal::interactive();
 #else
     (void)mpi_communicator;
     return false;

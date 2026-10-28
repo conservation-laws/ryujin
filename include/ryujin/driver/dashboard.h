@@ -12,7 +12,6 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include <cstdio>
 #include <deque>
 #include <memory>
 #include <mutex>
@@ -21,6 +20,11 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+namespace ryujin::terminal
+{
+  class Output;
+} // namespace ryujin::terminal
 
 namespace ryujin::animation
 {
@@ -514,13 +518,8 @@ namespace ryujin
     /** The animation of the last frame. */
     std::unique_ptr<animation::Animation> animation_;
 
-    /**
-     * The terminal (/dev/tty), written to directly instead of through
-     * stdout. Under mpirun, stdout of rank 0 is forwarded by mpirun,
-     * which delays the output if all cores are busy. Null if there is no
-     * controlling terminal, in which case we write to stdout.
-     */
-    std::FILE *terminal_ = nullptr;
+    /** The output to the terminal. */
+    std::unique_ptr<terminal::Output> output_;
 
     /** Guards all of the above, and the output to the terminal. */
     std::mutex mutex_;

@@ -6,6 +6,7 @@
 #pragma once
 
 #include <driver/dashboard_text.h>
+#include <driver/terminal.h>
 #include <ryujin/base/computing_timer.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/version_info.h>
@@ -67,13 +68,13 @@ namespace ryujin
                   "place: auto (if stdout reaches the terminal, also through "
                   "mpirun), on, off (print plain text instead).");
 
-    add_parameter("dashboard width",
+    add_parameter("dashboard max width",
                   dashboard_settings_.width,
                   "Maximal width of the terminal dashboard in columns. The "
                   "dashboard fills the terminal up to this width. Setting the "
                   "width to zero removes the limit.");
 
-    add_parameter("dashboard height",
+    add_parameter("dashboard max height",
                   dashboard_settings_.height,
                   "Maximal height of the terminal dashboard in lines. If "
                   "nonzero, the dashboard stretches to fill the terminal up to "
@@ -214,8 +215,9 @@ namespace ryujin
 #else
     /* Return whether we are running on an interactive terminal: */
     const auto mode = dashboard_settings_.mode;
-    return mode == DashboardMode::on ||
-           (mode == DashboardMode::automatic && stdout_reaches_terminal());
+    if (mode == DashboardMode::automatic)
+      return terminal::stdout_reaches_terminal();
+    return mode == DashboardMode::on;
 #endif
   }
 

@@ -5,6 +5,7 @@
 
 #include <driver/dashboard_animation.h>
 #include <driver/dashboard_theme.h>
+#include <driver/terminal.h>
 #include <ryujin/base/random.h>
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/dashboard.h>
@@ -13,9 +14,6 @@
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/dom/node.hpp>
 #include <ftxui/screen/screen.hpp>
-#include <ftxui/screen/terminal.hpp>
-
-#include <sys/ioctl.h>
 
 #include <algorithm>
 #include <array>
@@ -772,8 +770,6 @@ namespace ryujin
   {
     /* Stop the background thread: */
     thread_ = {};
-    if (terminal_ != nullptr)
-      std::fclose(terminal_);
   }
 
 
@@ -781,7 +777,7 @@ namespace ryujin
   {
     std::scoped_lock lock(mutex_);
 
-    terminal_ = std::fopen("/dev/tty", "we");
+    output_ = std::make_unique<terminal::Output>();
     settings_ = settings;
     theme = make_palette(settings.color_scheme);
     animation_ = animation::create(settings.animation);
@@ -897,14 +893,8 @@ namespace ryujin
 
   std::pair<int, int> Dashboard::terminal_size() const
   {
-    winsize size{};
-    if (terminal_ != nullptr &&
-        ::ioctl(fileno(terminal_), TIOCGWINSZ, &size) == 0 && size.ws_col > 0 &&
-        size.ws_row > 0)
-      return {size.ws_col, size.ws_row};
-
-    const auto fallback = Terminal::Size();
-    return {fallback.dimx, fallback.dimy};
+    /* The fallback size of FTXUI: */
+    return output_->size().value_or(std::pair{80, 24});
   }
 
 
@@ -912,9 +902,6 @@ namespace ryujin
   {
     /* Write out everything that is still pending on stdout first: */
     std::cout << std::flush;
-
-    const auto stream = terminal_ != nullptr ? terminal_ : stdout;
-    std::fwrite(output.data(), 1, output.size(), stream);
-    std::fflush(stream);
+    output_->write(output);
   }
 } // namespace ryujin

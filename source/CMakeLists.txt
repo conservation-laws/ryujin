@@ -48,6 +48,7 @@ set(CORE_SOURCE_FILES
   driver/parameter_editor.cc
   driver/parameter_model.cc
   driver/scheduler.cc
+  driver/terminal.cc
   geometries/geometry_library.cc
   linear_algebra/multicomponent_vector.cc
   linear_algebra/sparsity_pattern.cc
