@@ -258,9 +258,22 @@ namespace ryujin
      */
     void postpone();
 
+    /**
+     * Move a window at @p location by @p by = (columns, rows), within
+     * @p free_columns and @p free_rows of free space around it. The window
+     * keeps the new relative position, also for DashboardLocation::top_left
+     * and DashboardLocation::center.
+     */
+    void shift(DashboardLocation location,
+               std::pair<int, int> by,
+               int free_columns,
+               int free_rows);
+
   private:
     /** The fractions of the free space to the left and above. */
     std::pair<double, double> fractions_ = {0.5, 0.5};
+    /** Whether the fractions override the location. */
+    bool shifted_ = false;
     /** When the position changes next. */
     std::chrono::steady_clock::time_point next_move_;
   };
