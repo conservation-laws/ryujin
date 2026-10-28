@@ -18,7 +18,7 @@ namespace ryujin::animation
 {
   /**
    * The stage of an animation: the whole terminal, of which the animation
-   * may only change the cells outside of the dashboard.
+   * usually only changes the cells outside of the dashboard.
    *
    * @ingroup Driver
    */
@@ -29,11 +29,28 @@ namespace ryujin::animation
     ftxui::Box dashboard;
     /** The cells changed by the animation since the last step. */
     std::vector<std::pair<int, int>> changed = {};
+    /**
+     * Set by the animation to request a fresh rendering of the whole
+     * stage, including the dashboard, followed by Animation::draw().
+     */
+    bool redraw = false;
+    /**
+     * Set by the animation to move the dashboard by (columns, rows),
+     * followed by a fresh rendering of the whole stage.
+     */
+    std::pair<int, int> shift = {0, 0};
 
     /** Return whether the cell (x, y) is outside of the dashboard. */
     bool free(int x, int y) const
     {
       return !dashboard.Contain(x, y);
+    }
+
+    /** Return the free (columns, rows) around the dashboard. */
+    std::pair<int, int> free_space() const
+    {
+      return {screen.dimx() - (dashboard.x_max - dashboard.x_min + 1),
+              screen.dimy() - (dashboard.y_max - dashboard.y_min + 1)};
     }
 
     /** Clear the pixel at (x, y), mark it as changed, and return it. */

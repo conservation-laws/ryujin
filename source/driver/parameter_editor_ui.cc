@@ -85,6 +85,12 @@ namespace ryujin
         if (animation_ && stage_) {
           stage_->changed.clear();
           animation_->step(*stage_);
+          if (stage_->shift != std::pair{0, 0}) {
+            const auto [columns, rows] = stage_->free_space();
+            position_.shift(settings_.location, stage_->shift, columns, rows);
+          }
+          if (stage_->redraw || stage_->shift != std::pair{0, 0})
+            stage_.reset();
         }
       }
 

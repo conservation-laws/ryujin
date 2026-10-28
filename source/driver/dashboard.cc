@@ -735,9 +735,10 @@ namespace ryujin
                                                 int free_rows) const
   {
     const auto [x, y] =
-        location == DashboardLocation::top_left ? std::pair{0., 0.}
-        : location == DashboardLocation::center ? std::pair{.5, .5}
-                                                : fractions_;
+        shifted_                                  ? fractions_
+        : location == DashboardLocation::top_left ? std::pair{0., 0.}
+        : location == DashboardLocation::center   ? std::pair{.5, .5}
+                                                  : fractions_;
     return {static_cast<int>(x * free_columns),
             static_cast<int>(y * free_rows)};
   }
@@ -760,6 +761,23 @@ namespace ryujin
   void DashboardPosition::postpone()
   {
     next_move_ = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  }
+
+
+  void DashboardPosition::shift(DashboardLocation location,
+                                std::pair<int, int> by,
+                                int free_columns,
+                                int free_rows)
+  {
+    /* The fraction that offset() rounds down to the cell @p x: */
+    const auto fraction = [](int x, int free) {
+      return free > 0 ? std::clamp((x + 0.5) / free, 0., 1.) : 0.5;
+    };
+
+    const auto [left, top] = offset(location, free_columns, free_rows);
+    fractions_ = {fraction(left + by.first, free_columns),
+                  fraction(top + by.second, free_rows)};
+    shifted_ = true;
   }
 
 
@@ -802,7 +820,12 @@ namespace ryujin
         } else if (animation_ && stage_->screen.dimy() <= size.second) {
           stage_->changed.clear();
           animation_->step(*stage_);
-          write(changes(*stage_));
+          if (data_ && stage_->shift != std::pair{0, 0}) {
+            const auto [columns, rows] = stage_->free_space();
+            position_.shift(settings_.location, stage_->shift, columns, rows);
+            stage_->redraw = true;
+          }
+          write(stage_->redraw ? render() : changes(*stage_));
         }
       }
     });
