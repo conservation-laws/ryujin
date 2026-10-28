@@ -26,6 +26,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace ryujin::terminal
 {
@@ -76,6 +77,37 @@ namespace ryujin::terminal
       const auto target = std::filesystem::read_symlink(path, error);
       return std::pair{output.st_rdev, error ? "" : target.string()};
     }
+
+    /*
+     * Return whether the process @p parent holds the read end of the pipe
+     * that is stdout of the process @p pid:
+     */
+    bool parent_reads_stdout(pid_t pid, pid_t parent)
+    {
+      std::error_code error;
+      const auto output = std::filesystem::read_symlink(
+          "/proc/" + std::to_string(pid) + "/fd/1", error);
+      if (error || !output.string().starts_with("pipe:"))
+        return false;
+
+      const auto directory = "/proc/" + std::to_string(parent);
+      std::filesystem::directory_iterator fd(directory + "/fd", error);
+      for (; !error && fd != std::filesystem::directory_iterator();
+           fd.increment(error)) {
+        std::error_code link_error;
+        if (std::filesystem::read_symlink(fd->path(), link_error) != output)
+          continue;
+
+        std::ifstream file(directory + "/fdinfo/" +
+                           fd->path().filename().string());
+        std::string line;
+        while (std::getline(file, line))
+          if (line.starts_with("flags:") &&
+              (std::stoul(line.substr(6), nullptr, 8) & O_ACCMODE) == O_RDONLY)
+            return true;
+      }
+      return false;
+    }
 #elif defined(__APPLE__)
     /* The pseudo terminals that launchers forward: */
     constexpr std::string_view pseudo_terminals = "/dev/ttys";
@@ -114,34 +146,73 @@ namespace ryujin::terminal
       return std::pair{static_cast<dev_t>(stat.vst_rdev),
                        std::string(vnode.pvip.vip_path)};
     }
+
+    /*
+     * Return whether the process @p parent holds the read end of the pipe
+     * that is stdout of the process @p pid:
+     */
+    bool parent_reads_stdout(pid_t pid, pid_t parent)
+    {
+      pipe_fdinfo output = {};
+      constexpr int size = sizeof(output);
+      constexpr int flavor = PROC_PIDFDPIPEINFO;
+      if (::proc_pidfdinfo(pid, STDOUT_FILENO, flavor, &output, size) != size)
+        return false;
+
+      const int bytes = ::proc_pidinfo(parent, PROC_PIDLISTFDS, 0, nullptr, 0);
+      if (bytes <= 0)
+        return false;
+      std::vector<proc_fdinfo> fds(bytes / sizeof(proc_fdinfo));
+      const int filled =
+          ::proc_pidinfo(parent, PROC_PIDLISTFDS, 0, fds.data(), bytes);
+      fds.resize(std::max(filled, 0) / sizeof(proc_fdinfo));
+
+      return std::ranges::any_of(fds, [&](const proc_fdinfo &fd) {
+        pipe_fdinfo input = {};
+        return fd.proc_fdtype == PROX_FDTYPE_PIPE &&
+               ::proc_pidfdinfo(parent, fd.proc_fd, flavor, &input, size) ==
+                   size &&
+               input.pipeinfo.pipe_handle == output.pipeinfo.pipe_peerhandle;
+      });
+    }
 #endif
+
+    /*
+     * Return the path of the terminal that stdout reaches, or an empty
+     * string: follow stdout up the process tree as long as a launcher
+     * forwards it, i.e., through a pseudo terminal other than the
+     * controlling terminal (Open MPI), or through a pipe read by the parent
+     * if there is no controlling terminal (MPICH):
+     */
+    std::string stdout_terminal_path()
+    {
+#if defined(__linux__) || defined(__APPLE__)
+      pid_t pid = getpid();
+      for (int depth = 0; depth < 16 && pid > 1; ++depth) {
+        const auto [parent, terminal] = process_info(pid);
+        const auto output = stdout_device(pid);
+        if (output && terminal != 0 && output->first == terminal)
+          return output->second;
+
+        const bool forwarded =
+            terminal != 0
+                ? output && output->second.starts_with(pseudo_terminals)
+                : parent_reads_stdout(pid, parent);
+        if (!forwarded)
+          return "";
+
+        pid = parent;
+      }
+#endif
+      return "";
+    }
   } // namespace
 
 
   bool stdout_reaches_terminal()
   {
 #if defined(__linux__) || defined(__APPLE__)
-    const dev_t terminal = process_info(getpid()).second;
-    if (terminal == 0)
-      return false;
-
-    /*
-     * Follow stdout up the process tree as long as it is a pseudo terminal
-     * other than the controlling terminal, i.e., a launcher forwards it:
-     */
-    pid_t pid = getpid();
-    for (int depth = 0; depth < 16 && pid > 1; ++depth) {
-      const auto output = stdout_device(pid);
-      if (!output)
-        return false;
-      if (output->first == terminal)
-        return true;
-      if (!output->second.starts_with(pseudo_terminals))
-        return false;
-
-      pid = process_info(pid).first;
-    }
-    return false;
+    return !stdout_terminal_path().empty();
 #else
     /*
      * Without a way to inspect other processes we cannot look past a
@@ -162,6 +233,9 @@ namespace ryujin::terminal
   Output::Output()
       : terminal_(::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC))
   {
+    if (terminal_ < 0)
+      terminal_ = ::open(stdout_terminal_path().c_str(),
+                         O_WRONLY | O_NOCTTY | O_CLOEXEC);
   }
 
 
