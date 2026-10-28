@@ -23,6 +23,12 @@ The git submodule `simd-math/` contains the
 is third party software licensed under the terms of the Apache License 2.0
 and copyrighted by Agner Fog and collaborators.
 
+The git submodule `ftxui/` contains the
+[FTXUI terminal user interface library](https://github.com/ArthurSonzogni/FTXUI),
+which is third party software licensed under the terms of the
+[MIT License](https://spdx.org/licenses/MIT.html) and copyrighted by Arthur
+Sonzogni.
+
 
 Logo
 ----

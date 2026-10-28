@@ -85,7 +85,11 @@ option(CMAKE_INSTALL_RPATH_USE_LINK_PATH "Set the rpath of the library to the ex
 # External packages:
 #
 
+# Doxygen:
+
 option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
+
+# FTXUI:
 
 if("${WITH_FTXUI}" STREQUAL "")
   #
@@ -109,18 +113,42 @@ if("${WITH_FTXUI}" STREQUAL "")
 endif()
 option(WITH_FTXUI "Render the terminal output with the FTXUI library (git submodule)" ${RYUJIN_HAVE_STD_FORMAT})
 
+# miniaudio:
+
+find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h
+  PATH_SUFFIXES miniaudio
+  PATHS ${CMAKE_CURRENT_SOURCE_DIR}/miniaudio
+  )
+mark_as_advanced(MINIAUDIO_INCLUDE_DIR)
+set(_have_miniaudio OFF)
+if(WITH_FTXUI AND MINIAUDIO_INCLUDE_DIR)
+  set(_have_miniaudio ON)
+endif()
+option(WITH_MINIAUDIO "Play music with the arcade splash screen with the miniaudio library (system header or checked out in miniaudio/)" ${_have_miniaudio})
+
+# likwid:
+
 option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
+
+# nvtx:
+
 option(WITH_NVTX "Compile and link against the NVIDIA Tools Extension (NVTX) library and annotate compute sections for the CUDA profiler" OFF)
+
+# openmp:
 
 if("${WITH_OPENMP}" STREQUAL "")
   find_package(OpenMP QUIET)
 endif()
 option(WITH_OPENMP "Enable threading support via OpenMP" ${OpenMP_FOUND})
 
+# eospac:
+
 if("${WITH_EOSPAC}" STREQUAL "")
   find_package(EOSPAC QUIET)
 endif()
 option(WITH_EOSPAC "Add support for the EOSPAC suite" ${EOSPAC_FOUND})
+
+# gdal:
 
 if("${WITH_GDAL}" STREQUAL "")
   find_package(GDAL QUIET)
@@ -216,6 +244,22 @@ if(WITH_FTXUI)
     )
   list(APPEND EXTERNAL_TARGETS
     "$<BUILD_INTERFACE:ftxui::dom>" "$<BUILD_INTERFACE:ftxui::component>"
+    )
+endif()
+
+if(WITH_MINIAUDIO)
+  if(NOT MINIAUDIO_INCLUDE_DIR)
+    message(FATAL_ERROR
+      "The miniaudio library is missing. Install it, or run\n"
+      "  $ git clone https://github.com/mackron/miniaudio\n"
+      "in the source directory, or configure with -DWITH_MINIAUDIO=OFF\n"
+      )
+  endif()
+  message(STATUS "Using miniaudio from ${MINIAUDIO_INCLUDE_DIR}")
+  # miniaudio loads the audio backends at run time with dlopen():
+  find_package(Threads REQUIRED)
+  list(APPEND EXTERNAL_TARGETS
+    "$<BUILD_INTERFACE:Threads::Threads>" "$<BUILD_INTERFACE:${CMAKE_DL_LIBS}>"
     )
 endif()
 

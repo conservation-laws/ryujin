@@ -27,6 +27,7 @@
 #cmakedefine WITH_FTXUI
 #cmakedefine WITH_GDAL
 #cmakedefine WITH_LIKWID
+#cmakedefine WITH_MINIAUDIO
 #cmakedefine WITH_NVTX
 #cmakedefine WITH_OPENMP
 
