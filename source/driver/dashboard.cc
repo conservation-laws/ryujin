@@ -5,6 +5,7 @@
 
 #include <driver/dashboard_animation.h>
 #include <driver/dashboard_theme.h>
+#include <ryujin/base/random.h>
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/dashboard.h>
 
@@ -750,7 +751,7 @@ namespace ryujin
         std::chrono::steady_clock::now() < next_move_)
       return false;
 
-    static std::mt19937 random{std::random_device{}()};
+    static auto random = seeded_mersenne_twister();
     std::uniform_real_distribution<double> uniform;
     fractions_ = {uniform(random), uniform(random)};
     postpone();

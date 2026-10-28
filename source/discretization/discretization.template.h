@@ -186,9 +186,15 @@ namespace ryujin
 
     triangulation.refine_global(refinement_);
 
-    if (std::abs(mesh_distortion_) > 1.0e-10)
-      GridTools::distort_random(
-          mesh_distortion_, triangulation, false, std::random_device()());
+    if (std::abs(mesh_distortion_) > 1.0e-10) {
+      /*
+       * A parallel::shared::Triangulation is distorted independently on
+       * every rank, so all ranks have to use the same seed:
+       */
+      const auto seed = Utilities::MPI::broadcast(
+          mpi_ensemble_.ensemble_communicator(), std::random_device()());
+      GridTools::distort_random(mesh_distortion_, triangulation, false, seed);
+    }
 
     const auto fe_degree = polynomial_degree();
     const auto mapping_degree = fe_degree;

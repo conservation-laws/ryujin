@@ -8,6 +8,7 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/random.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/scalar_conservation/hyperbolic_system.h>
 
@@ -380,10 +381,9 @@ namespace ryujin
          * Thread-local helper lambda to generate a random number in [0,1]:
          */
 
-        thread_local static const auto draw = []() {
-          static std::random_device random_device;
-          static auto generator = std::default_random_engine(random_device());
-          static std::uniform_real_distribution<ScalarNumber> dist(0., 1.);
+        const auto draw = []() {
+          thread_local auto generator = seeded_mersenne_twister();
+          std::uniform_real_distribution<ScalarNumber> dist(0., 1.);
 
           if constexpr (std::is_same_v<ScalarNumber, Number>) {
             /*

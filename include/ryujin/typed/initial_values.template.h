@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ryujin/base/random.h>
 #include <ryujin/typed/initial_values.h>
 
 #include <deal.II/numerics/vector_tools.h>
@@ -223,12 +224,10 @@ namespace ryujin
         if (t > 0.)
           return state;
 
-        static std::default_random_engine generator =
-            std::default_random_engine(std::random_device()());
-        static std::uniform_real_distribution<Number> distribution(-1., 1.);
-        static auto draw = std::bind(distribution, generator);
+        thread_local auto generator = seeded_mersenne_twister();
+        std::uniform_real_distribution<Number> distribution(-1., 1.);
         for (unsigned int i = 0; i < problem_dimension; ++i)
-          state[i] *= (Number(1.) + perturbation * draw());
+          state[i] *= (Number(1.) + perturbation * distribution(generator));
 
         return state;
       };
