@@ -3,8 +3,8 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_text.h>
 #include <driver/splash_screen_logo.h>
+#include <driver/terminal.h>
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/splash_screen.h>
 
@@ -1231,7 +1231,8 @@ namespace ryujin
                           unsigned int n_ranks,
                           SplashScreen splash_screen)
   {
-    if (splash_screen == SplashScreen::none || !stdout_reaches_terminal())
+    if (splash_screen == SplashScreen::none ||
+        !terminal::stdout_reaches_terminal())
       return;
 
     terminal = ::open("/dev/tty", O_WRONLY | O_NOCTTY | O_CLOEXEC);

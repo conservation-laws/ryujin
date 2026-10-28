@@ -7,18 +7,9 @@
 
 #include <deal.II/base/utilities.h>
 
-#include <sys/stat.h>
-#include <unistd.h>
-#if defined(__linux__)
-#include <sys/sysmacros.h>
-#endif
-
 #include <algorithm>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
 #include <iomanip>
-#include <iterator>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -29,34 +20,6 @@ namespace ryujin
 {
   namespace
   {
-#if defined(__linux__)
-    /*
-     * Return the parent and the controlling terminal of the process @p pid,
-     * read from /proc/<pid>/stat:
-     */
-    std::pair<pid_t, dev_t> process_info(pid_t pid)
-    {
-      std::ifstream file("/proc/" + std::to_string(pid) + "/stat");
-      const std::string stat(std::istreambuf_iterator<char>(file), {});
-
-      /* Skip over the process name, which may contain spaces: */
-      const auto position = stat.rfind(')');
-      if (position == std::string::npos)
-        return {0, 0};
-
-      std::istringstream fields(stat.substr(position + 1));
-      char state = 0;
-      pid_t parent = 0, group = 0, session = 0;
-      unsigned int tty = 0;
-      fields >> state >> parent >> group >> session >> tty;
-
-      const unsigned int major = (tty >> 8) & 0xfff;
-      const unsigned int minor = (tty & 0xff) | ((tty >> 12) & 0xfff00);
-      return {parent, makedev(major, minor)};
-    }
-#endif
-
-
     void print_head(const DashboardData &data, std::ostream &stream)
     {
       std::ostringstream primary;
@@ -332,44 +295,5 @@ namespace ryujin
     print_tasks(data, output);
     print_throughput(data, output);
     return output.str();
-  }
-
-
-  bool stdout_reaches_terminal()
-  {
-#if defined(__linux__)
-    const dev_t terminal = process_info(getpid()).second;
-    if (terminal == 0)
-      return false;
-
-    /*
-     * Follow stdout up the process tree as long as it is a pseudo terminal
-     * other than the controlling terminal, i.e., a launcher forwards it:
-     */
-    pid_t pid = getpid();
-    for (int depth = 0; depth < 16 && pid > 1; ++depth) {
-      const auto path = "/proc/" + std::to_string(pid) + "/fd/1";
-
-      struct stat output = {};
-      if (::stat(path.c_str(), &output) != 0 || !S_ISCHR(output.st_mode))
-        return false;
-      if (output.st_rdev == terminal)
-        return true;
-
-      std::error_code error;
-      const auto target = std::filesystem::read_symlink(path, error);
-      if (error || !target.string().starts_with("/dev/pts/"))
-        return false;
-
-      pid = process_info(pid).first;
-    }
-    return false;
-#else
-    /*
-     * Without /proc we cannot look past a launcher and only accept stdout
-     * being the controlling terminal itself:
-     */
-    return isatty(STDOUT_FILENO) && tcgetpgrp(STDOUT_FILENO) != -1;
-#endif
   }
 } // namespace ryujin
