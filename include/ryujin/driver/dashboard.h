@@ -94,19 +94,52 @@ namespace ryujin
     ryujin,
 
     /**
-     * Saturated colors of the full spectrum.
+     * The 16 colors of the terminal, so that the colors follow the
+     * theme of the terminal, and work without true color support.
      */
-    rainbow,
+    ansi16,
 
     /**
-     * Aggie Maroon and the neutrals of the Texas A&M University brand.
+     * The warm colors of the dark Gruvbox palette by Pavel Pertsev,
+     * https://github.com/morhetz/gruvbox
      */
-    tamu,
+    gruvbox,
+
+    /**
+     * Shades of blue for terminals with a light background, derived
+     * from the Tokyo Night Day palette by Folke Lemaitre,
+     * https://github.com/folke/tokyonight.nvim
+     */
+    light,
 
     /**
      * Shades of gray.
      */
     monochrome,
+
+    /**
+     * The palette of M. Okabe and K. Ito, "Color Universal Design
+     * (CUD): How to make figures and presentations that are friendly to
+     * colorblind people" (2008), https://jfly.uni-koeln.de/color/, which
+     * stays distinguishable for color vision deficiencies.
+     */
+    okabe_ito,
+
+    /**
+     * Saturated colors of the full spectrum.
+     */
+    rainbow,
+
+    /**
+     * The accent colors of the Solarized palette by Ethan Schoonover,
+     * https://ethanschoonover.com/solarized/
+     */
+    solarized,
+
+    /**
+     * Aggie Maroon and the neutrals of the Texas A&M University brand.
+     */
+    tamu,
   };
 
 
@@ -165,9 +198,14 @@ DECLARE_ENUM(ryujin::DashboardLocation,
 
 DECLARE_ENUM(ryujin::DashboardColorScheme,
              LIST({ryujin::DashboardColorScheme::ryujin, "ryujin"},
+                  {ryujin::DashboardColorScheme::ansi16, "ansi16"},
+                  {ryujin::DashboardColorScheme::gruvbox, "gruvbox"},
+                  {ryujin::DashboardColorScheme::light, "light"},
+                  {ryujin::DashboardColorScheme::monochrome, "monochrome"},
+                  {ryujin::DashboardColorScheme::okabe_ito, "okabe-ito"},
                   {ryujin::DashboardColorScheme::rainbow, "rainbow"},
-                  {ryujin::DashboardColorScheme::tamu, "tamu"},
-                  {ryujin::DashboardColorScheme::monochrome, "monochrome"}, ));
+                  {ryujin::DashboardColorScheme::solarized, "solarized"},
+                  {ryujin::DashboardColorScheme::tamu, "tamu"}, ));
 
 DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
