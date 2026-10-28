@@ -12,6 +12,9 @@
 #include <unistd.h>
 #if defined(__linux__)
 #include <sys/sysmacros.h>
+#elif defined(__APPLE__)
+#include <libproc.h>
+#include <sys/param.h>
 #endif
 
 #include <algorithm>
@@ -22,12 +25,16 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 namespace ryujin::terminal
 {
   namespace
   {
 #if defined(__linux__)
+    /* The pseudo terminals that launchers forward: */
+    constexpr std::string_view pseudo_terminals = "/dev/pts/";
+
     /*
      * Return the parent and the controlling terminal of the process @p pid,
      * read from /proc/<pid>/stat:
@@ -52,13 +59,68 @@ namespace ryujin::terminal
       const unsigned int minor = (tty & 0xff) | ((tty >> 12) & 0xfff00);
       return {parent, makedev(major, minor)};
     }
+
+    /*
+     * Return the device and the path of stdout of the process @p pid if it
+     * is a character device, read from /proc/<pid>/fd/1:
+     */
+    std::optional<std::pair<dev_t, std::string>> stdout_device(pid_t pid)
+    {
+      const auto path = "/proc/" + std::to_string(pid) + "/fd/1";
+
+      struct stat output = {};
+      if (::stat(path.c_str(), &output) != 0 || !S_ISCHR(output.st_mode))
+        return std::nullopt;
+
+      std::error_code error;
+      const auto target = std::filesystem::read_symlink(path, error);
+      return std::pair{output.st_rdev, error ? "" : target.string()};
+    }
+#elif defined(__APPLE__)
+    /* The pseudo terminals that launchers forward: */
+    constexpr std::string_view pseudo_terminals = "/dev/ttys";
+
+    /*
+     * Return the parent and the controlling terminal of the process @p pid,
+     * queried with libproc:
+     */
+    std::pair<pid_t, dev_t> process_info(pid_t pid)
+    {
+      proc_bsdinfo info = {};
+      constexpr int size = sizeof(info);
+      if (::proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) != size)
+        return {0, 0};
+
+      const auto tty = static_cast<dev_t>(info.e_tdev);
+      return {static_cast<pid_t>(info.pbi_ppid), tty == NODEV ? 0 : tty};
+    }
+
+    /*
+     * Return the device and the path of stdout of the process @p pid if it
+     * is a character device, queried with libproc:
+     */
+    std::optional<std::pair<dev_t, std::string>> stdout_device(pid_t pid)
+    {
+      vnode_fdinfowithpath vnode = {};
+      constexpr int size = sizeof(vnode);
+      constexpr int flavor = PROC_PIDFDVNODEPATHINFO;
+      if (::proc_pidfdinfo(pid, STDOUT_FILENO, flavor, &vnode, size) != size)
+        return std::nullopt;
+
+      const auto &stat = vnode.pvip.vip_vi.vi_stat;
+      if (!S_ISCHR(stat.vst_mode))
+        return std::nullopt;
+
+      return std::pair{static_cast<dev_t>(stat.vst_rdev),
+                       std::string(vnode.pvip.vip_path)};
+    }
 #endif
   } // namespace
 
 
   bool stdout_reaches_terminal()
   {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
     const dev_t terminal = process_info(getpid()).second;
     if (terminal == 0)
       return false;
@@ -69,17 +131,12 @@ namespace ryujin::terminal
      */
     pid_t pid = getpid();
     for (int depth = 0; depth < 16 && pid > 1; ++depth) {
-      const auto path = "/proc/" + std::to_string(pid) + "/fd/1";
-
-      struct stat output = {};
-      if (::stat(path.c_str(), &output) != 0 || !S_ISCHR(output.st_mode))
+      const auto output = stdout_device(pid);
+      if (!output)
         return false;
-      if (output.st_rdev == terminal)
+      if (output->first == terminal)
         return true;
-
-      std::error_code error;
-      const auto target = std::filesystem::read_symlink(path, error);
-      if (error || !target.string().starts_with("/dev/pts/"))
+      if (!output->second.starts_with(pseudo_terminals))
         return false;
 
       pid = process_info(pid).first;
@@ -87,8 +144,9 @@ namespace ryujin::terminal
     return false;
 #else
     /*
-     * Without /proc we cannot look past a launcher and only accept stdout
-     * being the controlling terminal itself:
+     * Without a way to inspect other processes we cannot look past a
+     * launcher and only accept stdout being the controlling terminal
+     * itself:
      */
     return ::isatty(STDOUT_FILENO) && ::tcgetpgrp(STDOUT_FILENO) != -1;
 #endif
