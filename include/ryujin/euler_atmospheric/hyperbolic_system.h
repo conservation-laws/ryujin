@@ -1326,13 +1326,17 @@ namespace ryujin
       const Number s = factor / rho_theta_pow;
       const Number r = ryujin::pow(s, gamma_minus_one_inverse());
 
-      using dealii::SIMDComparison;
-      using ryujin::compare_and_apply_mask;
-      const auto theta_star = compare_and_apply_mask<SIMDComparison::less_than>(
-          delta_xd, Number(0.), std::max(theta, theta_other), theta);
+      /*
+       * theta_star = min(max(theta, theta_other), theta / r), i.e., we cap
+       * theta_star by the lift of rho theta so that theta_star - theta =
+       * O(delta_xd). With r = 1 for delta_xd = 0 this leaves theta
+       * unchanged. We compute theta / theta_star without dividing by r:
+       */
+      const auto theta_ratio =
+          std::max(theta / std::max(theta, theta_other), r);
 
       /* Scale density and momentum by rho_star / rho: */
-      state_type U_star = (r * theta / theta_star) * U;
+      state_type U_star = (r * theta_ratio) * U;
       U_star[dim + 1] = r * rho_theta;
 
       return {U_star, p * r * s};
