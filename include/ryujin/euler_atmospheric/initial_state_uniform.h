@@ -62,8 +62,8 @@ namespace ryujin
           typename InitialState<HyperbolicSystem, dim, Number>::
               initial_precomputed_type final
       {
-        /* Return the vertical coordinate: */
-        return {Number(point[dim - 1])};
+        return hyperbolic_system_.initial_precomputations(
+            point, compute(point, Number(0.)));
       }
 
     private:

@@ -18,11 +18,16 @@
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/memory_space.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <memory>
+#include <string>
 #include <tuple>
 
 namespace ryujin
@@ -133,6 +138,18 @@ namespace ryujin
           StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
+      /**
+       * Return the initial precomputed values at @p point for the initial
+       * (background) state @p U: the vertical coordinate, the damping
+       * coefficient of the sponge layers, and the background velocity and
+       * potential temperature that the sponge layers relax to.
+       */
+      template <int dim, typename Number>
+      auto
+      initial_precomputations(const dealii::Point<dim> &point,
+                              const dealii::Tensor<1, dim + 2, Number> &U) const
+          -> typename View<dim, Number>::initial_precomputed_type;
+
     private:
       /**
        * @name Internal fields, methods, and friends
@@ -146,6 +163,15 @@ namespace ryujin
       void update_parameters();
 
       Mirrored<Parameters> parameters_;
+
+      /*
+       * The damping coefficient of the sponge layers is only evaluated on
+       * the host when setting up the initial precomputed values and is
+       * thus not part of Parameters. We always use a three dimensional
+       * function parser and pad points of lower dimension with zeros:
+       */
+      std::string sponge_damping_expression_;
+      std::unique_ptr<dealii::FunctionParser<3>> sponge_damping_function_;
 
       template <int, typename, typename>
       friend class HyperbolicSystemView;
@@ -227,9 +253,11 @@ namespace ryujin
       using precomputed_type = std::array<Number, n_precomputed_values>;
 
       /**
-       * The number of precomputed initial values.
+       * The number of precomputed initial values: the vertical coordinate,
+       * the damping coefficient of the sponge layers, and the background
+       * velocity and potential temperature.
        */
-      static constexpr unsigned int n_initial_precomputed_values = 1;
+      static constexpr unsigned int n_initial_precomputed_values = dim + 3;
 
       /**
        * Array type used for precomputed initial values.
@@ -614,20 +642,41 @@ namespace ryujin
        */
       //@{
 
-      /** We do not have source terms: */
-      static constexpr bool have_source_terms = false;
+      /** We have source terms, the Rayleigh damping of sponge layers: */
+      static constexpr bool have_source_terms = true;
+
+      /**
+       * Return the Rayleigh damping source term of the sponge layers
+       * \f[
+       *   \begin{pmatrix}
+       *   0 \\
+       *   -\sigma(\textbf m - \rho\textbf v_0) \\
+       *   -\sigma(\rho\theta - \rho\theta_0)
+       *   \end{pmatrix},
+       * \f]
+       * for the state @p U and initial precomputed values @p initial
+       * (holding the damping coefficient \f$\sigma\f$ and the background
+       * velocity \f$\textbf v_0\f$ and potential temperature
+       * \f$\theta_0\f$).
+       */
+      DEAL_II_HOST_DEVICE
+      state_type
+      rayleigh_damping(const state_type &U,
+                       const initial_precomputed_type &initial) const;
 
       DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int i,
                               const state_type &U_i,
-                              const ScalarNumber tau) const = delete;
+                              const ScalarNumber tau) const;
 
       DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int *js,
                               const state_type &U_j,
-                              const ScalarNumber tau) const = delete;
+                              const ScalarNumber tau) const;
 
       //@}
       /**
@@ -717,7 +766,9 @@ namespace ryujin
               {{{"p", "eta_h", "rho_pow", "theta_pow"},
                 {"p", "eta_h", "rho_pow", "theta_pow"},
                 {"p", "eta_h", "rho_pow", "theta_pow"}}},
-              {{{"x_d"}, {"x_d"}, {"x_d"}}},
+              {{{"x_d", "sigma", "v_0", "theta_0"},
+                {"x_d", "sigma", "v_0_1", "v_0_2", "theta_0"},
+                {"x_d", "sigma", "v_0_1", "v_0_2", "v_0_3", "theta_0"}}},
               subsection)
         , parameters_("euler_atmospheric_hyperbolic_system_parameters",
                       TransferPolicy::implicit_transfers_host_resident)
@@ -756,6 +807,21 @@ namespace ryujin
                     parameters.vacuum_state_relaxation_large,
                     "Problem specific vacuum relaxation parameter");
 
+      sponge_damping_expression_ = "0";
+      add_parameter("sponge damping",
+                    sponge_damping_expression_,
+                    "A function expression in x, y, z describing the "
+                    "Rayleigh damping coefficient of the sponge layers "
+                    "[1/time]. Set to 0 to disable the sponge layers.");
+
+      const auto set_up_muparser = [this] {
+        sponge_damping_function_ = std::make_unique<dealii::FunctionParser<3>>(
+            sponge_damping_expression_);
+      };
+
+      set_up_muparser();
+      ParameterAcceptor::parse_parameters_call_back.connect(set_up_muparser);
+
       ParameterAcceptor::parse_parameters_call_back.connect(
           [this] { update_parameters(); });
 
@@ -779,6 +845,30 @@ namespace ryujin
       parameters.gamma_minus_one = gamma - 1.;
       parameters.gamma_inverse = 1. / gamma;
       parameters.gamma_minus_one_inverse = 1. / (gamma - 1.);
+    }
+
+
+    template <int dim, typename Number>
+    auto HyperbolicSystem::initial_precomputations(
+        const dealii::Point<dim> &point,
+        const dealii::Tensor<1, dim + 2, Number> &U) const ->
+        typename View<dim, Number>::initial_precomputed_type
+    {
+      dealii::Point<3> padded_point;
+      for (unsigned int k = 0; k < dim; ++k)
+        padded_point[k] = point[k];
+      const auto sigma = sponge_damping_function_->value(padded_point);
+
+      const auto view = this->template view<dim, Number>();
+      const auto rho = view.density(U);
+
+      typename View<dim, Number>::initial_precomputed_type result;
+      result[0] = Number(point[dim - 1]);
+      result[1] = Number(sigma);
+      for (unsigned int k = 0; k < dim; ++k)
+        result[2 + k] = view.momentum(U)[k] / rho;
+      result[2 + dim] = view.potential_temperature(U) / rho;
+      return result;
     }
 
 
@@ -1414,6 +1504,53 @@ namespace ryujin
 
       return -ScalarNumber(2.) * (d_ij + rho_inverse_i * (m_i * c_ij)) *
              (U_star_i - U_i);
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::rayleigh_damping(
+        const state_type &U, const initial_precomputed_type &initial) const
+        -> state_type
+    {
+      const auto sigma = initial[1];
+      const auto rho = density(U);
+      const auto m = momentum(U);
+
+      state_type result;
+      for (unsigned int k = 0; k < dim; ++k)
+        result[1 + k] = -sigma * (m[k] - rho * initial[2 + k]);
+      result[dim + 1] =
+          -sigma * (potential_temperature(U) - rho * initial[2 + dim]);
+      return result;
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::nodal_source(
+        const PrecomputedVectorView & /*pv*/,
+        const InitialPrecomputedVectorView &ipv,
+        const unsigned int i,
+        const state_type &U_i,
+        const ScalarNumber /*tau*/) const -> state_type
+    {
+      return rayleigh_damping(
+          U_i, ipv.template read_tensor<Number, initial_precomputed_type>(i));
+    }
+
+
+    template <int dim, typename Number, typename MemorySpace>
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
+    HyperbolicSystemView<dim, Number, MemorySpace>::nodal_source(
+        const PrecomputedVectorView & /*pv*/,
+        const InitialPrecomputedVectorView &ipv,
+        const unsigned int *js,
+        const state_type &U_j,
+        const ScalarNumber /*tau*/) const -> state_type
+    {
+      return rayleigh_damping(
+          U_j, ipv.template read_tensor<Number, initial_precomputed_type>(js));
     }
 
 
