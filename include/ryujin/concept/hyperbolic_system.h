@@ -121,14 +121,15 @@ namespace ryujin
          requires(const V &view,
                   const typename V::state_type &U,
                   const typename V::PrecomputedVectorView &precomputed,
+                  const typename V::InitialPrecomputedVectorView &initial,
                   const typename V::ScalarNumber tau,
                   const unsigned int i,
                   const unsigned int *js) {
            {
-             view.nodal_source(precomputed, i, U, tau)
+             view.nodal_source(precomputed, initial, i, U, tau)
            } -> std::same_as<typename V::state_type>;
            {
-             view.nodal_source(precomputed, js, U, tau)
+             view.nodal_source(precomputed, initial, js, U, tau)
            } -> std::same_as<typename V::state_type>;
          });
 

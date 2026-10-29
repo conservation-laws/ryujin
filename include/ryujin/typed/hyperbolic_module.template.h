@@ -979,8 +979,10 @@ namespace ryujin
               stage_precomputed_view[s], initial_precomputed_view, i, U_iHs);
 
           if constexpr (View::have_source_terms) {
-            S_iH += stage_weight[s] *
-                    view.nodal_source(stage_precomputed_view[s], i, U_iHs, tau);
+            const auto &pv_s = stage_precomputed_view[s];
+            const auto S_iHs = view.nodal_source(
+                pv_s, initial_precomputed_view, i, U_iHs, tau);
+            S_iH += stage_weight[s] * S_iHs;
           }
         }
 
@@ -988,7 +990,8 @@ namespace ryujin
         state_type F_iH;
 
         if constexpr (View::have_source_terms) {
-          S_i = view.nodal_source(old_precomputed_view, i, U_i, tau);
+          S_i = view.nodal_source(
+              old_precomputed_view, initial_precomputed_view, i, U_i, tau);
           S_iH += weight * S_i;
           U_i_new += tau * /* m_i_inv * m_i */ S_i;
           F_iH += m_i * S_iH;
@@ -1114,8 +1117,8 @@ namespace ryujin
           }
 
           if constexpr (View::have_source_terms) {
-            const auto S_j =
-                view.nodal_source(old_precomputed_view, js, U_j, tau);
+            const auto S_j = view.nodal_source(
+                old_precomputed_view, initial_precomputed_view, js, U_j, tau);
             F_iH += weight * m_ij * S_j;
             P_ij += weight * m_ij * S_j;
           }
@@ -1138,8 +1141,9 @@ namespace ryujin
             }
 
             if constexpr (View::have_source_terms) {
-              const auto S_js =
-                  view.nodal_source(stage_precomputed_view[s], js, U_jHs, tau);
+              const auto &pv_s = stage_precomputed_view[s];
+              const auto S_js = view.nodal_source(
+                  pv_s, initial_precomputed_view, js, U_jHs, tau);
               F_iH += stage_weight[s] * m_ij * S_js;
               P_ij += stage_weight[s] * m_ij * S_js;
             }

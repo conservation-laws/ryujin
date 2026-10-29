@@ -440,11 +440,13 @@ namespace ryujin
       static constexpr bool have_source_terms = false;
 
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const = delete;
 
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const = delete;

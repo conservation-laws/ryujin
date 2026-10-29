@@ -261,11 +261,11 @@ compute_quantities(const View &view,
 
   {
     /* Exercise both nodal_source() variants: */
-    const auto source_i = view.nodal_source(pv, i, U, tau);
+    const auto source_i = view.nodal_source(pv, ipv, i, U, tau);
     for (unsigned int d = 0; d < problem_dimension; ++d)
       result[k++] = source_i[d];
 
-    const auto source_j = view.nodal_source(pv, &j, U_bar, tau);
+    const auto source_j = view.nodal_source(pv, ipv, &j, U_bar, tau);
     for (unsigned int d = 0; d < problem_dimension; ++d)
       result[k++] = source_j[d];
   }

@@ -763,12 +763,14 @@ namespace ryujin
 
       DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const = delete;
 
       DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const = delete;
