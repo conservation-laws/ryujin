@@ -1235,7 +1235,8 @@ namespace ryujin
     HyperbolicSystemView<dim, Number, MemorySpace>::g(const state_type &U) const
         -> flux_type
     {
-      const auto rho_inverse = ScalarNumber(1.) / density(U);
+      /* The star state might be a vacuum state: */
+      const auto rho_inverse = safe_division(Number(1.), density(U));
       const auto m = momentum(U);
       const auto rho_theta = potential_temperature(U);
 

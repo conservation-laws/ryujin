@@ -35,7 +35,7 @@ namespace ryujin
     inline constexpr EulerAEOS::NASGRiemannSolverOptions
         ideal_gas_riemann_solver_options{.covolume = false,
                                          .pinf = false,
-                                         .safe_division = false,
+                                         .safe_division = true,
                                          .variable_gamma = false};
 
     /**
@@ -299,7 +299,34 @@ namespace ryujin
       const auto riemann_data_j =
           riemann_data_from_state(U_star_ji, p_star_ji, n_ij);
 
-      return compute(riemann_data_i, riemann_data_j);
+      const auto lambda_max = compute(riemann_data_i, riemann_data_j);
+
+      /*
+       * The hydrostatic reconstruction lifts a state to vacuum if the
+       * height difference exceeds the height of the hydrostatic column
+       * supported by its pressure. The Riemann solver does not account for
+       * vacuum data, in which case the maximal wave speed is the speed of
+       * the vacuum front, u -/+ 2 a / (gamma - 1), of the other state:
+       */
+      using dealii::SIMDComparison;
+      using ryujin::compare_and_apply_mask;
+      const auto factor = ScalarNumber(2.) / (view_.gamma() - ScalarNumber(1.));
+      const auto &[rho_star_i, u_star_i, p_i_, gamma_i_, a_star_i] =
+          riemann_data_i;
+      const auto &[rho_star_j, u_star_j, p_j_, gamma_j_, a_star_j] =
+          riemann_data_j;
+      const auto front_i = compare_and_apply_mask<SIMDComparison::equal>(
+          rho_star_i,
+          Number(0.),
+          std::abs(u_star_j - factor * a_star_j),
+          Number(0.));
+      const auto front_j = compare_and_apply_mask<SIMDComparison::equal>(
+          rho_star_j,
+          Number(0.),
+          std::abs(u_star_i + factor * a_star_i),
+          Number(0.));
+
+      return std::max(lambda_max, std::max(front_i, front_j));
     }
 
 
@@ -310,8 +337,9 @@ namespace ryujin
         const Number &p,
         const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
     {
+      /* The star state might be a vacuum state: */
       const auto rho = view_.density(U);
-      const auto rho_inverse = Number(1.0) / rho;
+      const auto rho_inverse = safe_division(Number(1.0), rho);
 
       const auto m = view_.momentum(U);
       const auto proj_m = n_ij * m;
