@@ -44,10 +44,11 @@ namespace ryujin
    *
    * @note OfflineData::boundary_map_ is a std::vector that stores all
    * encountered boundary conditions for an individual degree of freedom.
-   * The individual algebraic constraint is applied in no particular order.
-   * It is thus important to ensure that neighboring boundary conditions,
-   * are compatible. For example, inflow conditions prescribed via a
-   * Boundary::dirichlet face neighboring a Boundary::no_slip face have to
+   * The individual algebraic constraints are applied in descending order
+   * of the boundary id, i.e., slip and no slip conditions last.
+   * Nevertheless, it is important to ensure that neighboring boundary
+   * conditions are compatible. For example, inflow conditions prescribed
+   * via a Boundary::dirichlet face neighboring a Boundary::no_slip face have to
    * ensure that they prescribe a state compatible with the no slip
    * condition, etc.
    *
