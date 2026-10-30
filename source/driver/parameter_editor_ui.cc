@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <thread>
@@ -147,22 +148,70 @@ namespace ryujin
     }
 
 
-    /* A single line input that leaves the arrow keys up and down alone: */
+    /* A single line input that is edited after enter or i, like in ccmake: */
     class SingleLine : public ComponentBase
     {
     public:
-      /* Wrap the input component @p input: */
-      explicit SingleLine(Component input)
+      /* Wrap the input component @p input that edits @p value, and set @p
+       * editing while editing: */
+      explicit SingleLine(Component input,
+                          std::string &value,
+                          std::function<void()> on_change,
+                          bool &editing)
+          : value_(value)
+          , on_change_(std::move(on_change))
+          , editing_(editing)
       {
         Add(std::move(input));
       }
 
-      /* Hand up and down to the container, everything else to the input: */
+      /* Hand all keys to the container, and to the input only while editing: */
       bool OnEvent(Event event) override
       {
-        return event != Event::ArrowUp && event != Event::ArrowDown &&
-               ComponentBase::OnEvent(event);
+        if (!edit_) {
+          const bool click = event.is_mouse() &&
+                             event.mouse().button == Mouse::Left &&
+                             event.mouse().motion == Mouse::Pressed &&
+                             box_.Contain(event.mouse().x, event.mouse().y);
+          if (event != Event::Return && event != Event::Character('i') &&
+              !click)
+            return false;
+          TakeFocus();
+          saved_ = value_;
+          edit_ = editing_ = true;
+          return true;
+        }
+
+        if (event == Event::Escape && value_ != saved_) {
+          value_ = saved_;
+          on_change_();
+        }
+        if (event == Event::Return || event == Event::Escape ||
+            event == Event::ArrowUp || event == Event::ArrowDown) {
+          edit_ = editing_ = false;
+          return event == Event::Return || event == Event::Escape;
+        }
+        return ComponentBase::OnEvent(event);
       }
+
+      Element OnRender() override
+      {
+        if (edit_ && !Focused())
+          edit_ = editing_ = false;
+        if (edit_)
+          return ComponentBase::OnRender();
+
+        auto element = text(value_) | xflex | reflect(box_);
+        return Focused() ? element | bgcolor(theme.track) | focus : element;
+      }
+
+    private:
+      std::string &value_;
+      std::function<void()> on_change_;
+      bool &editing_;
+      bool edit_ = false;
+      std::string saved_;
+      Box box_;
     };
 
 
@@ -483,7 +532,8 @@ namespace ryujin
             return state.focused ? state.element | bgcolor(theme.track)
                                  : state.element;
           };
-          return std::make_shared<SingleLine>(Input(option));
+          return std::make_shared<SingleLine>(
+              Input(option), entry.value, on_change, editing_);
         }
         }
 
@@ -680,8 +730,10 @@ namespace ryujin
                 flex,
             panel("documentation", documentation()) | size(HEIGHT, EQUAL, 13),
             hbox({text(" "), buttons_->Render(), filler(), std::move(status)}),
-            muted(" arrows: move   enter: select   esc: back/quit   "
-                  "ctrl-s: save   ctrl-a: all sections"),
+            editing_
+                ? muted(" enter: confirm   esc: cancel")
+                : muted(" arrows: move   enter: select/edit   esc: back/quit   "
+                        "ctrl-s: save   ctrl-a: all sections"),
         });
 
         return dbox({backdrop_, backdrop_->place(std::move(document))});
@@ -709,6 +761,8 @@ namespace ryujin
 
       std::string status_;
       bool status_good_ = false;
+
+      bool editing_ = false;
 
       bool confirm_ = false;
       EditorOutcome pending_ = EditorOutcome::quit;
