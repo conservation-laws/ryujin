@@ -74,6 +74,10 @@ subsection E - InitialValues
   end
 end
 
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
 subsection H - TimeIntegrator
   set cfl min               = 0.2
   set cfl max               = 0.2

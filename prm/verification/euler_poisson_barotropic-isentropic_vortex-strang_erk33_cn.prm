@@ -81,6 +81,10 @@ subsection C - Discretization
   end
 end
 
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
 subsection G - ParabolicModule
   set gauss law restart strategy    = no restart
 
