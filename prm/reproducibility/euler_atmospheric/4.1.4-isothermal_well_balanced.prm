@@ -1,0 +1,85 @@
+##
+#
+# Well-balancing test for a 1D isothermal steady state [1, 2], Section
+# 4.1.4 (Table 4.4) of [3].
+#
+# The initial state is the isothermal equilibrium
+#
+#   rho_e = exp(-(x - 2)),  p_e = exp(-(x - 2)),  v = 0,
+#   theta = (1 / rho_e) * p_e^(1/gamma),
+#
+# on the computational domain [0,5] with slip boundary conditions. The
+# thermodynamic constants are p_0 = 1, c_v = 2.5, gamma = 1.4 (thus R = 1)
+# and g = 1. The final time is t = 0.8 with CFL 0.05.
+#
+# The scheme preserves the isothermal equilibrium exactly, i.e., up to
+# round-off errors. Table 4.4 of [3] uses 100, 200, ..., 3200
+# subdivisions. The tabulated error is the sum of the normalized errors of
+# rho and rho_theta (this file) and the unnormalized error of m (which
+# vanishes identically and cannot be normalized); the latter is obtained by
+# setting "error quantities = m" and "error normalize = false".
+#
+# [1] P. Li and Z. Gao. Simple high order well-balanced finite difference
+#     WENO schemes for the Euler equations under gravitational fields.
+#     Journal of Computational Physics, 437:110341, 2021.
+#
+# [2] A. Navas-Montilla and I. Echeverribar. A family of well-balanced WENO
+#     and TENO schemes for atmospheric flows. Journal of Computational
+#     Physics, 489:112273, 2023.
+#
+# [3] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+#     approximation of the compressible atmospheric Euler equations.
+#     arXiv:2606.19764, 2026.
+#
+##
+
+subsection A - Scheduler
+  set basename          = isothermal-well-balanced
+  set tasks             = error evaluation
+  set final time        = 0.8
+  set timer granularity = 0.008
+end
+
+subsection B - Equation
+  set dimension          = 1
+  set equation           = euler atmospheric
+  set c_v                = 2.5
+  set gamma              = 1.4
+  set gravity            = 1
+  set reference pressure = 1
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 5
+    set subdivisions x           = 200
+    set boundary condition left  = slip
+    set boundary condition right = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set position      = 0
+
+  subsection function
+    set density expression               = exp(-x+2)
+    set velocity x expression            = 0
+    set potential temperature expression = (1/exp(-x+2)) * (exp(-x+2))^(1/1.4)
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.05
+  set cfl max = 0.05
+end
+
+subsection K - ErrorEvaluation
+  set error quantities = rho, rho_theta
+  set error normalize  = true
+  set error norms      = Linf, L1, L2
+end

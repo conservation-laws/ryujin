@@ -1,0 +1,13 @@
+diff --git a/include/ryujin/typed/hyperbolic_module.template.h b/include/ryujin/typed/hyperbolic_module.template.h
+index 5061faf5..2aff9204 100644
+--- a/include/ryujin/typed/hyperbolic_module.template.h
++++ b/include/ryujin/typed/hyperbolic_module.template.h
+@@ -1279,7 +1279,7 @@ namespace ryujin
+             const auto b_ij = m_i * m_ij_inv - kronecker_ij;
+             const auto b_ji = m_j * m_ij_inv - kronecker_ij;
+ 
+-            P_ij += b_ij * F_jH - b_ji * F_iH;
++            P_ij += T(0.) * (b_ij * F_jH - b_ji * F_iH);
+ 
+           } else {
+             /* Use Neumann series expansion: */

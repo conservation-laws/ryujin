@@ -1,0 +1,93 @@
+##
+#
+# 2D density current proposed by Carpenter et al. [1], Section 4.2.2
+# (Figure 4.5) of [2].
+#
+# A cold bubble, given by a cosine shaped perturbation of the potential
+# temperature,
+#
+#   theta = 300 - 15/2 (1 + cos(pi r)),
+#   r = ((x / 4000)^2 + ((y - 3000) / 2000)^2)^(1/2) <= 1,
+#
+# and theta = 300 K otherwise, descends in an isentropic atmosphere at
+# rest, hits the ground, and propagates along the bottom boundary as a
+# density current. The density is given as for the rising bubble. The
+# computational domain [0,25600] x [0,6400] m^2 covers the right half of
+# the symmetric configuration; slip boundary conditions are enforced on all
+# sides. The thermodynamic constants are p_0 = 10^5 Pa, c_v = 717.5,
+# gamma = 1.4 and g = 9.806.
+#
+# The chosen 512 x 128 subdivisions correspond to a mesh size of h = 50 m.
+# Mesh refinement levels 1, 2, and 3 give h = 25 m, 12.5 m, and 6.25 m
+# (Figure 4.5 of [2]). The final time is set to t = 900 s and we output a
+# vtk every δt = 10 s.
+#
+# [1] R. L. Carpenter, K. K. Droegemeier, P. R. Woodward, and C. E. Hane.
+#     Application of the piecewise parabolic method (PPM) to meteorological
+#     modeling. Monthly Weather Review, 118(3):586-612, 1990.
+#
+# [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+#     approximation of the compressible atmospheric Euler equations.
+#     arXiv:2606.19764, 2026.
+#
+##
+
+subsection A - Scheduler
+  set basename          = density-current
+  set tasks             = vtu output
+  set final time        = 900
+  set timer granularity = 10
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 717.5
+  set gamma              = 1.4
+  set gravity            = 9.806
+  set reference pressure = 100000
+  set reference density  = 1.2
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left      = 0, 0
+    set position top right        = 25600, 6400
+    set subdivisions x            = 512
+    set subdivisions y            = 128
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = stratified function
+  set position      = 0, 0
+
+  subsection stratified function
+    set velocity x expression = 0
+    set velocity y expression = 0
+    set theta expression      = 300 - 7.5*(1 + cos(3.141592653589793*sqrt((x/4000)^2+((y-3000)/2000)^2)))
+    set radius                = 1
+    set blast width           = 0
+    set blast height          = 3000
+    set x factor              = 4000
+    set y factor              = 2000
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.9
+  set cfl max = 0.9
+end
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = theta, schlieren_theta
+  end
+end

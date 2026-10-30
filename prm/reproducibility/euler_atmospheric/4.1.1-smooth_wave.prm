@@ -1,0 +1,70 @@
+##
+#
+# Smooth traveling wave, 1D, g = 0, Section 4.1.1 (Table 4.1) of [1].
+#
+# Domain [0,1] with Dirichlet boundary conditions, v_0 = p_c = 1, reference
+# pressure p_0 = 1, final time t = 0.1, CFL 0.5. Convergence rates are
+# obtained with mesh refinement levels 0, 1, ..., 5 (100 to 3200 cells).
+# Limiting is disabled at the Dirichlet boundary nodes (see
+# 4.1.2-exact_source-1d-high_order.prm).
+#
+# [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+#     approximation of the compressible atmospheric Euler equations.
+#     arXiv:2606.19764, 2026.
+#
+##
+
+subsection A - Scheduler
+  set basename   = smooth-wave
+  set tasks      = error evaluation
+  set final time = 0.1
+  set align time steps = true
+end
+
+subsection B - Equation
+  set dimension          = 1
+  set equation           = euler atmospheric
+  set c_v                = 2.5
+  set gamma              = 1.4
+  set gravity            = 0
+  set reference pressure = 1
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 1
+    set subdivisions x           = 100
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = smooth wave
+  set position      = 0
+
+  subsection smooth wave
+    set mach number        = 1
+    set reference density  = 1
+    set reference pressure = 1
+  end
+end
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.5
+  set cfl max = 0.5
+end
+
+subsection K - ErrorEvaluation
+  set error quantities = rho, m, rho_theta
+  set error normalize  = true
+  set error norms      = Linf, L1, L2
+end

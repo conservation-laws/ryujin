@@ -26,3 +26,15 @@ The `./benchmarks` directory contains parameter files for well known and
 popular <i>benchmark</i> configurations. These configurations typically do
 not have an analytical solution, but the expected solution structure is
 well known. They are thus usually compared in the <i>eyeball norm</i>.
+
+Reproducibility
+---------------
+
+The `./reproducibility` directory contains the parameter files used for
+the numerical results of publications, one subdirectory per equation
+module. Each subdirectory has a `README.md` with the reference and
+instructions:
+
+ - `./reproducibility/euler_atmospheric`: C. Farris, M. Maier, E. J. Tovar.
+   Well-balanced second-order approximation of the compressible
+   atmospheric Euler equations. arXiv:2606.19764, 2026.
