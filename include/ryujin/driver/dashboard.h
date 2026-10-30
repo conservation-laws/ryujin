@@ -163,6 +163,12 @@ namespace ryujin
      * Snakes that roam around the dashboard and hunt for food.
      */
     matthias,
+
+    /**
+     * A barista brewing a pour-over coffee that is ready when the
+     * simulation finishes.
+     */
+    eric,
   };
 
 
@@ -210,7 +216,8 @@ DECLARE_ENUM(ryujin::DashboardColorScheme,
 DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
                   {ryujin::DashboardAnimation::sparkle, "sparkle"},
-                  {ryujin::DashboardAnimation::matthias, "matthias"}, ));
+                  {ryujin::DashboardAnimation::matthias, "matthias"},
+                  {ryujin::DashboardAnimation::eric, "eric"}, ));
 
 DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
              LIST({ryujin::DashboardThroughputDisplay::speedometer,

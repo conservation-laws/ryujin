@@ -9,13 +9,18 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <optional>
 #include <random>
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace ryujin::animation
 {
@@ -52,6 +57,47 @@ namespace ryujin::animation
       pixel.character = glyph;
       pixel.foreground_color = color;
       pixel.bold = bold;
+    }
+
+    /** The content of a cell of a frame, empty if the cell is blank. */
+    struct Glyph {
+      std::string character;
+      ftxui::Color color;
+      bool bold = false;
+      bool dim = false;
+
+      bool operator==(const Glyph &) const = default;
+    };
+
+    /*
+     * Paint the cells of the @p frame of a region of the stage, row by
+     * row, that differ from the @p last frame, and make @p frame the last
+     * frame:
+     */
+    void repaint(Stage &stage,
+                 const ftxui::Box &region,
+                 std::vector<Glyph> &last,
+                 std::vector<Glyph> frame)
+    {
+      const int width = region.x_max - region.x_min + 1;
+      if (last.size() != frame.size())
+        last.assign(frame.size(), Glyph());
+
+      for (std::size_t i = 0; i < frame.size(); ++i) {
+        const auto &glyph = frame[i];
+        if (glyph == last[i])
+          continue;
+        auto &pixel = stage.pixel(region.x_min + int(i) % width,
+                                  region.y_min + int(i) / width);
+        if (!glyph.character.empty()) {
+          pixel.character = glyph.character;
+          pixel.foreground_color = glyph.color;
+          pixel.bold = glyph.bold;
+          pixel.dim = glyph.dim;
+        }
+      }
+
+      last = std::move(frame);
     }
 
     void sparkle(Stage &stage, Cell c)
@@ -413,6 +459,509 @@ namespace ryujin::animation
       /* The Content of every cell of the stage: */
       std::vector<std::uint8_t> cells_;
     };
+
+
+    /**
+     * A pour-over coffee bar below the dashboard: a barista walks up,
+     * weighs and grinds the beans, and brews a pot of coffee that is
+     * ready when the simulation finishes, or after about two and a half
+     * minutes if the progress of the simulation is unknown.
+     */
+    class Coffee final : public Animation
+    {
+    public:
+      void draw(Stage &stage) override
+      {
+        place(stage);
+        sync(stage);
+        frame_.clear();
+        show(stage);
+      }
+
+      void step(Stage &stage) override
+      {
+        tick(stage);
+        sync(stage);
+        show(stage);
+      }
+
+      /* Serve the coffee when the simulation finishes: */
+      void finish(Stage &stage) override
+      {
+        place(stage);
+        phase_ = Phase::done;
+        barista_ = station();
+        brew_ = 1.;
+        level_ = 1.;
+        water_ = bloom_water;
+        for (const auto &pour : pours)
+          water_ += pour.water;
+        frame_.clear();
+        show(stage);
+      }
+
+    private:
+      enum class Phase : std::uint8_t { weigh, grind, bloom, pour, done };
+
+      /* The duration of the phases in steps of the animation: */
+      static constexpr int weigh_steps = 25;
+      static constexpr int grind_steps = 30;
+      static constexpr int bloom_steps = 200;
+      static constexpr int pour_steps = 800;
+
+      /* The water of the bloom in grams, poured in the first steps: */
+      static constexpr double bloom_water = 75.;
+      static constexpr int bloom_pour_steps = 30;
+
+      /*
+       * The pours after the bloom: the water in grams, and the fractions
+       * of the brew at which the pour begins and ends:
+       */
+      struct Pour {
+        double water;
+        double begin;
+        double end;
+      };
+      static constexpr std::array<Pour, 3> pours = {
+          {{75., 0., 0.15}, {50., 0.33, 0.43}, {100., 0.6, 0.8}}};
+
+      /* The size of the coffee bar: */
+      static constexpr int bar_width = 58;
+      static constexpr int bar_height = 10;
+
+      /* The columns of the stations, relative to the left end: */
+      static constexpr int bag_x = 0;
+      static constexpr int scale_x = 15;
+      static constexpr int grinder_x = 27;
+      static constexpr int dripper_x = 38;
+      static constexpr int kettle_x = 46;
+
+      /* The column of the barista before walking up to the bar: */
+      static constexpr int barista_start = -6;
+
+      /* The duration of a step of the animation: */
+      static constexpr std::chrono::milliseconds step_duration{150};
+
+      /*
+       * The steps of the preparations before the pour: walking to the
+       * stations at a column every two steps, weighing, grinding, and the
+       * bloom:
+       */
+      static constexpr double preparation_steps =
+          2 * (dripper_x - 5 - barista_start) + weigh_steps + grind_steps +
+          bloom_steps;
+
+      /* The time on the brew timer at the end of the bloom and in total: */
+      static constexpr int bloom_seconds = 30;
+      static constexpr int brew_seconds = 150;
+
+      static std::string_view pick_roaster()
+      {
+        static constexpr std::array<std::string_view, 4> others = {
+            "Corvus", "Native", "Freeform", "Iconik"};
+        return chance(0.6) ? "Jitterz" : others[pick(others.size())];
+      }
+
+      static ftxui::Color coffee()
+      {
+        return ftxui::Color::RGB(150, 95, 55);
+      }
+
+      /*
+       * Place the bottom left corner of the bar in a free band below,
+       * above, left, or right of the dashboard:
+       */
+      void place(Stage &stage)
+      {
+        const auto &box = stage.dashboard;
+        const int width = stage.screen.dimx();
+        const int height = stage.screen.dimy();
+
+        struct Band {
+          int x_min, x_max, y_min, y_max;
+        };
+        const std::array<Band, 4> bands = {{
+            {0, width - 1, box.y_max + 1, height - 1},
+            {0, width - 1, 0, box.y_min - 1},
+            {0, box.x_min - 1, 0, height - 1},
+            {box.x_max + 1, width - 1, 0, height - 1},
+        }};
+
+        origin_.reset();
+        for (const auto &band : bands) {
+          const int columns = band.x_max - band.x_min + 1;
+          const int rows = band.y_max - band.y_min + 1;
+          if (columns >= bar_width && rows >= bar_height) {
+            origin_ = Cell{band.x_min + (columns - bar_width) / 2, band.y_max};
+            return;
+          }
+        }
+
+        /*
+         * The bar does not fit next to the dashboard. Move the dashboard
+         * to the left, or to the top, if that makes room:
+         */
+        const auto [columns, rows] = stage.free_space();
+        if (box.x_min > box.x_max)
+          return;
+        if (columns >= bar_width && box.x_min > 0)
+          stage.shift = {-box.x_min, 0};
+        else if (rows >= bar_height && box.y_min > 0)
+          stage.shift = {0, -box.y_min};
+      }
+
+      /*
+       * The column the barista works at in the current phase, to the left
+       * of the station, or to the right of the kettle with a cup:
+       */
+      int station() const
+      {
+        switch (phase_) {
+        case Phase::weigh:
+          return scale_x - 5;
+        case Phase::grind:
+          return grinder_x - 5;
+        case Phase::done:
+          return kettle_x + 5;
+        default:
+          return dripper_x - 5;
+        }
+      }
+
+      /*
+       * Advance the animation to the wall time. The dashboard only
+       * redraws the whole stage once per update if it does not fit into
+       * the terminal, and never calls step() then:
+       */
+      void sync(const Stage &stage)
+      {
+        const auto now = std::chrono::steady_clock::now();
+        if (!start_)
+          start_ = now;
+        const auto target = (now - *start_) / step_duration;
+        while (ticks_ < target)
+          tick(stage);
+      }
+
+      /*
+       * Advance the animation by one step of wall time. If the simulation
+       * finishes soon, hurry through the preparations so that they take
+       * no more than about a quarter of the remaining time:
+       */
+      void tick(const Stage &stage)
+      {
+        ++ticks_;
+        int steps = 1;
+        if (phase_ < Phase::pour && stage.eta > 0.) {
+          const double budget = 0.25 * stage.eta / 0.15;
+          steps = std::clamp(int(std::ceil(preparation_steps / budget)), 1, 8);
+        }
+        for (int i = 0; i < steps; ++i)
+          advance(stage);
+      }
+
+      void advance(const Stage &stage)
+      {
+        ++step_;
+
+        /* Walk over to the station of the current phase first: */
+        if (barista_ != station()) {
+          if (step_ % 2 == 0)
+            barista_ += barista_ < station() ? 1 : -1;
+          return;
+        }
+
+        const auto enter = [this](Phase phase) {
+          phase_ = phase;
+          phase_step_ = 0;
+        };
+
+        switch (++phase_step_; phase_) {
+        case Phase::weigh:
+          if (phase_step_ == weigh_steps)
+            enter(Phase::grind);
+          break;
+        case Phase::grind:
+          if (phase_step_ == grind_steps)
+            enter(Phase::bloom);
+          break;
+        case Phase::bloom:
+          level_ = 0.05 * phase_step_ / bloom_steps;
+          water_ = bloom_water * std::min(phase_step_, bloom_pour_steps) /
+                   bloom_pour_steps;
+          if (phase_step_ == bloom_steps)
+            enter(Phase::pour);
+          break;
+        case Phase::pour: {
+          /*
+           * Follow the progress of the simulation, or the clock, but
+           * brew no faster than in about thirty seconds:
+           */
+          const double progress = stage.progress >= 0.
+                                      ? stage.progress
+                                      : double(phase_step_) / pour_steps;
+          brew_ += std::clamp(std::min(progress, 1.) - brew_, 0., 1. / 200.);
+          if (brew_ >= 1.) {
+            brew_ = 1.;
+            enter(Phase::done);
+          }
+          level_ = 0.05 + 0.95 * brew_;
+          water_ = bloom_water;
+          for (const auto &pour : pours)
+            water_ += pour.water *
+                      std::clamp((brew_ - pour.begin) / (pour.end - pour.begin),
+                                 0.,
+                                 1.);
+          break;
+        }
+        case Phase::done:
+          break;
+        }
+      }
+
+      /* Whether water streams from the kettle: */
+      bool pouring() const
+      {
+        if (barista_ != dripper_x - 5)
+          return false;
+        if (phase_ == Phase::bloom)
+          return phase_step_ < bloom_pour_steps;
+        return phase_ == Phase::pour &&
+               std::ranges::any_of(pours, [this](const Pour &pour) {
+                 return pour.begin <= brew_ && brew_ < pour.end;
+               });
+      }
+
+      /* Compose the current frame and paint the cells that changed: */
+      void show(Stage &stage)
+      {
+        if (!origin_)
+          return;
+
+        const int width = stage.screen.dimx();
+        const int height = stage.screen.dimy();
+        const ftxui::Box region = {origin_->first,
+                                   origin_->first + bar_width - 1,
+                                   origin_->second - bar_height + 1,
+                                   origin_->second};
+        std::vector<Glyph> frame(bar_width * bar_height);
+
+        /*
+         * Write the text @p row rows above the bottom of the bar,
+         * skipping blanks:
+         */
+        const auto text = [&](int column,
+                              int row,
+                              std::string_view text,
+                              ftxui::Color color,
+                              bool bold = false,
+                              bool dim = false) {
+          int x = origin_->first + column;
+          const int y = origin_->second - row;
+          for (std::size_t i = 0; i < text.size(); ++x) {
+            /* The length of the UTF-8 sequence: */
+            const auto lead = static_cast<unsigned char>(text[i]);
+            const std::size_t n = lead < 0x80   ? 1
+                                  : lead < 0xe0 ? 2
+                                  : lead < 0xf0 ? 3
+                                                : 4;
+            if (text[i] != ' ' && region.Contain(x, y) && x < width &&
+                y < height && stage.free(x, y))
+              frame[(y - region.y_min) * bar_width + x - region.x_min] = {
+                  std::string(text.substr(i, n)), color, bold, dim};
+            i += n;
+          }
+        };
+
+        const auto &theme = dashboard::theme;
+        const auto plain = ftxui::Color::Default;
+        const bool grinding = phase_ == Phase::grind && barista_ == station();
+
+        /* The counter: */
+        for (int x = 0; x < bar_width; ++x)
+          text(x, 2, "━", theme.muted);
+        for (const int x : {0, bar_width - 1})
+          for (const int row : {0, 1})
+            text(x, row, "┃", theme.muted);
+
+        /* The bag of beans: */
+        text(bag_x, 4, "┌~~~~~~~~┐", theme.muted);
+        text(bag_x, 3, "│", theme.muted);
+        text(bag_x + 1 + (8 - int(roaster_.size()) + 1) / 2,
+             3,
+             roaster_,
+             coffee(),
+             true);
+        text(bag_x + 9, 3, "│", theme.muted);
+
+        /* The scale, with the beans in the bowl until they are ground: */
+        const double grams = phase_ == Phase::weigh
+                                 ? 18. * phase_step_ / weigh_steps
+                             : phase_ == Phase::grind && !grinding ? 18.
+                                                                   : 0.;
+        char display[16];
+        std::snprintf(display, sizeof(display), "%4.1fg", grams);
+        text(scale_x, 3, "[", theme.muted);
+        text(scale_x + 1, 3, display, theme.good, true);
+        text(scale_x + 6, 3, "]", theme.muted);
+        text(scale_x + 1, 4, "\\___/", theme.muted);
+        const int beans = int(std::ceil(3. * grams / 18.));
+        text(scale_x + 2, 4, std::string(beans, 'o'), coffee(), true);
+        if (phase_ == Phase::weigh && barista_ == station() &&
+            phase_step_ < weigh_steps - 4)
+          text(scale_x + 3, 5 + step_ % 2, "∘", coffee(), true);
+
+        /* The grinder, shaking while it grinds: */
+        const int shake = grinding ? step_ % 2 : 0;
+        const bool hopper = phase_ == Phase::weigh ||
+                            (grinding && phase_step_ < 2 * grind_steps / 3) ||
+                            (phase_ == Phase::grind && !grinding);
+        text(grinder_x + 1 + shake, 6, "▄▄▄", theme.muted);
+        text(grinder_x + 1 + shake, 5, "\\ /", theme.muted);
+        if (hopper)
+          text(grinder_x + 2 + shake,
+               5,
+               grinding && step_ % 2 ? "░" : "▒",
+               coffee());
+        text(grinder_x + 1 + shake, 4, "|▓|", theme.muted);
+        text(grinder_x, 3, "[___]", theme.muted);
+        if (grinding)
+          text(grinder_x - 1 + 2 * shake, 7, "brrr", theme.muted, false, true);
+
+        /* The dripper on top of the pot: */
+        text(dripper_x, 6, "\\     /", theme.muted);
+        text(dripper_x + 1, 5, "\\___/", theme.muted);
+        text(dripper_x, 4, "(     )", theme.muted);
+        text(dripper_x, 3, "(     )", theme.muted);
+        if (phase_ >= Phase::bloom) {
+          const bool wet = pouring() || phase_ == Phase::pour;
+          text(dripper_x + 1,
+               6,
+               wet && step_ % 4 < 2 ? "~~~~~" : "▒▒▒▒▒",
+               wet ? theme.animation[0] : coffee());
+        }
+
+        /* The coffee in the pot, in eighths of a cell: */
+        static const std::array<std::string, 9> blocks = {
+            " ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"};
+        const int eighths = int(std::lround(16. * level_));
+        if (eighths > 0)
+          text(
+              dripper_x + 1,
+              3,
+              [&] {
+                std::string row;
+                for (int i = 0; i < 5; ++i)
+                  row += blocks[std::min(eighths, 8)];
+                return row;
+              }(),
+              coffee());
+        if (eighths > 8)
+          text(
+              dripper_x + 1,
+              4,
+              [&] {
+                std::string row;
+                for (int i = 0; i < 5; ++i)
+                  row += blocks[eighths - 8];
+                return row;
+              }(),
+              coffee());
+        if (phase_ >= Phase::bloom && phase_ != Phase::done && eighths < 16 &&
+            step_ % 3 == 0)
+          text(dripper_x + 3, 4, "·", coffee(), true);
+
+        /*
+         * The timer of the brew, from the start of the bloom, and the
+         * water poured so far:
+         */
+        if (phase_ >= Phase::bloom) {
+          /*
+           * The timer runs as if the brew took two and a half minutes,
+           * however long the simulation takes:
+           */
+          const int seconds =
+              phase_ == Phase::bloom
+                  ? bloom_seconds * phase_step_ / bloom_steps
+                  : bloom_seconds +
+                        int(std::lround((brew_seconds - bloom_seconds) *
+                                        brew_));
+          char timer[16];
+          std::snprintf(
+              timer, sizeof(timer), "%d:%02d", seconds / 60, seconds % 60);
+          const int length = int(std::strlen(timer));
+          char water[16];
+          std::snprintf(water, sizeof(water), "%3.0fg", water_);
+          text(kettle_x, 6, timer, theme.good, true);
+          text(kettle_x + length + 1, 6, water, theme.good, true);
+        }
+
+        /* The kettle, held over the dripper while pouring: */
+        if (pouring()) {
+          text(dripper_x, 9, "▄▄", theme.muted);
+          text(dripper_x - 1, 8, "(▓▓)╮", theme.muted);
+          text(dripper_x + 3, 7, "│", theme.animation[0], true);
+        } else {
+          text(kettle_x + 1, 4, "▄▄", theme.muted);
+          text(kettle_x, 3, "(▓▓)╮", theme.muted);
+        }
+
+        /* The barista, walking, working, or enjoying a cup: */
+        const int x = barista_;
+        const bool walking = barista_ != station();
+        text(x, 5, "  O", plain, true);
+        if (phase_ == Phase::done && !walking) {
+          text(x + 4, 5, "c[]", plain);
+          text(x + 5, 6, step_ % 8 < 4 ? "~" : "≀", plain, false, true);
+          text(x, 4, " /|_/", plain);
+          text(x, 3, "/ |", plain);
+        } else if (pouring()) {
+          text(x + 4, 5, "/", plain);
+          text(x, 4, " /|/", plain);
+          text(x, 3, "/ |", plain);
+        } else {
+          text(x, 4, " /|\\", plain);
+          text(x, 3, "/ | \\", plain);
+        }
+        text(x, 2, "  |", plain);
+        if (walking && step_ % 4 < 2) {
+          text(x, 1, "  |", plain);
+          text(x, 0, " / \\", plain);
+        } else {
+          text(x, 1, " / \\", plain);
+          text(x, 0, "/   \\", plain);
+        }
+
+        repaint(stage, region, frame_, std::move(frame));
+      }
+
+      std::optional<Cell> origin_;
+
+      std::string_view roaster_ = pick_roaster();
+
+      Phase phase_ = Phase::weigh;
+      /* The steps of wall time, and the steps of the animation: */
+      int ticks_ = 0;
+      int step_ = 0;
+      int phase_step_ = 0;
+
+      /* The column of the barista, starting off the bar to the left: */
+      int barista_ = barista_start;
+
+      /* The wall time of the first step: */
+      std::optional<std::chrono::steady_clock::time_point> start_;
+
+      /* The progress of the brew after the bloom, from 0 to 1: */
+      double brew_ = 0.;
+
+      /* The fill level of the pot from 0 to 1: */
+      double level_ = 0.;
+
+      /* The water poured so far in grams: */
+      double water_ = 0.;
+
+      std::vector<Glyph> frame_;
+    };
   } // namespace
 
 
@@ -425,6 +974,8 @@ namespace ryujin::animation
       return std::make_unique<Sparkle>();
     case DashboardAnimation::matthias:
       return std::make_unique<Snakes>();
+    case DashboardAnimation::eric:
+      return std::make_unique<Coffee>();
     }
 
     __builtin_unreachable();
