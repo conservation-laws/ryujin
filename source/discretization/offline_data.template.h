@@ -1485,6 +1485,18 @@ namespace ryujin
           return {index, new_normal, new_normal_mass, boundary_mass, id, point};
         });
 
+    /*
+     * Sort entries for the same degree of freedom by descending boundary
+     * id, see the documentation of Boundary:
+     */
+    std::stable_sort(std::begin(boundary_map),
+                     std::end(boundary_map),
+                     [](const auto &left, const auto &right) {
+                       if (std::get<0>(left) != std::get<0>(right))
+                         return std::get<0>(left) < std::get<0>(right);
+                       return std::get<4>(left) > std::get<4>(right);
+                     });
+
     return boundary_map;
   }
 

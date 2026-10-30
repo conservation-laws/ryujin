@@ -7,6 +7,7 @@
 #include <ryujin/geometries/geometry_annulus.h>
 #include <ryujin/geometries/geometry_cylinder.h>
 #include <ryujin/geometries/geometry_disk.h>
+#include <ryujin/geometries/geometry_elevation_profile.h>
 #include <ryujin/geometries/geometry_geotiff_profile.h>
 #include <ryujin/geometries/geometry_library.h>
 #include <ryujin/geometries/geometry_reader.h>
@@ -31,6 +32,7 @@ namespace ryujin
           GeometryLibrary<dim>::template creator<Annulus<dim>>(),
           GeometryLibrary<dim>::template creator<Cylinder<dim>>(),
           GeometryLibrary<dim>::template creator<Disk<dim>>(),
+          GeometryLibrary<dim>::template creator<ElevationProfile<dim>>(),
           GeometryLibrary<dim>::template creator<GeoTIFFProfile<dim>>(),
           GeometryLibrary<dim>::template creator<Reader<dim>>(),
           GeometryLibrary<dim>::template creator<RectangularDomain<dim>>(),

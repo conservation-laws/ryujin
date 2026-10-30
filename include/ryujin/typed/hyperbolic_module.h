@@ -323,6 +323,15 @@ namespace ryujin
 
     mutable ScalarVector<Number> alpha_;
 
+    /*
+     * Limit in rows of degrees of freedom with Dirichlet boundary
+     * conditions. If disabled we skip limiting in all rows for which the
+     * mask is one. The mask is zero otherwise and only populated if the
+     * option is disabled.
+     */
+    bool limit_at_dirichlet_boundaries_;
+    ScalarVector<Number> dirichlet_mask_;
+
     static constexpr auto n_bounds =
         decltype(std::declval<const Limiter &>()
                      .template view<dim, Number>())::n_bounds;

@@ -23,7 +23,7 @@ cfl max: floating, value = 0.5, valid = true
 dashboard max width: integer, value = wide, valid = false
 cylinder
 modified: false
-geometry: selection, value = cylinder, valid = true, choices = »airfoil« »annulus« »cylinder« »disk« »geotiff profile« »reader« »rectangular domain« »step« »two tanks« »wall« »wave tank«
+geometry: selection, value = cylinder, valid = true, choices = »airfoil« »annulus« »cylinder« »disk« »elevation profile« »geotiff profile« »reader« »rectangular domain« »step« »two tanks« »wall« »wave tank«
 active: »cylinder«
 active: »disk«
 invalid: 0

@@ -305,7 +305,8 @@ namespace ryujin
         precomputed.template view<n_initial_precomputed_values>();
     const auto callable = [&](const auto &p) { return initial_precomputed(p); };
     for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
-      VectorTools::interpolate(offline_data_->dof_handler(),
+      VectorTools::interpolate(offline_data_->discretization().mapping(),
+                               offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);
       precomputed_view.insert_component(temp, d);

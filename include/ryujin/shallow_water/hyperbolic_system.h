@@ -549,12 +549,14 @@ namespace ryujin
 
       DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const;
 
       DEAL_II_HOST_DEVICE
       state_type nodal_source(const PrecomputedVectorView &pv,
+                              const InitialPrecomputedVectorView &ipv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const;
@@ -1266,6 +1268,7 @@ namespace ryujin
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::nodal_source(
         const PrecomputedVectorView &pv,
+        const InitialPrecomputedVectorView & /*ipv*/,
         const unsigned int i,
         const state_type &U_i,
         const ScalarNumber tau) const -> state_type
@@ -1281,6 +1284,7 @@ namespace ryujin
     DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::nodal_source(
         const PrecomputedVectorView &pv,
+        const InitialPrecomputedVectorView & /*ipv*/,
         const unsigned int *js,
         const state_type &U_j,
         const ScalarNumber tau) const -> state_type
