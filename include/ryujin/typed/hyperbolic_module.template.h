@@ -57,6 +57,19 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , initial_values_(&initial_values)
   {
+    limit_at_dirichlet_boundaries_ = true;
+    this->add_parameter(
+        "limit at dirichlet boundaries",
+        limit_at_dirichlet_boundaries_,
+        "Limit the high-order update in rows of degrees of freedom with "
+        "Dirichlet boundary conditions. Their states are overwritten by the "
+        "boundary data, but the local bounds are constructed from interior "
+        "states only and do not accommodate time-dependent boundary data. "
+        "Due to the symmetrization of l_ij limiting such a row also limits "
+        "the update of the interior neighbors, which degrades convergence "
+        "rates for time-dependent inflow data. Disabling the option is only "
+        "intended for convergence tests; the default (true) is "
+        "unconditionally stable.");
   }
 
 
@@ -95,6 +108,21 @@ namespace ryujin
         scalar_partitioner, 1, TransferPolicy::implicit_transfers);
 
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner, n_bounds);
+
+    dirichlet_mask_.reinit_with_scalar_partitioner(scalar_partitioner, 1);
+    if (!limit_at_dirichlet_boundaries_) {
+      const auto dirichlet_mask_view = dirichlet_mask_.template view<1>();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      for (unsigned int i = 0; i < n_owned; ++i)
+        dirichlet_mask_view.template write_entry<Number>(Number(0.), i);
+      for (const auto &entry : offline_data_->boundary_map()) {
+        const auto &[i, normal, normal_mass, boundary_mass, id, position] =
+            entry;
+        if (id == Boundary::dirichlet && i < n_owned)
+          dirichlet_mask_view.template write_entry<Number>(Number(1.), i);
+      }
+    }
+
     r_.reinit_with_vector_partitioner(
         offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
 
@@ -125,6 +153,7 @@ namespace ryujin
       using MemorySpace = selected_memory_space_t;
 
       bounds_.template move_to_memory_space<MemorySpace>();
+      dirichlet_mask_.template move_to_memory_space<MemorySpace>();
       r_.template move_to_memory_space<MemorySpace>();
 
       dij_matrix_.template move_to_memory_space<MemorySpace>();
@@ -595,6 +624,8 @@ namespace ryujin
 
     const auto alpha_view = alpha_.template view<1, MemorySpace>();
     const auto bounds_view = bounds_.template view<n_bounds, MemorySpace>();
+    const auto dirichlet_mask_view =
+        dirichlet_mask_.template view<1, MemorySpace>();
     const auto r_view = r_.template view<problem_dimension, MemorySpace>();
 
     if (have_separate_memory_spaces)
@@ -1202,6 +1233,7 @@ namespace ryujin
 
       const auto body = [=](auto sentinel,
                             auto have_discontinuous_ansatz,
+                            auto skip_dirichlet_boundaries,
                             const unsigned int i) {
         using T = decltype(sentinel);
 
@@ -1305,8 +1337,12 @@ namespace ryujin
            * Compute limiter coefficients:
            */
 
-          const auto &[l_ij, success] =
+          auto [l_ij, success] =
               limiter_view.limit(local_bounds, U_i_new, P_ij);
+          if constexpr (skip_dirichlet_boundaries) {
+            const auto mask_i = dirichlet_mask_view.template read_entry<T>(i);
+            l_ij += mask_i * (T(1.) - l_ij);
+          }
           lij_matrix_view.template write_entry<T>(l_ij, i, col_idx, true);
 
           /*
@@ -1330,12 +1366,29 @@ namespace ryujin
        * (constexpr) integral constant later on to avoid branching when
        * computing d_ijH.
        */
+      const auto dispatch = [&](auto have_discontinuous_ansatz) {
+        if (!limit_at_dirichlet_boundaries_)
+          loop<MemorySpace, Number>(loop_name(),
+                                    body,
+                                    0,
+                                    n_internal,
+                                    n_owned,
+                                    have_discontinuous_ansatz,
+                                    std::true_type{});
+        else
+          loop<MemorySpace, Number>(loop_name(),
+                                    body,
+                                    0,
+                                    n_internal,
+                                    n_owned,
+                                    have_discontinuous_ansatz,
+                                    std::false_type{});
+      };
+
       if (have_discontinuous_ansatz) {
-        loop<MemorySpace, Number>(
-            loop_name(), body, 0, n_internal, n_owned, std::true_type{});
+        dispatch(std::true_type{});
       } else {
-        loop<MemorySpace, Number>(
-            loop_name(), body, 0, n_internal, n_owned, std::false_type{});
+        dispatch(std::false_type{});
       }
 
       lij_matrix_view.update_ghost_rows();
@@ -1362,7 +1415,9 @@ namespace ryujin
                                 ? lij_matrix_next_view
                                 : lij_matrix_view;
 
-      const auto body = [=](auto sentinel, const unsigned int i) {
+      const auto body = [=](auto sentinel,
+                            auto skip_dirichlet_boundaries,
+                            const unsigned int i) {
         using T = decltype(sentinel);
 
         auto limiter_view = limiter_views.template view<T>();
@@ -1438,12 +1493,21 @@ namespace ryujin
            *
            * This approach only works for at most two limiting steps.
            */
-          const auto entry = (T(1.) - old_l_ij) * new_l_ij;
+          auto entry = (T(1.) - old_l_ij) * new_l_ij;
+          if constexpr (skip_dirichlet_boundaries) {
+            const auto mask_i = dirichlet_mask_view.template read_entry<T>(i);
+            entry += mask_i * (T(1.) - entry);
+          }
           lij_matrix_next_view.write_entry(entry, i, col_idx, true);
         }
       };
 
-      loop<MemorySpace, Number>(loop_name(), body, 0, n_internal, n_owned);
+      if (!limit_at_dirichlet_boundaries_)
+        loop<MemorySpace, Number>(
+            loop_name(), body, 0, n_internal, n_owned, std::true_type{});
+      else
+        loop<MemorySpace, Number>(
+            loop_name(), body, 0, n_internal, n_owned, std::false_type{});
 
       if (!last_round) {
         lij_matrix_next_view.update_ghost_rows();
