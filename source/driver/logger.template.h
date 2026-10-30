@@ -64,7 +64,7 @@ namespace ryujin
     add_parameter("dashboard animation",
                   dashboard_settings_.animation,
                   "Animation in the space around the terminal dashboard: "
-                  "ryujin, matthias, wyatt, none");
+                  "ryujin, matthias, eric, wyatt, none");
 
     add_parameter("dashboard color scheme",
                   dashboard_settings_.color_scheme,
