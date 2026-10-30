@@ -897,11 +897,29 @@ namespace ryujin
           Box{left, left + width - 1, top, top + height - 1});
       Render(stage_->screen,
              place(element | size(HEIGHT, EQUAL, height), left, top));
+      if (data_->t_final > 0.)
+        stage_->progress = std::clamp(data_->t / data_->t_final, 0., 1.);
+      if (data_->eta > 0.)
+        stage_->eta = data_->eta;
     }
 
-    /* Leave the screen around the final dashboard empty: */
+    /* Let the animation decide what stays around the final dashboard: */
     if (animation_ && !final_time)
       animation_->draw(*stage_);
+    else if (animation_)
+      animation_->finish(*stage_);
+
+    /*
+     * Move the dashboard right away if the animation asks for it, and
+     * render the whole screen again:
+     */
+    if (data_ && stage_->shift != std::pair{0, 0}) {
+      const auto [free_columns, free_rows] = stage_->free_space();
+      position_.shift(
+          settings_.location, stage_->shift, free_columns, free_rows);
+      terminal_size_ = {};
+      return render();
+    }
 
     std::string output = clear ? "\033[2J\033[H" : "\033[H";
     output += stage_->screen.ToString();
