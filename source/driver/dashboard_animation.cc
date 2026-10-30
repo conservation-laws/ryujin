@@ -9,13 +9,17 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <deque>
+#include <initializer_list>
+#include <map>
 #include <optional>
 #include <random>
 #include <set>
 #include <string>
+#include <string_view>
 
 namespace ryujin::animation
 {
@@ -46,12 +50,69 @@ namespace ryujin::animation
                Cell c,
                const std::string &glyph,
                ftxui::Color color,
-               bool bold = false)
+               bool bold = false,
+               bool dim = false)
     {
       auto &pixel = stage.pixel(c.first, c.second);
       pixel.character = glyph;
       pixel.foreground_color = color;
       pixel.bold = bold;
+      pixel.dim = dim;
+    }
+
+    bool open(const Stage &stage, int x, int y)
+    {
+      return x >= 0 && y >= 0 && x < stage.screen.dimx() &&
+             y < stage.screen.dimy() && stage.free(x, y);
+    }
+
+    ftxui::Color shade(double t)
+    {
+      const auto &colors = dashboard::theme.animation;
+      const int n = static_cast<int>(colors.size());
+      return colors[std::clamp(static_cast<int>(t * n), 0, n - 1)];
+    }
+
+    int free_area(const Stage &stage)
+    {
+      int area = 0;
+      for (int y = 0; y < stage.screen.dimy(); ++y)
+        for (int x = 0; x < stage.screen.dimx(); ++x)
+          area += stage.free(x, y);
+      return area;
+    }
+
+    using Sprite = std::vector<std::vector<std::string>>;
+
+    Sprite make_sprite(std::initializer_list<std::string_view> rows)
+    {
+      Sprite sprite;
+      for (const auto row : rows) {
+        auto &glyphs = sprite.emplace_back();
+        for (const char c : row)
+          if ((c & 0xc0) == 0x80)
+            glyphs.back() += c;
+          else
+            glyphs.emplace_back(1, c);
+      }
+      return sprite;
+    }
+
+    Sprite mirror(Sprite sprite)
+    {
+      static const std::map<std::string, std::string> swap = {{"(", ")"},
+                                                              {")", "("},
+                                                              {"/", "\\"},
+                                                              {"\\", "/"},
+                                                              {"<", ">"},
+                                                              {">", "<"}};
+      for (auto &row : sprite) {
+        std::ranges::reverse(row);
+        for (auto &glyph : row)
+          if (const auto it = swap.find(glyph); it != swap.end())
+            glyph = it->second;
+      }
+      return sprite;
     }
 
     void sparkle(Stage &stage, Cell c)
@@ -413,6 +474,325 @@ namespace ryujin::animation
       /* The Content of every cell of the stage: */
       std::vector<std::uint8_t> cells_;
     };
+
+
+    /**
+     * Fish, crabs, and jellyfish that swim through the free cells.
+     */
+    class Aquarium final : public Animation
+    {
+    public:
+      void draw(Stage &stage) override
+      {
+        width_ = stage.screen.dimx();
+        height_ = stage.screen.dimy();
+
+        if (static_cast<int>(weeds_.size()) != std::max(1, width_ / 8)) {
+          weeds_.clear();
+          const int n = std::max(1, width_ / 8);
+          for (int k = 0; k < n; ++k)
+            weeds_.push_back(
+                {static_cast<int>(width_ * (k + 0.2 + 0.6 * pick(100) / 100.) /
+                                  n),
+                 3 + pick(7),
+                 pick(2),
+                 shade(0.2 + 0.5 * pick(100) / 100.)});
+        }
+
+        std::erase_if(fish_, [&](const Fish &f) {
+          return !fits(stage, look(f), f.x, f.y);
+        });
+        const auto count = [&](auto... kinds) {
+          return std::ranges::count_if(
+              fish_, [&](const Fish &f) { return ((f.kind == kinds) || ...); });
+        };
+        for (auto n = count(Kind::small, Kind::big);
+             n < std::clamp(free_area(stage) / 250, 1, 12);
+             ++n)
+          spawn(stage, chance(0.4) ? Kind::big : Kind::small);
+        for (const Kind kind : {Kind::puffer, Kind::crab, Kind::jelly})
+          if (count(kind) == 0)
+            spawn(stage, kind);
+
+        bubbles_.clear();
+        scene_.clear();
+        compose(stage);
+      }
+
+      void step(Stage &stage) override
+      {
+        ++time_;
+        for (auto &f : fish_)
+          swim(stage, f);
+
+        for (const auto &w : weeds_)
+          if (chance(0.03))
+            bubble(w.x, height_ - 2 - w.height);
+
+        std::erase_if(bubbles_, [&](Bubble &b) {
+          b.y -= 0.5;
+          b.x += (pick(3) - 1) * 0.3;
+          ++b.age;
+          return !open(stage, round(b.x), round(b.y));
+        });
+
+        compose(stage);
+      }
+
+    private:
+      enum class Kind : std::uint8_t { small, big, puffer, crab, jelly };
+
+      struct Fish {
+        Kind kind;
+        double x;
+        int y;
+        int dir;
+        int timer;
+        bool alt;
+        ftxui::Color color;
+      };
+
+      struct Weed {
+        int x;
+        int height;
+        int phase;
+        ftxui::Color color;
+      };
+
+      struct Bubble {
+        double x;
+        double y;
+        int age;
+      };
+
+      struct Glyph {
+        std::string text;
+        ftxui::Color color;
+        bool bold = false;
+        bool dim = false;
+        bool operator==(const Glyph &) const = default;
+      };
+
+      const std::vector<Sprite> right_ = {
+          make_sprite({"><>"}),
+          make_sprite({"><(((°>"}),
+          make_sprite({">(°)"}),
+          make_sprite({"  \\ | /  ", ">-(  ° )-", "  / | \\  "}),
+          make_sprite({"V(°.°)V"}),
+          make_sprite({"Y(°.°)Y"}),
+          make_sprite({" .--. ", "(    )", " )()( ", " (  ) ", " )  ( "}),
+          make_sprite({" .--. ", "(    )", " ()() ", " )  ( ", " (  ) "}),
+          make_sprite({" .-. ", "(   )", " ||| ", " | | ", " | | "})};
+      const std::vector<Sprite> left_ = [this] {
+        std::vector<Sprite> sprites;
+        for (const auto &sprite : right_)
+          sprites.push_back(mirror(sprite));
+        return sprites;
+      }();
+
+      static int round(double v)
+      {
+        return static_cast<int>(std::lround(v));
+      }
+
+      const Sprite &look(const Fish &f) const
+      {
+        const auto frame = [&] {
+          switch (f.kind) {
+          case Kind::small:
+            return 0;
+          case Kind::big:
+            return 1;
+          case Kind::puffer:
+            return f.alt ? 3 : 2;
+          case Kind::crab:
+            return f.alt && f.timer / 3 % 2 ? 5 : 4;
+          case Kind::jelly:
+            return f.alt ? 8 : 6 + time_ / 4 % 2;
+          }
+          __builtin_unreachable();
+        }();
+        return (f.dir > 0 ? right_ : left_)[frame];
+      }
+
+      bool fits(const Stage &stage, const Sprite &sprite, double x, int y) const
+      {
+        if (y + static_cast<int>(sprite.size()) > height_ - 1)
+          return false;
+        for (int r = 0; r < static_cast<int>(sprite.size()); ++r)
+          for (int k = 0; k < static_cast<int>(sprite[r].size()); ++k)
+            if (sprite[r][k] != " " && !open(stage, round(x) + k, y + r))
+              return false;
+        return true;
+      }
+
+      bool fits(const Stage &stage, const Fish &f) const
+      {
+        return fits(stage, look(f), f.x, f.y);
+      }
+
+      void spawn(const Stage &stage, Kind kind)
+      {
+        for (int attempt = 0; attempt < 100; ++attempt) {
+          const Fish f{kind,
+                       static_cast<double>(pick(width_)),
+                       kind == Kind::crab ? height_ - 2 : pick(height_),
+                       chance(0.5) ? 1 : -1,
+                       60 + pick(80),
+                       false,
+                       random_color()};
+          if (fits(stage, f)) {
+            fish_.push_back(f);
+            return;
+          }
+        }
+      }
+
+      void bubble(double x, int y)
+      {
+        bubbles_.push_back({x, static_cast<double>(y), 0});
+      }
+
+      void advance(const Stage &stage, Fish &f, double speed)
+      {
+        if (const double x = f.x + f.dir * speed;
+            fits(stage, look(f), x, f.y) && !chance(0.003))
+          f.x = x;
+        else
+          f.dir = -f.dir;
+      }
+
+      bool change(const Stage &stage, Fish &f, bool alt, int dy)
+      {
+        Fish g = f;
+        g.alt = alt;
+        g.y += dy;
+        if (!fits(stage, g))
+          return false;
+        f = g;
+        return true;
+      }
+
+      void swim(const Stage &stage, Fish &f)
+      {
+        switch (f.kind) {
+        case Kind::small:
+        case Kind::big:
+          if (const int dy = chance(0.5) ? 1 : -1; chance(0.02))
+            change(stage, f, false, dy);
+          advance(stage, f, f.kind == Kind::big ? 0.25 : 0.45);
+          if (chance(0.01))
+            bubble(f.x + (f.dir > 0 ? look(f)[0].size() : -1.), f.y);
+          return;
+
+        case Kind::puffer:
+          if (--f.timer <= 0) {
+            if (change(stage, f, !f.alt, f.alt ? 1 : -1)) {
+              f.timer = f.alt ? 25 + pick(15) : 60 + pick(80);
+              for (int k = 0; f.alt && k < 3; ++k)
+                bubble(f.x + pick(6), f.y - 1);
+            } else
+              f.timer = 10;
+          }
+          if (!f.alt)
+            advance(stage, f, 0.15);
+          return;
+
+        case Kind::crab:
+          if (f.alt)
+            f.alt = --f.timer > 0;
+          else if (chance(0.01)) {
+            f.alt = true;
+            f.timer = 20 + pick(20);
+          } else
+            advance(stage, f, 0.2);
+          return;
+
+        case Kind::jelly:
+          if (f.alt) {
+            if (f.timer > 5)
+              change(stage, f, true, -1);
+            if (--f.timer <= 0 && change(stage, f, false, 0))
+              f.timer = 14 + pick(13);
+          } else {
+            if (f.timer % 4 == 0 && !change(stage, f, false, 1))
+              f.timer = 1;
+            advance(stage, f, 0.05);
+            if (--f.timer <= 0 && change(stage, f, true, 0))
+              f.timer = 7 + pick(7);
+          }
+          return;
+        }
+      }
+
+      void compose(Stage &stage)
+      {
+        static constexpr std::array<const char *, 7> sand = {
+            "_", ".", "_", "_", ",", "_", "."};
+        std::map<int, Glyph> next;
+        const auto put = [&](int x, int y, Glyph g) {
+          if (open(stage, x, y))
+            next[y * width_ + x] = std::move(g);
+        };
+
+        const auto floor = dashboard::theme.animation.front();
+        for (int x = 0; x < width_; ++x)
+          put(x, height_ - 1, {sand[x * 5 % sand.size()], floor, false, true});
+
+        for (const auto &w : weeds_)
+          for (int r = 0; r < w.height && open(stage, w.x, height_ - 2 - r);
+               ++r)
+            put(w.x,
+                height_ - 2 - r,
+                {(time_ / 8 + r + w.phase) % 2 ? "(" : ")", w.color});
+
+        const auto bright = dashboard::theme.animation.back();
+        for (const auto &b : bubbles_)
+          put(round(b.x),
+              round(b.y),
+              {b.age < 6    ? "."
+               : b.age < 16 ? "o"
+                            : "O",
+               bright,
+               false,
+               b.age < 6});
+
+        for (const bool front : {false, true})
+          for (const auto &f : fish_) {
+            if ((f.kind == Kind::jelly || f.kind == Kind::crab) == front)
+              continue;
+            const auto &sprite = look(f);
+            for (int r = 0; r < static_cast<int>(sprite.size()); ++r)
+              for (int k = 0; k < static_cast<int>(sprite[r].size()); ++k)
+                if (sprite[r][k] != " ")
+                  put(round(f.x) + k,
+                      f.y + r,
+                      {sprite[r][k], f.color, true, f.kind == Kind::jelly});
+          }
+
+        for (const auto &[i, g] : scene_)
+          if (!next.contains(i))
+            stage.pixel(i % width_, i / width_);
+        for (const auto &[i, g] : next)
+          if (const auto it = scene_.find(i);
+              it == scene_.end() || !(it->second == g))
+            paint(stage,
+                  {i % width_, i / width_},
+                  g.text,
+                  g.color,
+                  g.bold,
+                  g.dim);
+        scene_ = std::move(next);
+      }
+
+      int width_ = 0;
+      int height_ = 0;
+      int time_ = 0;
+      std::vector<Fish> fish_;
+      std::vector<Weed> weeds_;
+      std::vector<Bubble> bubbles_;
+      std::map<int, Glyph> scene_;
+    };
   } // namespace
 
 
@@ -425,6 +805,8 @@ namespace ryujin::animation
       return std::make_unique<Sparkle>();
     case DashboardAnimation::matthias:
       return std::make_unique<Snakes>();
+    case DashboardAnimation::wyatt:
+      return std::make_unique<Aquarium>();
     }
 
     __builtin_unreachable();
