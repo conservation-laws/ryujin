@@ -1,0 +1,96 @@
+##
+#
+# 2D Schaer mountain, Section 4.2.3 (Figure 4.6) of [2]:
+#
+#   h(x) = h_c exp(-(x / a_c)^2) cos^2(pi x / lambda_c),
+#   h_c = 250 m, a_c = 5000 m, lambda_c = 4000 m,
+#
+# on D = [-25000,25000] x [0,21000] m^2, final time t = 5 h. Uniform
+# horizontal flow u = 10 m/s, constant Brunt-Vaisala frequency
+# N = 0.01 1/s, theta_0 = 280 K:
+#
+#   pi(z)    = 1 + g^2 / (c_p theta_0 N^2) (exp(-N^2 z / g) - 1),
+#   theta(z) = theta_0 exp(N^2 z / g),
+#   p(z)     = p_0 pi^(c_p / R),
+#   rho(z)   = p(z) / (R theta(z) pi(z)),
+#
+# with c_p = 1004, c_v = 717, R = c_p - c_v = 287, g = 9.81, and
+# p_0 = 10^5 Pa.
+#
+# The bottom boundary is the elevation profile h(x) (slip boundary
+# conditions); the mesh is aligned with the profile and cut cells are
+# replaced by triangles. The left, right, and top boundaries prescribe the
+# initial state (Dirichlet). Reflections are suppressed with sponge layers
+# as in [1, Sec. 7.4.3]: the last 8 km in the vertical direction and the
+# last 5 km near both lateral boundaries, with damping coefficient alpha =
+# 0.03 1/s and the sin^2 profile of [1, (173)].
+#
+# [1] M. Artiano, O. Knoth, P. Spichtinger, H. Ranocha. Structure-preserving
+#     high-order methods for the compressible Euler equations in potential
+#     temperature formulation for atmospheric flows. arXiv:2509.10311, 2025.
+#
+# [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+#     approximation of the compressible atmospheric Euler equations.
+#     arXiv:2606.19764, 2026.
+#
+##
+
+subsection A - Scheduler
+  set basename          = schaer-mountain
+  set tasks             = vtu output
+  set final time        = 18000
+  set timer granularity = 1800
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 717
+  set gamma              = 1.400278940027894
+  set gravity            = 9.81
+  set reference pressure = 100000
+  set sponge damping     = 0.03 * (sin(1.5707963267948966*max(0,min(1,(y-13000)/8000)))^2 + sin(1.5707963267948966*max(0,min(1,(-20000-x)/5000)))^2 + sin(1.5707963267948966*max(0,min(1,(x-20000)/5000)))^2)
+end
+
+subsection C - Discretization
+  set geometry              = elevation profile
+  set finite element ansatz = cG Q1
+  set mesh type             = parallel fullydistributed
+  set mesh refinement       = 0
+
+  subsection elevation profile
+    set elevation                 = 250*exp(-(x/5000)^2)*cos(3.141592653589793*x/4000)^2
+    set position bottom left      = -25000, 0
+    set position top right        =  25000, 21000
+    set subdivisions x            = 400
+    set subdivisions y            = 168
+    set refinement                = 0
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition bottom = slip
+    set boundary condition top    = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set position      = 0, 0
+
+  subsection function
+    set density expression               = 100000 * (1 + 9.81^2/(1004*280*1e-4)*(exp(-1e-4/9.81*y) - 1))^(1004/287 - 1) / (287 * 280 * exp(1e-4/9.81*y))
+    set velocity x expression            = 10
+    set velocity y expression            = 0
+    set potential temperature expression = 280 * exp(1e-4/9.81*y)
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.9
+  set cfl max = 0.9
+end
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, v_1, v_2, theta
+  end
+end

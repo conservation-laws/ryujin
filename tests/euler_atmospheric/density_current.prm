@@ -1,0 +1,71 @@
+##
+#
+# Density current (cold bubble), Section 4.2.2 (Figure 4.5) of the
+# atmospheric Euler paper, on a coarse mesh and for a short time. The
+# error measures the deviation from the initial state.
+#
+##
+
+subsection A - Scheduler
+  set basename             = test
+  set tasks                = error evaluation
+  set final time           = 100
+  set timer granularity    = 100
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 717.5
+  set gamma              = 1.4
+  set gravity            = 9.806
+  set reference pressure = 100000
+  set reference density  = 1.2
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+  set mesh writeout   = false
+
+  subsection rectangular domain
+    set position bottom left      = 0, 0
+    set position top right        = 25600, 6400
+    set subdivisions x            = 64
+    set subdivisions y            = 16
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = stratified function
+  set position      = 0, 0
+
+  subsection stratified function
+    set velocity x expression = 0
+    set velocity y expression = 0
+    set theta expression      = 300 - 7.5*(1 + cos(3.141592653589793*sqrt((x/4000)^2+((y-3000)/2000)^2)))
+    set radius                = 1
+    set blast width           = 0
+    set blast height          = 3000
+    set x factor              = 4000
+    set y factor              = 2000
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.9
+  set cfl max = 0.9
+end
+
+subsection K - ErrorEvaluation
+  set error quantities = v_1, v_2, theta
+  set error normalize  = false
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end

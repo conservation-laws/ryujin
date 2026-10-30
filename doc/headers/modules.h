@@ -228,6 +228,17 @@
 
 
 /**
+ * @defgroup EulerAtmosphericEquations The Atmospheric Euler Equations
+ * @ingroup EquationsLayer
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Euler equations with gravity, formulated in terms of the
+ * potential temperature, with a well-balanced hydrostatic reconstruction
+ * (<code>include/ryujin/euler_atmospheric</code>).
+ */
+
+
+/**
  * @defgroup EulerBarotropicEquations The Barotropic Euler Equations
  * @ingroup EquationsLayer
  *

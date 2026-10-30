@@ -1,0 +1,74 @@
+##
+#
+# Conservation of mass, momentum, and potential temperature for a warm
+# bubble on a warped, horizontally periodic mesh with slip boundary
+# conditions at the bottom and top, Section 4.1.5 (Table 4.5) of the
+# atmospheric Euler paper. Mass and volumetric potential temperature have
+# to stay constant up to round-off; the vertical momentum is not
+# conserved because of the gravity source.
+#
+##
+
+subsection A - Scheduler
+  set basename             = test
+  set tasks                = quantities
+  set final time           = 5
+  set timer granularity    = 5
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 717
+  set gamma              = 1.400278940027894
+  set gravity            = 9.81
+  set reference pressure = 100000
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+  set mesh writeout   = false
+
+  subsection rectangular domain
+    set position bottom left      = -1, -1
+    set position top right        =  1,  1
+    set transformation            = 500*(1 + x + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y)); 500*(1 + y + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y))
+    set subdivisions x            = 16
+    set subdivisions y            = 16
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = stratified function
+  set position      = 0, 0
+
+  subsection stratified function
+    set velocity x expression = 0
+    set velocity y expression = 0
+    set theta expression      = 300 + 2*(1 - sqrt((x-500)^2+(y-300)^2)/200)
+    set radius                = 200
+    set blast width           = 500
+    set blast height          = 300
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.5
+  set cfl max = 0.5
+end
+
+subsection J - Quantities
+  set quantities         = rho, m_1, m_2, rho_theta
+  set number of moments  = 1
+  set interior manifolds = domain : 0 : space_averaged
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+  set debug filename           = test-domain-R0000-space_averaged_time_series.dat
+end

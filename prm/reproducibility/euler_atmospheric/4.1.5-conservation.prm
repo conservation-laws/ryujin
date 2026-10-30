@@ -1,0 +1,87 @@
+##
+#
+# Conservation check, Section 4.1.5 (Table 4.5) of [1].
+#
+# Warped mesh of Section 4.1.3 (64 x 64 cells),
+#
+#   x = 500 (1 + xi  + 0.1 sin(pi xi) sin(pi eta)),
+#   y = 500 (1 + eta + 0.1 sin(pi xi) sin(pi eta)),
+#
+# periodic in x and with slip boundary conditions at the top and bottom.
+# The initial state is the isentropic equilibrium theta = 300 K perturbed
+# by a warm bubble,
+#
+#   theta = 300 + 2 (1 - r / 200)  for r = |x - (500, 300)| <= 200,
+#
+# where the density inside the bubble is evaluated pointwise from the
+# isentropic profile with the local potential temperature (as in Section
+# 4.2.1), v = 0, c_v = 717, c_p = 1004, p_0 = 10^5 Pa, g = 9.81, and final
+# time t = 200 s.
+#
+# Total mass, momentum, and rho theta are recorded with the "quantities"
+# task: the interior manifold "domain" (level set 0) contains all degrees
+# of freedom, and its spatial average is the lumped-mass weighted mean,
+# i.e., the total divided by |D|.
+#
+# [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+#     approximation of the compressible atmospheric Euler equations.
+#     arXiv:2606.19764, 2026.
+#
+##
+
+subsection A - Scheduler
+  set basename          = conservation
+  set tasks             = quantities
+  set final time        = 200
+  set timer granularity = 20
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 717
+  set gamma              = 1.400278940027894
+  set gravity            = 9.81
+  set reference pressure = 100000
+end
+
+subsection C - Discretization
+  set geometry              = rectangular domain
+  set finite element ansatz = cG Q1
+  set mesh refinement       = 0
+  subsection rectangular domain
+    set position bottom left      = -1, -1
+    set position top right        =  1,  1
+    set transformation            = 500*(1 + x + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y)); 500*(1 + y + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y))
+    set subdivisions x            = 64
+    set subdivisions y            = 64
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = stratified function
+  set position      = 0, 0
+  subsection stratified function
+    set velocity x expression = 0
+    set velocity y expression = 0
+    set theta expression      = 300 + 2*(1 - sqrt((x-500)^2+(y-300)^2)/200)
+    set radius                = 200
+    set blast width           = 500
+    set blast height          = 300
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.5
+  set cfl max = 0.5
+end
+
+subsection J - Quantities
+  set quantities         = rho, m_1, m_2, rho_theta
+  set number of moments  = 1
+  set interior manifolds = domain : 0 : space_averaged
+end

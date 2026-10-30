@@ -1,0 +1,36 @@
+subsection A - Scheduler
+  set basename   = verification-smooth_wave
+  set tasks      = error evaluation
+  set final time = 0.1
+end
+
+subsection B - Equation
+  set dimension          = 1
+  set equation           = euler atmospheric
+  set c_v                = 2.5
+  set gravity            = 0
+  set reference pressure = 1
+end
+
+subsection C - Discretization
+  set mesh writeout = false
+
+  subsection rectangular domain
+    set position top right = 1
+    set subdivisions x     = 100
+  end
+end
+
+subsection E - InitialValues
+  set configuration = smooth wave
+  set position      = 0
+end
+
+subsection H - TimeIntegrator
+  set cfl min = 0.25
+  set cfl max = 0.25
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end

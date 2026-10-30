@@ -37,6 +37,7 @@ set(CORE_SOURCE_FILES
   driver/equation.cc
   driver/equation_euler.cc
   driver/equation_euler_aeos.cc
+  driver/equation_euler_atmospheric.cc
   driver/equation_euler_barotropic.cc
   driver/equation_euler_poisson.cc
   driver/equation_euler_poisson_aeos.cc
@@ -100,7 +101,7 @@ target_link_libraries(object_core ${EXTERNAL_TARGETS})
 
 set(OBJECT_TARGETS)
 foreach(_equation
-    euler euler_aeos euler_barotropic euler_poisson
+    euler euler_aeos euler_atmospheric euler_barotropic euler_poisson
     navier_stokes scalar_conservation shallow_water
     )
   add_subdirectory(${_equation})
