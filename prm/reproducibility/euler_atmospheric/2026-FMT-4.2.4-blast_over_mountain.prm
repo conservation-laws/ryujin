@@ -6,16 +6,19 @@
 #   theta = 300  otherwise,  v = 0,
 #
 # on D = [-20,20] x [0,20] km^2 with the cosine shaped mountain
-# y = 0.58 (1 + cos(pi x / 3.4)) for |x| <= 3.4 at the bottom, p_0 = 0.1,
-# c_v = 717e-6, gamma = 1.4, g = 0.00981 (km units), slip boundary
-# conditions on all sides, CFL 0.9, final time t = 30 s. The density is
-# the isentropic (theta = 300) hydrostatic profile everywhere, also inside
-# the disc, so that rho theta and p jump by factors 10 and 10^1.4 across
-# the disc boundary.
+#
+#   y = 0.58 (1 + cos(pi x / 3.4))  for |x| <= 3.4
+#
+# at the bottom, p_0 = 0.1, c_v = 717e-6, gamma = 1.4, g = 0.00981 (km
+# units), slip boundary conditions on all sides, CFL 0.9, final time t = 30
+# s. The density is the isentropic (theta = 300) hydrostatic profile
+# everywhere, also inside the disc, so that rho theta and p jump by factors
+# 10 and 10^1.4 across the disc boundary.
 #
 # The triangular mesh (h = 0.1 km, 92943 vertices) is generated from
-# 4.2.4-rectangle_mountain.geo:
-#   gmsh -2 -format msh22 -o rectangle_mountain.msh 4.2.4-rectangle_mountain.geo
+# 2026-FMT-4.2.4-rectangle_mountain.geo:
+#   gmsh -2 -format msh22 -o rectangle_mountain.msh \
+#     2026-FMT-4.2.4-rectangle_mountain.geo
 #
 # [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.

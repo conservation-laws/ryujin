@@ -1,14 +1,15 @@
 ##
 #
-# Exact solution with gravitational source, 1D, high-order method,
-# Section 4.1.2 (Table 4.3) of [1]:
+# Exact solution with gravitational source, 1D, high-order method, Section
+# 4.1.2 (Table 4.3) of [1]:
 #
-#   rho = rho_0,  v = v_0,  theta^gamma = -g (x - v_0 t) / (K rho_0^(gamma-1)),
+#   rho = rho_0,  v = v_0,
+#   theta^gamma = -g (x - v_0 t) / (K rho_0^(gamma-1)),
 #
 # with rho_0 = v_0 = 1, g = 1, gamma = 1.4, zero integration constant, on
 # D = [-11,-1] with Dirichlet boundary conditions, final time t = 5, CFL
-# 0.5. Table 4.3 uses 100, 200, ..., 3200 subdivisions (mesh refinement
-# 0, ..., 5).
+# 0.5. Table 4.3 uses 100, 200, ..., 3200 subdivisions (mesh refinement 0,
+# ..., 5).
 #
 # The pressure p = -g rho_0 (x - v_0 t) does not depend on c_v and p_0;
 # changing them only rescales theta by a constant factor and leaves the

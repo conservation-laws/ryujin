@@ -7,7 +7,8 @@
 // (slip); h = lc.
 //
 // Generate rectangle_mountain.msh with:
-//   gmsh -2 -format msh22 -o rectangle_mountain.msh 4.2.4-rectangle_mountain.geo
+//   gmsh -2 -format msh22 -o rectangle_mountain.msh \
+//     2026-FMT-4.2.4-rectangle_mountain.geo
 //
 // [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 //     approximation of the compressible atmospheric Euler equations.

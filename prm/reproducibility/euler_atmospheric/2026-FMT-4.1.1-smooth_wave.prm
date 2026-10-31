@@ -6,7 +6,7 @@
 # pressure p_0 = 1, final time t = 0.1, CFL 0.5. Convergence rates are
 # obtained with mesh refinement levels 0, 1, ..., 5 (100 to 3200 cells).
 # Limiting is disabled at the Dirichlet boundary nodes (see
-# 4.1.2-exact_source-1d-high_order.prm).
+# 2026-FMT-4.1.2-exact_source-1d-high_order.prm).
 #
 # [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.

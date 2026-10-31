@@ -13,11 +13,11 @@
 # and g = 1. The final time is t = 0.8 with CFL 0.05.
 #
 # The scheme preserves the isothermal equilibrium exactly, i.e., up to
-# round-off errors. Table 4.4 of [3] uses 100, 200, ..., 3200
-# subdivisions. The tabulated error is the sum of the normalized errors of
-# rho and rho_theta (this file) and the unnormalized error of m (which
-# vanishes identically and cannot be normalized); the latter is obtained by
-# setting "error quantities = m" and "error normalize = false".
+# round-off errors. Table 4.4 of [3] uses 100, 200, ..., 3200 subdivisions.
+# The tabulated error is the sum of the normalized errors of rho and
+# rho_theta (this file) and the unnormalized error of m (which vanishes
+# identically and cannot be normalized); the latter is obtained by setting
+# "error quantities = m" and "error normalize = false".
 #
 # [1] P. Li and Z. Gao. Simple high order well-balanced finite difference
 #     WENO schemes for the Euler equations under gravitational fields.

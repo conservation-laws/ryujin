@@ -1,8 +1,8 @@
 ##
 #
 # Well-balancing test on a curvilinear mesh with an isentropic (constant
-# potential temperature) background state, Section 4.1.3 (Figure 4.1)
-# of [1]:
+# potential temperature) background state, Section 4.1.3 (Figure 4.1) of
+# [1]:
 #
 #   theta = 300 K,  T = theta - g y / c_p,  p = p_0 (T / theta)^(c_p / R),
 #   rho = p / (R T),  v = 0,
@@ -19,7 +19,8 @@
 # The boundaries remain straight because sin(pi xi) and sin(pi eta) vanish
 # at xi, eta = +-1. The final time is set to t = 5000 s.
 #
-# Variant (c) of Figure 4.1: full high-order method.
+# Variant (d) of Figure 4.1: full high-order method on a uniform mesh,
+# x = 500 (1 + xi), y = 500 (1 + eta).
 #
 # [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.
@@ -28,7 +29,7 @@
 ##
 
 subsection A - Scheduler
-  set basename          = well-balanced-adiabatic-c
+  set basename          = well-balanced-adiabatic-d
   set tasks             = error evaluation, vtu output
   set final time        = 5000
   set timer granularity = 50
@@ -51,7 +52,7 @@ subsection C - Discretization
   subsection rectangular domain
     set position bottom left      = -1, -1
     set position top right        =  1,  1
-    set transformation            = 500*(1 + x + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y)); 500*(1 + y + 0.1*sin(3.141592653589793*x)*sin(3.141592653589793*y))
+    set transformation            = 500*(1 + x); 500*(1 + y)
     set subdivisions x            = 16
     set subdivisions y            = 16
     set boundary condition left   = slip

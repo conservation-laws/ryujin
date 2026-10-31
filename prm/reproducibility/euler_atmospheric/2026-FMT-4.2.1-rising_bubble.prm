@@ -1,7 +1,7 @@
 ##
 #
-# 2D rising thermal bubble proposed by Robert [1], Section 4.2.1
-# (Figure 4.4) of [2].
+# 2D rising thermal bubble proposed by Robert [1], Section 4.2.1 (Figure
+# 4.4) of [2].
 #
 # A warm bubble, given by a cone shaped perturbation of the potential
 # temperature,

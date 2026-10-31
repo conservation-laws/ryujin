@@ -1,7 +1,7 @@
 ##
 #
-# Pressure perturbation over a 1D isothermal steady state [1, 2],
-# Section 4.1.4 (Figure 4.2) of [3].
+# Pressure perturbation over a 1D isothermal steady state [1, 2], Section
+# 4.1.4 (Figure 4.2) of [3].
 #
 # A small pressure perturbation is added to the isothermal equilibrium
 #
@@ -13,9 +13,9 @@
 #   theta = (1 / rho_e) * p^(1/gamma),
 #
 # with eta = 0.01. The perturbation splits into two acoustic waves
-# travelling in opposite directions. The computational domain is [0,5]
-# with slip boundary conditions. The thermodynamic constants are
-# p_0 = 1, c_v = 2.5, gamma = 1.4 (thus R = 1) and g = 1.
+# travelling in opposite directions. The computational domain is [0,5] with
+# slip boundary conditions. The thermodynamic constants are p_0 = 1,
+# c_v = 2.5, gamma = 1.4 (thus R = 1) and g = 1.
 #
 # The chosen 200 subdivisions correspond to the coarsest mesh of Figure 4.2
 # of [3]; the figure shows 200, 400, and 800 cells, as well as a reference
@@ -23,7 +23,8 @@
 # δt = 0.008.
 #
 # The scheme preserves the isothermal equilibrium exactly, see
-# 4.1.4-isothermal_well_balanced.prm for the corresponding Table 4.4 of [3].
+# 2026-FMT-4.1.4-isothermal_well_balanced.prm for the corresponding Table
+# 4.4 of [3].
 #
 # [1] P. Li and Z. Gao. Simple high order well-balanced finite difference
 #     WENO schemes for the Euler equations under gravitational fields.

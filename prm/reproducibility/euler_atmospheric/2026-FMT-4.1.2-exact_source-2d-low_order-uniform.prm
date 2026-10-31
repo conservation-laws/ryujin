@@ -1,17 +1,17 @@
 ##
 #
-# Exact solution with gravitational source, 2D, low-order method,
-# Section 4.1.2 (Table 4.2a) of [1]:
+# Exact solution with gravitational source, 2D, low-order method, Section
+# 4.1.2 (Table 4.2a) of [1]:
 #
 #   rho = rho_0,  v = (0, v_0),
 #   theta^gamma = -g (y - v_0 t) / (K rho_0^(gamma-1)),
 #
 # with rho_0 = v_0 = 1, g = 1, gamma = 1.4, zero integration constant, on
 # D = [0,10] x [-11,-1] with Dirichlet boundary conditions, final time
-# t = 1, CFL 0.5. The low-order method is obtained by disabling the
-# limiter (iterations = 0). The table uses 10 x 10, 20 x 20, ..., 160 x 160
-# cells (I = 121, ..., 25921; mesh refinement 0, ..., 4) and reports the
-# sum of the normalized errors of rho, m_2, and rho_theta. c_v and p_0 only
+# t = 1, CFL 0.5. The low-order method is obtained by disabling the limiter
+# (iterations = 0). The table uses 10 x 10, 20 x 20, ..., 160 x 160 cells
+# (I = 121, ..., 25921; mesh refinement 0, ..., 4) and reports the sum of
+# the normalized errors of rho, m_2, and rho_theta. c_v and p_0 only
 # rescale theta and do not affect the normalized errors.
 #
 # [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
