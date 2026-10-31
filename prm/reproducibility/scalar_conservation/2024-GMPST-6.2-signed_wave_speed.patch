@@ -1,0 +1,15 @@
+diff --git a/include/ryujin/scalar_conservation/wave_speed_estimator.h b/include/ryujin/scalar_conservation/wave_speed_estimator.h
+index 3201dcaf..34cdc884 100644
+--- a/include/ryujin/scalar_conservation/wave_speed_estimator.h
++++ b/include/ryujin/scalar_conservation/wave_speed_estimator.h
+@@ -432,8 +432,8 @@ namespace ryujin
+            * u_i and u_j the estimate then lies between lambda_12 and the
+            * maximum of |f'| on [u_i, u_j].
+            */
+-          const Number lambda_left = std::abs(d + b) / (std::abs(c + a) + h2);
+-          const Number lambda_right = std::abs(d - b) / (std::abs(c - a) + h2);
++          const Number lambda_left = (d + b) / (std::abs(c + a) + h2);
++          const Number lambda_right = (d - b) / (std::abs(c - a) + h2);
+ 
+ #ifdef DEBUG_WAVE_SPEED_ESTIMATOR
+           std::cout << "   left  wavespeed   = " << lambda_left << std::endl;

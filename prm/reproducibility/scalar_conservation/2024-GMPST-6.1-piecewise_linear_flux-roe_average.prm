@@ -1,0 +1,100 @@
+##
+#
+# 1D Riemann problem with the piecewise linear flux f(u) = 2 - u for u <= 2
+# and f(u) = 2u - 4 otherwise, Section 6.1 (Figure 2a) of [1].
+#
+# The initial data is u_0 = 1 for x <= 0 and u_0 = 3 otherwise on the
+# domain (-2, 2) with Dirichlet boundary conditions. The entropy solution
+# (6.1) of [1] consists of two contact waves moving with speed -1 and 2
+# separated by an expansion (u = 2 in between); it is used as initial state
+# and for the error evaluation. The final time is t = 0.5.
+#
+# First-order method (limiter iterations = 0) with the viscosity solely
+# based on the Roe average lambda_12 (greedy wave speed without entropy
+# inequality). This maintains the maximum principle but converges to a
+# non-entropic weak solution: the left discontinuity stays at x = 0 instead
+# of moving to the left. Compare with
+# 2024-GMPST-6.1-piecewise_linear_flux-averaged_entropy.prm (Figure 2b).
+# SSPRK(3,3), CFL = 0.75.
+#
+# The chosen 100 subdivisions with refinement 2 give 401 grid points.
+#
+# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
+#     First-order greedy invariant-domain preserving approximation for
+#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
+#     Comput., 100:46, 2024. arXiv:2310.01713
+#
+##
+
+subsection A - Scheduler
+  set basename          = piecewise-linear-flux-roe-average
+  set align time steps  = true
+  set tasks             = vtu output, error evaluation
+  set final time        = 0.5
+  set timer granularity = 0.05
+end
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = scalar conservation
+  set flux      = function
+
+  subsection function
+    set expression = if(u <= 2, 2 - u, 2 * u - 4)
+  end
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 2
+
+  subsection rectangular domain
+    set position bottom left     = -2
+    set position top right       = 2
+    set subdivisions x           = 100
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1
+  set position      = 0
+
+  subsection function
+    # exact solution (6.1) of [1]
+    set expression = if(x <= -t, 1, if(x <= 2 * t, 2, 3))
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations = 0
+  end
+
+  subsection wave speed estimator
+    set use greedy wavespeed = true
+    set use averaged entropy = false
+    set random entropies     = 0
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.75
+  set cfl max               = 0.75
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = u
+  end
+end
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error norms      = L1, L2
+  set error quantities = u
+end

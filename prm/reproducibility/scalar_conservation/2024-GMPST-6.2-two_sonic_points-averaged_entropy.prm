@@ -1,0 +1,113 @@
+##
+#
+# 1D Riemann problem with the non-convex flux f(u) = sin(u) and two sonic
+# points, Section 6.2 (Table 1, right) of [1].
+#
+# Same configuration as 2024-GMPST-6.2-two_sonic_points-random_entropy.prm
+# but with the greedy wave speed augmented by an entropy inequality for the
+# averaged Kruzkov entropy k = (u_i + u_j) / 2 per pair (i,j) (caption of
+# Table 1 of [1]; the text of Section 6.2 uses k_i = (U_i^min + U_i^max)/2
+# per grid point). As in [1] the computation is initialized with the exact
+# solution (6.2) at t0 = 1e-8, which only changes the value at the vertex
+# x = 0 to 5 pi / 2. The final time is t = 0.8 (the shift by t0 is
+# ignored).
+#
+# In [1] this choice keeps the stationary shock when started at t0 = 0, and
+# with t0 = 1e-8 the convergence stalls on fine meshes: the L1 error
+# decreases from 2.41e-2 (51 points) to 4.65e-3 (6401 points) with the rate
+# dropping to 0.16, the L2 error stagnates at about 8.4e-3.
+#
+# The computations of [1] use the entropy wave speeds (4.3) of [1] with
+# signed numerators; the current ryujin takes their absolute value. With
+# ryujin compiled with the patch 2024-GMPST-6.2-signed_wave_speed.patch
+# applied the stagnation is reproduced (L1 errors 5-16% below Table 1).
+# Without the patch the computation converges (L1 error 3.4e-2 to 9.1e-4,
+# 51 to 6401 points). Setting "use averaged entropy = false" gives the
+# plain Roe average lambda_12.
+#
+# The chosen 50 subdivisions with refinement 0 correspond to the coarsest
+# mesh (51 grid points, x = 0 is a vertex) of Table 1 of [1]. Mesh
+# refinement 1 to 7 gives the remaining meshes (101 to 6401 grid points).
+#
+# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
+#     First-order greedy invariant-domain preserving approximation for
+#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
+#     Comput., 100:46, 2024. arXiv:2310.01713
+#
+##
+
+subsection A - Scheduler
+  set basename          = two-sonic-points-averaged-entropy
+  set align time steps  = true
+  set tasks             = vtu output, error evaluation
+  set final time        = 0.8
+  set timer granularity = 0.8
+end
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = scalar conservation
+  set flux      = function
+
+  subsection function
+    set expression = sin(u)
+  end
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left     = -1
+    set position top right       = 1
+    set subdivisions x           = 50
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1
+  set position      = 0
+
+  subsection function
+    # exact solution (6.2) of [1] with a = 1, b = 0, evaluated at
+    # max(t, 1e-8); 3 pi = 9.42477796076938
+    set expression = if(x <= -max(t, 1e-8), 9.42477796076938, \
+                     if(x <= 0, 9.42477796076938 - acos(-x/max(t, 1e-8)), \
+                     if(x <= max(t, 1e-8), acos(x/max(t, 1e-8)), 0)))
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations = 0
+  end
+
+  subsection wave speed estimator
+    set use greedy wavespeed = true
+    set use averaged entropy = true
+    set random entropies     = 0
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = u
+  end
+end
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error norms      = L1, L2
+  set error quantities = u
+end
