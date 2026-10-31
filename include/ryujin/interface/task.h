@@ -119,14 +119,23 @@ namespace ryujin
   template <typename Number = double>
   struct TaskContext {
     /**
+     * Return whether the current time has reached the time @p time up to
+     * a relative tolerance of a few machine epsilon.
+     */
+    bool time_reached(const Number time) const
+    {
+      constexpr Number relax =
+          Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
+      return t >= relax * time;
+    }
+
+    /**
      * Return whether the current time has reached the timer tick @p
      * timer_cycle.
      */
     bool tick_reached() const
     {
-      constexpr Number relax =
-          Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
-      return t >= relax * timer_cycle * timer_granularity;
+      return time_reached(timer_cycle * timer_granularity);
     }
 
     /**
@@ -419,7 +428,7 @@ namespace ryujin
 
         bool fire = false;
         while (next_time_point_ < time_points_.size() &&
-               time_points_[next_time_point_] <= context.t) {
+               context.time_reached(time_points_[next_time_point_])) {
           ++next_time_point_;
           fire = true;
         }
