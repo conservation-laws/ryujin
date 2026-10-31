@@ -1,0 +1,87 @@
+##
+#
+# Rarefaction wave, Section 6.2 (ii), Table 2 of [1].
+#
+# A single rarefaction wave with a sonic point (gamma = 1.4) on the unit
+# interval [0, 1] with Dirichlet boundary conditions given by the exact
+# solution. The initial data is non-differentiable at x = 0.2. We report
+# the normalized L1, L2, Linf error norms summed over all components at the
+# final time.
+#
+# The discretization is dG Q1 on a uniform mesh with n_k = 60 elements (120
+# degrees of freedom). The rows of Table 2 are obtained by increasing "mesh
+# refinement" from 0 to 7. For Q2 and Q3 set the "finite element ansatz" to
+# "dG Q2" ("dG Q3") and the subdivisions to n_k = 40 (n_k = 30). The
+# limiter bounds are relaxed with "relaxation factor = 4". This is a
+# reconstruction, small differences to the published numbers are expected.
+#
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
+#     hyperbolic systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
+#     arXiv:2402.04514
+#
+##
+
+subsection A - Scheduler
+  set basename          = rarefaction
+
+  set align time steps  = true
+
+  set tasks             = error evaluation
+
+  set final time        = 0.30558
+  set timer granularity = 0.30558
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = rectangular domain
+  set mesh refinement       = 0
+
+  subsection rectangular domain
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 60
+
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = rarefaction
+
+  set direction     = 1
+  set position      = 0.2
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set relaxation factor = 4
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m, E
+end

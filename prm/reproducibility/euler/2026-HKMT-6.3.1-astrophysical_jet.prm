@@ -1,0 +1,108 @@
+##
+#
+# Mach 4000 astrophysical jet with adaptive mesh refinement, Section 6.3.1,
+# Figure 4 of [1].
+#
+# A high Mach number jet in a polytropic gas with gamma = 5/3 [2]. The
+# domain (0, 0.2) x (-0.1, 0.1) is initially filled with the ambient state
+# (rho, v, p) = (0.5, 0, 0.4127). The jet (rho, v, p) = (5, 1483.599...,
+# 0.4127), i.e., Mach 4000 with respect to the jet state, enters through
+# the left boundary at |y| <= 0.05 via Dirichlet boundary conditions; "do
+# nothing" conditions are enforced on all other boundaries. Figure 4 of [1]
+# shows the density at t = 1e-4; the final time is t = 2e-4.
+#
+# The mesh is adapted every cycle with the smoothness indicator of Section
+# 5.3 of [1] computed on the density, and the solution is transferred with
+# the conservative, invariant-domain preserving projection of [1]. The mesh
+# adaptation algorithm has changed considerably since [1] was written, so
+# the results differ from the published ones.
+#
+# [1] J. J. Harmon, M. Kronbichler, M. Maier, E. J. Tovar. A conservative
+#     invariant-domain preserving projection technique for hyperbolic
+#     systems under adaptive mesh refinement. arXiv:2507.18717, 2025.
+#
+# [2] Y. Ha, C. L. Gardner, A. Gelb, C.-W. Shu. Numerical simulation of
+#     high Mach number astrophysical jets with radiative cooling. J. Sci.
+#     Comput., 24(1):29-44, 2005.
+#
+##
+
+subsection A - Scheduler
+  set basename          = astrophysical_jet
+
+  set tasks             = vtu output, mesh adaptation
+
+  set final time        = 2.0e-4
+  set timer granularity = 1.0e-5
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.66666666666667
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 6
+
+  subsection rectangular domain
+    set position bottom left      = 0, -0.1
+    set position top right        = 0.2, 0.1
+
+    set boundary condition bottom = do nothing
+    set boundary condition left   = dirichlet
+    set boundary condition right  = do nothing
+    set boundary condition top    = do nothing
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = astro jet
+
+  subsection astro jet
+    set jet width               = 0.05
+    set primitive ambient right = 0.5, 0, 0.4127
+    set primitive jet state     = 5, 1483.59922710503, 0.4127
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set use mpi io            = true
+    set schlieren beta        = 10
+    set vtu output quantities = rho, m_1, m_2, E, schlieren_rho
+  end
+end
+
+
+subsection L - MeshAdaptor
+  set adaptation strategy = smoothness indicators
+  set marking strategy    = fixed threshold
+
+  set trigger             = every cycle
+  set trigger multiplier  = 1
+
+  subsection adaptation strategies
+    set smoothness indicators: quantities = rho
+  end
+
+  subsection marking strategies
+    set refinement threshold     = 0.20
+    set coarsening threshold     = 0.05
+    set minimal refinement level = 6
+    set maximal refinement level = 10
+  end
+end

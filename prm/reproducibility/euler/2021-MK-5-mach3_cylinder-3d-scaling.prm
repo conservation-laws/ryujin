@@ -1,0 +1,79 @@
+##
+#
+# Performance and scaling measurements for the 3D Mach 3 flow past a
+# cylinder, Section 5, Tables 2-6 and Figure 7 of [1].
+#
+# The configuration is the same as in 2021-MK-5-mach3_cylinder-3d.prm
+# (uniform Mach 3 flow past a cylinder of diameter 0.5 in the channel [0,4]
+# x [-1,1] x [-1,1]) but without any output, and the simulation is stopped
+# after a fixed number of time steps. The scheme uses the third-order SSP
+# Runge-Kutta method (ssprk 33) discussed in Section 3.6 of [1].
+#
+# The chosen refinement level 6 corresponds to the 29M gridpoints used for
+# the node-level measurements of Tables 2-6 (434 time steps, i.e., 1302
+# Runge-Kutta stages, on 80 Cascade Lake cores). For the scaling study of
+# Figure 7 increase the refinement level to 7, 8, and 9 (228M, 1.8B, and
+# 15B gridpoints); [1] uses between 434 and 1732 time steps for these runs.
+# The coarse mesh (208 gridpoints) is the one of [1]; this is a
+# reconstruction of the original configuration.
+#
+# [1] M. Maier, M. Kronbichler. Efficient parallel 3D computation of the
+#     compressible Euler equations with an invariant-domain preserving
+#     second-order finite-element scheme. ACM Trans. Parallel Comput.,
+#     8(3):16:1-30, 2021. DOI 10.1145/3470637, arXiv:2007.00094
+#
+##
+
+subsection A - Scheduler
+  set basename          = mach3-cylinder-3d-scaling
+
+  set tasks             =
+
+  set final time        = 5.00
+  set max cycles        = 434
+  set timer granularity = 5.00
+end
+
+
+subsection B - Equation
+  set dimension = 3
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = cylinder
+
+  set mesh refinement     = 6
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0, 0
+  set position      = 1, 0, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = ssprk 33
+end
