@@ -1,0 +1,143 @@
+##
+#
+# Laboratory experiment "G2-S.2" of Martinez-Aranda et al. [2], Section
+# 5.4.1 (Figures 4 and 5) of [1].
+#
+# Steady inflow of Q_0 = 9.01 m^3/h into an initially dry flume with a
+# semi-circular bump across its width followed by a rectangular obstacle at
+# the center line (bathymetry "G2" of the "transient experiments" initial
+# state). The unit discharge is q_0 = Q_0 / 0.24 m = 0.0104 m^2/s. The
+# geometry is the rectangle [0, 6.01 m] x [-0.12 m, 0.12 m], the flume
+# without the reservoir, which is not needed for a steady inflow. On the
+# left, "dirichlet momentum" inflow conditions are enforced (do nothing for
+# the water depth), and on the right outflow boundary we enforce "dynamic"
+# conditions. On all other boundaries (top and bottom boundary of the
+# flume) slip boundary conditions are enforced. We use g = 9.81 and a
+# Manning coefficient n = 0.01.
+#
+# The chosen refinement level 3 corresponds to 928,137 degrees of freedom
+# (mesh size 1.25 mm, as in [1]), which requires around 39k time steps and
+# runs for about 0.5h with 128 ranks / 2 threads on a modern system. The
+# flume length (6.0078 m in the experiment) is rounded to 6.01 m so that
+# the coarse cells are exactly 1 cm wide and the measurement sections fall
+# onto mesh vertices; the number of degrees of freedom is unchanged. The
+# time stepping is RK(4,3;1) (erk 43) with CFL 0.9.
+#
+# The final time is set to t = 50 s, which suffices to reach a steady
+# state. We output a vtk every δt = 10 s (Figure 4 shows t = 15, 30, 50 s).
+# For postprocessing the simulation into a nice video set the output
+# frequency to δt = 0.1. The quantities task records the water depth along
+# the two sections x = 2.40 m and y = 0 m of Figure 5.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+# [2] S. Martinez-Aranda, J. Fernandez-Pato, D. Caviedes-Voullieme, I.
+#     Garcia-Palacin, P. Garcia-Navarro. Towards transient experimental
+#     water surfaces: A new benchmark dataset for 2D shallow water solvers.
+#     Advances in Water Resources, 121:130-149, 2018.
+#
+##
+
+subsection A - Scheduler
+  set basename          = g2_s2
+
+  set tasks             = vtu output, quantities
+
+  set final time        = 50
+  set timer granularity = 0.1
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set reference water depth        = 1
+  set dry state relaxation large   = 1e4
+  set dry state relaxation small   = 1e2
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0.01
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+
+  # refinement 0 -  15050 DOFs
+  # refinement 1 -  58947 DOFs
+  # refinement 2 - 233285 DOFs
+  # refinement 3 - 928137 DOFs
+  set mesh refinement     = 3
+
+  subsection rectangular domain
+    set boundary condition bottom = slip
+    set boundary condition left   = dirichlet momentum
+    set boundary condition right  = dynamic
+    set boundary condition top    = slip
+
+    set position bottom left      = 0,      -0.12
+    set position top right        = 6.01,    0.12
+
+    set subdivisions x            = 601
+    set subdivisions y            = 24
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = transient experiments
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection transient experiments
+    #
+    # Discharges of the G2 experiments (Q divided by the 0.24 m flume width):
+    #   S.1: Q = 5.05 m^3/h -> q = 0.00585 m^2/s
+    #   S.2: Q = 9.01 m^3/h -> q = 0.0104  m^2/s
+    # The depth of the left state is not used for the inflow condition.
+    #
+    set experimental configuration = G2
+    set flow state left            = 0.1, 0.0104
+    set flow state right           = 0,   0
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations            = 2
+    set newton max iterations = 2
+    set newton tolerance      = 1e-10
+    set relaxation factor     = 2
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.9
+  set cfl min               = 0.45
+  set cfl recovery strategy = bang bang control
+  set time stepping scheme  = erk 43
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set trigger multiplier         = 100 # Change to 1 for nice movie
+    set schlieren beta             = 10
+    set schlieren recompute bounds = true
+    set use mpi io                 = true
+    set vtu output quantities      = h, m_1, m_2, bathymetry, v_1, schlieren_h
+  end
+end
+
+
+subsection J - Quantities
+  set trigger multiplier           = 100
+  set clear statistics on writeout = true
+  set interior manifolds           = lineout-x : x - 2.40 : instantaneous, \
+                                     lineout-y : y        : instantaneous
+end

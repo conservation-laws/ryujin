@@ -1,0 +1,94 @@
+##
+#
+# Efficiency comparison of time stepping schemes, Section 5.5 (Table 6) of
+# [1].
+#
+# The smooth vortex of Section 5.3.1 of [1] (see
+# 2025-GMT-5.3.1-smooth_vortex.prm), run until T = 0.5 s with CFL 0.2 on
+# refinement level 8 (66049 Q1 degrees of freedom). Table 6 compares the
+# number of cycles, throughput and runtime on a single rank with a single
+# thread (ryujin run.prm with DEAL_II_NUM_THREADS=1) for the schemes
+#
+#   RK(2,2;1/2) - ssprk 22        RK(2,2;1) - erk 22
+#   RK(3,3;1/3) - ssprk 33        RK(3,3;1) - erk 33
+#   RK(4,3;1)   - erk 43          RK(5,4;1) - erk 54
+#
+# selected with "time stepping scheme". With the current code the cycle
+# counts are about 11% higher than in Table 6, by the same factor for all
+# schemes; throughput and runtime depend on the hardware.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+##
+
+subsection A - Scheduler
+  set basename          = efficiency
+
+  set tasks             = error evaluation
+
+  set final time        = 0.5
+  set timer granularity = 0.5
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set reference water depth        = 2
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 8
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -6, -6
+    set position top right        =  6,  6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = smooth vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection smooth vortex
+    set beta            = 2
+    set mach number     = 1
+    set reference depth = 2
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.20
+  set cfl max               = 0.20
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h, m_1, m_2
+end

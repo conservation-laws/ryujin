@@ -1,0 +1,106 @@
+##
+#
+# Thacker's planar surface flow in a paraboloid-shaped basin, Section 5.3.2
+# (Table 5) of [1], in the configuration of Delestre et al. [2, Sec.
+# 4.2.2].
+#
+# A planar free surface rotates periodically in the radially symmetric
+# basin
+#
+#   z(x) = -h_0 (1 - |x - x_c|^2 / a^2)
+#
+# with h_0 = 0.1 m, a = 1 m, eta = 0.5, center x_c = (2, 2) and g = 9.81,
+# without friction. The moving shoreline is circular at all times. The
+# computational domain is [0,4]^2. The final time is three periods of the
+# motion,
+#
+#   T = 3 * 2 pi / sqrt(2 g h_0) = 13.4571044 s.
+#
+# We report the normalized L1, L2, and Linf errors of the water depth h at
+# final time.
+#
+# While the paper states slip boundary conditions, the domain boundary
+# stays dry for all times, and with "do nothing" conditions (used here) the
+# errors of Table 5 are reproduced to three digits.
+#
+# The chosen refinement level 6 corresponds to 4225 Q1 degrees of freedom
+# (second row of Table 5 of [1]). Table 5 is obtained with mesh refinement
+# 5 to 10 (1089 to 1050625 dofs), with RK(3,3;1) (erk 33) and RK(3,3;1/3)
+# (ssprk 33) at CFL 0.5.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+# [2] O. Delestre, C. Lucas, P.-A. Ksinant, F. Darboux, C. Laguerre, T. N.
+#     T. Vo, F. James, S. Cordier. SWASHES: a compilation of shallow water
+#     analytic solutions for hydraulic and environmental studies.
+#     International Journal for Numerical Methods in Fluids, 72(3):269-300,
+#     2013.
+#
+##
+
+subsection A - Scheduler
+  set basename          = paraboloid
+
+  set tasks             = error evaluation
+
+  set final time        = 13.45710440
+  set timer granularity = 13.45710440
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set reference water depth        = 0.1
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 6
+
+  subsection rectangular domain
+    set boundary condition bottom = do nothing
+    set boundary condition left   = do nothing
+    set boundary condition right  = do nothing
+    set boundary condition top    = do nothing
+
+    set position bottom left      = 0, 0
+    set position top right        = 4, 4
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = paraboloid
+  set position      = 2, 2
+  set direction     = 1, 0
+
+  subsection paraboloid
+    set eta                 = 0.5
+    set free surface radius = 1
+    set water height        = 0.1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h
+end

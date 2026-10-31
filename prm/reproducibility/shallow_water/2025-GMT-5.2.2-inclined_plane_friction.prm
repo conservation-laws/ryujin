@@ -1,0 +1,97 @@
+##
+#
+# Steady flow over an inclined plane with Gauckler-Manning friction,
+# Section 5.2.2 (Table 3) of [1]; "Example 1, Test 2" of Chertock et al.
+# [2, Sec. 4.1].
+#
+# The topography is z(x) = -b x with b = 0.01 on the domain (0, 25) m. The
+# unit discharge is q = q_0 = 0.1 m^2/s and the water depth is the constant
+#
+#   h_0 = (n^2 q_0^2 / b)^(3/10) = 0.095635 m,
+#
+# where n = 0.02 is the Manning coefficient. This state is an exact steady
+# solution in which gravity balances friction. Dirichlet conditions are
+# enforced at the left inflow boundary and "dynamic" (non-reflecting)
+# conditions at the right outflow boundary. We run until T = 100 s with CFL
+# 0.5 and report the normalized Linf errors of h and q (the consolidated
+# error delta^inf of [1]).
+#
+# The chosen refinement level 9 corresponds to 513 Q1 degrees of freedom
+# (first row of Table 3 of [1]); refinement 10 gives the second row (1025
+# dofs). Table 3 is computed with RK(3,3;1) (erk 33) and RK(3,3;1/3) (ssprk
+# 33). The errors are at the level of round-off and will differ in detail
+# from the published values.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+# [2] A. Chertock, S. Cui, A. Kurganov, T. Wu. Well-balanced positivity
+#     preserving central-upwind scheme for the shallow water system with
+#     friction terms. International Journal for Numerical Methods in
+#     Fluids, 78(6):355-383, 2015.
+#
+##
+
+subsection A - Scheduler
+  set basename          = inclined_plane_friction
+
+  set tasks             = error evaluation
+
+  set final time        = 100
+  set timer granularity = 100
+end
+
+
+subsection B - Equation
+  set dimension                    = 1
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0.02
+
+  set reference water depth        = 0.1
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 9
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dynamic
+
+    set position bottom left      = 0
+    set position top right        = 25
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = sloping friction
+  set direction     = 1
+  set position      = 0
+
+  subsection sloping friction
+    set ramp slope        = 0.01
+    set initial discharge = 0.1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error norms      = Linf
+  set error quantities = h, m
+end

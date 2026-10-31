@@ -1,0 +1,134 @@
+##
+#
+# Dam break over three conical obstacles with adaptive mesh refinement,
+# Section 6.2.1 (Figure 2) of [1].
+#
+# The topography consists of the three cones of Kawahara and Umetsu [2] in
+# the domain [0,75] x [0,30] m^2 (see
+# 2025-GMT-5.2.1-well_balancing_at_rest.prm). The initial state is a dam
+# break over a dry bottom: h_0 = 1.875 m for x <= 16 m and h_0 = 0
+# elsewhere, q_0 = 0. Slip boundary conditions are enforced on all sides,
+# g = 9.81. We run until T = 8 s with RK(3,3;1) (erk 33) at CFL 0.9.
+#
+# The mesh is adapted in every cycle with the smoothness indicator of [1,
+# Sec. 5.3] computed from the water depth h, and the solution is
+# transferred with the conservative, invariant-domain preserving projection
+# of [1]. The relative change of the total mass (spatial average of h) is
+# recorded every δt = 0.1 s and stays at round-off level.
+#
+# The mesh adaptation algorithm has changed considerably since [1] was
+# written, so the results differ from the published ones. The coarse mesh
+# consists of 10 x 4 cells refined 4 times globally (0.47 m), cells are
+# refined up to level 7 (0.06 m) if the indicator exceeds 0.2 and coarsened
+# below 0.05. With these settings the mesh grows to about 160k degrees of
+# freedom; the run takes about half an hour on 6 cores. Maximal refinement
+# level 6 gives a quick run (about 70k degrees of freedom, 4 min on 6
+# cores).
+#
+# [1] J. J. Harmon, M. Kronbichler, M. Maier, E. J. Tovar. A conservative
+#     invariant-domain preserving projection technique for hyperbolic
+#     systems under adaptive mesh refinement. arXiv:2507.18717, 2025.
+#
+# [2] M. Kawahara and T. Umetsu. Finite element method for moving boundary
+#     problems in river flow. International Journal for Numerical Methods
+#     in Fluids, 6(6):365-386, 1986.
+#
+##
+
+subsection A - Scheduler
+  set basename          = three_cones_dam_break-amr
+
+  set tasks             = vtu output, quantities, mesh adaptation
+
+  set final time        = 8
+  set timer granularity = 0.1
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set reference water depth        = 1.875
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 4
+
+  subsection rectangular domain
+    set boundary condition bottom = slip
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition top    = slip
+
+    set position bottom left      =  0,  0
+    set position top right        = 75, 30
+
+    set subdivisions x            = 10
+    set subdivisions y            = 4
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = three bumps dam break
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection three bumps dam break
+    set left water depth          = 1.875
+    set right water depth         = 0
+    set cone magnitude            = 1
+    set well balancing validation = true
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set trigger multiplier    = 10
+    set vtu output quantities = h, m_1, m_2, bathymetry, schlieren_h
+  end
+end
+
+
+subsection J - Quantities
+  set quantities         = h
+  set number of moments  = 1
+  set interior manifolds = mass : 0 : space_averaged
+end
+
+
+subsection L - MeshAdaptor
+  set adaptation strategy = smoothness indicators
+  set marking strategy    = fixed threshold
+
+  set trigger             = every cycle
+  set trigger multiplier  = 1
+
+  subsection adaptation strategies
+    set smoothness indicators: quantities = h
+  end
+
+  subsection marking strategies
+    set refinement threshold     = 0.2
+    set coarsening threshold     = 0.05
+    set minimal refinement level = 4
+    set maximal refinement level = 7
+  end
+end
