@@ -428,13 +428,9 @@ namespace ryujin
           const Number d = q_j - q_i;
 
           /*
-           * FIXME: Ordinarily, lambda_left and lambda_right would be
-           * computed without taking the absolute value of the numerator.
-           * (The denominator is - in the absence of rounding errors - always
-           * nonnegative. The numerator has a sign.)
-           * But empirically it turns out that taking the absolute value and
-           * letting both estimates participate in the maximal wavespeed
-           * estimate helps a lot.
+           * We take the absolute value of the numerators. For k between
+           * u_i and u_j the estimate then lies between lambda_12 and the
+           * maximum of |f'| on [u_i, u_j].
            */
           const Number lambda_left = std::abs(d + b) / (std::abs(c + a) + h2);
           const Number lambda_right = std::abs(d - b) / (std::abs(c - a) + h2);
