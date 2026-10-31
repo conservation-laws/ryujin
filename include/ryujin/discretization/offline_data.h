@@ -148,6 +148,32 @@ namespace ryujin
     ACCESSOR_READ_ONLY(dof_handler_dg)
 
     /**
+     * An index map that assigns every locally owned degree of freedom of
+     * dof_handler_dg() (numbered consecutively within the locally owned
+     * range) the global index of the collocated degree of freedom of
+     * dof_handler_cg(). A cG vector is interpolated into the dG space by
+     * setting `dg(i) = cg(dg_to_cg_index_map()[i])`.
+     *
+     * @note For a discontinuous ansatz the numbering of the locally owned
+     * range coincides with the local numbering of scalar_partitioner().
+     */
+    ACCESSOR_READ_ONLY(dg_to_cg_index_map)
+
+    /**
+     * The inverse of dg_to_cg_index_map(): An index map that assigns every
+     * locally owned degree of freedom of dof_handler_cg() (numbered
+     * consecutively within the locally owned range) the global index of
+     * one collocated degree of freedom of dof_handler_dg(). The choice
+     * among the collocated degrees of freedom is arbitrary; the map thus
+     * restricts a continuous dG function to the cG space by setting
+     * `cg(i) = dg(cg_to_dg_index_map()[i])`.
+     *
+     * @note For a continuous ansatz the numbering of the locally owned
+     * range coincides with the local numbering of scalar_partitioner().
+     */
+    ACCESSOR_READ_ONLY(cg_to_dg_index_map)
+
+    /**
      * Return a read-only const reference to the dof handler.
      */
     const dealii::DoFHandler<dim> &dof_handler() const
@@ -408,6 +434,9 @@ namespace ryujin
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
 
+    std::vector<dealii::types::global_dof_index> dg_to_cg_index_map_;
+    std::vector<dealii::types::global_dof_index> cg_to_dg_index_map_;
+
     std::unique_ptr<dealii::AffineConstraints<Number>> affine_constraints_cg_;
     std::unique_ptr<dealii::AffineConstraints<Number>> affine_constraints_dg_;
 
@@ -511,6 +540,14 @@ namespace ryujin
     void create_partitioner_and_simd_sparsity(
         const unsigned int problem_dimension,
         const unsigned int n_precomputed_values);
+
+    /**
+     * Set up dg_to_cg_index_map() and cg_to_dg_index_map(). Internally
+     * used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_index_maps();
 
     /**
      * Assemble all matrices. Internally used in prepare().
