@@ -1252,7 +1252,7 @@ namespace ryujin
         /*
          * In case of a discontinuous finite element ansatz we need to
          * extend bounds over the stencil. We do this by looping over the
-         * stencil once and taking the minimum/maximum:
+         * stencil once and taking the minimum/maximum.
          */
         if constexpr (have_discontinuous_ansatz) {
           /* Skip diagonal. */
@@ -1264,7 +1264,6 @@ namespace ryujin
                 bounds_view.template read_tensor<T, std::array<T, n_bounds>>(
                     js));
           }
-          bounds_view.template write_tensor<T>(local_bounds, i);
         }
 
         [[maybe_unused]] T m_i;
@@ -1456,8 +1455,23 @@ namespace ryujin
         if (last_round)
           return;
 
-        const auto local_bounds =
+        auto local_bounds =
             bounds_view.template read_tensor<T, std::array<T, n_bounds>>(i);
+
+        /* Extend bounds over the stencil: */
+        if (have_discontinuous_ansatz) {
+          const unsigned int stride_size = sparsity_simd_view.stride_of_row(i);
+          /* Skip diagonal. */
+          const unsigned int *js = sparsity_simd_view.columns(i) + stride_size;
+          for (unsigned int col_idx = 1; col_idx < row_length;
+               ++col_idx, js += stride_size) {
+            local_bounds = limiter_view.combine_bounds(
+                local_bounds,
+                bounds_view.template read_tensor<T, std::array<T, n_bounds>>(
+                    js));
+          }
+        }
+
         /* Skip diagonal. */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
