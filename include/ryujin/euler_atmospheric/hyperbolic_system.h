@@ -34,6 +34,39 @@ namespace ryujin
 {
   namespace EulerAtmospheric
   {
+    namespace internal
+    {
+      /**
+       * Return an approximation of the ratio \f$A(x,y) / L(x,y)\f$ of the
+       * arithmetic mean \f$A(x,y) = (x + y) / 2\f$ and the logarithmic
+       * mean \f$L(x,y) = (x - y) / \ln(x / y)\f$ of two positive numbers
+       * @p x and @p y.
+       *
+       * @note The ratio is exact up to roundoff for \f$|x - y| / (x + y) <
+       * 0.02\f$ and lies between 1 and \f$A(x,y) / L(x,y)\f$ otherwise. It
+       * is invariant under \f$x \to 1/x, y \to 1/y\f$.
+       */
+      template <typename Number>
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE Number
+      arithmetic_over_logarithmic_mean(const Number &x, const Number &y)
+      {
+        using ScalarNumber = typename get_value_type<Number>::type;
+
+        /*
+         * With f = (x - y) / (x + y) we have ln(x / y) = 2 atanh(f), and
+         * thus A(x,y) / L(x,y) = atanh(f) / f = 1 + f^2/3 + f^4/5 + ....
+         * We truncate the series after f^8:
+         */
+        const auto f = (x - y) / (x + y);
+        const auto u = f * f;
+        return ScalarNumber(1.) + u * (ScalarNumber(1. / 3.) +
+                                       u * (ScalarNumber(1. / 5.) +
+                                            u * (ScalarNumber(1. / 7.) +
+                                                 u * ScalarNumber(1. / 9.))));
+      }
+    } // namespace internal
+
+
     template <int dim,
               typename Number,
               typename MemorySpace = dealii::MemorySpace::Host>
@@ -1257,25 +1290,10 @@ namespace ryujin
     HyperbolicSystemView<dim, Number, MemorySpace>::inverse_theta_mean(
         const Number &theta_i, const Number &theta_j) const
     {
-      /*
-       * With a = 1 / theta_i, b = 1 / theta_j, and f = (a - b) / (a + b)
-       * we have ln(a / b) = 2 atanh(f), and thus for the logarithmic mean
-       *   (a - b) / ln(a / b) = (a + b) / 2 / (1 + f^2/3 + f^4/5 + ...).
-       * We truncate the series after f^8. This is exact up to roundoff
-       * for |f| < 0.02, and a consistent mean between the logarithmic and
-       * the arithmetic mean otherwise. In terms of theta_i and theta_j we
-       * have f = (theta_j - theta_i) / (theta_i + theta_j) and (a + b) / 2
-       * = (theta_i + theta_j) / (2 theta_i theta_j):
-       */
       const auto sum = theta_i + theta_j;
-      const auto f = (theta_j - theta_i) / sum;
-      const auto u = f * f;
-      const auto series =
-          ScalarNumber(1.) +
-          u * (ScalarNumber(1. / 3.) +
-               u * (ScalarNumber(1. / 5.) +
-                    u * (ScalarNumber(1. / 7.) + u * ScalarNumber(1. / 9.))));
-      return sum / (ScalarNumber(2.) * theta_i * theta_j * series);
+      const auto ratio =
+          internal::arithmetic_over_logarithmic_mean(theta_i, theta_j);
+      return sum / (ScalarNumber(2.) * theta_i * theta_j * ratio);
     }
 
 
