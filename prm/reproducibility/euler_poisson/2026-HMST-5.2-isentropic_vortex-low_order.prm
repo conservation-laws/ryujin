@@ -1,0 +1,122 @@
+##
+#
+# Isentropic vortex for the Euler-Poisson system, Section 5.2 (Table 5.1a)
+# of [2].
+#
+# The isentropic vortex [1] is an exact solution of the compressible Euler
+# equations. Adding the background density rho_b = -rho, where rho is the
+# vortex density, cancels the charge density, so that the potential is
+# constant and the vortex is also an exact solution of the Euler-Poisson
+# system. Parameters: gamma = 5/3, beta = 5, alpha = 1, no magnetic field,
+# vortex speed M = (1, 1) (mach number = |M| = sqrt(2)), initial center
+# x_0 = (-1, -1), domain [-5, 5]^2. Dirichlet boundary conditions with the
+# exact solution are enforced on the state, homogeneous Dirichlet
+# conditions on the potential.
+#
+# Low order method: forward Euler step with the first order hyperbolic
+# update (limiter iterations = 0) and a backward Euler step for the source
+# update ("imex 11"), dG Q1, CFL 0.1, final time t = 1. The error is the
+# (absolute) L1 error summed over rho, m, and E.
+#
+# The chosen refinement level 5 corresponds to the coarsest mesh of Table
+# 5.1 (4096 dofs per component); levels 6, 7, 8 give the other rows.
+#
+# [1] C.-W. Shu. Essentially non-oscillatory and weighted essentially
+#     non-oscillatory schemes for hyperbolic conservation laws. 1998.
+#
+# [2] J. Hoffart, M. Maier, J. N. Shadid, I. Tomas. Structure-preserving
+#     finite-element approximations of the magnetic Euler-Poisson
+#     equations. arXiv:2510.11808, 2025.
+#
+##
+
+subsection A - Scheduler
+  set basename          = isentropic_vortex-low_order
+  set tasks             = error evaluation
+
+  set final time        = 1.0
+  set timer granularity = 1.0
+  set align time steps  = true
+end
+
+
+subsection B - Equation
+  set dimension                   = 2
+  set equation                    = euler poisson
+  set gamma                       = 1.666666666666667
+
+  set alpha                       = 1
+  set electrostatic configuration = function
+
+  subsection function
+    set time dependent     = true
+    set magnetic field z   = 0.
+
+    #
+    # rho_b = -T^(1 / (gamma - 1)),
+    # T     = 1 - (gamma - 1) / (2 gamma) f^2,
+    # f     = beta / (2 pi) exp(0.5 (1 - |r|^2)),
+    # r     = (x, y) - (x_0, y_0) - (1, 1) t
+    #
+    set background density = -pow(1. - (5./3. - 1.) / (2. * 5./3.) * pow(5. / (2. * 3.1415926535897932) * exp(0.5 * (1. - pow(x + 1. - t, 2.) - pow(y + 1. - t, 2.))), 2.), 1. / (5./3. - 1.))
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = rectangular domain
+  set mesh refinement       = 5
+
+  subsection rectangular domain
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1.414213562373095
+    set beta        = 5
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+
+  subsection limiter
+    set iterations = 0
+  end
+end
+
+
+subsection G - ParabolicModule
+  set gauss law restart strategy = no restart
+  set tolerance                  = 1e-12
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.1
+  set cfl max               = 0.1
+  set cfl recovery strategy = none
+  set time stepping scheme  = imex 11
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = false
+  set error quantities = rho, m_1, m_2, E
+end

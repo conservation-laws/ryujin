@@ -1,0 +1,160 @@
+##
+#
+# Diocotron instability of a hollow electron beam in a uniform magnetic
+# field, Section 5.3 (Figures 5.2, 5.4b, 5.5) of [1]. Barotropic
+# Euler-Poisson system with an isothermal equation of state and a speed of
+# sound of 1e-12 (cold plasma).
+#
+# The domain is a disk of radius R = 16 (12 coarse cells). The initial
+# density is a perturbed annulus,
+#
+#   rho = rho_max (1 - delta + delta sin(l atan2(y, x)))  for 6 < r < 8,
+#   rho = rho_min                                          otherwise,
+#
+# with rho_max = 1, rho_min = 1e-6, delta = 0.1, and mode l = 4. The
+# initial potential solves the Gauss law with homogeneous Dirichlet
+# boundary conditions and the initial velocity is the E x B drift velocity
+# ("set up magnetic drift limit"). The fluid boundary is "do nothing".
+#
+# TIME SCALES AND MODELING PARAMETERS
+#
+#   Diocotron frequency: w_d = w_p^2 / w_c ~ 1
+#   Plasma frequency:    w_p = sqrt(alpha * rho_max) ~ 1 / beta
+#   Cyclotron frequency: w_c = |B_z| ~ 1 / beta^2
+#
+# where the coupling constant alpha and the magnetic field component B_z
+# are chosen such that
+#
+#   alpha =  4 pi^2 / beta^2,
+#   B_z   = -2 pi / beta^2,
+#
+# with beta = 1e-6. The final time t = 10 corresponds to 10 diocotron
+# periods. The time step is limited to tau_max = 1e-3, which oversteps the
+# plasma and cyclotron time scales by 3 and 9 orders of magnitude.
+#
+# The figures of [1] were computed with "no restart" of the Gauss law;
+# Figure 5.5 compares with "full restart" and relaxation (the relaxation
+# strategy "correction" is currently not implemented in ryujin). The chosen
+# refinement level 8 corresponds to 3,145,728 dG dofs per component; Figure
+# 5.2 uses level 9, Figure 5.4 levels 6, 7, 8. The settings of the
+# hyperbolic limiter follow the parameter file of the time of [1]; this is
+# a reconstruction and small differences to the published results are to be
+# expected.
+#
+# We output a vtu every dt = 0.1. The growth rate of Figure 5.4 is the
+# modulus of the l-th Fourier coefficient of the potential phi on the
+# circle r = 6 as a function of time; it has to be computed from the vtu
+# output (set "trigger multiplier = 1" for an output every dt = 0.01).
+#
+# [1] J. Hoffart, M. Maier, J. N. Shadid, I. Tomas. Structure-preserving
+#     finite-element approximations of the magnetic Euler-Poisson
+#     equations. arXiv:2510.11808, 2025.
+#
+##
+
+subsection A - Scheduler
+  set basename          = diocotron-mode_4
+  set tasks             = vtu output
+
+  set final time        = 10.00
+  set timer granularity = 0.01
+  set align time steps  = true
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = euler poisson barotropic
+
+  set barotropic equation of state = isothermal
+
+  subsection isothermal
+    set speed of sound = 1e-12
+  end
+
+  set alpha                        = 39.4784176e12
+  set set up magnetic drift limit  = true
+
+  set electrostatic configuration  = constant
+
+  subsection constant
+    set background density = 0
+    set magnetic field     = -6.28318531e12
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set mesh refinement       = 8
+  set mesh writeout         = false
+
+  set geometry              = disk
+
+  subsection disk
+    set balanced           = true
+    set radius             = 16
+    set boundary condition = do nothing
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = function
+  set position      = 0, 0
+
+  subsection function
+    # trigger the fourth mode by adding a 10% perturbation:
+    set density expression    = 6 < sqrt(x*x+y*y) && sqrt(x*x+y*y) < 8 ? 1 - 0.1 + 0.1 * sin(4 * atan2(y,x)) : 1e-6
+
+    set velocity x expression = 0
+    set velocity y expression = 0
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 1
+  end
+
+  subsection limiter
+    set iterations        = 1
+    set relaxation factor = 0
+  end
+end
+
+
+subsection G - ParabolicModule
+  set gauss law restart strategy    = no restart
+
+  set multigrid - max iter          = 12
+  set multigrid - chebyshev range   = 8
+  set multigrid - chebyshev max eig = 2
+  set multigrid - chebyshev degree  = 3
+  set multigrid - chebyshev cg iter = 10
+  set multigrid - min level         = 0
+  set tolerance                     = 1e-15
+  set tolerance linfty norm         = false
+end
+
+
+subsection H - TimeIntegrator
+  set time stepping scheme     = strang erk 33 cn
+
+  set cfl min                  = 0.5
+  set cfl max                  = 0.5
+  set cfl recovery strategy    = cruise control
+
+  set acceptable tau_max ratio = 2.0
+  set tau_max                  = 1e-3
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set trigger multiplier    = 10
+    set vtu output quantities = rho, m_1, m_2, phi, schlieren_rho
+  end
+end

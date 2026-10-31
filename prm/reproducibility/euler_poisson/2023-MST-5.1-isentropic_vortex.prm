@@ -1,0 +1,139 @@
+##
+#
+# Isentropic vortex for the Euler-Poisson system, Section 5.1 (Table 2) of
+# [2].
+#
+# The isentropic vortex [1] is an exact solution of the compressible Euler
+# equations. Adding the background density rho_a = -rho, where rho is the
+# vortex density, cancels the charge density, so that the vortex is also an
+# exact solution of the Euler-Poisson system. Parameters: gamma = 5/3,
+# beta = 5, alpha = 1, vortex velocity M = (2, 2) (mach number = |M| = 2
+# sqrt(2)), initial center x_0 = (4, 4), domain [-5, 15]^2, final time
+# t = 2. Dirichlet boundary conditions with the exact solution are enforced
+# on the state, homogeneous Dirichlet conditions on the potential. Strang
+# split with explicit Runge-Kutta and Crank-Nicolson, dG Q1, CFL 0.5. The
+# limiter bounds are relaxed with "relaxation factor = 4"; with the default
+# relaxation the convergence rates level off at about 1.5.
+#
+# Table 2 uses a non-nested mesh sequence: each mesh is a uniform mesh of
+# 20 x 20, 40 x 40, ..., 320 x 320 elements whose vertices are moved
+# randomly by up to 5% of the mesh size. The chosen refinement level 2 of a
+# 5 x 5 coarse mesh corresponds to the coarsest mesh (20 x 20); levels 3 to
+# 6 give the other rows. (The coarse 5 x 5 mesh gives the geometric
+# multigrid of the potential solver a hierarchy to work with.) Set "mesh
+# distortion = 0" for an undistorted mesh sequence. The columns of Table 2
+# correspond to the Gauss law restart strategies "no restart" (a),
+# relaxation (b), and "full restart" (c); the relaxation strategy
+# "correction" is currently not implemented in ryujin. The mesh sequence of
+# Table 1 (a distorted coarse mesh refined without further distortion)
+# cannot be generated: ryujin distorts the mesh after global refinement.
+#
+# Note: The errors of [2] are the maximum over time of the L1 error summed
+# over rho, m, and E. We write out the L1 error every dt = 0.1, normalized
+# by the L1 norm of the exact solution per component. The results of [2]
+# were computed with a predecessor code; this is a reconstruction and
+# differences to the published numbers are expected.
+#
+# [1] C.-W. Shu. Essentially non-oscillatory and weighted essentially
+#     non-oscillatory schemes for hyperbolic conservation laws. 1998.
+#
+# [2] M. Maier, J. N. Shadid, I. Tomas. Structure-preserving finite-element
+#     schemes for the Euler-Poisson equations. Commun. Comput. Phys.,
+#     33(3):647-691, 2023. DOI 10.4208/cicp.OA-2022-0205, arXiv:2207.07860
+#
+##
+
+subsection A - Scheduler
+  set basename          = isentropic_vortex
+  set tasks             = error evaluation
+
+  set final time        = 2.0
+  set timer granularity = 0.1
+  set align time steps  = true
+end
+
+
+subsection B - Equation
+  set dimension                   = 2
+  set equation                    = euler poisson
+  set gamma                       = 1.666666666666667
+
+  set alpha                       = 1
+  set electrostatic configuration = function
+
+  subsection function
+    set time dependent     = true
+    set magnetic field z   = 0.
+
+    #
+    # rho_a = -T^(1 / (gamma - 1)),
+    # T     = 1 - (gamma - 1) / (2 gamma) f^2,
+    # f     = beta / (2 pi) exp(0.5 (1 - |r|^2)),
+    # r     = (x, y) - (x_0, y_0) - (2, 2) t
+    #
+    set background density = -pow(1. - (5./3. - 1.) / (2. * 5./3.) * pow(5. / (2. * 3.1415926535897932) * exp(0.5 * (1. - pow(x - 4. - 2. * t, 2.) - pow(y - 4. - 2. * t, 2.))), 2.), 1. / (5./3. - 1.))
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = rectangular domain
+  set mesh refinement       = 2
+  set mesh distortion       = 0.05
+
+  subsection rectangular domain
+    set position bottom left      = -5, -5
+    set position top right        = 15, 15
+    set subdivisions x            = 5
+    set subdivisions y            = 5
+
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     = 1, 1
+  set position      = 4, 4
+
+  subsection isentropic vortex
+    set mach number = 2.828427124746190
+    set beta        = 5
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+
+  subsection limiter
+    set relaxation factor = 4
+  end
+end
+
+
+subsection G - ParabolicModule
+  # (a) no restart, (c) full restart
+  set gauss law restart strategy = no restart
+  set tolerance                  = 1e-12
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, m_2, E
+end
