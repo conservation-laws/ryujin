@@ -1,0 +1,97 @@
+##
+#
+# 1D Woodward-Colella interacting blast waves with the Jones-Wilkins-Lee
+# equation of state, Section 5.4.1 (Figure 1, right, Table 3, Case 2) of
+# [1].
+#
+# Initial state (rho, v, p) = (1, 0, 1e3) on [0, 0.1], (1, 0, 1e-2) on
+# (0.1, 0.9), and (1, 0, 1e2) on [0.9, 1]. Domain (0,1) with slip boundary
+# conditions, CFL 0.9, SSPRK(3,3). JWL EOS (5.4) with the parameters of
+# Case 2 of Table 3 (HMX, Lee et al.): A = 7.7828e11, B = 7.071428e9,
+# R_1 = 4.2, R_2 = 1, omega = 0.3, rho_0 = 1891.
+#
+# Table 3 of [1] lists the final time T = 8.2e-4. Figure 1 (right) is
+# reproduced with T = 0.0367: since rho << rho_0 the JWL EOS reduces to a
+# gamma-law gas with gamma = 1 + omega, whose solution is invariant under p
+# -> s p, t -> t / sqrt(s); the figure thus corresponds to the printed data
+# at T = 0.0367, or to pressures scaled by 2000 at T = 8.2e-4.
+#
+# Note: The paper computed Figure 1 with a separate Fortran code (P1 on
+# simplices); this is the corresponding ryujin configuration. The 1600
+# subdivisions are the coarsest mesh of Figure 1; mesh refinement = 2 and 4
+# give the 6400 and 25600 element meshes.
+#
+# [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
+#     second-order approximation of the compressible Euler equations with
+#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     arXiv:2207.12832
+#
+##
+
+subsection A - Scheduler
+  set basename          = blast_wave-jwl-case_2
+  set tasks             = vtu output
+  set final time        = 0.0367
+  set timer granularity = 0.0367
+end
+
+
+subsection B - Equation
+  set dimension         = 1
+  set equation          = euler aeos
+  set equation of state = jones wilkins lee
+
+  subsection jones wilkins lee
+    set A     = 7.7828e11
+    set B     = 7.071428e9
+    set R1    = 4.2
+    set R2    = 1.0
+    set omega = 0.3
+    set rho_0 = 1891
+    set q_0   = 0
+  end
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 1
+    set subdivisions x           = 1600
+    set boundary condition left  = slip
+    set boundary condition right = slip
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = three state contrast
+  set direction     = 1
+  set position      = 0
+
+  subsection three state contrast
+    set left region length     = 0.1
+    set middle region length   = 0.8
+    set primitive state left   = 1, 0, 1e3
+    set primitive state middle = 1, 0, 1e-2
+    set primitive state right  = 1, 0, 1e2
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, v, p, e
+  end
+end
