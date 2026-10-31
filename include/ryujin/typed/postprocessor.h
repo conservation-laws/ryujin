@@ -282,14 +282,30 @@ namespace ryujin
 
     /*
      * Set up the components, and a view for every parabolic component, on
-     * the host, and copy them into arrays residing on the memory space:
+     * the host, and copy them into arrays residing on the memory space.
+     *
+     * A parabolic component might be stored in the continuous finite
+     * element space while the hyperbolic system uses a discontinuous
+     * ansatz, or vice versa. For such a component we translate the
+     * OfflineData index map into the local numbering of the vector and
+     * read through it:
      */
+
+    const auto &offline_data = *offline_data_;
+    const auto &index_map =
+        offline_data.discretization().have_discontinuous_ansatz()
+            ? offline_data.dg_to_cg_index_map()
+            : offline_data.cg_to_dg_index_map();
 
     const auto n_components = selected.size();
     Kokkos::View<Kokkos::pair<Section, unsigned int> *, Kokkos::HostSpace>
         host_components("postprocessor_components", n_components);
     Kokkos::View<VectorView<1, MemorySpace> *, Kokkos::HostSpace> host_scalars(
         "postprocessor_scalars", n_components);
+    Kokkos::View<bool *, Kokkos::HostSpace> host_mapped("postprocessor_mapped",
+                                                        n_components);
+    Kokkos::View<unsigned int **, Kokkos::LayoutLeft, Kokkos::HostSpace>
+        host_maps("postprocessor_maps", 0, 0);
 
     for (unsigned int k = 0; k < n_components; ++k) {
       const auto section = Section(selected[k].first);
@@ -300,6 +316,20 @@ namespace ryujin
         const auto &vector = state_vector.dynamic_state[index];
         copy_to_memory_space<MemorySpace>(vector);
         host_scalars[k] = vector.template view<1, MemorySpace>();
+
+        const auto &storage = vector.template deal_ii_vector<MemorySpace>();
+        if (storage.size() == offline_data.dof_handler().n_dofs())
+          continue;
+
+        storage.update_ghost_values();
+        const auto &partitioner = *storage.get_partitioner();
+
+        if (host_maps.extent(1) == 0)
+          host_maps = decltype(host_maps)(
+              "postprocessor_maps", index_map.size(), n_components);
+        for (unsigned int i = 0; i < index_map.size(); ++i)
+          host_maps(i, k) = partitioner.global_to_local(index_map[i]);
+        host_mapped[k] = true;
       }
     }
 
@@ -308,6 +338,8 @@ namespace ryujin
         Kokkos::create_mirror_view_and_copy(space, host_components);
     const auto scalars =
         Kokkos::create_mirror_view_and_copy(space, host_scalars);
+    const auto mapped = Kokkos::create_mirror_view_and_copy(space, host_mapped);
+    const auto maps = Kokkos::create_mirror_view_and_copy(space, host_maps);
 
     const SelectView<dim, Number, MemorySpace, HyperbolicSystem> system_views(
         *hyperbolic_system_);
@@ -353,7 +385,10 @@ namespace ryujin
           write(k, initial_i[index]);
           break;
         default:
-          write(k, scalars[k].template read_entry<T>(i));
+          if (mapped[k])
+            write(k, scalars[k].template read_entry<T>(&maps(i, k)));
+          else
+            write(k, scalars[k].template read_entry<T>(i));
         }
       }
     };

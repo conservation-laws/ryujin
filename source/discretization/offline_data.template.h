@@ -108,6 +108,8 @@ namespace ryujin
     create_partitioner_and_simd_sparsity(problem_dimension,
                                          n_precomputed_values);
 
+    create_index_maps();
+
     create_matrices();
 
     if (!dof_handler().has_hp_capabilities())
@@ -513,6 +515,82 @@ namespace ryujin
                                    scalar_partitioner_,
                                    /*symmetrize_ghost_range*/ true,
                                    TransferPolicy::implicit_transfers);
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::create_index_maps()
+  {
+    const auto &fe_collection_dg = dof_handler_dg_->get_fe_collection();
+    const auto &fe_collection_cg = dof_handler_cg_->get_fe_collection();
+    Assert(fe_collection_dg.size() == fe_collection_cg.size(),
+           dealii::ExcInternalError());
+
+    /*
+     * For every finite element of the (hp) collection, map the local dG
+     * indices to the local cG indices with the same unit support point:
+     */
+
+    std::vector<std::vector<unsigned int>> local_index_map(
+        fe_collection_dg.size());
+
+    for (unsigned int k = 0; k < fe_collection_dg.size(); ++k) {
+      const auto &support_dg = fe_collection_dg[k].get_unit_support_points();
+      const auto &support_cg = fe_collection_cg[k].get_unit_support_points();
+      Assert(support_dg.size() == support_cg.size(),
+             dealii::ExcInternalError());
+
+      for (const auto &point : support_dg) {
+        unsigned int j = 0;
+        while (j < support_cg.size() && point.distance(support_cg[j]) > 1.e-10)
+          ++j;
+        AssertThrow(j < support_cg.size(),
+                    dealii::ExcMessage("The continuous and discontinuous "
+                                       "finite elements do not share the "
+                                       "same unit support points."));
+        local_index_map[k].push_back(j);
+      }
+    }
+
+    /*
+     * Translate the local maps into index maps over all locally owned
+     * degrees of freedom. All dG degrees of freedom of a locally owned
+     * cell are locally owned, but some of the cG degrees of freedom are
+     * ghosts which we skip:
+     */
+
+    const auto &locally_owned_dg = dof_handler_dg_->locally_owned_dofs();
+    const auto &locally_owned_cg = dof_handler_cg_->locally_owned_dofs();
+
+    dg_to_cg_index_map_.resize(locally_owned_dg.n_elements());
+    cg_to_dg_index_map_.resize(locally_owned_cg.n_elements());
+
+    std::vector<types::global_dof_index> indices_dg;
+    std::vector<types::global_dof_index> indices_cg;
+
+    for (const auto &cell : dof_handler_dg_->active_cell_iterators()) {
+      if (!cell->is_locally_owned())
+        continue;
+
+      const auto &map = local_index_map[cell->active_fe_index()];
+      indices_dg.resize(map.size());
+      indices_cg.resize(map.size());
+      cell->get_dof_indices(indices_dg);
+      cell->as_dof_handler_iterator(*dof_handler_cg_)
+          ->get_dof_indices(indices_cg);
+
+      for (unsigned int i = 0; i < map.size(); ++i) {
+        const auto global_dg = indices_dg[i];
+        const auto global_cg = indices_cg[map[i]];
+
+        const auto local_dg = locally_owned_dg.index_within_set(global_dg);
+        dg_to_cg_index_map_[local_dg] = global_cg;
+
+        const auto local_cg = locally_owned_cg.index_within_set(global_cg);
+        if (local_cg != dealii::numbers::invalid_dof_index)
+          cg_to_dg_index_map_[local_cg] = global_dg;
+      }
+    }
   }
 
 
