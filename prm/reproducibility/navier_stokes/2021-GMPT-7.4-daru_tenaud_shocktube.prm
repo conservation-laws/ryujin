@@ -1,37 +1,52 @@
 ##
 #
-# Navier-Stokes Shocktube Benchmark
-#
-# See [1,2].
+# Navier-Stokes shocktube benchmark of Daru and Tenaud [1,2], ryujin
+# counterpart of Section 7.4 (Figures 1 and 2) of [3].
 #
 # The shocktube consists of a square cavity (0,1)^2 with a diaphragm at
 # {x=0.5} separating it in two parts. The fluid is initially at rest. The
 # state on the left-hand side of the diaphragm is (rho_L=120, v_L=0,
 # p_L=rho_L/gamma). The right state is (rho_R=1.2, v_R=0, p_R=rho_R/gamma).
+# The ideal gas equation of state with gamma=1.4 is used, the bulk
+# viscosity is 0 and the Prandtl number is Pr=0.73. Only the lower half
+# (0,1) x (0,0.5) is computed: no-slip, thermally insulated walls on the
+# left, right, and bottom, and a slip condition on {y=0.5}.
 #
-# We use the ideal gas equation of state p = (gamma - 1) rho e with
-# gamma=1.4. The bulk viscosity is set to 0. The Prandtl number is Pr=0.73.
+# Figure 1 of [3] uses mu = 10^-3 and shows the density at t = 0.6, 0.8,
+# 1.0 on three meshes with 359k, 685k, and 860k gridpoints. The chosen
+# refinement level 9 with a mesh graded towards the bottom wall gives
+# around 526k gridpoints. Figure 2 of [3] repeats the computation for
+# mu = 5 10^-4, 2 10^-4, 10^-4; for these set mu accordingly and c_v^{-1}
+# kappa = mu * gamma / Pr = 1.917808219 mu. The CFL number is 0.95 as in
+# [3]. We output a vtk every δt = 0.2.
 #
-# The chosen refinement level 10 corresponds to around 2.10M gridpoints
-# (8.40M degrees of freedom), which requires around 5k time steps and runs
-# for about (60h / #n_cores) on a modern system.
+# Note: The results of [3] were computed with a serial P1 demonstration
+# code on hand-graded triangular meshes, not with ryujin. This file sets up
+# the same problem on a graded quadrilateral mesh; the density fields
+# should be compared with Figures 1 and 2 of [3] qualitatively.
 #
-# [1] V.~Daru and C.~Tenaud. Evaluation of TVD high resolution schemes for
-#     unsteady viscous shocked flows. Computers & Fluids, 30(1):89-113, 2001
+# [1] V. Daru and C. Tenaud. Evaluation of TVD high resolution schemes for
+#     unsteady viscous shocked flows. Computers & Fluids, 30(1):89-113,
+#     2001
 #
-# [2] V.~Daru and C.~Tenaud. Numerical simulation of the viscous shock tube
+# [2] V. Daru and C. Tenaud. Numerical simulation of the viscous shock tube
 #     problem by using a high resolution monotonicity-preserving scheme.
-#      Computers & Fluids, 38(3):664-676, 2009.
+#     Computers & Fluids, 38(3):664-676, 2009.
+#
+# [3] J.-L. Guermond, M. Maier, B. Popov, I. Tomas. Second-order invariant
+#     domain preserving approximation of the compressible Navier-Stokes
+#     equations. Comput. Methods Appl. Mech. Engrg., 375:113608, 2021.
+#     arXiv:2009.06022
 #
 ##
 
 subsection A - Scheduler
-  set basename          = shocktube-graded
+  set basename          = daru_tenaud_shocktube-graded
 
-  set tasks             = vtu output, quantities
+  set tasks             = vtu output
 
   set final time        = 1.00
-  set timer granularity = 0.01
+  set timer granularity = 0.20
 end
 
 subsection B - Equation
@@ -47,7 +62,7 @@ end
 
 subsection C - Discretization
   set geometry            = rectangular domain
-  set mesh refinement     = 10
+  set mesh refinement     = 9
 
   subsection rectangular domain
     set boundary condition bottom = no slip
@@ -95,22 +110,15 @@ subsection G - ParabolicModule
 end
 
 subsection H - TimeIntegrator
-  set cfl min                = 0.80
-  set cfl max                = 0.80
+  set cfl min               = 0.95
+  set cfl max               = 0.95
   set cfl recovery strategy = none
   set time stepping scheme  = strang erk 33 cn
 end
 
 subsection I - VTUOutput
   subsection full
-    set trigger multiplier = 100
     set schlieren beta     = 10
     set use mpi io         = true
   end
-end
-
-
-subsection J - Quantities
-  set boundary manifolds = lower_boundary : y : time_averaged space_averaged
-  set interior manifolds =
 end

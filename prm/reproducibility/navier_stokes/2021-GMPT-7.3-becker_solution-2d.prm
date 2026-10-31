@@ -1,0 +1,109 @@
+##
+#
+# 2D viscous shock (Becker solution [1]), ryujin counterpart of Section 7.3
+# (Table 2) of [2].
+#
+# The exact steady viscous shock profile of Becker for gamma = 1.4,
+# mu = 0.01, lambda = 0, Pr = 3/4 (c_v^{-1} kappa = mu gamma / Pr), left
+# state rho_0 = 1, v_0 = 1 and right velocity v_1 = 7/27 (pre-shock Mach
+# number M_0 = 3), moved with a Galilean frame velocity v_infty = 0.2. The
+# shock starts at x = 0 and travels to x = 0.6 at the final time t = 3. The
+# domain is (-0.5,1) x (0,1) with Dirichlet conditions on the left and
+# right and periodic conditions on the top and bottom. Table 2 of [2] uses
+# CFL 0.4 and 0.9.
+#
+# [2] uses five non-nested Delaunay triangulations with mesh sizes from
+# about 0.02 to 0.0035. Here we use uniform quadrilateral meshes; mesh
+# refinement 5, 6, 7 give h = 1/64, 1/128, 1/256. The error evaluation
+# reports the normalized L1, L2, Linf errors summed over rho, m_1, and E
+# (delta_p in [2]; m_2 vanishes for the exact solution).
+#
+# Notes: The results of [2] were computed with a serial P1 demonstration
+# code, not with ryujin. This file sets up the same problem in ryujin; the
+# errors are close to, but not identical with, Table 2 of [2].
+#
+# [1] R. Becker. Stosswelle und Detonation. Zeitschrift fuer Physik,
+#     8(1):321-362, 1922.
+#
+# [2] J.-L. Guermond, M. Maier, B. Popov, I. Tomas. Second-order invariant
+#     domain preserving approximation of the compressible Navier-Stokes
+#     equations. Comput. Methods Appl. Mech. Engrg., 375:113608, 2021.
+#     arXiv:2009.06022
+#
+##
+
+subsection A - Scheduler
+  set basename          = becker_solution-2d
+
+  set tasks             = error evaluation
+
+  set final time        = 3.00
+  set timer granularity = 3.00
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = navier stokes
+
+  set gamma     = 1.4
+  set mu        = 0.01
+  set lambda    = 0
+  set kappa     = 1.866666666666666e-2
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 5
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition bottom = periodic
+    set boundary condition top    = periodic
+
+    set position bottom left      = -0.5, 0
+    set position top right        =  1.0, 1
+    set subdivisions x            = 3
+    set subdivisions y            = 2
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = becker solution
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection becker solution
+    set mu                      = 0.01
+    set velocity galilean frame = 0.2
+    set density left            = 1
+    set velocity left           = 1
+    set velocity right          = 0.259259259259
+  end
+end
+
+
+subsection G - ParabolicModule
+  set tolerance             = 1e-14
+  set tolerance linfty norm = false
+
+  set multigrid velocity    = false
+  set multigrid energy      = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.40
+  set cfl max               = 0.40
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, E
+end

@@ -1,0 +1,131 @@
+##
+#
+# Navier-Stokes shocktube benchmark of Daru and Tenaud [1,2], Section 6.3
+# (Figure 2, Table 2, Figure 6) of [3].
+#
+# The shocktube consists of a square cavity (0,1)^2 with a diaphragm at
+# {x=0.5} separating it in two parts. The fluid is initially at rest. The
+# state on the left-hand side of the diaphragm is (rho_L=120, v_L=0,
+# p_L=rho_L/gamma). The right state is (rho_R=1.2, v_R=0, p_R=rho_R/gamma).
+#
+# We use the ideal gas equation of state p = (gamma - 1) rho e with
+# gamma=1.4. The shear viscosity is mu = 10^-3, the bulk viscosity is set
+# to 0. The Prandtl number is Pr=0.73. Due to symmetry only the lower half
+# (0,1) x (0,0.5) is computed: no-slip, thermally insulated walls on the
+# left, right, and bottom, and a slip condition on the symmetry line
+# {y=0.5}.
+#
+# [3] reports the skin friction coefficient C_f on the bottom wall at t = 1
+# on uniform meshes with refinement levels L11 (8M gridpoints) to L14 (512M
+# gridpoints). The chosen refinement level 11 corresponds to around 8.4M
+# gridpoints (33.6M degrees of freedom), which requires around 7.5k time
+# steps and runs for about (250h / #n_cores) on a modern system. Levels 12,
+# 13, 14 are obtained by increasing mesh refinement. The quantities task
+# records time and space averages of the primitive state on the bottom
+# wall; C_f has to be computed from the wall shear stress in a
+# postprocessing step, see Eq. (6.4) of [3].
+#
+# This is a reconstruction, differences to the published C_f extrema are
+# expected.
+#
+# [1] V. Daru and C. Tenaud. Evaluation of TVD high resolution schemes for
+#     unsteady viscous shocked flows. Computers & Fluids, 30(1):89-113,
+#     2001
+#
+# [2] V. Daru and C. Tenaud. Numerical simulation of the viscous shock tube
+#     problem by using a high resolution monotonicity-preserving scheme.
+#     Computers & Fluids, 38(3):664-676, 2009.
+#
+# [3] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov, I. Tomas. On the
+#     implementation of a robust and efficient finite element-based
+#     parallel solver for the compressible Navier-Stokes equations. Comput.
+#     Methods Appl. Mech. Engrg., 389:114250, 2022. arXiv:2106.02159
+#
+##
+
+subsection A - Scheduler
+  set basename          = daru_tenaud_shocktube-L11
+
+  set tasks             = vtu output, quantities
+
+  set final time        = 1.00
+  set timer granularity = 0.01
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = navier stokes
+
+  set mu        = 1.0e-3
+  set lambda    = 0
+
+  # Scaled thermal conductivity c_v^{-1} kappa  =  mu * gamma / Pr
+  set kappa     = 1.91780821918e-3
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 11
+
+  subsection rectangular domain
+    set boundary condition bottom = no slip
+    set boundary condition left   = no slip
+    set boundary condition right  = no slip
+    set boundary condition top    = slip
+
+    set position bottom left      =  0, 0
+    set position top right        =  1, 0.5
+
+    set subdivisions x            = 2
+    set subdivisions y            = 1
+  end
+end
+
+subsection E - InitialValues
+  set configuration = contrast
+  set direction     = 1,   0
+  set position      = 0.5, 0
+
+  subsection contrast
+    set primitive state left  = 120, 0, 85.7142857143
+    set primitive state right = 1.2, 0, 0.857142857143
+  end
+end
+
+subsection G - ParabolicModule
+  set tolerance                              = 1e-10
+  set tolerance linfty norm                  = false
+
+  set multigrid - chebyshev degree           = 3
+  set multigrid - chebyshev cg iter          = 0
+
+  set multigrid energy                       = true
+  set multigrid energy - chebyshev max eig   = 2.0
+  set multigrid energy - chebyshev range     = 15.0
+  set multigrid energy - max iter            = 15
+
+  set multigrid velocity                     = true
+  set multigrid velocity - chebyshev max eig = 2.0
+  set multigrid velocity - chebyshev range   = 8.0
+  set multigrid velocity - max iter          = 12
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.80
+  set cfl max               = 0.80
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end
+
+subsection I - VTUOutput
+  subsection full
+    set trigger multiplier = 100
+    set schlieren beta     = 10
+    set use mpi io         = true
+  end
+end
+
+subsection J - Quantities
+  set boundary manifolds = lower_boundary : y : time_averaged space_averaged
+  set interior manifolds =
+end

@@ -1,0 +1,132 @@
+##
+#
+# Transonic flow around the ONERA OAT15a supercritical airfoil in 3D,
+# Section 6.4 (Figure 3) of [3]; experiment of Jacquin et al. [1, 2].
+#
+# Free stream of air at Mach 0.73 with an angle of attack of 3.5 deg:
+#
+#   rho = 1.225 kg/m^3,  |v| = 248.42 m/s,  p = 1.013 10^5 N/m^2,
+#   gamma = 1.401,  mu = 1.789 10^-5 Ns/m^2,  lambda = 0,
+#   c_v^{-1} kappa = 3.616 10^-5 Ns/m^2.
+#
+# The chord length is 0.23 m (Reynolds number about 3 10^6) and the airfoil
+# is extruded in z-direction over a width of 0.046 m (span to chord ratio
+# 0.2). The mesh is graded towards the airfoil with x -> x^2. No-slip
+# conditions are enforced on the airfoil and non-reflecting ("dynamic")
+# conditions on the outer boundary. All boundaries are thermally insulated.
+#
+# The airfoil geometry makes the two z-planes periodic. [3] states slip
+# conditions there, but the code of the time also used periodic faces.
+#
+# Physical and airfoil parameters are taken from the parameter file of the
+# time (git 6241230f, May 2021). Mesh refinement 5 with 16 coarse
+# subdivisions in z-direction gives about 535k gridpoints per z-slice and
+# 512 slices, i.e. around 274M gridpoints as in [3]. The time stepping
+# scheme follows today's defaults. This is a reconstruction, differences to
+# the published results are expected.
+#
+# The pressure coefficient C_p of Figure 3 of [3] is a time average over
+# 900 samples taken every δt = 10^-4 s, averaged in z-direction: the
+# quantities task records the time and space averaged primitive state on
+# the airfoil surface. The final time is t = 0.22 s and we output cut
+# planes every δt = 0.005 s.
+#
+# The strong scaling tests of Section 6.5 (Figure 4) of [3] use this
+# configuration on meshes with 4.36M to 17.4B gridpoints and measure the
+# run time of 1000 time steps; use "max cycles = 1000", drop the output
+# tasks, and change mesh refinement.
+#
+# [1] L. Jacquin, P. Molton, S. Deck, B. Maury, D. Soulevant. Experimental
+#     study of shock oscillation over a transonic supercritical profile.
+#     AIAA J. 47:1985-1994, 2009.
+#
+# [2] S. Deck, N. Renard. Towards an enhanced protection of attached
+#     boundary layers in hybrid RANS/LES methods. J. Comput. Phys.
+#     400:108970, 2020.
+#
+# [3] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov, I. Tomas. On the
+#     implementation of a robust and efficient finite element-based
+#     parallel solver for the compressible Navier-Stokes equations. Comput.
+#     Methods Appl. Mech. Engrg., 389:114250, 2022. arXiv:2106.02159
+#
+##
+
+subsection A - Scheduler
+  set basename          = oat15a-3d
+
+  set tasks             = vtu levelsets, quantities
+
+  set final time        = 0.2200
+  set timer granularity = 0.0001
+end
+
+
+subsection B - Equation
+  set dimension = 3
+  set equation  = navier stokes
+
+  # Air at sea level
+  set gamma     = 1.401
+  set mu        = 1.789e-5
+  set lambda    = 0
+  # Scaled thermal conductivity c_v^{-1} kappa
+  set kappa     = 3.616e-5
+end
+
+
+subsection C - Discretization
+  set geometry        = airfoil
+  set mesh refinement = 5
+
+  subsection airfoil
+    set airfoil type                        = ONERA OAT15a
+    set airfoil center                      = -0.0613, 0.
+    set airfoil length                      =  0.2300
+    set psi center                          =  0.03, 0.
+    set psi ratio                           =  3.00
+    set height                              =  1.0
+    set width                               =  0.046
+    set grading exponent                    =  2.0000
+    set grading epsilon                     =  0.0005
+    set grading epsilon trailing            =  0.0100
+    set anisotropic pre refinement airfoil  =  1
+    set anisotropic pre refinement trailing =  3
+    set subdivisions z                      =  16
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+  # 3.5deg angle of attack:
+  set direction     = 0.99813, 0.061049, 0.
+  set position      = 0., 0., 0.
+
+  subsection uniform
+    # Air at sea level and flow at Mach 0.73
+    # rho [kg/m^3], v [m/s], p [N/m^2]
+    set primitive state = 1.225, 248.42, 1.013e5
+  end
+end
+
+
+subsection G - ParabolicModule
+  set tolerance             = 1e-14
+  set tolerance linfty norm = false
+end
+
+
+subsection I - VTUOutput
+  subsection levelsets
+    set manifolds          = x-0.075, x-0.15, y, y-0.01, y+0.01, z-0.023
+    set trigger multiplier = 50
+    set use mpi io         = true
+    set schlieren beta     = 10
+  end
+end
+
+
+subsection J - Quantities
+  set boundary manifolds = \
+    airfoil : floor(x*x/0.0266 + 36*y*y/0.0266) : time_averaged space_averaged
+end
