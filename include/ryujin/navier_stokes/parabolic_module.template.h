@@ -405,6 +405,7 @@ namespace ryujin
 
       /* Index ranges for the iteration over the sparsity pattern : */
 
+      const unsigned int n_internal = offline_data_->n_locally_internal();
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
       const auto sparsity_simd_view =
@@ -615,11 +616,15 @@ namespace ryujin
         ComputingTimer::Scope scope(
             "time step [X] _ - synchronization barriers");
 
-        /* Compute the global minimum of the internal energy: */
+        /*
+         * Compute the global minimum of the internal energy over all
+         * unconstrained degrees of freedom:
+         */
 
-        // .begin() and .end() denote the locally owned index range:
-        e_min_old =
-            *std::min_element(internal_energy_.begin(), internal_energy_.end());
+        e_min_old = std::numeric_limits<Number>::max();
+        for (unsigned int i = 0; i < n_owned; ++i)
+          if (sparsity_simd_view.row_length(i) != 1)
+            e_min_old = std::min(e_min_old, internal_energy_.local_element(i));
 
         e_min_old = Utilities::MPI::min(e_min_old,
                                         mpi_ensemble_.ensemble_communicator());
@@ -1009,7 +1014,7 @@ namespace ryujin
         };
 
         cpu_simd_loop<Number>(
-            "time_step_parabolic_3", body, 0, n_owned, n_owned);
+            "time_step_parabolic_3", body, 0, n_internal, n_owned);
 
         new_U_view.update_ghost_values();
       }
