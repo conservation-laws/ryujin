@@ -1,0 +1,118 @@
+##
+#
+# Isentropic vortex, Section 6.2 (i), Table 1 of [1].
+#
+# The isentropic vortex [2] is a smooth analytic solution of the
+# compressible Euler equations with polytropic gas equation of state. The
+# vortex has strength beta = 5, is initially centered at x_0 = (-1, -1),
+# and is advected with velocity v_inf = (1, 1), i.e., with a speed of
+# sqrt(2) in diagonal direction. At the final time t = 2 it is centered at
+# (1, 1). The computational domain is [-5, 5]^2 with Dirichlet boundary
+# conditions given by the exact solution, and gamma = 5/3. We report the
+# normalized L1, L2, Linf error norms summed over all components.
+#
+# The discretization is dG Q1 on a uniform mesh with n_k = 24 elements per
+# edge (2304 degrees of freedom per component). The rows of Table 1 are
+# obtained by increasing "mesh refinement" from 0 to 5. For Q2 and Q3 set
+# the "finite element ansatz" to "dG Q2" ("dG Q3") and the subdivisions to
+# n_k = 16 (n_k = 12); the number of degrees of freedom then matches Q1.
+# As in Section 5.2 of [1] also scale the entropy viscosity commutator
+# with c_ev = 0.5 for Q2 and c_ev = 0.25 for Q3, i.e., set "evc factor" in
+# subsection "F - HyperbolicModule/indicator" accordingly.
+#
+# The limiter bounds are relaxed with "relaxation factor = 4". With these
+# settings Q2 and Q3 reproduce the convergence rates of Table 1 with L1
+# errors 6-25% below the table (levels 0-3). For Q1 the errors agree
+# within 11% on levels 0-2, but the rate stays at about 1.6 (Table 1:
+# 1.8-1.9) and the error is 1.7 times larger on level 3. With the default
+# relaxation factor 1 the Q3 rate drops to about 1.5.
+#
+# Table 5 of [1] (first-order method) is obtained by setting the limiter
+# iterations to 0.
+#
+# [1] uses an "SSPRK-54" scheme which we replace by the explicit erk 54
+# Runge-Kutta scheme. This is a reconstruction, small differences to the
+# published numbers are expected.
+#
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
+#     hyperbolic systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
+#     arXiv:2402.04514
+#
+# [2] H. C. Yee, N. D. Sandham, M. J. Djomehri. Low-dissipative high-order
+#     shock-capturing methods using characteristic-based filters. J.
+#     Comput. Phys., 150(1):199-238, 1999.
+#
+##
+
+subsection A - Scheduler
+  set basename          = isentropic_vortex
+
+  set align time steps  = true
+
+  set tasks             = error evaluation
+
+  set final time        = 2.0
+  set timer granularity = 2.0
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.66666666666667
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = rectangular domain
+  set mesh refinement       = 0
+
+  subsection rectangular domain
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+    set subdivisions x            = 24
+    set subdivisions y            = 24
+
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1.41421356237310
+    set beta        = 5
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations        = 2
+    set relaxation factor = 4
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 54
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, m_2, E
+end

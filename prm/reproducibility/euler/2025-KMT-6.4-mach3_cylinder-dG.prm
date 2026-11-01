@@ -1,0 +1,92 @@
+##
+#
+# Supersonic channel flow past a cylinder in 2D at Mach 3 with
+# discontinuous elements, Section 6.4, Figure 1 of [1].
+#
+# The geometry is a disc of diameter 0.5 positioned at coordinates {0.6,0}
+# in a channel [0,4] x [-1,1]. The channel is initially filled with a
+# uniform flow at Mach 3 (rho = 1.4, v = 3, p = 1, gamma = 1.4). On the
+# left inflow boundary Dirichlet boundary conditions and on the right
+# outflow boundary "do nothing" conditions are enforced. On all other
+# boundaries (top and bottom boundary of the channel and the cylinder
+# boundary) slip boundary conditions are enforced. This is the same
+# configuration as 2021-MK-1-mach3_cylinder-2d.prm but discretized with dG
+# Q1.
+#
+# The chosen refinement level 9 corresponds to around 9.4M quadrilaterals
+# and 9.4M degrees of freedom per component as in Figure 1(a) of [1], which
+# shows the density at t = 4.0. For Figure 1(b) and 1(c) set the "finite
+# element ansatz" to "dG Q2" ("dG Q3") and the refinement level to 8 (2.4M
+# quadrilaterals; 5.3M and 9.4M degrees of freedom per component,
+# respectively). This is a reconstruction.
+#
+# The final time is set to t = 4.0 and we output a vtk every δt = 0.1.
+#
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
+#     hyperbolic systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
+#     arXiv:2402.04514
+#
+##
+
+subsection A - Scheduler
+  set basename          = mach3-cylinder-dG
+
+  set tasks             = vtu output
+
+  set final time        = 4.00
+  set timer granularity = 0.10
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = cylinder
+  set mesh refinement       = 9
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
+end

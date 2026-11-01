@@ -1,0 +1,111 @@
+##
+#
+# 1D smooth traveling wave of [2, Sec. 5.2] with a Mie-Gruneisen equation
+# of state, Section 5.3.1 (Table 1, column "MG") of [1].
+#
+# The density is
+#
+#   rho = rho_0 + 2^6 (x_1-x_0)^-6 (x-v_0 t-x_0)^3 (x_1-x+v_0 t)^3
+#
+# for x_0 <= x - v_0 t <= x_1 (x_0 = 0.1, x_1 = 0.3) and rho_0 otherwise;
+# velocity v_0 and pressure p_0 are constant, so the solution does not
+# depend on the equation of state. Domain (0,1), Dirichlet boundary
+# conditions, CFL 0.1, SSPRK(3,3). Mie-Gruneisen (5.3) with linear
+# Hugoniot: rho~_0 = 2790, c_0 = 5330, s = 1.34, Gamma_0 = 2, rho_0 = 3500,
+# p_0 = 1e11, v_0 = 1e4, T = 6e-5. There is no Mie-Gruneisen EOS class in
+# ryujin; the pressure oracle is given with the "function" EOS.
+#
+# The paper computed Table 1 with a separate Fortran code (P1 on
+# simplices); this is the corresponding ryujin configuration, so the errors
+# differ somewhat from the published ones. We report the consolidated error
+# delta_q of (5.5) of [1] (sum of the relative errors of rho, m, E). The
+# 100 subdivisions are the coarsest mesh of Table 1 (101 points); mesh
+# refinement = 1, 2, ... gives the finer meshes.
+#
+# [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
+#     second-order approximation of the compressible Euler equations with
+#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     arXiv:2207.12832
+#
+# [2] J.-L. Guermond, M. Nazarov, B. Popov, I. Tomas. Second-order
+#     invariant domain preserving approximation of the Euler equations
+#     using convex limiting. SIAM J. Sci. Comput., 40(5):A3211-A3239, 2018.
+#     DOI 10.1137/17M1149961
+#
+##
+
+subsection A - Scheduler
+  set basename          = smooth_wave-mie_gruneisen
+  set tasks             = error evaluation
+  set final time        = 6e-5
+  set timer granularity = 6e-5
+end
+
+
+subsection B - Equation
+  set dimension         = 1
+  set equation          = euler aeos
+  set equation of state = function
+
+  #
+  # Mie-Gruneisen EOS (5.3) with rho~_0 = 2790, c_0 = 5330, s = 1.34,
+  # Gamma_0 = 2, P_0 = e_0 = 0:
+  #   p = p_ref + Gamma_0 rho (e - e_ref),  eta = 1 - rho~_0 / rho,
+  #   p_ref = rho~_0 c_0^2 eta / (1 - s eta)^2,  e_ref = p_ref eta / (2 rho~_0).
+  # Only pressure and specific internal energy enter the scheme.
+  #
+  subsection function
+    set pressure                 = \
+      2790*5330^2*(1-2790/rho)/(1-1.34*(1-2790/rho))^2 \
+      + 2*rho*(e - 5330^2*(1-2790/rho)^2/(1-1.34*(1-2790/rho))^2/2)
+    set specific internal energy = \
+      5330^2*(1-2790/rho)^2/(1-1.34*(1-2790/rho))^2/2 \
+      + (p - 2790*5330^2*(1-2790/rho)/(1-1.34*(1-2790/rho))^2)/(2*rho)
+  end
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 1
+    set subdivisions x           = 100
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = smooth wave
+  set direction     = 1
+  set position      = 0
+
+  subsection smooth wave
+    set reference density  = 3500
+    set reference pressure = 1e11
+    set mach number        = 1e4
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m, E
+end

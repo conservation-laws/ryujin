@@ -1,0 +1,83 @@
+##
+#
+# Reproducibility test for
+#   prm/reproducibility/shallow_water/2025-GMT-5.3.1-smooth_vortex.prm
+# at mesh refinement 6 (4225 dofs). Table 4 of [2025-GMT] reports
+# delta_1 = 6.281e-4 for this mesh (RK(3,3;1)).
+#
+##
+
+subsection A - Scheduler
+  set basename          = smooth_vortex
+
+  set tasks             = error evaluation
+
+  set final time        = 2.0
+  set timer granularity = 2.0
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set reference water depth        = 2
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 6
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -6, -6
+    set position top right        =  6,  6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = smooth vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection smooth vortex
+    set beta            = 2
+    set mach number     = 1
+    set reference depth = 2
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.25
+  set cfl max               = 0.25
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h, m_1, m_2
+end
+
+
+subsection M - Logger
+  set terminal update interval = 0
+end

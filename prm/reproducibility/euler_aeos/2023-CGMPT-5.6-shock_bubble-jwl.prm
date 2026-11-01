@@ -1,0 +1,111 @@
+##
+#
+# Single-material shock-bubble interaction with the Jones-Wilkins-Lee
+# equation of state (Wang and Li [2, Sec. 5.2.2]), Section 5.6 (Figures
+# 4-6) of [1].
+#
+# JWL EOS (5.4) with A = 8.545e11, B = 2.05e10, R_1 = 4.6, R_2 = 1.35,
+# omega = 0.25, rho_0 = 1840. The initial state (rho, v_1, v_2, p) is
+#
+#   (3778.85, 16867.6, 0, 4.369e11)  for x < 0.05 (post-shock state),
+#   (2000, 0, 0, 5e10)               in the bubble |x - (0.5,0.5)| < 0.25,
+#   (1000, 0, 0, 5e10)               otherwise.
+#
+# Domain (0,3) x (0,1) with Dirichlet inflow conditions on the left and
+# slip boundary conditions on all other sides. Final time T = 1e-4, CFL
+# 0.5, SSPRK(3,3). We output a vtu at t = 40, 70, and 100 microseconds
+# (Figures 4, 5, and 6).
+#
+# The chosen refinement level 12 of the 3 x 1 coarse mesh gives the
+# 50,348,033 Q1 nodes of [1] (a large computation); level 9 (about 0.8M
+# nodes) is sufficient to see the main features.
+#
+# [1] states slip conditions on all boundaries. With a slip wall on the
+# left the post-shock flow (v_1 = 16867.6) separates from the wall and the
+# shock decelerates; the shock positions and the location of the bubble in
+# Figures 4-6 (shock at x = 0.97 at t = 40 microseconds, moving with the
+# Rankine-Hugoniot speed 22.9 km/s) require inflow conditions on the left.
+#
+# [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
+#     second-order approximation of the compressible Euler equations with
+#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     arXiv:2207.12832
+#
+# [2] Y. Wang, J. Li. Stiffened gas approximation and GRP resolution for
+#     fluid flows of real materials. arXiv:2108.13780, 2021.
+#
+##
+
+subsection A - Scheduler
+  set basename          = shock_bubble-jwl
+  set tasks             = vtu output
+  set final time        = 1e-4
+  set timer granularity = 1e-5
+end
+
+
+subsection B - Equation
+  set dimension         = 2
+  set equation          = euler aeos
+  set equation of state = jones wilkins lee
+
+  subsection jones wilkins lee
+    set A     = 8.545e11
+    set B     = 2.05e10
+    set R1    = 4.6
+    set R2    = 1.35
+    set omega = 0.25
+    set rho_0 = 1840
+    set q_0   = 0
+  end
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 12
+
+  subsection rectangular domain
+    set position bottom left      = 0, 0
+    set position top right        = 3, 1
+    set subdivisions x            = 3
+    set subdivisions y            = 1
+    set boundary condition left   = dirichlet
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection function
+    set density expression    = \
+      x < 0.05 ? 3778.85 : ((x-0.5)^2 + (y-0.5)^2 < 0.0625 ? 2000 : 1000)
+    set velocity x expression = x < 0.05 ? 16867.6 : 0
+    set velocity y expression = 0
+    set pressure expression   = x < 0.05 ? 4.369e11 : 5e10
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set trigger               = time points
+    set trigger time points   = 4e-5, 7e-5, 1e-4
+    set schlieren beta        = 15
+    set vtu output quantities = rho, v_1, v_2, p, schlieren_rho
+  end
+end

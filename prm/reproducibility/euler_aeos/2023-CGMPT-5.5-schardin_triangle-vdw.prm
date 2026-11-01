@@ -1,0 +1,85 @@
+##
+#
+# Schardin's problem: a Mach 1.3 shock hits a triangular obstacle, Section
+# 5.5 (Figure 3) of [1].
+#
+# Van der Waals EOS (5.2) with gamma = 864.7/577.8, a = 0.14, b = 3.258e-5.
+# Initial state (rho, v_1, v_2, p) = (1.82039, 148.597, 0, 185145) for
+# x <= -0.55 (post-shock state, M_S = 1.3) and (1.225, 0, 0, 101325)
+# otherwise. Domain D = (-0.65,0.5) x (-0.5,0.5) without the triangle with
+# vertices (-0.2,0), (0.1,1/6), (0.1,-1/6). Dirichlet conditions on the
+# left, dynamic outflow conditions on the right, and slip conditions
+# elsewhere. Final time T = 2.2e-3, CFL 0.6, SSPRK(3,3). We output a vtu at
+# t = 1e-3, 1.6e-3, 2.2e-3 (the snapshots of Figure 3).
+#
+# The quadrilateral mesh is generated with gmsh from
+# 2023-CGMPT-5.5-schardin_triangle.geo (see README.md). Mesh refinement 6
+# gives 6,985,344 Q1 nodes, close to the 7,347,200 nodes of [1]. This is a
+# reconstruction of the mesh of [1].
+#
+# [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
+#     second-order approximation of the compressible Euler equations with
+#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     arXiv:2207.12832
+#
+##
+
+subsection A - Scheduler
+  set basename          = schardin_triangle-vdw
+  set tasks             = vtu output
+  set final time        = 2.2e-3
+  set timer granularity = 1e-4
+end
+
+
+subsection B - Equation
+  set dimension         = 2
+  set equation          = euler aeos
+  set equation of state = van der waals
+
+  subsection van der waals
+    set gamma      = 1.4965385946694358
+    set vdw a      = 0.14
+    set covolume b = 3.258e-5
+  end
+end
+
+
+subsection C - Discretization
+  set geometry        = reader
+  set mesh refinement = 6
+
+  subsection reader
+    set filename = schardin_triangle.msh
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = contrast
+  set direction     = 1, 0
+  set position      = -0.55, 0
+
+  subsection contrast
+    set primitive state left  = 1.82039, 148.597, 185145
+    set primitive state right = 1.225, 0, 101325
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.60
+  set cfl max               = 0.60
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set trigger               = time points
+    set trigger time points   = 1e-3, 1.6e-3, 2.2e-3
+    set schlieren beta        = 15
+    set vtu output quantities = rho, v_1, v_2, p, schlieren_rho
+  end
+end

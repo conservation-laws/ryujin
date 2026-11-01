@@ -1,0 +1,100 @@
+##
+#
+# Supersonic channel flow past a cylinder in 3D at Mach 3, Section 5 and
+# Figure 6 of [1].
+#
+# The geometry is a cylinder of diameter 0.5 centered along (0.6, 0, z) in
+# a channel [0,4] x [-1,1] x [-1,1]; the 2D coarse mesh is extruded into 3D
+# with 4 layers of hexahedra. The channel is initially filled with a
+# uniform flow at Mach 3 (rho = 1.4, v = 3, p = 1, gamma = 1.4). On the
+# left inflow boundary Dirichlet boundary conditions and on the right
+# outflow boundary "do nothing" conditions are enforced. On all other
+# boundaries (top, bottom, front, and back boundaries of the channel and
+# the cylinder boundary) slip boundary conditions are enforced.
+#
+# Warning, this is a very large computation!
+#
+# The chosen refinement level 8 corresponds to around 1.8B gridpoints as in
+# Figure 6 of [1], which shows a snapshot at t = 5.0. Figure 6 was computed
+# with an earlier version of the solver using a second-order SSP
+# Runge-Kutta scheme (ssprk 22) on 30720 MPI ranks with an average
+# time-step size of 6.0e-05 (about 83k time steps). Refinement levels 6 and
+# 7 correspond to 29M and 228M gridpoints, respectively. The coarse mesh
+# (208 gridpoints) is the one of [1]; this is a reconstruction of the
+# original configuration.
+#
+# Output reduced vtks only containing hexahedra that intersect with the
+# cutplanes x, y, z, and x^2+y^2-0.25*0.25 (as configured down below in the
+# "subsection I - VTUOutput"). Figure 6 of [1] shows a Schlieren plot and
+# the magnitude of the vorticity on cutplanes.
+#
+# [1] M. Maier, M. Kronbichler. Efficient parallel 3D computation of the
+#     compressible Euler equations with an invariant-domain preserving
+#     second-order finite-element scheme. ACM Trans. Parallel Comput.,
+#     8(3):16:1-30, 2021. DOI 10.1145/3470637, arXiv:2007.00094
+#
+##
+
+subsection A - Scheduler
+  set basename          = mach3-cylinder-3d
+
+  set tasks             = vtu levelsets
+
+  set final time        = 5.00
+  set timer granularity = 0.10
+end
+
+
+subsection B - Equation
+  set dimension = 3
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = cylinder
+
+  set mesh refinement     = 8
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0, 0
+  set position      = 1, 0, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = ssprk 22
+end
+
+
+subsection I - VTUOutput
+  subsection levelsets
+    set manifolds             = x, y, z, x^2+y^2-0.25*0.25
+    set vtu output quantities = rho, m_1, m_2, m_3, E, schlieren_rho, vorticity_v_1
+
+    set use mpi io            = true
+    set schlieren beta        = 10
+  end
+end

@@ -1,0 +1,89 @@
+##
+#
+# 2D rising thermal bubble proposed by Robert [1], Section 4.2.1 (Figure
+# 4.4) of [2].
+#
+# A warm bubble, given by a cone shaped perturbation of the potential
+# temperature,
+#
+#   theta = 300 + 2 (1 - r / 2000),  r = |(x, y) - (10000, 2000)| <= 2000,
+#
+# and theta = 300 K otherwise, rises in an isentropic atmosphere at rest
+# and deforms into a mushroom-like shape. The density is given by the
+# isentropic profile evaluated pointwise with the local potential
+# temperature, so the initial state is out of equilibrium inside the
+# bubble. The computational domain is [5000,15000] x [0,10000] m^2 with
+# slip boundary conditions on all sides. The thermodynamic constants are
+# p_0 = 10^5 Pa, c_v = 715, gamma = 1.4 and g = 9.8.
+#
+# The chosen 200 x 200 subdivisions correspond to a mesh size of h = 50 m
+# (Figure 4.4 of [2]). The final time is set to t = 1020 s and we output a
+# vtk every δt = 10 s.
+#
+# [1] A. Robert. Bubble convection experiments with a semi-implicit
+#     formulation of the Euler equations. Journal of Atmospheric Sciences,
+#     50(13):1865-1873, 1993.
+#
+# [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+#     approximation of the compressible atmospheric Euler equations.
+#     arXiv:2606.19764, 2026.
+#
+##
+
+subsection A - Scheduler
+  set basename          = rising-bubble
+  set tasks             = vtu output
+  set final time        = 1020
+  set timer granularity = 10
+end
+
+subsection B - Equation
+  set dimension          = 2
+  set equation           = euler atmospheric
+  set c_v                = 715
+  set gamma              = 1.4
+  set gravity            = 9.8
+  set reference pressure = 100000
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left      = 5000, 0
+    set position top right        = 15000, 10000
+    set subdivisions x            = 200
+    set subdivisions y            = 200
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+subsection E - InitialValues
+  set configuration = stratified function
+  set position      = 0, 0
+
+  subsection stratified function
+    set velocity x expression = 0
+    set velocity y expression = 0
+    set theta expression      = 300 + 2*(1 - sqrt((x-10000)^2+(y-2000)^2)/2000)
+    set radius                = 2000
+    set blast width           = 10000
+    set blast height          = 2000
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.9
+  set cfl max               = 0.9
+  set cfl recovery strategy = bang bang control
+end
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, theta, m_1, m_2, schlieren_theta
+  end
+end

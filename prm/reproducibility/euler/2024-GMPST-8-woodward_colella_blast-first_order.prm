@@ -1,0 +1,101 @@
+##
+#
+# Woodward-Colella blast wave computed with the first-order method, Section
+# 8, Figure 6 of [1].
+#
+# The Woodward-Colella blast wave [2] on the interval [0, 1] with slip
+# (reflecting) boundary conditions and gamma = 1.4. The gas is initially at
+# rest with rho = 1 and pressure p = 1000 on [0, 0.1], p = 0.01 on [0.1,
+# 0.9], and p = 100 on [0.9, 1]. Figure 6 of [1] shows the density at
+# t = 0.038 for I = 400, 800, 1600 gridpoints.
+#
+# This configuration runs the first-order (low-order) method only by
+# setting the limiter iterations to 0. It reproduces the "GMS" curves of
+# Figure 6 (guaranteed maximum wave speed). The "Greedy" curves use the
+# greedy wave speed estimate of [1], which is not available for the Euler
+# equations in the curent version of ryujin.
+#
+# The chosen 400 subdivisions correspond to the left panel of Figure 6; use
+# "mesh refinement" 1 and 2 for the other two panels.
+#
+# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
+#     First-order greedy invariant-domain preserving approximation for
+#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
+#     Comput., 100:46, 2024. arXiv:2310.01713
+#
+# [2] P. Woodward, P. Colella. The numerical simulation of two-dimensional
+#     fluid flow with strong shocks. J. Comput. Phys., 54(1):115-173, 1984.
+#
+##
+
+subsection A - Scheduler
+  set basename          = woodward_colella_blast
+
+  set align time steps  = true
+
+  set tasks             = vtu output
+
+  set final time        = 0.038
+  set timer granularity = 0.038
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 400
+
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = three state contrast
+
+  set direction     = 1
+  set position      = 0
+
+  subsection three state contrast
+    set left region length     = 0.1
+    set middle region length   = 0.8
+    set primitive state left   = 1, 0, 1000
+    set primitive state middle = 1, 0, 0.01
+    set primitive state right  = 1, 0, 100
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations = 0
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set use mpi io            = true
+    set vtu output quantities = rho, m, E
+  end
+end

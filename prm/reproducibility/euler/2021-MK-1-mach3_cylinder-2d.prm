@@ -1,0 +1,101 @@
+##
+#
+# Supersonic channel flow past a cylinder in 2D at Mach 3, Figure 1 of [1].
+#
+# The geometry is a disc of diameter 0.5 positioned at coordinates {0.6,0}
+# in a channel [0,4] x [-1,1]. The channel is initially filled with a
+# uniform flow at Mach 3 (rho = 1.4, v = 3, p = 1, gamma = 1.4). On the
+# left inflow boundary Dirichlet boundary conditions and on the right
+# outflow boundary "do nothing" conditions are enforced. On all other
+# boundaries (top and bottom boundary of the channel and the cylinder
+# boundary) slip boundary conditions are enforced.
+#
+# Warning, this is a large computation!
+#
+# The chosen refinement level 10 corresponds to around 38M gridpoints (151M
+# degrees of freedom) as in Figure 1 of [1], which shows a Schlieren plot
+# at t = 3.5. Every refinement level increases the number of gridpoints by
+# 4 and the number of time steps by 2. Refinement level 8 (2.36M gridpoints
+# already shows the same flow features and is 64 times cheaper.
+#
+# Note: The same configuration, shifted to the domain [0,4] x [0,2], is
+# shown in Section 5.7, Figure 3 of [2]; those results were computed with
+# P1 elements on an unstructured mesh with 252820 nodes and CFL 0.3 by a
+# code different from ryujin.
+#
+# The final time is set to t = 3.5 and we output a vtk every δt = 0.1. For
+# postprocessing the simulation into a nice video set the output frequency
+# to δt = 0.01 which will result in a 25.0 seconds long video at 20 fps.
+#
+# [1] M. Maier, M. Kronbichler. Efficient parallel 3D computation of the
+#     compressible Euler equations with an invariant-domain preserving
+#     second-order finite-element scheme. ACM Trans. Parallel Comput.,
+#     8(3):16:1-30, 2021. DOI 10.1145/3470637, arXiv:2007.00094
+#
+# [2] J.-L. Guermond, M. Nazarov, B. Popov, I. Tomas. Second-order
+#     invariant domain preserving approximation of the Euler equations
+#     using convex limiting. SIAM J. Sci. Comput., 40(5):A3211-A3239, 2018.
+#     DOI 10.1137/17M1149961
+#
+##
+
+subsection A - Scheduler
+  set basename          = mach3-cylinder-2d
+
+  set tasks             = vtu output
+
+  set final time        = 5.00
+  set timer granularity = 0.10
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = cylinder
+
+  set mesh refinement     = 10
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
+end

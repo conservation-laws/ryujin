@@ -1,0 +1,113 @@
+##
+#
+# Electrostatic implosion, Section 5.3 (Figures 4 and 5) of [1].
+#
+# The domain is a disk of radius 16 with slip boundary conditions on the
+# state and phi = 0 on the boundary. alpha = 1e3, gamma = 5/3. The initial
+# state is uniform with rho = 1, v = 0, p = 1e-4. A constant background
+# charge density rho_b = -1e4 (in ryujin's sign convention rho_b = -rho is
+# neutralizing) is placed in the annulus 4 < r <= 6. The electron gas is
+# pulled towards the annulus.
+#
+# The final time is t_F = 3/64 t_P with the plasma period t_P = 2 pi /
+# sqrt(alpha rho_0); we output a vtu every t_F / 16. Figure 4 is a
+# reference computation with "full restart" and about 1M quadrilaterals
+# (refinement level 8 of the 12-cell disk mesh, 786k cells); Figure 5
+# compares "no restart", relaxation, and "full restart" at t = 7/8 t_F.
+# (The relaxation strategy "correction" is currently not implemented in
+# ryujin.) The results of [1] were computed with a predecessor code; this
+# is a reconstruction and differences to the published results are
+# expected.
+#
+# [1] M. Maier, J. N. Shadid, I. Tomas. Structure-preserving finite-element
+#     schemes for the Euler-Poisson equations. Commun. Comput. Phys.,
+#     33(3):647-691, 2023. DOI 10.4208/cicp.OA-2022-0205, arXiv:2207.07860
+#
+##
+
+subsection A - Scheduler
+  set basename          = electrostatic_implosion
+  set tasks             = vtu output
+
+  set final time        = 0.00931368
+  set timer granularity = 0.000582105
+  set align time steps  = true
+end
+
+
+subsection B - Equation
+  set dimension                   = 2
+  set equation                    = euler poisson
+  set gamma                       = 1.666666666666667
+
+  set alpha                       = 1e3
+  set electrostatic configuration = function
+
+  subsection function
+    set background density = x*x + y*y > 16. && x*x + y*y <= 36. ? -1e4 : 0.
+    set magnetic field z   = 0.
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = disk
+  set mesh refinement       = 8
+  set mesh writeout         = false
+
+  subsection disk
+    set balanced           = true
+    set boundary condition = slip
+    set radius             = 16
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection uniform
+    set primitive state = 1, 0, 1e-4
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0.25
+  end
+end
+
+
+subsection G - ParabolicModule
+  # no restart, full restart
+  set gauss law restart strategy    = full restart
+
+  set multigrid - max iter          = 20
+  set multigrid - chebyshev range   = 8
+  set multigrid - chebyshev max eig = 2
+  set multigrid - chebyshev degree  = 3
+  set multigrid - chebyshev cg iter = 10
+  set multigrid - min level         = 2
+  set tolerance                     = 1e-10
+  set tolerance linfty norm         = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.9
+  set cfl max               = 0.9
+  set cfl recovery strategy = cruise control
+  set time stepping scheme  = strang erk 33 cn
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, m_1, m_2, p, schlieren_rho
+  end
+end

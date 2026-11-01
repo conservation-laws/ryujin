@@ -1,0 +1,120 @@
+##
+#
+# Vortex leaving the domain through non-reflecting boundaries, test of
+# Fosso et al. [1] as used in Section 6.2 (Figure 1) of [2]. This is an
+# inviscid computation (compressible Euler equations); it is part of this
+# directory because it belongs to [2].
+#
+# A vortex is advected with the background velocity v_infty = (1, 0)
+# through the domain [-1,1]^2 and leaves it through the right boundary:
+#
+#   rho = 1,
+#   v   = v_infty + vbar / r0 psi(r) (-(y - y0), x - x0),
+#   p   = p_infty - 1/2 vbar^2 psi(r)^2,
+#   psi(r) = exp((1 - r^2 / r0^2) / 2),   r = |x - x0|,
+#
+# where p_infty = a_infty^2 / gamma and a_infty = 1 / M_infty. The
+# non-reflecting ("dynamic") boundary condition based on characteristic
+# variables of [2, §4.3.2] is enforced on all four sides. The four cases of
+# [2] are
+#
+#   (i)   M_infty = 0.5,  vbar = 0.75  (p_infty = 2.857142857)
+#   (ii)  M_infty = 0.5,  vbar = 0.25  (p_infty = 2.857142857)
+#   (iii) M_infty = 0.05, vbar = 0.75  (p_infty = 285.7142857)
+#   (iv)  M_infty = 0.05, vbar = 0.25  (p_infty = 285.7142857)
+#
+# This file is set up for case (i); for the other cases change vbar (0.75
+# in the velocity expressions, 0.5625 = vbar^2 in the pressure expression)
+# and p_infty. We use r0 = 0.1, x0 = (0, 0) (the vortex center crosses the
+# boundary at t = 1 as stated in [2]), and gamma = 1.4. This is a
+# reconstruction.
+#
+# The mesh has 80 x 80 cells as in [2], CFL = 0.75, and the final time is
+# t = 4. The quantities task writes the velocity at all gridpoints every
+# δt = 0.05, from which delta_1(t) = |v - v_infty|_Linf / |v_infty| of
+# Figure 1 of [2] is computed. delta_2(t) (relative Linf norm of the
+# vorticity) is obtained from the same data or the vtu output.
+#
+# [1] P. A. Fosso, H. Deniau, N. Lamarque, T. Poinsot. Comparison of
+#     outflow boundary conditions for subsonic aeroacoustic simulations.
+#     Int. J. Numer. Meth. Fluids 68(10):1207-1233, 2012.
+#
+# [2] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov, I. Tomas. On the
+#     implementation of a robust and efficient finite element-based
+#     parallel solver for the compressible Navier-Stokes equations. Comput.
+#     Methods Appl. Mech. Engrg., 389:114250, 2022. arXiv:2106.02159
+#
+##
+
+subsection A - Scheduler
+  set basename          = non_reflecting_vortex
+
+  set tasks             = vtu output, quantities
+
+  set final time        = 4.00
+  set timer granularity = 0.05
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set boundary condition left   = dynamic
+    set boundary condition right  = dynamic
+    set boundary condition bottom = dynamic
+    set boundary condition top    = dynamic
+
+    set position bottom left      = -1, -1
+    set position top right        =  1,  1
+    set subdivisions x            = 80
+    set subdivisions y            = 80
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection function
+    set density expression    = 1.
+    set velocity x expression = \
+      1. - 0.75 / 0.1 * exp(0.5 * (1. - (x*x + y*y) / 0.01)) * y
+    set velocity y expression = \
+      0.75 / 0.1 * exp(0.5 * (1. - (x*x + y*y) / 0.01)) * x
+    set pressure expression   = \
+      2.857142857 - 0.5 * 0.5625 * exp(1. - (x*x + y*y) / 0.01)
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.75
+  set cfl max               = 0.75
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, m_1, m_2, E
+  end
+end
+
+
+subsection J - Quantities
+  set interior manifolds = all : floor(0.5) : instantaneous
+  set quantities         = v_1, v_2
+  set number of moments  = 1
+end

@@ -1,0 +1,121 @@
+##
+#
+# Sedov-like explosion with the Jones-Wilkins-Lee equation of state and
+# adaptive mesh refinement, Section 6.3.2 (Figure 5) of [1].
+#
+# JWL EOS with A = 632.1, B = -4.472, R_1 = 11.3, R_2 = 1.13,
+# omega = 0.8938, rho_0 = 1, e_0 = 0 (Table 1 of [1]). Ambient state (rho,
+# v, p) = (1, 0, 0.1) and (1, 0, 100) for |x| <= 0.05. Domain (0,0.4)^2,
+# final time T = 0.05, CFL 0.9, ERK(3,3), slip boundary conditions on all
+# sides.
+#
+# The mesh is adapted every 10th cycle with the smoothness indicator of
+# [1, Sec. 5.3] on the density and the threshold marking strategy with a
+# refinement threshold of 0.2, up to a maximal level 9 (513^2 = 263,169
+# nodes for a uniform mesh, the comparison run of [1]). For the uniform
+# comparison run remove the "mesh adaptation" task and set
+# "mesh refinement = 9".
+#
+# Table 1 of [1] lists A = 6.321e3; as for Section 5.4.1 of [2] (see
+# 2023-CGMPT-5.4.1-blast_wave-jwl-case_1.prm) we use A = 632.1. At rho = 1
+# the A term is negligible: both values give the same solution.
+#
+# The mesh adaptation algorithm has changed considerably since [1] was
+# written, so the results differ from the published ones.
+#
+# [1] J. J. Harmon, M. Kronbichler, M. Maier, E. J. Tovar. A conservative
+#     invariant-domain preserving projection technique for hyperbolic
+#     systems under adaptive mesh refinement. arXiv:2507.18717, 2025.
+#
+# [2] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
+#     second-order approximation of the compressible Euler equations with
+#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     arXiv:2207.12832
+#
+##
+
+subsection A - Scheduler
+  set basename          = sedov_blast-jwl-amr
+  set tasks             = vtu output, mesh adaptation
+  set final time        = 0.05
+  set timer granularity = 0.005
+end
+
+
+subsection B - Equation
+  set dimension         = 2
+  set equation          = euler aeos
+  set equation of state = jones wilkins lee
+
+  subsection jones wilkins lee
+    set A     = 632.1
+    set B     = -4.472
+    set R1    = 11.3
+    set R2    = 1.13
+    set omega = 0.8938
+    set rho_0 = 1
+    set q_0   = 0
+  end
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 5
+
+  subsection rectangular domain
+    set position bottom left      = 0, 0
+    set position top right        = 0.4, 0.4
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = radial contrast
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection radial contrast
+    set primitive state inner = 1, 0, 100
+    set primitive state outer = 1, 0, 0.1
+    set radius                = 0.05
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = rho, v_1, v_2, p
+  end
+end
+
+
+subsection L - MeshAdaptor
+  set adaptation strategy = smoothness indicators
+  set marking strategy    = fixed threshold
+  set trigger             = every cycle
+  set trigger multiplier  = 10
+
+  subsection adaptation strategies
+    set smoothness indicators: quantities = rho
+  end
+
+  subsection marking strategies
+    set refinement threshold     = 0.2
+    set coarsening threshold     = 0.05
+    set minimal refinement level = 5
+    set maximal refinement level = 9
+  end
+end

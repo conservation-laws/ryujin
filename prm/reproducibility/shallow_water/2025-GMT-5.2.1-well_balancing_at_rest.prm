@@ -1,0 +1,109 @@
+##
+#
+# Well-balancing at rest over three conical bumps, Section 5.2.1 (Table 2,
+# Figure 1) of [1].
+#
+# The topography consists of the three cones of Kawahara and Umetsu [2] in
+# the domain [0,75] x [0,30] m^2,
+#
+#   z(x) = max(0, 1 - |x - (30, 6)| / 8, 1 - |x - (30, 24)| / 8,
+#                 3 - 3 |x - (47.5, 15)| / 10),
+#
+# and the water depth is initialized with the lake at rest H_0(x) = max(1.5
+# - z(x), 0), so that the two small cones are submerged and the large one
+# creates a shoreline. Slip boundary conditions are enforced on all sides,
+# g = 9.81. The mesh is randomly distorted so that the shoreline is not
+# aligned with the mesh. We run until T = 100 s with CFL 0.9 and report the
+# Linf error of h with respect to the initial state.
+#
+# The chosen refinement level 6 corresponds to 4225 Q1 degrees of freedom
+# (first row of Table 2 of [1]); refinement 7 gives the second row (16641
+# dofs). We use a mesh distortion of 0.25 (relative to the local mesh size).
+# Table 2 is computed with RK(3,3;1) (erk 33) and RK(3,3;1/3) (ssprk 33).
+# The errors are at the level of round-off and will differ in detail from
+# the published values.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+# [2] M. Kawahara and T. Umetsu. Finite element method for moving boundary
+#     problems in river flow. International Journal for Numerical Methods
+#     in Fluids, 6(6):365-386, 1986.
+#
+##
+
+subsection A - Scheduler
+  set basename          = well_balancing_at_rest
+
+  set tasks             = vtu output, error evaluation
+
+  set final time        = 100
+  set timer granularity = 100
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set reference water depth        = 1.5
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 6
+  set mesh distortion     = 0.25
+
+  subsection rectangular domain
+    set boundary condition bottom = slip
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition top    = slip
+
+    set position bottom left      =  0,  0
+    set position top right        = 75, 30
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = three bumps dam break
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection three bumps dam break
+    set left water depth          = 1.5
+    set right water depth         = 1.5
+    set cone magnitude            = 1
+    set well balancing validation = true
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = h, m_1, m_2, bathymetry
+  end
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = false
+  set error norms      = Linf
+  set error quantities = h
+end

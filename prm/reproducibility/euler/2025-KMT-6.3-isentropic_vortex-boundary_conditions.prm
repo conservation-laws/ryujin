@@ -1,0 +1,103 @@
+##
+#
+# Boundary condition validation with a modified isentropic vortex, Section
+# 6.3, Table 4 of [1].
+#
+# The isentropic vortex of 2025-KMT-6.2-isentropic_vortex.prm (gamma = 5/3,
+# beta = 5, x_0 = (-1, -1), domain [-5, 5]^2) is advected with velocity
+# v_inf = (M, M), i.e., with speed sqrt(2) M in diagonal direction. The
+# final time t = 6 / M is chosen such that the vortex is centered on the
+# top right corner of the domain at final time. A large part of the outflow
+# boundary is subsonic for M = 1 and M = 1.5.
+#
+# This file corresponds to strategy (b) of Table 4, sub/supersonic boundary
+# conditions ("dynamic") with the exact solution as boundary data, for M =
+# 1. For strategy (a) set all boundary conditions to "dirichlet". For M =
+# 1.5, 2.0, 2.5 set the "mach number" to sqrt(2) M and the final time to 6
+# / M. The rows of Table 4 are obtained by increasing "mesh refinement"
+# from 0 to 5 (dG Q1, 24 elements per edge, 2304 degrees of freedom per
+# component on level 0). As in 2025-KMT-6.2-isentropic_vortex.prm we use
+# erk 54 instead of "SSPRK-54" and "relaxation factor = 4"; this is a
+# reconstruction.
+#
+# The boundary conditions have been changed since the computations of [1]
+# were done. The L1 errors are 2-9 times larger than in Table 4 and
+# converge with rates 1.1-1.9 instead of 2.1-2.3 (levels 0-3).
+#
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
+#     hyperbolic systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
+#     arXiv:2402.04514
+#
+##
+
+subsection A - Scheduler
+  set basename          = isentropic_vortex-boundary_conditions
+
+  set align time steps  = true
+
+  set tasks             = error evaluation
+
+  set final time        = 6.0
+  set timer granularity = 6.0
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.66666666666667
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = rectangular domain
+  set mesh refinement       = 0
+
+  subsection rectangular domain
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+    set subdivisions x            = 24
+    set subdivisions y            = 24
+
+    set boundary condition bottom = dynamic
+    set boundary condition left   = dynamic
+    set boundary condition right  = dynamic
+    set boundary condition top    = dynamic
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1.41421356237310
+    set beta        = 5
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set relaxation factor = 4
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 54
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, m_2, E
+end

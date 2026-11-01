@@ -1,0 +1,102 @@
+##
+#
+# Smooth vortex for the shallow water equations, Section 5.3.1 (Table 4) of
+# [1].
+#
+# A divergence-free vortex adapted from Ricchiuto and Bollermann [2],
+#
+#   h(x, t) = h_inf - psi(x_bar)^2 / (2 g r_0^2),   v = v_inf + dv,
+#   psi(x)  = beta / (2 pi) exp((1 - |x|^2 / r_0^2) / 2),
+#   x_bar   = x - x_0 - v_inf t,
+#
+# with h_inf = 2 m, beta = 2, r_0 = 1 m and g = 9.81. The vortex starts at
+# x_0 = (-1, -1) and travels in diagonal direction with speed |v_inf| = 1
+# (the "mach number" of the initial state). The computational domain is
+# (-6, 6)^2 with Dirichlet boundary conditions. The final time is T = 2 s,
+# and we report the normalized L1, L2 and Linf errors of h, m_1, m_2 at
+# final time.
+#
+# The chosen refinement level 8 corresponds to 66049 Q1 degrees of freedom
+# (fourth row of Table 4 of [1]). Table 4 is obtained with mesh refinement
+# 5 to 10 (1089 to 1050625 dofs), with RK(3,3;1) (erk 33) and RK(3,3;1/3)
+# (ssprk 33) at CFL 0.25.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+# [2] M. Ricchiuto and A. Bollermann. Stabilized residual distribution for
+#     shallow water simulations. Journal of Computational Physics,
+#     228(4):1071-1115, 2009.
+#
+##
+
+subsection A - Scheduler
+  set basename          = smooth_vortex
+
+  set tasks             = error evaluation
+
+  set final time        = 2.0
+  set timer granularity = 2.0
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set reference water depth        = 2
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 8
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -6, -6
+    set position top right        =  6,  6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = smooth vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection smooth vortex
+    set beta            = 2
+    set mach number     = 1
+    set reference depth = 2
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.25
+  set cfl max               = 0.25
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = h, m_1, m_2
+end

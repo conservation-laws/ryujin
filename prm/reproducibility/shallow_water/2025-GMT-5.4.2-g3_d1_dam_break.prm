@@ -1,0 +1,133 @@
+##
+#
+# Laboratory experiment "G3-D.1" of Martinez-Aranda et al. [2], Section
+# 5.4.2 (Figures 7 and 8) of [1].
+#
+# Dam break from a reservoir with initial water depth H_0 = 0.055 m into an
+# initially dry flume containing two semi-circular Venturi constriction
+# elements followed by a rectangular obstacle at the center line
+# (bathymetry "G3" of the "transient experiments" initial state). The
+# geometry is the "wave tank" consisting of the reservoir [-1.57, 0] x
+# [-0.405, 0.405] m^2 and the flume [0, 6.01] x [-0.12, 0.12] m^2. The
+# paper quotes slightly different lengths; the reservoir length 1.57 m
+# gives exactly the published number of degrees of freedom, and the flume
+# length (6.0078 m in the experiment) is rounded to 6.01 m so that the
+# coarse cells are exactly 1 cm wide and the gauges fall onto mesh vertices
+# (with the same number of degrees of freedom). Slip boundary conditions
+# are enforced on all boundaries except the end of the flume, where
+# "dynamic" (non-reflecting) outflow conditions are enforced. We use
+# g = 9.81 and a Manning coefficient n = 0.01.
+#
+# The chosen refinement level 3 corresponds to 1,753,793 degrees of freedom
+# (mesh size 1.25 mm, as in [1]). The time stepping is RK(4,3;1) (erk 43)
+# with CFL 0.9. The final time is set to t = 20 s. We output a vtk at
+# t = 3, 4, 5, 6 s (Figure 7) and record the water depth every δt = 0.1 s
+# at the three wave gauges of Figure 8: (2.25, 0.12), (2.40, 0.20), (2.60,
+# 0.12) in the coordinates of [2], i.e. measured from the flume wall, which
+# correspond to (2.25, 0), (2.40, 0.08), (2.60, 0) here.
+#
+# [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
+#     Runge-Kutta approximation technique for the shallow water equations.
+#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#
+# [2] S. Martinez-Aranda, J. Fernandez-Pato, D. Caviedes-Voullieme, I.
+#     Garcia-Palacin, P. Garcia-Navarro. Towards transient experimental
+#     water surfaces: A new benchmark dataset for 2D shallow water solvers.
+#     Advances in Water Resources, 121:130-149, 2018.
+#
+##
+
+subsection A - Scheduler
+  set basename          = g3_d1
+
+  set tasks             = vtu output, quantities
+
+  set final time        = 20
+  set timer granularity = 0.1
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set reference water depth        = 0.055
+  set dry state relaxation large   = 1e4
+  set dry state relaxation small   = 1e2
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0.01
+end
+
+
+subsection C - Discretization
+  set geometry            = wave tank
+
+  # refinement 0 -   28139 DOFs
+  # refinement 1 -  110873 DOFs
+  # refinement 2 -  440129 DOFs
+  # refinement 3 - 1753793 DOFs
+  set mesh refinement     = 3
+
+  subsection wave tank
+    set reservoir length = 1.57
+    set reservoir width  = 0.81
+    set flume length     = 6.01
+    set flume width      = 0.24
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = transient experiments
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection transient experiments
+    set experimental configuration = G3
+    set flow state left            = 0.055, 0
+    set flow state right           = 0,     0
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations            = 2
+    set newton max iterations = 2
+    set newton tolerance      = 1e-10
+    set relaxation factor     = 2
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.9
+  set cfl min               = 0.45
+  set cfl recovery strategy = bang bang control
+  set time stepping scheme  = erk 43
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set trigger                    = time points
+    set trigger time points        = 3, 4, 5, 6
+    set schlieren beta             = 10
+    set schlieren recompute bounds = true
+    set use mpi io                 = true
+    set vtu output quantities      = h, m_1, m_2, bathymetry, schlieren_h
+  end
+end
+
+
+subsection J - Quantities
+  set trigger                      = timer tick
+  set trigger multiplier           = 1
+  set clear statistics on writeout = true
+  set quantities                   = h
+  set interior manifolds           = \
+    gauge-1 : (x-2.25)^2 + y^2        : instantaneous, \
+    gauge-2 : (x-2.40)^2 + (y-0.08)^2 : instantaneous, \
+    gauge-3 : (x-2.60)^2 + y^2        : instantaneous
+end

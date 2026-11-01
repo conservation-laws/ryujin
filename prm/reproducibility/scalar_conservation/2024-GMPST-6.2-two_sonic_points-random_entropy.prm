@@ -1,0 +1,115 @@
+##
+#
+# 1D Riemann problem with the non-convex flux f(u) = sin(u) and two sonic
+# points, Section 6.2 (Table 1, left) of [1].
+#
+# The initial data is u_0 = 3 pi for x < 0 and u_0 = 0 otherwise (a = 1,
+# b = 0 in [1]) on the domain (-1, 1) with Dirichlet boundary conditions.
+# The entropy solution (6.2) of [1] is a composite wave: an expansion, a
+# stationary shock at x = 0 from 5 pi / 2 to pi / 2, and a second
+# expansion. It is used for the error evaluation at the final time t = 0.8.
+# The computation is initialized with the exact solution at t0 = 1e-8
+# (the text of [1] states t0 = 0 for this column, but only t0 = 1e-8
+# reproduces Table 1).
+#
+# First-order method (limiter iterations = 0) with the greedy wave speed of
+# [1]: the Roe average lambda_12, augmented by an entropy inequality for
+# one random Kruzkov entropy k = theta u_i + (1 - theta) u_j per pair (i,j)
+# and time step, with theta uniformly distributed in (0,1). This is the
+# choice described in the caption of Table 1 of [1]; the text of Section
+# 6.2 draws one theta_i per grid point instead. The random number generator
+# is seeded differently on every run, so the errors vary slightly from run
+# to run. SSPRK(3,3), CFL = 0.5.
+#
+# The computations of [1] use the entropy wave speeds (4.3) of [1] with
+# signed numerators; the current ryujin takes their absolute value. Table 1
+# is reproduced (L1 within 4%, L2 within 7%) with ryujin compiled with the
+# patch 2024-GMPST-6.2-signed_wave_speed.patch applied. Without the patch
+# the L1 errors are 7% (fine meshes) to 1.7 times (coarse meshes) larger
+# and the L2 errors 2.3 to 2.4 times larger.
+#
+# The chosen 50 subdivisions with refinement 0 correspond to the coarsest
+# mesh (51 grid points) of Table 1 of [1]. Mesh refinement 1 to 7 gives the
+# remaining meshes (101 to 6401 grid points).
+#
+# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
+#     First-order greedy invariant-domain preserving approximation for
+#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
+#     Comput., 100:46, 2024. arXiv:2310.01713
+#
+##
+
+subsection A - Scheduler
+  set basename          = two-sonic-points-random-entropy
+  set align time steps  = true
+  set tasks             = vtu output, error evaluation
+  set final time        = 0.8
+  set timer granularity = 0.8
+end
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = scalar conservation
+  set flux      = function
+
+  subsection function
+    set expression = sin(u)
+  end
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set position bottom left     = -1
+    set position top right       = 1
+    set subdivisions x           = 50
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1
+  set position      = 0
+
+  subsection function
+    # exact solution (6.2) of [1] with a = 1, b = 0; 3 pi = 9.42477796076938
+    set expression = if(x <= -max(t, 1e-8), 9.42477796076938, \
+                     if(x <= 0, 9.42477796076938 - acos(-x/max(t, 1e-8)), \
+                     if(x <= max(t, 1e-8), acos(x/max(t, 1e-8)), 0)))
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations = 0
+  end
+
+  subsection wave speed estimator
+    set use greedy wavespeed = true
+    set use averaged entropy = false
+    set random entropies     = 1
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+subsection I - VTUOutput
+  subsection full
+    set vtu output quantities = u
+  end
+end
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error norms      = L1, L2
+  set error quantities = u
+end
