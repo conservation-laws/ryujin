@@ -1197,13 +1197,20 @@ namespace ryujin
     {
       const auto &[U_i, Z_i, V_i] = flux_i;
       const auto &[U_j, Z_j, V_j] = flux_j;
+      const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
 
       const auto H_i = water_depth(U_i);
-      const auto H_j = water_depth(U_j);
+      const auto H_star_ij = water_depth(U_star_ij);
+      const auto H_star_ji = water_depth(U_star_ji);
 
       state_type result = -(U_i * (V_i * c_ij) + U_j * (V_j * c_ij));
 
-      const auto factor = gravity() * H_i * (H_j + Z_j - Z_i);
+      /*
+       * Away from dry states H_star_ji - H_star_ij = H_j + Z_j - H_i - Z_i.
+       * Using the equilibrated states ensures that the lake at rest
+       * is preserved next to dry states:
+       */
+      const auto factor = gravity() * H_i * (H_i + H_star_ji - H_star_ij);
       for (unsigned int d = 0; d < dim; ++d)
         result[1 + d] -= factor * c_ij[d];
 
