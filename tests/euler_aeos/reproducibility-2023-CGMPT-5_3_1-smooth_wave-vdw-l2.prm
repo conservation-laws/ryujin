@@ -1,0 +1,79 @@
+##
+#
+# Reproducibility test for
+#   prm/reproducibility/euler_aeos/2023-CGMPT-5.3.1-smooth_wave-vdw.prm
+# at mesh refinement 2 (401 points). Table 1 of [2023-CGMPT] reports
+# delta_inf = 9.92e-4 for this mesh (column "VdW").
+#
+##
+
+subsection A - Scheduler
+  set basename          = smooth_wave-vdw
+  set tasks             = error evaluation
+  set final time        = 0.6
+  set timer granularity = 0.6
+end
+
+
+subsection B - Equation
+  set dimension         = 1
+  set equation          = euler aeos
+  set equation of state = van der waals
+
+  subsection van der waals
+    set gamma      = 1.4
+    set vdw a      = 1
+    set covolume b = 0.075
+  end
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 2
+
+  subsection rectangular domain
+    set position bottom left     = 0
+    set position top right       = 1
+    set subdivisions x           = 100
+    set boundary condition left  = dirichlet
+    set boundary condition right = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = smooth wave
+  set direction     = 1
+  set position      = 0
+
+  subsection smooth wave
+    set reference density  = 1
+    set reference pressure = 1
+    set mach number        = 1
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set limit at dirichlet boundaries = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m, E
+end
+
+
+subsection M - Logger
+  set terminal update interval = 0
+end

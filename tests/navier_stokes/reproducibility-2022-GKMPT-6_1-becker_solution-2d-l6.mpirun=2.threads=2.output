@@ -1,0 +1,12 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »navier stokes« with dim=2
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 4225
+t     = 2.000183027375309
+Linf  = 0.01220092994861575
+L1    = 0.004201550628555933
+L2    = 0.005452991651594301

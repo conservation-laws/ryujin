@@ -1,0 +1,87 @@
+##
+#
+# Reproducibility test for
+#   prm/reproducibility/navier_stokes/2022-GKMPT-6.1-becker_solution-2d.prm
+# at mesh refinement 6 (4225 gridpoints). Table 1 of [2022-GKMPT] reports
+# delta_1 = 4.68e-3, delta_inf = 1.29e-2 for this mesh.
+#
+##
+
+subsection A - Scheduler
+  set basename          = becker_solution-2d
+
+  set tasks             = error evaluation
+
+  set final time        = 2.00
+  set timer granularity = 2.00
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = navier stokes
+
+  set gamma     = 1.4
+  set mu        = 0.01
+  set lambda    = 0
+  set kappa     = 1.866666666666666e-2
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 6
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition bottom = periodic
+    set boundary condition top    = periodic
+
+    set position bottom left      = -0.25, -0.25
+    set position top right        =  0.25,  0.25
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = becker solution
+  set direction     = 1, 0
+  set position      = -0.125, 0
+
+  subsection becker solution
+    set mu                      = 0.01
+    set velocity galilean frame = 0.125
+    set density left            = 1
+    set velocity left           = 1
+    set velocity right          = 0.259259259259
+  end
+end
+
+
+subsection G - ParabolicModule
+  set tolerance             = 1e-14
+  set tolerance linfty norm = false
+
+  set multigrid velocity    = false
+  set multigrid energy      = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.30
+  set cfl max               = 0.30
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang ssprk 33 cn
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m_1, E
+end
+
+
+subsection M - Logger
+  set terminal update interval = 0
+end

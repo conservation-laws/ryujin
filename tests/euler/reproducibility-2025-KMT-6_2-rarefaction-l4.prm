@@ -1,0 +1,77 @@
+##
+#
+# Reproducibility test for
+#   prm/reproducibility/euler/2025-KMT-6.2-rarefaction.prm
+# at mesh refinement 4 (dG Q1, 1920 dofs). Table 2 of [2025-KMT] reports
+# an L1 error of 1.301e-5 for this mesh.
+#
+##
+
+subsection A - Scheduler
+  set basename          = rarefaction
+
+  set align time steps  = true
+
+  set tasks             = error evaluation
+
+  set final time        = 0.30558
+  set timer granularity = 0.30558
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry              = rectangular domain
+  set mesh refinement       = 4
+
+  subsection rectangular domain
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 60
+
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = rarefaction
+
+  set direction     = 1
+  set position      = 0.2
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set relaxation factor = 4
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection K - ErrorEvaluation
+  set error normalize  = true
+  set error quantities = rho, m, E
+end
+
+
+subsection M - Logger
+  set terminal update interval = 0
+end
