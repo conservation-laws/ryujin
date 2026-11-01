@@ -170,9 +170,13 @@ namespace ryujin
                 break;
               }
 
-              if (v_next < velocity_right_)
+              /*
+               * Bisect if the Newton step reaches or leaves the interval:
+               * psi has a logarithmic singularity at both end points.
+               */
+              if (v_next <= velocity_right_)
                 v = 0.5 * (velocity_right_ + v);
-              else if (v_next > velocity_left_)
+              else if (v_next >= velocity_left_)
                 v = 0.5 * (velocity_left_ + v);
               else
                 v = v_next;
