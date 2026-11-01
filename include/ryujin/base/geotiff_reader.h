@@ -12,6 +12,7 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <algorithm>
 #include <numeric>
 
 #ifdef WITH_GDAL
@@ -187,14 +188,16 @@ namespace ryujin
        * the minimum or above the maximum index.
        */
 
-      const auto i_left = std::min(
-          std::max(static_cast<int>(std::floor(di)), 0), raster_size_[0]);
-      const auto i_right = std::min(
-          std::max(static_cast<int>(std::ceil(di)), 0), raster_size_[0]);
-      const auto j_left = std::min(
-          std::max(static_cast<int>(std::floor(dj)), 0), raster_size_[1]);
-      const auto j_right = std::min(
-          std::max(static_cast<int>(std::ceil(dj)), 0), raster_size_[1]);
+      const int nx = raster_size_[0];
+      const int ny = raster_size_[1];
+      const int i_left =
+          std::clamp(static_cast<int>(std::floor(di)), 0, nx - 1);
+      const int i_right =
+          std::clamp(static_cast<int>(std::ceil(di)), 0, nx - 1);
+      const int j_left =
+          std::clamp(static_cast<int>(std::floor(dj)), 0, ny - 1);
+      const int j_right =
+          std::clamp(static_cast<int>(std::ceil(dj)), 0, ny - 1);
 
 #ifdef DEBUG_OUTPUT
       if (!in_bounds) {
