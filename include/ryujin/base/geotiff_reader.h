@@ -109,6 +109,15 @@ namespace ryujin
                           "GeoTIFF: choose base point for height normalization "
                           "that is set to 0.: none, minimum, average, maximum");
 
+      spherical_coordinates_ = false;
+      this->add_parameter(
+          "spherical coordinates",
+          spherical_coordinates_,
+          "GeoTIFF: query a three dimensional point at its longitude and "
+          "latitude (in degrees). The raster must be a global, pixel "
+          "registered grid with the GeoTIFF transformation and origin. The "
+          "longitude is periodic.");
+
       height_scaling_ = 1.0;
       this->add_parameter("height scaling",
                           height_scaling_,
@@ -151,6 +160,11 @@ namespace ryujin
         read_in_raster();
         return true;
       });
+
+      if constexpr (dim == 3) {
+        if (spherical_coordinates_)
+          return compute_height_spherical(point);
+      }
 
       double x = 0;
       if constexpr (dim >= 1)
@@ -209,16 +223,43 @@ namespace ryujin
       const double i_ratio = std::fmod(di, 1.);
       const double j_ratio = std::fmod(dj, 1.);
 
-      const auto v_iljl = raster_[i_left + j_left * raster_size_[0]];
-      const auto v_irjl = raster_[i_right + j_left * raster_size_[0]];
+      return interpolate(i_left, i_right, j_left, j_right, i_ratio, j_ratio);
+    }
 
-      const auto v_iljr = raster_[i_left + j_right * raster_size_[0]];
-      const auto v_irjr = raster_[i_right + j_right * raster_size_[0]];
 
-      const auto v_jl = v_iljl * (1. - i_ratio) + v_irjl * i_ratio;
-      const auto v_jr = v_iljr * (1. - i_ratio) + v_irjr * i_ratio;
+    /*
+     * Query height information for a point on (or around) a sphere
+     * centered at the origin: The point is projected radially and the
+     * raster is queried at its longitude and latitude (in degrees).
+     */
+    DEAL_II_ALWAYS_INLINE inline double
+    compute_height_spherical(const dealii::Point<3> &point) const
+    {
+      static constexpr double degree = 180. / M_PI;
+      const double lon = degree * std::atan2(point[1], point[0]);
+      const double lat =
+          degree * std::atan2(point[2], std::hypot(point[0], point[1]));
 
-      return height_scaling_ * (v_jl * (1. - j_ratio) + v_jr * j_ratio);
+      /*
+       * The GDAL transformation maps an index (i, j) to the upper left
+       * corner of the pixel. Shift by one half to pixel centers.
+       */
+      auto [di, dj] = apply_inverse_transformation(lon, lat);
+      di -= 0.5;
+      dj -= 0.5;
+
+      const double fi = std::floor(di);
+      const double fj = std::floor(dj);
+
+      /* Periodic in longitude, constant extension at the poles: */
+      const int nx = raster_size_[0];
+      const int ny = raster_size_[1];
+      const int i_left = (static_cast<int>(fi) % nx + nx) % nx;
+      const int i_right = (i_left + 1) % nx;
+      const int j_left = std::clamp(static_cast<int>(fj), 0, ny - 1);
+      const int j_right = std::clamp(static_cast<int>(fj) + 1, 0, ny - 1);
+
+      return interpolate(i_left, i_right, j_left, j_right, di - fi, dj - fj);
     }
 
     /*
@@ -232,6 +273,22 @@ namespace ryujin
     ACCESSOR_READ_ONLY(height_scaling);
 
   private:
+    /*
+     * Bilinear interpolation between the four raster values at the left
+     * and right indices (il, ir) and (jl, jr) with ratios ri and rj.
+     */
+    double
+    interpolate(int il, int ir, int jl, int jr, double ri, double rj) const
+    {
+      const auto nx = raster_size_[0];
+      const auto v_jl =
+          raster_[il + jl * nx] * (1. - ri) + raster_[ir + jl * nx] * ri;
+      const auto v_jr =
+          raster_[il + jr * nx] * (1. - ri) + raster_[ir + jr * nx] * ri;
+      return height_scaling_ * (v_jl * (1. - rj) + v_jr * rj);
+    }
+
+
     void read_in_raster() const
     {
 #ifdef WITH_GDAL
@@ -327,6 +384,20 @@ namespace ryujin
             transformation_[0] - j_max * affine_transformation_[2];
         affine_transformation_[3] =
             transformation_[3] - j_max * affine_transformation_[5];
+      }
+
+      if (spherical_coordinates_) {
+        const auto &at = affine_transformation_;
+        AssertThrow(
+            transformation_use_geotiff_ && transformation_use_geotiff_origin_,
+            dealii::ExcMessage("GeoTIFF: spherical coordinates require the "
+                               "GeoTIFF transformation and origin"));
+        AssertThrow(at[2] == 0. && at[4] == 0.,
+                    dealii::ExcMessage("GeoTIFF: spherical coordinates "
+                                       "require an axis aligned raster"));
+        AssertThrow(std::abs(at[1] * raster_size_[0] - 360.) < 1.e-6,
+                    dealii::ExcMessage("GeoTIFF: spherical coordinates "
+                                       "require a global raster"));
       }
 
       /*
@@ -429,6 +500,7 @@ namespace ryujin
     bool transformation_use_geotiff_;
     bool transformation_use_geotiff_origin_;
     HeightNormalization height_normalization_;
+    bool spherical_coordinates_;
     double height_scaling_;
 
     /* GDAL data structures: */
