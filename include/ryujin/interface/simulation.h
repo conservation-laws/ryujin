@@ -135,8 +135,8 @@ namespace ryujin
       }
 
       std::unique_ptr<MPIEnsemble> mpi_ensemble_;
-      std::unique_ptr<Discretization<dim>> discretization_;
-      std::unique_ptr<OfflineData<dim, Number>> offline_data_;
+      std::unique_ptr<ryujin::Discretization<dim>> discretization_;
+      std::unique_ptr<ryujin::OfflineData<dim, Number>> offline_data_;
 
       const HyperbolicSystem *hyperbolic_system_ = nullptr;
       const ParabolicSystem *parabolic_system_ = nullptr;

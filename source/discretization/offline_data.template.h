@@ -34,36 +34,12 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble,
       const Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
-      : ParameterAcceptor(subsection)
+      : Interface::OfflineData<dim, Number>(subsection)
       , mpi_ensemble_(mpi_ensemble)
       , discretization_(&discretization)
-      , n_export_indices_(0)
-      , n_locally_internal_(0)
-      , n_locally_owned_(0)
-      , n_locally_relevant_(0)
-      , measure_of_omega_(0.)
   {
-    affine_constraints_cg_ =
-        std::make_unique<dealii::AffineConstraints<Number>>();
-    affine_constraints_dg_ =
-        std::make_unique<dealii::AffineConstraints<Number>>();
-    boundary_indices_ = std::make_unique<Mirrored<unsigned int *>>(
-        "offline_data_boundary_indices");
-    coupling_boundary_pairs_ =
-        std::make_unique<Mirrored<CouplingDescription *>>(
-            "offline_data_coupling_boundary_pairs");
-    sparsity_pattern_ = std::make_unique<dealii::DynamicSparsityPattern>();
-    sparsity_pattern_simd_ = std::make_unique<SparsityPattern<warp_size>>();
-    mass_matrix_ = std::make_unique<SparseMatrix<Number>>();
-    mass_matrix_inverse_ = std::make_unique<SparseMatrix<Number>>();
-    lumped_mass_matrix_ = std::make_unique<ScalarVector<Number>>();
-    lumped_mass_matrix_inverse_ = std::make_unique<ScalarVector<Number>>();
-    betaij_matrix_ = std::make_unique<SparseMatrix<Number>>();
-    cij_matrix_ = std::make_unique<SparseMatrix<Number, dim>>();
-    incidence_matrix_ = std::make_unique<SparseMatrix<Number>>();
-
     treat_fe_nothing_as_boundary_ = true;
-    add_parameter(
+    this->add_parameter(
         "treat fe_nothing as boundary",
         treat_fe_nothing_as_boundary_,
         "If set to true, we treat cell with where the active finite element is "
@@ -73,18 +49,20 @@ namespace ryujin
         "set via the material id of the cell with active FE_Nothing element.");
 
     incidence_relaxation_even_ = 0.5;
-    add_parameter("incidence matrix relaxation even degree",
-                  incidence_relaxation_even_,
-                  "Scaling exponent for incidence matrix used for "
-                  "discontinuous finite elements with even degree. The default "
-                  "value 0.5 scales the jump penalization with (h_i+h_j)^0.5.");
+    this->add_parameter(
+        "incidence matrix relaxation even degree",
+        incidence_relaxation_even_,
+        "Scaling exponent for incidence matrix used for "
+        "discontinuous finite elements with even degree. The default "
+        "value 0.5 scales the jump penalization with (h_i+h_j)^0.5.");
 
     incidence_relaxation_odd_ = 0.0;
-    add_parameter("incidence matrix relaxation odd degree",
-                  incidence_relaxation_odd_,
-                  "Scaling exponent for incidence matrix used for "
-                  "discontinuous finite elements with even degree. The default "
-                  "value of 0.0 sets the jump penalization to a constant 1.");
+    this->add_parameter(
+        "incidence matrix relaxation odd degree",
+        incidence_relaxation_odd_,
+        "Scaling exponent for incidence matrix used for "
+        "discontinuous finite elements with even degree. The default "
+        "value of 0.0 sets the jump penalization to a constant 1.");
   }
 
 
@@ -96,6 +74,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::prepare()" << std::endl;
 #endif
+
+    this->have_discontinuous_ansatz_ =
+        discretization_->have_discontinuous_ansatz();
 
     create_dof_handlers();
 
@@ -150,7 +131,7 @@ namespace ryujin
   {
     auto &dof_handler = writable_dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-    n_locally_owned_ = locally_owned.n_elements();
+    this->n_locally_owned_ = locally_owned.n_elements();
 
     /*
      * Initial renumbering with Cuthill McKee (because we can):
@@ -168,7 +149,7 @@ namespace ryujin
      */
     DoFRenumbering::export_indices_first(dof_handler,
                                          mpi_ensemble_.ensemble_communicator(),
-                                         n_locally_owned_,
+                                         this->n_locally_owned_,
                                          1);
 
     /*
@@ -179,8 +160,8 @@ namespace ryujin
      * temporary sparsity pattern:
      */
     create_constraints_and_sparsity_pattern();
-    n_locally_internal_ = DoFRenumbering::internal_range(
-        dof_handler, *sparsity_pattern_, warp_size);
+    this->n_locally_internal_ = DoFRenumbering::internal_range(
+        dof_handler, *this->sparsity_pattern_, warp_size);
 
     /*
      * Reorder all (strides of) locally internal indices that contain
@@ -193,10 +174,10 @@ namespace ryujin
      * not know at this point because they depend on the renumbering...).
      * We therefore have to update n_export_indices_ later again.
      */
-    n_export_indices_ = DoFRenumbering::export_indices_first(
+    this->n_export_indices_ = DoFRenumbering::export_indices_first(
         dof_handler,
         mpi_ensemble_.ensemble_communicator(),
-        n_locally_internal_,
+        this->n_locally_internal_,
         warp_size);
   }
 
@@ -291,9 +272,11 @@ namespace ryujin
 #endif
         };
 
-    populate_affine_constraints(*dof_handler_cg_, *affine_constraints_cg_);
+    populate_affine_constraints(*dof_handler_cg_,
+                                *this->affine_constraints_cg_);
     /* Note: for dG the affine constraints object will be empty. */
-    populate_affine_constraints(*dof_handler_dg_, *affine_constraints_dg_);
+    populate_affine_constraints(*dof_handler_dg_,
+                                *this->affine_constraints_dg_);
 
     /*
      * Next, set up the (hyperbolic) sparsity pattern:
@@ -302,13 +285,13 @@ namespace ryujin
     const auto &dof_handler = this->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-    Assert(n_locally_owned_ == locally_owned.n_elements(),
+    Assert(this->n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
     const auto locally_relevant =
         DoFTools::extract_locally_relevant_dofs(dof_handler);
 
-    sparsity_pattern_->reinit(
+    this->sparsity_pattern_->reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
 
     if (discretization_->have_discontinuous_ansatz()) {
@@ -316,13 +299,13 @@ namespace ryujin
        * Create dG sparsity pattern:
        */
       DoFTools::make_extended_sparsity_pattern_dg(
-          dof_handler, *sparsity_pattern_, affine_constraints, false);
+          dof_handler, *this->sparsity_pattern_, affine_constraints, false);
     } else {
       /*
        * Create cG sparsity pattern:
        */
       DoFTools::make_sparsity_pattern(
-          dof_handler, *sparsity_pattern_, affine_constraints, false);
+          dof_handler, *this->sparsity_pattern_, affine_constraints, false);
     }
 
     /*
@@ -332,7 +315,7 @@ namespace ryujin
      */
 
     SparsityTools::distribute_sparsity_pattern(
-        *sparsity_pattern_,
+        *this->sparsity_pattern_,
         locally_owned,
         mpi_ensemble_.ensemble_communicator(),
         locally_relevant);
@@ -354,15 +337,17 @@ namespace ryujin
      */
     const auto consistent_stride_range [[maybe_unused]] = [&]() {
       const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-      const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+      const auto offset =
+          this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
 
       unsigned int warp_row_length = 0;
       unsigned int i = 0;
-      for (; i < n_locally_internal_; ++i) {
+      for (; i < this->n_locally_internal_; ++i) {
         if (i % warp_size == 0) {
-          warp_row_length = sparsity_pattern_->row_length(offset + i);
+          warp_row_length = this->sparsity_pattern_->row_length(offset + i);
         } else {
-          if (warp_row_length != sparsity_pattern_->row_length(offset + i)) {
+          if (warp_row_length !=
+              this->sparsity_pattern_->row_length(offset + i)) {
             break;
           }
         }
@@ -393,16 +378,19 @@ namespace ryujin
     const auto &affine_constraints = this->affine_constraints();
     if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
       if (mpi_allreduce_logical_or( //
-              consistent_stride_range() != n_locally_internal_)) {
+              consistent_stride_range() != this->n_locally_internal_)) {
         /*
          * In this case we try to fix up the numbering by pushing affected
          * strides to the end and slightly lowering the n_locally_internal_
          * marker.
          */
-        n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
-            dof_handler, *sparsity_pattern_, n_locally_internal_, warp_size);
+        this->n_locally_internal_ =
+            DoFRenumbering::inconsistent_strides_last(dof_handler,
+                                                      *this->sparsity_pattern_,
+                                                      this->n_locally_internal_,
+                                                      warp_size);
         create_constraints_and_sparsity_pattern();
-        n_locally_internal_ = consistent_stride_range();
+        this->n_locally_internal_ = consistent_stride_range();
       }
     }
 
@@ -411,7 +399,7 @@ namespace ryujin
      * with indices in [0, locally_internal) that have uniform stencil size
      * within a stride.
      */
-    Assert(consistent_stride_range() == n_locally_internal_,
+    Assert(consistent_stride_range() == this->n_locally_internal_,
            dealii::ExcInternalError());
   }
 
@@ -432,7 +420,7 @@ namespace ryujin
     const auto &dof_handler = this->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-    Assert(n_locally_owned_ == locally_owned.n_elements(),
+    Assert(this->n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
     auto locally_relevant =
@@ -440,7 +428,7 @@ namespace ryujin
     /* Enlarge the locally relevant set to include all additional couplings: */
     {
       IndexSet additional_dofs(dof_handler.n_dofs());
-      for (auto &entry : *sparsity_pattern_)
+      for (auto &entry : *this->sparsity_pattern_)
         if (!locally_relevant.is_element(entry.column())) {
           Assert(locally_owned.is_element(entry.row()), ExcInternalError());
           additional_dofs.add_index(entry.column());
@@ -450,16 +438,19 @@ namespace ryujin
       locally_relevant.compress();
     }
 
-    n_locally_relevant_ = locally_relevant.n_elements();
+    this->n_locally_relevant_ = locally_relevant.n_elements();
 
-    scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
-        locally_owned, locally_relevant, mpi_ensemble_.ensemble_communicator());
+    this->scalar_partitioner_ =
+        std::make_shared<dealii::Utilities::MPI::Partitioner>(
+            locally_owned,
+            locally_relevant,
+            mpi_ensemble_.ensemble_communicator());
 
-    hyperbolic_vector_partitioner_ =
-        create_vector_partitioner(scalar_partitioner_, problem_dimension);
+    this->hyperbolic_vector_partitioner_ =
+        create_vector_partitioner(this->scalar_partitioner_, problem_dimension);
 
-    precomputed_vector_partitioner_ =
-        create_vector_partitioner(scalar_partitioner_, n_precomputed_values);
+    this->precomputed_vector_partitioner_ = create_vector_partitioner(
+        this->scalar_partitioner_, n_precomputed_values);
 
     /*
      * A small lambda that performs a "logical or" over all MPI ranks:
@@ -483,24 +474,26 @@ namespace ryujin
       /*
        * Recalculate n_export_indices_:
        */
-      n_export_indices_ = 0;
-      for (const auto &it : scalar_partitioner_->import_indices())
-        if (it.second <= n_locally_internal_)
-          n_export_indices_ = std::max(n_export_indices_, it.second);
+      this->n_export_indices_ = 0;
+      for (const auto &it : this->scalar_partitioner_->import_indices())
+        if (it.second <= this->n_locally_internal_)
+          this->n_export_indices_ =
+              std::max(this->n_export_indices_, it.second);
 
-      n_export_indices_ =
-          (n_export_indices_ + warp_size - 1) / warp_size * warp_size;
+      this->n_export_indices_ =
+          (this->n_export_indices_ + warp_size - 1) / warp_size * warp_size;
     }
 
 #ifdef DEBUG
     /* Check that n_export_indices_ is valid: */
     unsigned int control = 0;
-    for (const auto &it : scalar_partitioner_->import_indices())
-      if (it.second <= n_locally_internal_)
+    for (const auto &it : this->scalar_partitioner_->import_indices())
+      if (it.second <= this->n_locally_internal_)
         control = std::max(control, it.second);
 
-    Assert(control <= n_export_indices_, ExcInternalError());
-    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
+    Assert(control <= this->n_export_indices_, ExcInternalError());
+    Assert(this->n_export_indices_ <= this->n_locally_internal_,
+           ExcInternalError());
 #endif
 
     /*
@@ -510,11 +503,11 @@ namespace ryujin
      * pattern from global deal.II (typical) dof indexing to local indices.
      */
 
-    sparsity_pattern_simd_->reinit(n_locally_internal_,
-                                   *sparsity_pattern_,
-                                   scalar_partitioner_,
-                                   /*symmetrize_ghost_range*/ true,
-                                   TransferPolicy::implicit_transfers);
+    this->sparsity_pattern_simd_->reinit(this->n_locally_internal_,
+                                         *this->sparsity_pattern_,
+                                         this->scalar_partitioner_,
+                                         /*symmetrize_ghost_range*/ true,
+                                         TransferPolicy::implicit_transfers);
   }
 
 
@@ -562,8 +555,8 @@ namespace ryujin
     const auto &locally_owned_dg = dof_handler_dg_->locally_owned_dofs();
     const auto &locally_owned_cg = dof_handler_cg_->locally_owned_dofs();
 
-    dg_to_cg_index_map_.resize(locally_owned_dg.n_elements());
-    cg_to_dg_index_map_.resize(locally_owned_cg.n_elements());
+    this->dg_to_cg_index_map_.resize(locally_owned_dg.n_elements());
+    this->cg_to_dg_index_map_.resize(locally_owned_cg.n_elements());
 
     std::vector<types::global_dof_index> indices_dg;
     std::vector<types::global_dof_index> indices_cg;
@@ -584,11 +577,11 @@ namespace ryujin
         const auto global_cg = indices_cg[map[i]];
 
         const auto local_dg = locally_owned_dg.index_within_set(global_dg);
-        dg_to_cg_index_map_[local_dg] = global_cg;
+        this->dg_to_cg_index_map_[local_dg] = global_cg;
 
         const auto local_cg = locally_owned_cg.index_within_set(global_cg);
         if (local_cg != dealii::numbers::invalid_dof_index)
-          cg_to_dg_index_map_[local_cg] = global_dg;
+          this->cg_to_dg_index_map_[local_cg] = global_dg;
       }
     }
   }
@@ -610,19 +603,19 @@ namespace ryujin
 
     constexpr auto policy = TransferPolicy::implicit_transfers;
 
-    mass_matrix_->reinit(*sparsity_pattern_simd_, policy);
+    this->mass_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      mass_matrix_inverse_->reinit(*sparsity_pattern_simd_, policy);
+      this->mass_matrix_inverse_->reinit(*this->sparsity_pattern_simd_, policy);
 
-    lumped_mass_matrix_->reinit_with_scalar_partitioner(
-        scalar_partitioner_, 1, policy);
-    lumped_mass_matrix_inverse_->reinit_with_scalar_partitioner(
-        scalar_partitioner_, 1, policy);
+    this->lumped_mass_matrix_->reinit_with_scalar_partitioner(
+        this->scalar_partitioner_, 1, policy);
+    this->lumped_mass_matrix_inverse_->reinit_with_scalar_partitioner(
+        this->scalar_partitioner_, 1, policy);
 
-    betaij_matrix_->reinit(*sparsity_pattern_simd_, policy);
-    cij_matrix_->reinit(*sparsity_pattern_simd_, policy);
+    this->betaij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+    this->cij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      incidence_matrix_->reinit(*sparsity_pattern_simd_, policy);
+      this->incidence_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
 
     /*
      * Now, assemble all matrices:
@@ -631,7 +624,7 @@ namespace ryujin
     const auto &dof_handler = this->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
 
-    measure_of_omega_ = 0.;
+    this->measure_of_omega_ = 0.;
 
     /* The local, per-cell assembly routine: */
     const auto local_assemble_system = [&](const auto &cell,
@@ -839,11 +832,13 @@ namespace ryujin
       if (!is_locally_owned)
         return;
 
-      distribute_local_to_global(
-          cell_mass_matrix, dof_indices, affine_constraints, *mass_matrix_);
+      distribute_local_to_global(cell_mass_matrix,
+                                 dof_indices,
+                                 affine_constraints,
+                                 *this->mass_matrix_);
 
       distribute_local_to_global(
-          cell_cij_matrix, dof_indices, affine_constraints, *cij_matrix_);
+          cell_cij_matrix, dof_indices, affine_constraints, *this->cij_matrix_);
 
       /*
        * Workaround: We need to catch the case local_dof_indices.size() == 0
@@ -856,21 +851,23 @@ namespace ryujin
                                        dof_indices,
                                        neighbor_dof_indices[f_index],
                                        affine_constraints,
-                                       *cij_matrix_);
+                                       *this->cij_matrix_);
           }
         }
       }
 
-      distribute_local_to_global(
-          cell_betaij_matrix, dof_indices, affine_constraints, *betaij_matrix_);
+      distribute_local_to_global(cell_betaij_matrix,
+                                 dof_indices,
+                                 affine_constraints,
+                                 *this->betaij_matrix_);
 
       if (discretization_->have_discontinuous_ansatz())
         distribute_local_to_global(cell_mass_matrix_inverse,
                                    dof_indices,
                                    affine_constraints,
-                                   *mass_matrix_inverse_);
+                                   *this->mass_matrix_inverse_);
 
-      measure_of_omega_ += cell_measure;
+      this->measure_of_omega_ += cell_measure;
     };
 
     WorkStream::run(dof_handler.begin_active(),
@@ -880,31 +877,31 @@ namespace ryujin
                     AssemblyScratchData<dim>(*discretization_),
                     AssemblyCopyData<dim, Number>());
 
-    mass_matrix_->view().compress(VectorOperation::add);
-    mass_matrix_->view().update_ghost_rows();
-    cij_matrix_->view().compress(VectorOperation::add);
-    cij_matrix_->view().update_ghost_rows();
-    betaij_matrix_->view().compress(VectorOperation::add);
-    betaij_matrix_->view().update_ghost_rows();
+    this->mass_matrix_->view().compress(VectorOperation::add);
+    this->mass_matrix_->view().update_ghost_rows();
+    this->cij_matrix_->view().compress(VectorOperation::add);
+    this->cij_matrix_->view().update_ghost_rows();
+    this->betaij_matrix_->view().compress(VectorOperation::add);
+    this->betaij_matrix_->view().update_ghost_rows();
     if (discretization_->have_discontinuous_ansatz()) {
-      mass_matrix_inverse_->view().compress(VectorOperation::add);
-      mass_matrix_inverse_->view().update_ghost_rows();
+      this->mass_matrix_inverse_->view().compress(VectorOperation::add);
+      this->mass_matrix_inverse_->view().update_ghost_rows();
     }
 
-    measure_of_omega_ = Utilities::MPI::sum(
-        measure_of_omega_, mpi_ensemble_.ensemble_communicator());
+    this->measure_of_omega_ = Utilities::MPI::sum(
+        this->measure_of_omega_, mpi_ensemble_.ensemble_communicator());
 
     /*
      * Create lumped mass matrix:
      */
 
     {
-      const auto sparsity_simd_view = sparsity_pattern_simd_->view();
-      const auto mass_matrix_view = mass_matrix_->view();
+      const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+      const auto mass_matrix_view = this->mass_matrix_->view();
       const auto lumped_mass_matrix_view =
-          lumped_mass_matrix_->template view<1>();
+          this->lumped_mass_matrix_->template view<1>();
       const auto lumped_mass_matrix_inverse_view =
-          lumped_mass_matrix_inverse_->template view<1>();
+          this->lumped_mass_matrix_inverse_->template view<1>();
 
       const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -930,7 +927,8 @@ namespace ryujin
             template write_entry<T>(Number(1.) / m_i, i);
       };
 
-      cpu_simd_loop<Number>("", body, 0, n_locally_internal_, n_locally_owned_);
+      cpu_simd_loop<Number>(
+          "", body, 0, this->n_locally_internal_, this->n_locally_owned_);
 
       lumped_mass_matrix_view.update_ghost_values();
       lumped_mass_matrix_inverse_view.update_ghost_values();
@@ -942,7 +940,7 @@ namespace ryujin
 
     if (discretization_->have_discontinuous_ansatz()) {
       const auto lumped_mass_matrix_view =
-          lumped_mass_matrix_->template view<1>();
+          this->lumped_mass_matrix_->template view<1>();
 
       /* The local, per-cell assembly routine: */
       const auto local_assemble_system = [&](const auto &cell,
@@ -1041,13 +1039,13 @@ namespace ryujin
                   const auto global_i = local_dof_indices[i];
                   const auto global_j = neighbor_local_dof_indices[f_index][j];
                   const auto local_i =
-                      scalar_partitioner_->global_to_local(global_i);
+                      this->scalar_partitioner_->global_to_local(global_i);
                   const auto local_j =
-                      scalar_partitioner_->global_to_local(global_j);
+                      this->scalar_partitioner_->global_to_local(global_j);
                   const auto m_i = lumped_mass_matrix_view.read_entry(local_i);
                   const auto m_j = lumped_mass_matrix_view.read_entry(local_j);
                   const auto hd_ij =
-                      Number(0.5) * (m_i + m_j) / measure_of_omega_;
+                      Number(0.5) * (m_i + m_j) / this->measure_of_omega_;
 
                   Number r_ij = 1.0;
 
@@ -1097,7 +1095,7 @@ namespace ryujin
                                          dof_indices,
                                          neighbor_dof_indices[f_index],
                                          affine_constraints,
-                                         *incidence_matrix_);
+                                         *this->incidence_matrix_);
             }
           }
         }
@@ -1110,15 +1108,16 @@ namespace ryujin
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
 
-      incidence_matrix_->view().compress(VectorOperation::add);
+      this->incidence_matrix_->view().compress(VectorOperation::add);
     }
 
     /*
      * Populate boundary map and collect coupling boundary pairs:
      */
     {
-      boundary_map_ = construct_boundary_map(
-          dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
+      this->boundary_map_ = construct_boundary_map(dof_handler.begin_active(),
+                                                   dof_handler.end(),
+                                                   *this->scalar_partitioner_);
 
       /*
        * Compact the degrees of freedom stored in the boundary map into a
@@ -1132,32 +1131,34 @@ namespace ryujin
       std::vector<unsigned int> boundary_indices;
       std::map<unsigned int, unsigned int> position_of_index;
 
-      boundary_slots_.clear();
-      boundary_slots_.reserve(boundary_map_.size());
+      this->boundary_slots_.clear();
+      this->boundary_slots_.reserve(this->boundary_map_.size());
 
-      for (const auto &entry : boundary_map_) {
+      for (const auto &entry : this->boundary_map_) {
         const auto index = std::get<0>(entry);
         const auto [it, inserted] =
             position_of_index.try_emplace(index, boundary_indices.size());
         if (inserted)
           boundary_indices.push_back(index);
-        boundary_slots_.push_back(it->second);
+        this->boundary_slots_.push_back(it->second);
       }
 
-      boundary_indices_->reinit(boundary_indices.size(),
-                                TransferPolicy::implicit_transfers);
+      this->boundary_indices_->reinit(boundary_indices.size(),
+                                      TransferPolicy::implicit_transfers);
       std::copy(boundary_indices.begin(),
                 boundary_indices.end(),
-                boundary_indices_->view());
+                this->boundary_indices_->view());
 
-      const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
-          dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
+      const auto coupling_boundary_pairs =
+          collect_coupling_boundary_pairs(dof_handler.begin_active(),
+                                          dof_handler.end(),
+                                          *this->scalar_partitioner_);
 
-      coupling_boundary_pairs_->reinit(coupling_boundary_pairs.size(),
-                                       TransferPolicy::implicit_transfers);
+      this->coupling_boundary_pairs_->reinit(
+          coupling_boundary_pairs.size(), TransferPolicy::implicit_transfers);
       std::copy(coupling_boundary_pairs.begin(),
                 coupling_boundary_pairs.end(),
-                coupling_boundary_pairs_->view());
+                this->coupling_boundary_pairs_->view());
     }
 
 #ifdef DEBUG_SYMMETRY_CHECK
@@ -1166,16 +1167,16 @@ namespace ryujin
      */
 
     const auto lumped_mass_matrix_view =
-        lumped_mass_matrix_->template view<1>();
+        this->lumped_mass_matrix_->template view<1>();
 
     double total_mass = 0.;
-    for (unsigned int i = 0; i < n_locally_owned_; ++i)
+    for (unsigned int i = 0; i < this->n_locally_owned_; ++i)
       total_mass += lumped_mass_matrix_view.read_entry(i);
     total_mass =
         Utilities::MPI::sum(total_mass, mpi_ensemble_.ensemble_communicator());
 
-    Assert(std::abs(measure_of_omega_ - total_mass) <
-               1.e-12 * measure_of_omega_,
+    Assert(std::abs(this->measure_of_omega_ - total_mass) <
+               1.e-12 * this->measure_of_omega_,
            dealii::ExcMessage(
                "Total mass differs from the measure of the domain."));
 
@@ -1183,11 +1184,11 @@ namespace ryujin
      * Verify that the mij_matrix_ object is consistent:
      */
 
-    const auto sparsity_simd_view = sparsity_pattern_simd_->view();
-    const auto mass_matrix_view = mass_matrix_->view();
-    const auto cij_matrix_view = cij_matrix_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+    const auto mass_matrix_view = this->mass_matrix_->view();
+    const auto cij_matrix_view = this->cij_matrix_->view();
 
-    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+    for (unsigned int i = 0; i < this->n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
       const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
@@ -1201,7 +1202,7 @@ namespace ryujin
       const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = js[col_idx * stride_size];
-        Assert(j < n_locally_relevant_, dealii::ExcInternalError());
+        Assert(j < this->n_locally_relevant_, dealii::ExcInternalError());
 
         const auto m_ij = mass_matrix_view.read_entry(i, col_idx);
         if (discretization_->have_discontinuous_ansatz()) {
@@ -1229,7 +1230,7 @@ namespace ryujin
      * Verify that the cij_matrix_ object is consistent:
      */
 
-    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+    for (unsigned int i = 0; i < this->n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
       const unsigned int row_length = sparsity_simd_view.row_length(i);
       if (row_length == 1)
@@ -1242,7 +1243,7 @@ namespace ryujin
       const unsigned int *js = sparsity_simd_view.columns(i);
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = js[col_idx * stride_size];
-        Assert(j < n_locally_relevant_, dealii::ExcInternalError());
+        Assert(j < this->n_locally_relevant_, dealii::ExcInternalError());
 
         const auto c_ij = cij_matrix_view.read_tensor(i, col_idx);
         Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
@@ -1254,8 +1255,8 @@ namespace ryujin
           // and j are both located on the boundary.
 
           const CouplingDescription coupling{i, col_idx, j};
-          const auto *begin = coupling_boundary_pairs_->view();
-          const auto *end = begin + coupling_boundary_pairs_->size();
+          const auto *begin = this->coupling_boundary_pairs_->view();
+          const auto *end = begin + this->coupling_boundary_pairs_->size();
           if (std::find(begin, end, coupling) == end) {
             std::stringstream ss;
             ss << "c_ij matrix is not anti-symmetric: " << c_ij << " <-> "
@@ -1354,7 +1355,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto sparsity_simd_view = sparsity_pattern_simd_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
 
     /*
      * Create a temporary multimap with the (local) dof index as key:
@@ -1463,7 +1464,7 @@ namespace ryujin
           const auto index = partitioner.global_to_local(global_index);
 
           /* Skip nonlocal degrees of freedom: */
-          if (index >= n_locally_owned_)
+          if (index >= this->n_locally_owned_)
             continue;
 
           /* Skip constrained degrees of freedom: */
@@ -1644,7 +1645,7 @@ namespace ryujin
           const auto index = partitioner.global_to_local(global_index);
 
           /* Skip irrelevant degrees of freedom: */
-          if (index >= n_locally_relevant_)
+          if (index >= this->n_locally_relevant_)
             continue;
 
           locally_relevant_boundary_indices.insert(index);
@@ -1656,14 +1657,14 @@ namespace ryujin
      * Now, collect all coupling boundary pairs:
      */
 
-    const auto sparsity_simd_view = sparsity_pattern_simd_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
 
     CouplingBoundaryPairs result;
 
     for (const auto i : locally_relevant_boundary_indices) {
 
       /* Only record pairs with a left index that is locally owned: */
-      if (i >= n_locally_owned_)
+      if (i >= this->n_locally_owned_)
         continue;
 
       const unsigned int row_length = sparsity_simd_view.row_length(i);
