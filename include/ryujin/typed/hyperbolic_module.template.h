@@ -42,7 +42,7 @@ namespace ryujin
   template <typename HD, int dim, typename Number>
   HyperbolicModule<HD, dim, Number>::HyperbolicModule(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const InitialValues &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
@@ -559,7 +559,7 @@ namespace ryujin
      * initialized (and accessed) for a discontinuous ansatz:
      */
     const bool have_discontinuous_ansatz =
-        offline_data_->discretization().have_discontinuous_ansatz();
+        offline_data_->have_discontinuous_ansatz();
     using MatrixReadView =
         decltype(offline_data_->mass_matrix().template view<MemorySpace>());
     const auto mass_matrix_inverse_view =

@@ -10,7 +10,7 @@
 #include <ryujin/base/loop.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/simd.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/postprocessor.h>
 #include <ryujin/linear_algebra/state_vector.h>
@@ -58,7 +58,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Postprocessor(const OfflineData<dim, Number> &offline_data,
+    Postprocessor(const Interface::OfflineData<dim, Number> &offline_data,
                   const HyperbolicSystem &hyperbolic_system,
                   const Interface::ParabolicSystem &parabolic_system,
                   const MultiComponentVector<Number> &initial_precomputed);
@@ -111,7 +111,8 @@ namespace ryujin
     auto reader(const Selection &selection,
                 const StateVector<Number> &state_vector) const;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
     const MultiComponentVector<Number> &initial_precomputed_;
@@ -128,7 +129,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Postprocessor<Description, dim, Number>::Postprocessor(
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const MultiComponentVector<Number> &initial_precomputed)
@@ -292,10 +293,9 @@ namespace ryujin
      */
 
     const auto &offline_data = *offline_data_;
-    const auto &index_map =
-        offline_data.discretization().have_discontinuous_ansatz()
-            ? offline_data.dg_to_cg_index_map()
-            : offline_data.cg_to_dg_index_map();
+    const auto &index_map = offline_data.have_discontinuous_ansatz()
+                                ? offline_data.dg_to_cg_index_map()
+                                : offline_data.cg_to_dg_index_map();
 
     const auto n_components = selected.size();
     Kokkos::View<Kokkos::pair<Section, unsigned int> *, Kokkos::HostSpace>
@@ -318,7 +318,7 @@ namespace ryujin
         host_scalars[k] = vector.template view<1, MemorySpace>();
 
         const auto &storage = vector.template deal_ii_vector<MemorySpace>();
-        if (storage.size() == offline_data.dof_handler().n_dofs())
+        if (storage.size() == offline_data.scalar_partitioner()->size())
           continue;
 
         storage.update_ghost_values();

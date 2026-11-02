@@ -14,6 +14,7 @@
 #include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/initial_values.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
@@ -112,7 +113,7 @@ namespace ryujin
                           Interface::HyperbolicModule<dim, Number>> &&
         std::constructible_from<hyperbolic_module_type<HD, dim, Number>,
                                 const MPIEnsemble &,
-                                const OfflineData<dim, Number> &,
+                                const Interface::OfflineData<dim, Number> &,
                                 const system_type<HD> &,
                                 const initial_values_type<HD, dim, Number> &,
                                 const std::string &> &&
