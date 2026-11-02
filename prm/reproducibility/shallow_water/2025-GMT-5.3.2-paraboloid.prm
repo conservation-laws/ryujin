@@ -1,6 +1,7 @@
 ##
 #
-# Thacker's planar surface flow in a paraboloid-shaped basin, Section 5.3.2
+# Thacker's planar surface flow in a paraboloid-shaped basin [3], Section
+# 5.3.2
 # (Table 5) of [1], in the configuration of Delestre et al. [2, Sec.
 # 4.2.2].
 #
@@ -30,13 +31,17 @@
 #
 # [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
 #     Runge-Kutta approximation technique for the shallow water equations.
-#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#     Comput. Fluids, 288:106493, 2025. DOI 10.1016/j.compfluid.2024.106493,
+#     arXiv:2403.17123
 #
-# [2] O. Delestre, C. Lucas, P.-A. Ksinant, F. Darboux, C. Laguerre, T. N.
-#     T. Vo, F. James, S. Cordier. SWASHES: a compilation of shallow water
-#     analytic solutions for hydraulic and environmental studies.
-#     International Journal for Numerical Methods in Fluids, 72(3):269-300,
-#     2013.
+# [2] O. Delestre, C. Lucas, P.-A. Ksinant, F. Darboux, C. Laguerre,
+#     T. N. T. Vo, F. James, S. Cordier. SWASHES: a compilation of shallow
+#     water analytic solutions for hydraulic and environmental studies. Int.
+#     J. Numer. Methods Fluids, 72(3):269-300, 2013. DOI 10.1002/fld.3741
+#
+# [3] W. C. Thacker. Some exact solutions to the nonlinear shallow-water
+#     wave equations. J. Fluid Mech., 107:499-508, 1981.
+#     DOI 10.1017/S0022112081001882
 #
 ##
 

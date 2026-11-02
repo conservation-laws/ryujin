@@ -1,7 +1,7 @@
 ##
 #
-# 2D density current proposed by Carpenter et al. [1], Section 4.2.2
-# (Figure 4.5) of [2].
+# 2D density current benchmark of Straka et al. [1], Section 4.2.2 (Figure
+# 4.5) of [2].
 #
 # A cold bubble, given by a cosine shaped perturbation of the potential
 # temperature,
@@ -22,13 +22,14 @@
 # (Figure 4.5 of [2]). The final time is set to t = 900 s and we output a
 # vtk every δt = 10 s.
 #
-# [1] R. L. Carpenter, K. K. Droegemeier, P. R. Woodward, and C. E. Hane.
-#     Application of the piecewise parabolic method (PPM) to meteorological
-#     modeling. Monthly Weather Review, 118(3):586-612, 1990.
+# [1] J. M. Straka, R. B. Wilhelmson, L. J. Wicker, J. R. Anderson,
+#     K. K. Droegemeier. Numerical solutions of a non-linear density
+#     current: A benchmark solution and comparisons. Int. J. Numer. Methods
+#     Fluids, 17(1):1-22, 1993. DOI 10.1002/fld.1650170103
 #
 # [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.
-#     arXiv:2606.19764, 2026.
+#     Preprint, 2026. arXiv:2606.19764
 #
 ##
 

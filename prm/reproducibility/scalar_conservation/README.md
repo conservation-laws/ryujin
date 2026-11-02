@@ -6,7 +6,8 @@ This directory contains parameter files for the numerical results of
 > [2024-GMPST] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
 > First-order greedy invariant-domain preserving approximation for
 > hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
-> Comput., 100:46, 2024.
+> Comput., 100(2):46, 2024.
+> [DOI:10.1007/s10915-024-02592-4](https://doi.org/10.1007/s10915-024-02592-4),
 > [arXiv:2310.01713](https://arxiv.org/abs/2310.01713)
 
 The file names start with `2024-GMPST-` followed by the number of the

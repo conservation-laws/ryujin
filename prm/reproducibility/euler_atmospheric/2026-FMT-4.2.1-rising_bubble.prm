@@ -1,6 +1,6 @@
 ##
 #
-# 2D rising thermal bubble proposed by Robert [1], Section 4.2.1 (Figure
+# 2D rising thermal bubble of Ahmad and Lindeman [1], Section 4.2.1 (Figure
 # 4.4) of [2].
 #
 # A warm bubble, given by a cone shaped perturbation of the potential
@@ -20,13 +20,13 @@
 # (Figure 4.4 of [2]). The final time is set to t = 1020 s and we output a
 # vtk every δt = 10 s.
 #
-# [1] A. Robert. Bubble convection experiments with a semi-implicit
-#     formulation of the Euler equations. Journal of Atmospheric Sciences,
-#     50(13):1865-1873, 1993.
+# [1] N. Ahmad, J. Lindeman. Euler solutions using flux-based wave
+#     decomposition. Int. J. Numer. Methods Fluids, 54(1):47-72, 2007.
+#     DOI 10.1002/fld.1392
 #
 # [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.
-#     arXiv:2606.19764, 2026.
+#     Preprint, 2026. arXiv:2606.19764
 #
 ##
 

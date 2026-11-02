@@ -22,13 +22,14 @@
 # (the consolidated error delta_p of [2]; m_2 vanishes for the exact
 # solution).
 #
-# [1] R. Becker. Stosswelle und Detonation. Zeitschrift fuer Physik,
-#     8(1):321-362, 1922.
+# [1] R. Becker. Stosswelle und Detonation. Z. Phys., 8(1):321-362, 1922.
+#     DOI 10.1007/BF01329605
 #
 # [2] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov, I. Tomas. On the
-#     implementation of a robust and efficient finite element-based
-#     parallel solver for the compressible Navier-Stokes equations. Comput.
-#     Methods Appl. Mech. Engrg., 389:114250, 2022. arXiv:2106.02159
+#     implementation of a robust and efficient finite element-based parallel
+#     solver for the compressible Navier-Stokes equations. Comput. Methods
+#     Appl. Mech. Engrg., 389:114250, 2022. DOI 10.1016/j.cma.2021.114250,
+#     arXiv:2106.02159
 #
 ##
 

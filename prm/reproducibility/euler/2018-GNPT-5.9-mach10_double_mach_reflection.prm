@@ -29,9 +29,9 @@
 # frequency to δt = 0.0005 which will result in a 20 seconds long video at
 # 20 fps.
 #
-# [1] J.-L. Guermond, M. Nazarov, B. Popov, I. Tomas. Second-order
-#     invariant domain preserving approximation of the Euler equations
-#     using convex limiting. SIAM J. Sci. Comput., 40(5):A3211-A3239, 2018.
+# [1] J.-L. Guermond, M. Nazarov, B. Popov, I. Tomas. Second-order invariant
+#     domain preserving approximation of the Euler equations using convex
+#     limiting. SIAM J. Sci. Comput., 40(5):A3211-A3239, 2018.
 #     DOI 10.1137/17M1149961
 #
 # [2] P. Woodward, P. Colella. The numerical simulation of two-dimensional

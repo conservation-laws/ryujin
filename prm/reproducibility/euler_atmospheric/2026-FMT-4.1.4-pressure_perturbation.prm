@@ -1,7 +1,8 @@
 ##
 #
-# Pressure perturbation over a 1D isothermal steady state [1, 2], Section
-# 4.1.4 (Figure 4.2) of [3].
+# Pressure perturbation over a 1D isothermal steady state proposed by
+# LeVeque and Bale [1], in the configuration of [2], Section 4.1.4 (Figure
+# 4.2) of [3].
 #
 # A small pressure perturbation is added to the isothermal equilibrium
 #
@@ -26,17 +27,18 @@
 # 2026-FMT-4.1.4-isothermal_well_balanced.prm for the corresponding Table
 # 4.4 of [3].
 #
-# [1] P. Li and Z. Gao. Simple high order well-balanced finite difference
-#     WENO schemes for the Euler equations under gravitational fields.
-#     Journal of Computational Physics, 437:110341, 2021.
+# [1] R. J. LeVeque, D. S. Bale. Wave propagation methods for conservation
+#     laws with source terms. In: M. Fey, R. Jeltsch (eds.), Hyperbolic
+#     Problems: Theory, Numerics, Applications, pp. 609-618, Birkhäuser,
+#     1999. DOI 10.1007/978-3-0348-8724-3_12
 #
-# [2] A. Navas-Montilla and I. Echeverribar. A family of well-balanced WENO
-#     and TENO schemes for atmospheric flows. Journal of Computational
-#     Physics, 489:112273, 2023.
+# [2] A. Navas-Montilla, I. Echeverribar. A family of well-balanced WENO and
+#     TENO schemes for atmospheric flows. J. Comput. Phys., 489:112273,
+#     2023. DOI 10.1016/j.jcp.2023.112273
 #
 # [3] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.
-#     arXiv:2606.19764, 2026.
+#     Preprint, 2026. arXiv:2606.19764
 #
 ##
 

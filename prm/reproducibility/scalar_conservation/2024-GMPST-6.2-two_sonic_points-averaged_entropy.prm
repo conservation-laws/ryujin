@@ -29,10 +29,10 @@
 # mesh (51 grid points, x = 0 is a vertex) of Table 1 of [1]. Mesh
 # refinement 1 to 7 gives the remaining meshes (101 to 6401 grid points).
 #
-# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
-#     First-order greedy invariant-domain preserving approximation for
-#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
-#     Comput., 100:46, 2024. arXiv:2310.01713
+# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas. First-order
+#     greedy invariant-domain preserving approximation for hyperbolic
+#     problems: scalar conservation laws, and p-system. J. Sci. Comput.,
+#     100(2):46, 2024. DOI 10.1007/s10915-024-02592-4, arXiv:2310.01713
 #
 ##
 

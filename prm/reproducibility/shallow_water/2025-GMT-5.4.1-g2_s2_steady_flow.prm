@@ -31,12 +31,14 @@
 #
 # [1] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
 #     Runge-Kutta approximation technique for the shallow water equations.
-#     Computers & Fluids, 288:106493, 2025. arXiv:2403.17123
+#     Comput. Fluids, 288:106493, 2025. DOI 10.1016/j.compfluid.2024.106493,
+#     arXiv:2403.17123
 #
-# [2] S. Martinez-Aranda, J. Fernandez-Pato, D. Caviedes-Voullieme, I.
-#     Garcia-Palacin, P. Garcia-Navarro. Towards transient experimental
+# [2] S. Martinez-Aranda, J. Fernandez-Pato, D. Caviedes-Voullieme,
+#     I. Garcia-Palacin, P. Garcia-Navarro. Towards transient experimental
 #     water surfaces: A new benchmark dataset for 2D shallow water solvers.
-#     Advances in Water Resources, 121:130-149, 2018.
+#     Adv. Water Resour., 121:130-149, 2018.
+#     DOI 10.1016/j.advwatres.2018.08.013
 #
 ##
 

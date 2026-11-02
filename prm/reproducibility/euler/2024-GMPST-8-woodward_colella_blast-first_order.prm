@@ -18,13 +18,14 @@
 # The chosen 400 subdivisions correspond to the left panel of Figure 6; use
 # "mesh refinement" 1 and 2 for the other two panels.
 #
-# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
-#     First-order greedy invariant-domain preserving approximation for
-#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
-#     Comput., 100:46, 2024. arXiv:2310.01713
+# [1] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas. First-order
+#     greedy invariant-domain preserving approximation for hyperbolic
+#     problems: scalar conservation laws, and p-system. J. Sci. Comput.,
+#     100(2):46, 2024. DOI 10.1007/s10915-024-02592-4, arXiv:2310.01713
 #
 # [2] P. Woodward, P. Colella. The numerical simulation of two-dimensional
 #     fluid flow with strong shocks. J. Comput. Phys., 54(1):115-173, 1984.
+#     DOI 10.1016/0021-9991(84)90142-6
 #
 ##
 

@@ -25,18 +25,19 @@
 # the same problem on a graded quadrilateral mesh; the density fields
 # should be compared with Figures 1 and 2 of [3] qualitatively.
 #
-# [1] V. Daru and C. Tenaud. Evaluation of TVD high resolution schemes for
-#     unsteady viscous shocked flows. Computers & Fluids, 30(1):89-113,
-#     2001
+# [1] V. Daru, C. Tenaud. Evaluation of TVD high resolution schemes for
+#     unsteady viscous shocked flows. Comput. Fluids, 30(1):89-113, 2001.
+#     DOI 10.1016/S0045-7930(00)00006-2
 #
-# [2] V. Daru and C. Tenaud. Numerical simulation of the viscous shock tube
+# [2] V. Daru, C. Tenaud. Numerical simulation of the viscous shock tube
 #     problem by using a high resolution monotonicity-preserving scheme.
-#     Computers & Fluids, 38(3):664-676, 2009.
+#     Comput. Fluids, 38(3):664-676, 2009.
+#     DOI 10.1016/j.compfluid.2008.06.008
 #
 # [3] J.-L. Guermond, M. Maier, B. Popov, I. Tomas. Second-order invariant
 #     domain preserving approximation of the compressible Navier-Stokes
 #     equations. Comput. Methods Appl. Mech. Engrg., 375:113608, 2021.
-#     arXiv:2009.06022
+#     DOI 10.1016/j.cma.2020.113608, arXiv:2009.06022
 #
 ##
 

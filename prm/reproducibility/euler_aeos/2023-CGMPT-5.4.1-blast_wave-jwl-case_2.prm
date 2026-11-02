@@ -1,6 +1,6 @@
 ##
 #
-# 1D Woodward-Colella interacting blast waves with the Jones-Wilkins-Lee
+# 1D Woodward-Colella interacting blast waves [2] with the Jones-Wilkins-Lee
 # equation of state, Section 5.4.1 (Figure 1, right, Table 3, Case 2) of
 # [1].
 #
@@ -22,9 +22,13 @@
 # give the 6400 and 25600 element meshes.
 #
 # [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
-#     second-order approximation of the compressible Euler equations with
-#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
-#     arXiv:2207.12832
+#     second-order approximation of the compressible Euler equations with an
+#     arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     DOI 10.1016/j.jcp.2023.111926, arXiv:2207.12832
+#
+# [2] P. Woodward, P. Colella. The numerical simulation of two-dimensional
+#     fluid flow with strong shocks. J. Comput. Phys., 54(1):115-173, 1984.
+#     DOI 10.1016/0021-9991(84)90142-6
 #
 ##
 

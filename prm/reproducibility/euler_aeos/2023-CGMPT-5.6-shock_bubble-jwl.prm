@@ -27,12 +27,13 @@
 # Rankine-Hugoniot speed 22.9 km/s) require inflow conditions on the left.
 #
 # [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
-#     second-order approximation of the compressible Euler equations with
-#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
-#     arXiv:2207.12832
+#     second-order approximation of the compressible Euler equations with an
+#     arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     DOI 10.1016/j.jcp.2023.111926, arXiv:2207.12832
 #
 # [2] Y. Wang, J. Li. Stiffened gas approximation and GRP resolution for
-#     fluid flows of real materials. arXiv:2108.13780, 2021.
+#     compressible fluid flows of real materials. J. Sci. Comput., 95(1):22,
+#     2023. DOI 10.1007/s10915-023-02140-6, arXiv:2108.13780
 #
 ##
 

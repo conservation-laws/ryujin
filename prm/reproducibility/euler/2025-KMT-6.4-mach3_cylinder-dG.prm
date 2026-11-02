@@ -22,10 +22,10 @@
 #
 # The final time is set to t = 4.0 and we output a vtk every δt = 0.1.
 #
-# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
-#     hyperbolic systems of conservation laws using discontinuous space
-#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
-#     arXiv:2402.04514
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for hyperbolic
+#     systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38(1):74-108, 2025.
+#     DOI 10.4208/cicp.OA-2024-0225, arXiv:2402.04514
 #
 ##
 

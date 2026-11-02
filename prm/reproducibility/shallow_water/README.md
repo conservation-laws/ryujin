@@ -5,12 +5,15 @@ This directory contains parameter files for the numerical results of
 
 > [2025-GMT] J.-L. Guermond, M. Maier, E. J. Tovar. A high-order explicit
 > Runge-Kutta approximation technique for the shallow water equations.
-> Computers & Fluids, 288:106493, 2025.
+> Comput. Fluids, 288:106493, 2025.
+> [DOI:10.1016/j.compfluid.2024.106493](https://doi.org/10.1016/j.compfluid.2024.106493),
 > [arXiv:2403.17123](https://arxiv.org/abs/2403.17123)
 
 > [2026-HKMT] J. J. Harmon, M. Kronbichler, M. Maier, E. J. Tovar. A
 > conservative invariant-domain preserving projection technique for
-> hyperbolic systems under adaptive mesh refinement. Preprint, 2025.
+> hyperbolic systems under adaptive mesh refinement. SIAM J. Sci. Comput.,
+> 48(5):A2910–A2933, 2026.
+> [DOI:10.1137/25M1785885](https://doi.org/10.1137/25M1785885),
 > [arXiv:2507.18717](https://arxiv.org/abs/2507.18717)
 
 The file names start with the year and author initials of the paper,
@@ -23,6 +26,9 @@ published numbers are to be expected. Run a configuration with
 ```
 mpirun -np <n> ryujin 2025-GMT-5.3.1-smooth_vortex.prm
 ```
+
+Section, figure and table numbers of [2026-HKMT] refer to the arXiv
+preprint; the numbering of the journal version may differ.
 
 All configurations use the `shallow water` equation module and should be
 run with double precision (`NUMBER=double`).
