@@ -37,7 +37,7 @@ namespace ryujin
    *
    * @ingroup Typed
    */
-  template <typename HyperbolicDescription, int dim, typename Number = double>
+  template <typename HD, int structdim, int dim, typename Number = double>
   class SolutionTransfer final : public Interface::SolutionTransfer<dim, Number>
   {
   public:
@@ -46,11 +46,11 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = typename HyperbolicDescription::HyperbolicSystem;
+    using HyperbolicSystem = typename HD::HyperbolicSystem;
 
     using View = typename HyperbolicSystem::template View<dim, Number>;
 
-    using Limiter = typename HyperbolicDescription::template Limiter<Number>;
+    using Limiter = typename HD::template Limiter<Number>;
 
     using LimiterView =
         decltype(std::declval<const Limiter &>().template view<dim, Number>());
@@ -81,8 +81,8 @@ namespace ryujin
      * Constructor.
      */
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
-                     Discretization<dim> &discretization, /*mutable*/
-                     const OfflineData<dim, Number> &offline_data,
+                     Discretization<structdim, dim> &discretization, /*mutable*/
+                     const OfflineData<structdim, dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const Interface::ParabolicSystem &parabolic_system,
                      const std::string &subsection = "/SolutionTransfer");
@@ -139,8 +139,9 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<Discretization<dim>> discretization_;
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<Discretization<structdim, dim>> discretization_;
+    dealii::ObserverPointer<const OfflineData<structdim, dim, Number>>
+        offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;
 

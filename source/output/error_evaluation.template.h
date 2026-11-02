@@ -19,9 +19,9 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <int dim, typename Number>
-  ErrorEvaluation<dim, Number>::ErrorEvaluation(
-      const Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  ErrorEvaluation<structdim, dim, Number>::ErrorEvaluation(
+      const Interface::Simulation<structdim, dim, Number> &simulation,
       const std::string &subsection /*= "ErrorEvaluation"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("error evaluation", TaskPhase::pre_step)
@@ -55,11 +55,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::initialize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void ErrorEvaluation<structdim, dim, Number>::initialize(
+      TaskContext<Number> &context)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<dim, Number>::initialize()" << std::endl;
+    std::cout << "ErrorEvaluation<structdim, dim, Number>::initialize()"
+              << std::endl;
 #endif
 
     base_name_ = context.base_name;
@@ -98,8 +100,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void
+  ErrorEvaluation<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     if (!this->trigger_->fire(context))
       return;
@@ -124,8 +127,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::finalize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void ErrorEvaluation<structdim, dim, Number>::finalize(
+      TaskContext<Number> &context)
   {
     StateVector<Number> analytic;
     simulation_.interpolate_analytic_solution(analytic, context.t);
@@ -153,13 +157,14 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  std::vector<Number> ErrorEvaluation<dim, Number>::compute(
+  template <int structdim, int dim, typename Number>
+  std::vector<Number> ErrorEvaluation<structdim, dim, Number>::compute(
       const StateVector<Number> &state_vector,
       const StateVector<Number> &analytic) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<dim, Number>::compute()" << std::endl;
+    std::cout << "ErrorEvaluation<structdim, dim, Number>::compute()"
+              << std::endl;
 #endif
 
     const auto &discretization = offline_data_->discretization();
@@ -229,8 +234,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  std::string ErrorEvaluation<dim, Number>::description() const
+  template <int structdim, int dim, typename Number>
+  std::string ErrorEvaluation<structdim, dim, Number>::description() const
   {
     std::string result =
         error_normalize_ ? "Normalized consolidated " : "Consolidated ";

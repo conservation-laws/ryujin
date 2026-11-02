@@ -42,9 +42,15 @@ namespace ryujin
    * @note Data structures in OfflineData are initialized with the ensemble
    * subrange communicator stored in MPIEnsemble.
    *
+   * The template parameters @p structdim and @p dim follow the deal.II
+   * convention for dealii::DoFHandler<structdim, dim>. All data that the
+   * algebraic part of ryujin operates on is accessible through the base
+   * class Interface::OfflineData<dim, Number>, which only depends on the
+   * space dimension @p dim.
+   *
    * @ingroup MeshAndOfflineData
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class OfflineData final : public Interface::OfflineData<dim, Number>
   {
   public:
@@ -70,7 +76,7 @@ namespace ryujin
      * Constructor
      */
     OfflineData(const MPIEnsemble &mpi_ensemble,
-                const Discretization<dim> &discretization,
+                const Discretization<structdim, dim> &discretization,
                 const std::string &subsection = "/OfflineData");
 
     /**
@@ -111,7 +117,7 @@ namespace ryujin
     /**
      * Return a read-only const reference to the dof handler.
      */
-    const dealii::DoFHandler<dim> &dof_handler() const
+    const dealii::DoFHandler<structdim, dim> &dof_handler() const
     {
       if (discretization_->have_discontinuous_ansatz()) {
         Assert(dof_handler_dg_, dealii::ExcInternalError());
@@ -159,10 +165,11 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Discretization<dim>> discretization_;
+    dealii::ObserverPointer<const Discretization<structdim, dim>>
+        discretization_;
 
-    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
-    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
+    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_cg_;
+    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_dg_;
 
     std::vector<BoundaryMap> level_boundary_map_;
 
@@ -177,7 +184,7 @@ namespace ryujin
     /**
      * Return a writable reference to the dof handler.
      */
-    dealii::DoFHandler<dim> &writable_dof_handler()
+    dealii::DoFHandler<structdim, dim> &writable_dof_handler()
     {
       if (this->discretization_->have_discontinuous_ansatz()) {
         Assert(this->dof_handler_dg_, dealii::ExcInternalError());

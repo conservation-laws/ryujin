@@ -102,9 +102,9 @@ void run(const std::string &time_loop_parameters,
              << "end\n";
 
   {
-    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+    Simulation<HyperbolicDescription, ParabolicDescription, dim, dim, Number>
         simulation(MPI_COMM_WORLD);
-    TaskComposition<dim, Number> task_composition(simulation);
+    TaskComposition<dim, dim, Number> task_composition(simulation);
     ParameterAcceptor::initialize(parameters);
     task_composition.run();
   }

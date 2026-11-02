@@ -35,14 +35,14 @@ namespace ryujin
      *
      * @ingroup Concepts
      */
-    template <typename T, typename HD, int dim, typename Number>
+    template <typename T, typename HD, int structdim, int dim, typename Number>
     concept ParabolicDescription =
         ParabolicSystem<typename T::ParabolicSystem> &&
         std::derived_from<parabolic_module_type<T, HD, dim, Number>,
                           Interface::ParabolicModule<dim, Number>> &&
         std::constructible_from<parabolic_module_type<T, HD, dim, Number>,
                                 const MPIEnsemble &,
-                                const OfflineData<dim, Number> &,
+                                const OfflineData<structdim, dim, Number> &,
                                 const typename HD::HyperbolicSystem &,
                                 const typename T::ParabolicSystem &,
                                 const initial_values_type<HD, dim, Number> &,

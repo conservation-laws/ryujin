@@ -24,11 +24,11 @@
 
 namespace ryujin
 {
-  template <typename HyperbolicDescription, int dim, typename Number>
-  SolutionTransfer<HyperbolicDescription, dim, Number>::SolutionTransfer(
+  template <typename HD, int structdim, int dim, typename Number>
+  SolutionTransfer<HD, structdim, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
-      Discretization<dim> &discretization,
-      const OfflineData<dim, Number> &offline_data,
+      Discretization<structdim, dim> &discretization,
+      const OfflineData<structdim, dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
@@ -101,12 +101,12 @@ namespace ryujin
   } // namespace
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void SolutionTransfer<HyperbolicDescription, dim, Number>::prepare_projection(
+  template <typename HD, int structdim, int dim, typename Number>
+  void SolutionTransfer<HD, structdim, dim, Number>::prepare_projection(
       const StateVector<Number> &old_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<HyperbolicDescription, dim, "
+    std::cout << "SolutionTransfer<HD, structdim, dim, "
                  "Number>::prepare_projection()"
               << std::endl;
 #endif
@@ -136,11 +136,12 @@ namespace ryujin
         [this, &old_state_vector](const auto cell,
                                   const dealii::CellStatus status) {
           const auto &dof_handler = offline_data_->dof_handler();
-          const auto dof_cell = typename dealii::DoFHandler<dim>::cell_iterator(
-              &cell->get_triangulation(),
-              cell->level(),
-              cell->index(),
-              &dof_handler);
+          const auto dof_cell =
+              typename dealii::DoFHandler<structdim, dim>::cell_iterator(
+                  &cell->get_triangulation(),
+                  cell->level(),
+                  cell->index(),
+                  &dof_handler);
 
           const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
@@ -196,7 +197,7 @@ namespace ryujin
             const auto &mapping = discretization.mapping()[index];
             const auto &quadrature = discretization.quadrature()[index];
 
-            dealii::FEValues<dim> fe_values(
+            dealii::FEValues<structdim, dim> fe_values(
                 mapping,
                 finite_element,
                 quadrature,
@@ -207,13 +208,13 @@ namespace ryujin
                 dealii::internal::FEPointEvaluation::get_polynomial_space(
                     finite_element);
 
-            std::vector<dealii::Point<dim, Number>> unit_points(
+            std::vector<dealii::Point<structdim, Number>> unit_points(
                 quadrature.size());
             /*
              * for Number == float we need a temporary vector for the
              * transform_points_real_to_unit_cell() function:
              */
-            std::vector<dealii::Point<dim>> unit_points_temp(
+            std::vector<dealii::Point<structdim>> unit_points_temp(
                 std::is_same_v<Number, float> ? quadrature.size() : 0);
 
             /* Step 1: build up right hand side by iterating over children: */
@@ -288,10 +289,10 @@ namespace ryujin
               for (unsigned int q = 0; q < quadrature.size(); ++q) {
                 const unsigned int n_shapes = polynomial_space.size();
                 AssertIndexRange(n_shapes, 10);
-                dealii::ndarray<Number, 10, 2, dim> shapes;
+                dealii::ndarray<Number, 10, 2, structdim> shapes;
                 // Evaluate 1d polynomials and their derivatives
-                std::array<Number, dim> point;
-                for (unsigned int d = 0; d < dim; ++d)
+                std::array<Number, structdim> point;
+                for (unsigned int d = 0; d < structdim; ++d)
                   point[d] = unit_points[q][d];
                 for (unsigned int i = 0; i < n_shapes; ++i)
                   polynomial_space[i].values_of_array(point, 1, &shapes[i][0]);
@@ -300,7 +301,7 @@ namespace ryujin
 
                 ryujin::internal::integrate_tensor_product_value<
                     /*is linear*/ true,
-                    dim,
+                    structdim,
                     Number,
                     state_type>(shapes.data(),
                                 n_shapes,
@@ -418,7 +419,7 @@ namespace ryujin
 
           if (!U_dynamic.empty()) {
             const auto dof_cell_cg =
-                typename dealii::DoFHandler<dim>::cell_iterator(
+                typename dealii::DoFHandler<structdim, dim>::cell_iterator(
                     &cell->get_triangulation(),
                     cell->level(),
                     cell->index(),
@@ -443,14 +444,13 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
-  void SolutionTransfer<HyperbolicDescription, dim, Number>::project(
+  template <typename HD, int structdim, int dim, typename Number>
+  void SolutionTransfer<HD, structdim, dim, Number>::project(
       StateVector<Number> &new_state_vector [[maybe_unused]])
   {
 #ifdef DEBUG_OUTPUT
-    std::cout
-        << "SolutionTransfer<HyperbolicDescription, dim, Number>::project()"
-        << std::endl;
+    std::cout << "SolutionTransfer<HD, structdim, dim, Number>::project()"
+              << std::endl;
 #endif
 
     move_to_memory_space<dealii::MemorySpace::Host>(
@@ -512,11 +512,12 @@ namespace ryujin
             const dealii::CellStatus status,
             const auto &data_range) {
           const auto &dof_handler = offline_data_->dof_handler();
-          const auto dof_cell = typename dealii::DoFHandler<dim>::cell_iterator(
-              &cell->get_triangulation(),
-              cell->level(),
-              cell->index(),
-              &dof_handler);
+          const auto dof_cell =
+              typename dealii::DoFHandler<structdim, dim>::cell_iterator(
+                  &cell->get_triangulation(),
+                  cell->level(),
+                  cell->index(),
+                  &dof_handler);
 
           /*
            * Retrieve packed values and project onto cell:
@@ -542,7 +543,7 @@ namespace ryujin
 
           if (!U_dynamic.empty()) {
             const auto dof_cell_cg =
-                typename dealii::DoFHandler<dim>::cell_iterator(
+                typename dealii::DoFHandler<structdim, dim>::cell_iterator(
                     &cell->get_triangulation(),
                     cell->level(),
                     cell->index(),
@@ -592,11 +593,11 @@ namespace ryujin
             const auto &mapping = discretization.mapping()[index];
             const auto &quadrature = discretization.quadrature()[index];
 
-            dealii::FEValues<dim> fe_values(mapping,
-                                            finite_element,
-                                            quadrature,
-                                            dealii::update_values |
-                                                dealii::update_JxW_values);
+            dealii::FEValues<structdim, dim> fe_values(
+                mapping,
+                finite_element,
+                quadrature,
+                dealii::update_values | dealii::update_JxW_values);
 
             fe_values.reinit(dof_cell);
 
@@ -630,7 +631,7 @@ namespace ryujin
             const auto &mapping = discretization.mapping()[index];
             const auto &quadrature = discretization.quadrature()[index];
 
-            dealii::FEValues<dim> fe_values(
+            dealii::FEValues<structdim, dim> fe_values(
                 mapping,
                 finite_element,
                 quadrature,
@@ -640,13 +641,13 @@ namespace ryujin
             const auto polynomial_space =
                 dealii::internal::FEPointEvaluation::get_polynomial_space(
                     finite_element);
-            std::vector<dealii::Point<dim, Number>> unit_points(
+            std::vector<dealii::Point<structdim, Number>> unit_points(
                 quadrature.size());
             /*
              * for Number == float we need a temporary vector for the
              * transform_points_real_to_unit_cell() function:
              */
-            std::vector<dealii::Point<dim>> unit_points_temp(
+            std::vector<dealii::Point<structdim>> unit_points_temp(
                 std::is_same_v<Number, float> ? quadrature.size() : 0);
 
             dealii::FullMatrix<double> mass_inverse(n_dofs_per_cell,
@@ -991,9 +992,9 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
+  template <typename HD, int structdim, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE auto
-  SolutionTransfer<HyperbolicDescription, dim, Number>::read_tensor(
+  SolutionTransfer<HD, structdim, dim, Number>::read_tensor(
       const MultiComponentVector<Number> &U,
       const dealii::types::global_dof_index global_i) -> state_type
   {
@@ -1015,9 +1016,9 @@ namespace ryujin
   }
 
 
-  template <typename HyperbolicDescription, int dim, typename Number>
+  template <typename HD, int structdim, int dim, typename Number>
   inline DEAL_II_ALWAYS_INLINE void
-  SolutionTransfer<HyperbolicDescription, dim, Number>::add_tensor(
+  SolutionTransfer<HD, structdim, dim, Number>::add_tensor(
       MultiComponentVector<Number> &U,
       const state_type &new_U_i,
       const dealii::types::global_dof_index global_i)

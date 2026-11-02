@@ -10,7 +10,7 @@ namespace ryujin
 {
   using HyperbolicDescription = EulerAEOS::HyperbolicDescription;
 
-  template class SolutionTransfer<HyperbolicDescription, 1, NUMBER>;
-  template class SolutionTransfer<HyperbolicDescription, 2, NUMBER>;
-  template class SolutionTransfer<HyperbolicDescription, 3, NUMBER>;
+  template class SolutionTransfer<HyperbolicDescription, 1, 1, NUMBER>;
+  template class SolutionTransfer<HyperbolicDescription, 2, 2, NUMBER>;
+  template class SolutionTransfer<HyperbolicDescription, 3, 3, NUMBER>;
 } // namespace ryujin

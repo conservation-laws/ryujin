@@ -418,7 +418,7 @@ namespace ryujin
       double gmg_coarse_tolerance;
     };
 
-    void initialize(const OfflineData<dim, Number> &offline_data,
+    void initialize(const OfflineData<dim, dim, Number> &offline_data,
                     const std::set<dealii::types::boundary_id> boundary_ids,
                     const MultigridParameters parameters)
     {

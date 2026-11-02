@@ -134,7 +134,7 @@ std::pair<double, double> run(const std::string &name)
   std::pair<double, double> norms;
 
   {
-    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number, TI>
+    Simulation<HyperbolicDescription, ParabolicDescription, dim, dim, Number, TI>
         simulation(MPI_COMM_WORLD);
     Scheduler<Number> scheduler(
         MPI_COMM_WORLD, {&simulation}, {}, [](const std::string &) {});

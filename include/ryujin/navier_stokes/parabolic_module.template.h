@@ -31,7 +31,7 @@ namespace ryujin
     template <int dim, typename Number>
     ParabolicModule<dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const OfflineData<dim, dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
         const InitialValues &initial_values,

@@ -53,9 +53,9 @@ namespace ryujin
   } // namespace
 
 
-  template <int dim, typename Number>
-  Quantities<dim, Number>::Quantities(
-      const Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  Quantities<structdim, dim, Number>::Quantities(
+      const Interface::Simulation<structdim, dim, Number> &simulation,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("quantities", TaskPhase::pre_step)
@@ -110,11 +110,11 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::prepare(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::prepare(TaskContext<Number> &context)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
+    std::cout << "Quantities<structdim, dim, Number>::prepare()" << std::endl;
 #endif
 
     base_name_ = mpi_ensemble_.base_name(context.base_name);
@@ -313,8 +313,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     const auto &state_vector = simulation_.state_vector();
 
@@ -331,15 +331,16 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  unsigned int Quantities<dim, Number>::stride() const
+  template <int structdim, int dim, typename Number>
+  unsigned int Quantities<structdim, dim, Number>::stride() const
   {
     return n_moments_ * selection_.size();
   }
 
 
-  template <int dim, typename Number>
-  std::string Quantities<dim, Number>::header(const bool averaged) const
+  template <int structdim, int dim, typename Number>
+  std::string
+  Quantities<structdim, dim, Number>::header(const bool averaged) const
   {
     static const std::array<std::string, 4> labels{
         "mean", "var", "mu_3", "mu_4"};
@@ -353,13 +354,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  Quantities<dim, Number>::accumulate(const StateVector<Number> &state_vector,
-                                      const Number t)
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::accumulate(
+      const StateVector<Number> &state_vector, const Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
+    std::cout << "Quantities<structdim, dim, Number>::accumulate()"
+              << std::endl;
 #endif
 
     using MemorySpace = selected_memory_space_t;
@@ -424,14 +425,14 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  Quantities<dim, Number>::write_out(const StateVector<Number> &state_vector,
-                                     const Number t,
-                                     unsigned int cycle)
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::write_out(
+      const StateVector<Number> &state_vector,
+      const Number t,
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
+    std::cout << "Quantities<structdim, dim, Number>::write_out()" << std::endl;
 #endif
 
     /*
@@ -527,8 +528,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::write_mesh_files(unsigned int cycle)
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::write_mesh_files(unsigned int cycle)
   {
     for (const auto &manifold : manifolds_) {
       /* Skip outputting the point map for spatial averages. */
@@ -577,8 +578,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::clear_statistics()
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::clear_statistics()
   {
     using MemorySpace = selected_memory_space_t;
 
@@ -598,8 +599,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::clear_time_averages()
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::clear_time_averages()
   {
     using MemorySpace = selected_memory_space_t;
 
@@ -613,8 +614,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  std::vector<Number> Quantities<dim, Number>::internal_accumulate(
+  template <int structdim, int dim, typename Number>
+  std::vector<Number> Quantities<structdim, dim, Number>::internal_accumulate(
       Manifold &manifold, const StateVector<Number> &state_vector)
   {
     using MemorySpace = selected_memory_space_t;
@@ -676,13 +677,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  Quantities<dim, Number>::internal_write_out(const std::string &file_name,
-                                              const std::string &time_stamp,
-                                              const Mirrored<Number *> &values,
-                                              const Number scale,
-                                              const bool averaged)
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::internal_write_out(
+      const std::string &file_name,
+      const std::string &time_stamp,
+      const Mirrored<Number *> &values,
+      const Number scale,
+      const bool averaged)
   {
     /*
      * Gather the values of all MPI ranks on the root rank, which then
@@ -734,8 +735,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::internal_write_out_time_series(
+  template <int structdim, int dim, typename Number>
+  void Quantities<structdim, dim, Number>::internal_write_out_time_series(
       const std::string &file_name,
       const std::vector<std::pair<Number, std::vector<Number>>> &values,
       bool append)

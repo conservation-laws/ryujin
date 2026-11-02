@@ -64,9 +64,9 @@ namespace ryujin
   template class HyperbolicModule<HD, 2, NUMBER>;
   template class HyperbolicModule<HD, 3, NUMBER>;
 
-  template class SolutionTransfer<HD, 1, NUMBER>;
-  template class SolutionTransfer<HD, 2, NUMBER>;
-  template class SolutionTransfer<HD, 3, NUMBER>;
+  template class SolutionTransfer<HD, 1, 1, NUMBER>;
+  template class SolutionTransfer<HD, 2, 2, NUMBER>;
+  template class SolutionTransfer<HD, 3, 3, NUMBER>;
 
   template class Postprocessor<HD, 1, NUMBER>;
   template class Postprocessor<HD, 2, NUMBER>;
@@ -82,7 +82,8 @@ void test()
   constexpr bool hyperbolic = Concept::HyperbolicDescription<HD, dim, NUMBER>;
   constexpr bool kernels =
       Concept::HyperbolicModuleDescription<HD, dim, NUMBER>;
-  constexpr bool parabolic = Concept::ParabolicDescription<PD, HD, dim, NUMBER>;
+  constexpr bool parabolic =
+      Concept::ParabolicDescription<PD, HD, dim, dim, NUMBER>;
 
   std::cout << "dim = " << dim << std::endl;
   std::cout << "  HyperbolicDescription:       " << hyperbolic << std::endl;
@@ -90,7 +91,7 @@ void test()
   std::cout << "  ParabolicDescription:        " << parabolic << std::endl;
 
   {
-    Simulation<HD, PD, dim, NUMBER> simulation(MPI_COMM_SELF);
+    Simulation<HD, PD, dim, dim, NUMBER> simulation(MPI_COMM_SELF);
 
     std::stringstream parameters;
     parameters << "subsection B - Equation\n"

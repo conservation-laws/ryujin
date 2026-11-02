@@ -41,13 +41,14 @@ namespace ryujin
    */
   template <typename HD,
             typename PD,
+            int structdim,
             int dim,
             typename Number = double,
             template <int, typename> class TI = TimeIntegrator>
     requires Concept::HyperbolicDescription<HD, dim, Number> &&
-             Concept::ParabolicDescription<PD, HD, dim, Number> &&
+             Concept::ParabolicDescription<PD, HD, structdim, dim, Number> &&
              Concept::TimeIntegrator<TI<dim, Number>, dim, Number>
-  class Simulation final : public Interface::Simulation<dim, Number>
+  class Simulation final : public Interface::Simulation<structdim, dim, Number>
   {
   public:
     /**
@@ -98,11 +99,12 @@ namespace ryujin
           parabolic_system_container_->get();
       this->parabolic_system_ = &parabolic_system;
 
-      this->discretization_ = std::make_unique<Discretization<dim>>(
+      this->discretization_ = std::make_unique<Discretization<structdim, dim>>(
           mpi_ensemble, "/C - Discretization");
 
-      this->offline_data_ = std::make_unique<OfflineData<dim, Number>>(
-          mpi_ensemble, *this->discretization_, "/D - OfflineData");
+      this->offline_data_ =
+          std::make_unique<OfflineData<structdim, dim, Number>>(
+              mpi_ensemble, *this->discretization_, "/D - OfflineData");
       const auto &offline_data = *this->offline_data_;
 
       initial_values_container_ =
@@ -149,7 +151,7 @@ namespace ryujin
                                                            initial_precomputed);
 
       this->solution_transfer_ =
-          std::make_unique<SolutionTransfer<HD, dim, Number>>(
+          std::make_unique<SolutionTransfer<HD, structdim, dim, Number>>(
               mpi_ensemble,
               *this->discretization_,
               offline_data,

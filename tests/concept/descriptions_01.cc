@@ -30,7 +30,7 @@ using namespace ryujin;
 template <typename HD, typename PD, typename Number>
 constexpr bool pairs = []<int... dim>(std::integer_sequence<int, dim...>) {
   return ((Concept::HyperbolicDescription<HD, dim, Number> &&
-           Concept::ParabolicDescription<PD, HD, dim, Number>)&&...);
+           Concept::ParabolicDescription<PD, HD, dim, dim, Number>)&&...);
 }(std::integer_sequence<int, 1, 2, 3>());
 
 #define CHECK(HD, PD)                                                          \

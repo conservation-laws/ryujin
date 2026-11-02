@@ -90,7 +90,7 @@ namespace ryujin
    *
    * @ingroup MeshAndOfflineData
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class MeshAdaptor final : public dealii::ParameterAcceptor,
                             public Interface::Task<Number>
   {
@@ -103,7 +103,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    MeshAdaptor(Interface::Simulation<dim, Number> &simulation,
+    MeshAdaptor(Interface::Simulation<structdim, dim, Number> &simulation,
                 const std::string &subsection = "/MeshAdaptor");
 
     //@}
@@ -153,10 +153,11 @@ namespace ryujin
      */
     //@{
 
-    Interface::Simulation<dim, Number> &simulation_;
+    Interface::Simulation<structdim, dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const OfflineData<structdim, dim, Number>>
+        offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 

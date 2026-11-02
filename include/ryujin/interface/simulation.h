@@ -41,9 +41,14 @@ namespace ryujin
      * Simulation, which is the only class that sees the hyperbolic and
      * the parabolic description.
      *
+     * The interface knows the intrinsic dimension @p structdim of the mesh
+     * because the tasks (output, mesh adaptation, checkpointing) operate
+     * on the Discretization and OfflineData objects directly. The modules
+     * and the time integrator only depend on the space dimension @p dim.
+     *
      * @ingroup Interfaces
      */
-    template <int dim, typename Number = double>
+    template <int structdim, int dim, typename Number = double>
     class Simulation : public Task<Number>
     {
     public:
@@ -135,8 +140,9 @@ namespace ryujin
       }
 
       std::unique_ptr<MPIEnsemble> mpi_ensemble_;
-      std::unique_ptr<ryujin::Discretization<dim>> discretization_;
-      std::unique_ptr<ryujin::OfflineData<dim, Number>> offline_data_;
+      std::unique_ptr<ryujin::Discretization<structdim, dim>> discretization_;
+      std::unique_ptr<ryujin::OfflineData<structdim, dim, Number>>
+          offline_data_;
 
       const HyperbolicSystem *hyperbolic_system_ = nullptr;
       const ParabolicSystem *parabolic_system_ = nullptr;

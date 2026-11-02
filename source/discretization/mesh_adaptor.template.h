@@ -18,9 +18,9 @@
 
 namespace ryujin
 {
-  template <int dim, typename Number>
-  MeshAdaptor<dim, Number>::MeshAdaptor(
-      Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  MeshAdaptor<structdim, dim, Number>::MeshAdaptor(
+      Interface::Simulation<structdim, dim, Number> &simulation,
       const std::string &subsection /*= "MeshAdaptor"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("mesh adaptation", TaskPhase::adapt)
@@ -143,25 +143,27 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::prepare(TaskContext<Number> & /*context*/)
+  template <int structdim, int dim, typename Number>
+  void MeshAdaptor<structdim, dim, Number>::prepare(
+      TaskContext<Number> & /*context*/)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "MeshAdaptor<dim, Number>::prepare()" << std::endl;
+    std::cout << "MeshAdaptor<structdim, dim, Number>::prepare()" << std::endl;
 #endif
 
     selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
   }
 
 
-  template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void
+  MeshAdaptor<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     if (!this->trigger_->fire(context))
       return;
 
 #ifdef DEBUG_OUTPUT
-    std::cout << "MeshAdaptor<dim, Number>::execute()" << std::endl;
+    std::cout << "MeshAdaptor<structdim, dim, Number>::execute()" << std::endl;
 #endif
 
     AssertThrow(mpi_ensemble_.n_ensembles() == 1, dealii::ExcNotImplemented());
@@ -193,12 +195,12 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  MeshAdaptor<dim, Number>::analyze(const StateVector<Number> &state_vector)
+  template <int structdim, int dim, typename Number>
+  void MeshAdaptor<structdim, dim, Number>::analyze(
+      const StateVector<Number> &state_vector)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "MeshAdaptor<dim, Number>::analyze()" << std::endl;
+    std::cout << "MeshAdaptor<structdim, dim, Number>::analyze()" << std::endl;
 #endif
 
     /*
@@ -227,8 +229,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::populate_cell_indicators_with_random_values()
+  template <int structdim, int dim, typename Number>
+  void MeshAdaptor<structdim, dim, Number>::
+      populate_cell_indicators_with_random_values()
   {
     std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
       static std::uniform_real_distribution<double> distribution(0.0, 10.0);
@@ -237,10 +240,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  MeshAdaptor<dim,
-              Number>::populate_cell_indicators_from_smoothness_indicators()
+  template <int structdim, int dim, typename Number>
+  void MeshAdaptor<structdim, dim, Number>::
+      populate_cell_indicators_from_smoothness_indicators()
   {
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
@@ -279,8 +281,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::mark_cells_for_coarsening_and_refinement()
+  template <int structdim, int dim, typename Number>
+  void MeshAdaptor<structdim, dim, Number>::
+      mark_cells_for_coarsening_and_refinement()
   {
     auto &triangulation = simulation_.discretization().triangulation();
 
@@ -384,8 +387,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void MeshAdaptor<dim, Number>::compute_smoothness_indicators(
+  template <int structdim, int dim, typename Number>
+  void MeshAdaptor<structdim, dim, Number>::compute_smoothness_indicators(
       const StateVector<Number> &state_vector)
   {
     const auto &affine_constraints = offline_data_->affine_constraints();

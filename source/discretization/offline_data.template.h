@@ -29,10 +29,10 @@ namespace ryujin
   using namespace dealii;
 
 
-  template <int dim, typename Number>
-  OfflineData<dim, Number>::OfflineData(
+  template <int structdim, int dim, typename Number>
+  OfflineData<structdim, dim, Number>::OfflineData(
       const MPIEnsemble &mpi_ensemble,
-      const Discretization<dim> &discretization,
+      const Discretization<structdim, dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : Interface::OfflineData<dim, Number>(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -66,13 +66,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  OfflineData<dim, Number>::prepare(const unsigned int problem_dimension,
-                                    const unsigned int n_precomputed_values)
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::prepare(
+      const unsigned int problem_dimension,
+      const unsigned int n_precomputed_values)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::prepare()" << std::endl;
+    std::cout << "OfflineData<structdim, dim, Number>::prepare()" << std::endl;
 #endif
 
     this->have_discontinuous_ansatz_ =
@@ -100,18 +100,18 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_dof_handlers()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_dof_handlers()
   {
     const auto &triangulation = discretization_->triangulation();
 
     if (!dof_handler_cg_)
       dof_handler_cg_ =
-          std::make_unique<dealii::DoFHandler<dim>>(triangulation);
+          std::make_unique<dealii::DoFHandler<structdim, dim>>(triangulation);
 
     if (!dof_handler_dg_)
       dof_handler_dg_ =
-          std::make_unique<dealii::DoFHandler<dim>>(triangulation);
+          std::make_unique<dealii::DoFHandler<structdim, dim>>(triangulation);
 
     /*
      * Set active FE indices: This information depends on the selected
@@ -128,8 +128,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::renumber_for_simd()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::renumber_for_simd()
   {
     auto &dof_handler = writable_dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
@@ -191,8 +191,9 @@ namespace ryujin
    *     n_locally_owned_
    *     sparsity_pattern_
    */
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_constraints_and_sparsity_pattern()
+  template <int structdim, int dim, typename Number>
+  void
+  OfflineData<structdim, dim, Number>::create_constraints_and_sparsity_pattern()
   {
     /*
      * First, we set up the (globally indexed) affine constraints object
@@ -228,13 +229,13 @@ namespace ryujin
           for (const auto &[left, value] : periodic_faces) {
             const auto &[right, orientation] = value;
 
-            typename DoFHandler<dim>::cell_iterator dof_cell_left(
+            typename DoFHandler<structdim, dim>::cell_iterator dof_cell_left(
                 &left.first->get_triangulation(),
                 left.first->level(),
                 left.first->index(),
                 &dof_handler);
 
-            typename DoFHandler<dim>::cell_iterator dof_cell_right(
+            typename DoFHandler<structdim, dim>::cell_iterator dof_cell_right(
                 &right.first->get_triangulation(),
                 right.first->level(),
                 right.first->index(),
@@ -328,8 +329,8 @@ namespace ryujin
    * Modifies:
    *     n_locally_internal_
    */
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::ensure_simd_stride_consistency()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency()
   {
     auto &dof_handler = writable_dof_handler();
 
@@ -414,8 +415,9 @@ namespace ryujin
    *     precomputed_vector_partitioner_
    *     sparsity_pattern_simd_
    */
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_partitioner_and_simd_sparsity(
+  template <int structdim, int dim, typename Number>
+  void
+  OfflineData<structdim, dim, Number>::create_partitioner_and_simd_sparsity(
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
@@ -513,8 +515,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_index_maps()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_index_maps()
   {
     const auto &fe_collection_dg = dof_handler_dg_->get_fe_collection();
     const auto &fe_collection_cg = dof_handler_cg_->get_fe_collection();
@@ -589,8 +591,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_support_points()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_support_points()
   {
     const auto &dof_handler = this->dof_handler();
     const auto &fe_collection = dof_handler.get_fe_collection();
@@ -601,15 +603,16 @@ namespace ryujin
      * collection to real space by using them as quadrature points:
      */
 
-    dealii::hp::QCollection<dim> q_collection;
+    dealii::hp::QCollection<structdim> q_collection;
     for (unsigned int k = 0; k < fe_collection.size(); ++k)
-      q_collection.push_back(
-          dealii::Quadrature<dim>(fe_collection[k].get_unit_support_points()));
+      q_collection.push_back(dealii::Quadrature<structdim>(
+          fe_collection[k].get_unit_support_points()));
 
-    dealii::hp::FEValues<dim> hp_fe_values(discretization_->mapping(),
-                                           fe_collection,
-                                           q_collection,
-                                           dealii::update_quadrature_points);
+    dealii::hp::FEValues<structdim, dim> hp_fe_values(
+        discretization_->mapping(),
+        fe_collection,
+        q_collection,
+        dealii::update_quadrature_points);
 
     this->support_points_.resize(this->n_locally_owned_);
 
@@ -654,11 +657,12 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_matrices()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_matrices()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::create_matrices()" << std::endl;
+    std::cout << "OfflineData<structdim, dim, Number>::create_matrices()"
+              << std::endl;
 #endif
 
     /*
@@ -801,7 +805,7 @@ namespace ryujin
         /* Do not assemble jumps to neighboring cells with FE_Nothing: */
         const bool neighbor_cell_has_fe_nothing =
             treat_fe_nothing_as_boundary_ &&
-            (dynamic_cast<const dealii::FE_Nothing<dim> *>(
+            (dynamic_cast<const dealii::FE_Nothing<structdim, dim> *>(
                  &neighbor_cell->get_fe()) != nullptr);
         if (neighbor_cell_has_fe_nothing) {
           // set the vector of local dof indices to 0 to indicate that
@@ -941,8 +945,8 @@ namespace ryujin
                     dof_handler.end(),
                     local_assemble_system,
                     copy_local_to_global,
-                    AssemblyScratchData<dim>(*discretization_),
-                    AssemblyCopyData<dim, Number>());
+                    AssemblyScratchData<structdim, dim>(*discretization_),
+                    AssemblyCopyData<structdim, dim, Number>());
 
     this->mass_matrix_->view().compress(VectorOperation::add);
     this->mass_matrix_->view().update_ghost_rows();
@@ -1065,7 +1069,7 @@ namespace ryujin
           /* Do not assemble jumps to neighboring cells with FE_Nothing: */
           const bool neighbor_cell_has_fe_nothing =
               treat_fe_nothing_as_boundary_ &&
-              (dynamic_cast<const dealii::FE_Nothing<dim> *>(
+              (dynamic_cast<const dealii::FE_Nothing<structdim, dim> *>(
                    &neighbor_cell->get_fe()) != nullptr);
           if (neighbor_cell_has_fe_nothing) {
             neighbor_local_dof_indices[f_index].resize(0);
@@ -1123,14 +1127,16 @@ namespace ryujin
                      * Note, that we will visit every coupling
                      * pair of degrees of freedom (i, j) precisely once.
                      */
-                    r_ij = std::pow(hd_ij, incidence_relaxation_even_ / dim);
+                    r_ij =
+                        std::pow(hd_ij, incidence_relaxation_even_ / structdim);
                   } else {
                     /*
                      * For odd polynomial degree we normalize the incidence
                      * matrix to 1. Note, that we will visit every coupling
                      * pair of degrees of freedom (i, j) precisely once.
                      */
-                    r_ij = std::pow(hd_ij, incidence_relaxation_odd_ / dim);
+                    r_ij =
+                        std::pow(hd_ij, incidence_relaxation_odd_ / structdim);
                   }
 
                   interface_incidence_matrix[f_index](i, j) += r_ij;
@@ -1172,8 +1178,8 @@ namespace ryujin
                       dof_handler.end(),
                       local_assemble_system,
                       copy_local_to_global,
-                      AssemblyScratchData<dim>(*discretization_),
-                      AssemblyCopyData<dim, Number>());
+                      AssemblyScratchData<structdim, dim>(*discretization_),
+                      AssemblyCopyData<structdim, dim, Number>());
 
       this->incidence_matrix_->view().compress(VectorOperation::add);
     }
@@ -1339,11 +1345,11 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_multigrid_data()
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_multigrid_data()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::create_multigrid_data()"
+    std::cout << "OfflineData<structdim, dim, Number>::create_multigrid_data()"
               << std::endl;
 #endif
 
@@ -1380,10 +1386,11 @@ namespace ryujin
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);
       dealii::Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
-      dealii::hp::FEValues<dim> hp_fe_values(discretization_->mapping(),
-                                             discretization_->finite_element(),
-                                             discretization_->quadrature(),
-                                             update_values | update_JxW_values);
+      dealii::hp::FEValues<structdim, dim> hp_fe_values(
+          discretization_->mapping(),
+          discretization_->finite_element(),
+          discretization_->quadrature(),
+          update_values | update_JxW_values);
       for (const auto &cell : dof_handler.cell_iterators_on_level(level))
         // TODO for assembly with dealii::SparseMatrix and local
         // numbering this probably has to read !cell->is_artificial()
@@ -1410,15 +1417,15 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
+  template <int structdim, int dim, typename Number>
   template <typename ITERATOR1, typename ITERATOR2>
-  auto OfflineData<dim, Number>::construct_boundary_map(
+  auto OfflineData<structdim, dim, Number>::construct_boundary_map(
       const ITERATOR1 &begin,
       const ITERATOR2 &end,
       const Utilities::MPI::Partitioner &partitioner) const -> BoundaryMap
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::construct_boundary_map()"
+    std::cout << "OfflineData<structdim, dim, Number>::construct_boundary_map()"
               << std::endl;
 #endif
 
@@ -1437,7 +1444,7 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    dealii::hp::FEFaceValues<dim> hp_fe_face_values(
+    dealii::hp::FEFaceValues<structdim, dim> hp_fe_face_values(
         discretization_->mapping(),
         discretization_->finite_element(),
         discretization_->face_quadrature(),
@@ -1477,13 +1484,13 @@ namespace ryujin
         /*
          * Check for interior faces neighboring a cell with FE nothing:
          */
-        const bool neighbor_cell_has_fe_nothing =                 //
-            treat_fe_nothing_as_boundary_ &&                      //
-            !face->at_boundary() &&                               //
-            cell->neighbor(f_index)->is_active() &&               //
-            !cell->neighbor(f_index)->is_artificial() &&          //
-            (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
-                 &cell->neighbor(f_index)->get_fe()) != nullptr); //
+        const bool neighbor_cell_has_fe_nothing =                      //
+            treat_fe_nothing_as_boundary_ &&                           //
+            !face->at_boundary() &&                                    //
+            cell->neighbor(f_index)->is_active() &&                    //
+            !cell->neighbor(f_index)->is_artificial() &&               //
+            (dynamic_cast<const dealii::FE_Nothing<structdim, dim> *>( //
+                 &cell->neighbor(f_index)->get_fe()) != nullptr);      //
 
         if (neighbor_cell_has_fe_nothing) {
           /*
@@ -1591,7 +1598,7 @@ namespace ryujin
           inserted = true;
           continue;
 
-        } else if constexpr (dim == 2) {
+        } else if constexpr (structdim == 2) {
           /*
            * Workaround for 2D: When enforcing slip boundary conditions
            * with two noncollinear vectors the resulting momentum must be
@@ -1647,16 +1654,17 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
+  template <int structdim, int dim, typename Number>
   template <typename ITERATOR1, typename ITERATOR2>
-  auto OfflineData<dim, Number>::collect_coupling_boundary_pairs(
+  auto OfflineData<structdim, dim, Number>::collect_coupling_boundary_pairs(
       const ITERATOR1 &begin,
       const ITERATOR2 &end,
       const Utilities::MPI::Partitioner &partitioner) const
       -> CouplingBoundaryPairs
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::collect_coupling_boundary_pairs()"
+    std::cout << "OfflineData<structdim, dim, "
+                 "Number>::collect_coupling_boundary_pairs()"
               << std::endl;
 #endif
 
@@ -1692,13 +1700,13 @@ namespace ryujin
         /*
          * Check for interior faces neighboring a cell with FE nothing:
          */
-        const bool neighbor_cell_has_fe_nothing =                 //
-            treat_fe_nothing_as_boundary_ &&                      //
-            !face->at_boundary() &&                               //
-            cell->neighbor(f_index)->is_active() &&               //
-            !cell->neighbor(f_index)->is_artificial() &&          //
-            (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
-                 &cell->neighbor(f_index)->get_fe()) != nullptr); //
+        const bool neighbor_cell_has_fe_nothing =                      //
+            treat_fe_nothing_as_boundary_ &&                           //
+            !face->at_boundary() &&                                    //
+            cell->neighbor(f_index)->is_active() &&                    //
+            !cell->neighbor(f_index)->is_artificial() &&               //
+            (dynamic_cast<const dealii::FE_Nothing<structdim, dim> *>( //
+                 &cell->neighbor(f_index)->get_fe()) != nullptr);      //
 
         if (!neighbor_cell_has_fe_nothing && !face->at_boundary())
           continue;

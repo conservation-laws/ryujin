@@ -78,7 +78,7 @@ void run(const std::string &ansatz)
   HyperbolicSystem hyperbolic_system;
   ParabolicSystem parabolic_system;
   Discretization<dim> discretization(mpi_ensemble);
-  OfflineData<dim, Number> offline_data(mpi_ensemble, discretization);
+  OfflineData<dim, dim, Number> offline_data(mpi_ensemble, discretization);
 
   std::stringstream parameters;
   parameters << "subsection Discretization\n"

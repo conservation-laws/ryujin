@@ -22,9 +22,9 @@
 
 namespace ryujin
 {
-  template <int dim, typename Number>
-  Checkpointing<dim, Number>::Checkpointing(
-      Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  Checkpointing<structdim, dim, Number>::Checkpointing(
+      Interface::Simulation<structdim, dim, Number> &simulation,
       const std::string &subsection /*= "/Checkpointing"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("checkpointing", TaskPhase::post_step)
@@ -44,14 +44,15 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Checkpointing<dim, Number>::start(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void
+  Checkpointing<structdim, dim, Number>::start(TaskContext<Number> &context)
   {
     if (!resume_)
       return;
 
 #ifdef DEBUG_OUTPUT
-    std::cout << "Checkpointing<dim, Number>::start()" << std::endl;
+    std::cout << "Checkpointing<structdim, dim, Number>::start()" << std::endl;
 #endif
 
     context.info("resume: reading mesh and loading state vector");
@@ -117,8 +118,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Checkpointing<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void
+  Checkpointing<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     if (!this->trigger_->fire(context))
       return;
@@ -127,19 +129,21 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Checkpointing<dim, Number>::finalize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void
+  Checkpointing<structdim, dim, Number>::finalize(TaskContext<Number> &context)
   {
     write_checkpoint(context);
   }
 
 
-  template <int dim, typename Number>
-  void Checkpointing<dim, Number>::write_checkpoint(
+  template <int structdim, int dim, typename Number>
+  void Checkpointing<structdim, dim, Number>::write_checkpoint(
       const TaskContext<Number> &context)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Checkpointing<dim, Number>::write_checkpoint()" << std::endl;
+    std::cout << "Checkpointing<structdim, dim, Number>::write_checkpoint()"
+              << std::endl;
 #endif
 
     ComputingTimer::Scope scope("time step [X]   - perform checkpointing");

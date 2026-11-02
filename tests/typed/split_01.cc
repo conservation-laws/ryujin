@@ -112,7 +112,7 @@ public:
       typename Interface::HyperbolicModule<dim, Number>::StageWeights;
 
   AdditiveModule(const MPIEnsemble &mpi_ensemble,
-                 const OfflineData<dim, Number> &offline_data,
+                 const Interface::OfflineData<dim, Number> &offline_data,
                  const HyperbolicSystem &hyperbolic_system,
                  const InitialValues &initial_values,
                  const std::string &subsection = "/HyperbolicModule")
@@ -278,9 +278,9 @@ namespace ryujin
   template class HyperbolicModule<SecondDescription, 2, NUMBER>;
   template class HyperbolicModule<SecondDescription, 3, NUMBER>;
 
-  template class SolutionTransfer<Description, 1, NUMBER>;
-  template class SolutionTransfer<Description, 2, NUMBER>;
-  template class SolutionTransfer<Description, 3, NUMBER>;
+  template class SolutionTransfer<Description, 1, 1, NUMBER>;
+  template class SolutionTransfer<Description, 2, 2, NUMBER>;
+  template class SolutionTransfer<Description, 3, 3, NUMBER>;
 
   template class Postprocessor<Description, 1, NUMBER>;
   template class Postprocessor<Description, 2, NUMBER>;
@@ -301,7 +301,7 @@ void test()
   constexpr bool hyperbolic =
       Concept::HyperbolicDescription<Description, dim, NUMBER>;
   constexpr bool parabolic =
-      Concept::ParabolicDescription<PD, Description, dim, NUMBER>;
+      Concept::ParabolicDescription<PD, Description, dim, dim, NUMBER>;
 
   std::cout << "dim = " << dim << std::endl;
   std::cout << "  Description:" << std::endl;
@@ -317,7 +317,7 @@ void test()
             << has_kernels<SecondDescription, dim> << std::endl;
 
   {
-    Simulation<Description, PD, dim, NUMBER> simulation(MPI_COMM_SELF);
+    Simulation<Description, PD, dim, dim, NUMBER> simulation(MPI_COMM_SELF);
 
     /* A single entry sets the parameter of both hyperbolic systems: */
     std::stringstream parameters;

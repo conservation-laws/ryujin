@@ -28,7 +28,7 @@ namespace ryujin
    *
    * @ingroup Driver
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class Logger final : public dealii::ParameterAcceptor,
                        public Interface::Task<Number>
   {
@@ -36,7 +36,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Logger(const Interface::Simulation<dim, Number> &simulation,
+    Logger(const Interface::Simulation<structdim, dim, Number> &simulation,
            const std::string &subsection = "/Logger");
 
     /**
@@ -98,7 +98,7 @@ namespace ryujin
     //@{
 
     /** The simulation whose statistics we record. */
-    const Interface::Simulation<dim, Number> &simulation_;
+    const Interface::Simulation<structdim, dim, Number> &simulation_;
     /** The MPI ensemble of the simulation. */
     const MPIEnsemble &mpi_ensemble_;
 

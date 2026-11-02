@@ -31,12 +31,12 @@ namespace ryujin
    *
    * @ingroup Driver
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   struct TaskComposition {
     /**
      * Constructor taking the Simulation the tasks work with.
      */
-    TaskComposition(Interface::Simulation<dim, Number> &simulation)
+    TaskComposition(Interface::Simulation<structdim, dim, Number> &simulation)
         : simulation(simulation)
         , vtu_output(simulation, /*levelsets*/ false, "/I - VTUOutput/full")
         , vtu_levelsets(
@@ -65,15 +65,15 @@ namespace ryujin
       scheduler.run();
     }
 
-    Interface::Simulation<dim, Number> &simulation;
+    Interface::Simulation<structdim, dim, Number> &simulation;
 
-    VTUOutput<dim, Number> vtu_output;
-    VTUOutput<dim, Number> vtu_levelsets;
-    Quantities<dim, Number> quantities;
-    ErrorEvaluation<dim, Number> error_evaluation;
-    MeshAdaptor<dim, Number> mesh_adaptor;
-    Logger<dim, Number> logger;
-    Checkpointing<dim, Number> checkpointing;
+    VTUOutput<structdim, dim, Number> vtu_output;
+    VTUOutput<structdim, dim, Number> vtu_levelsets;
+    Quantities<structdim, dim, Number> quantities;
+    ErrorEvaluation<structdim, dim, Number> error_evaluation;
+    MeshAdaptor<structdim, dim, Number> mesh_adaptor;
+    Logger<structdim, dim, Number> logger;
+    Checkpointing<structdim, dim, Number> checkpointing;
 
     Scheduler<Number> scheduler;
   };
