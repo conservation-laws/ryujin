@@ -34,14 +34,16 @@
 # Runge-Kutta scheme. This is a reconstruction, small differences to the
 # published numbers are expected.
 #
-# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
-#     hyperbolic systems of conservation laws using discontinuous space
-#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
-#     arXiv:2402.04514
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for hyperbolic
+#     systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38(1):74-108, 2025.
+#     DOI 10.4208/cicp.OA-2024-0225, arXiv:2402.04514
 #
-# [2] H. C. Yee, N. D. Sandham, M. J. Djomehri. Low-dissipative high-order
-#     shock-capturing methods using characteristic-based filters. J.
-#     Comput. Phys., 150(1):199-238, 1999.
+# [2] C.-W. Shu. Essentially non-oscillatory and weighted essentially
+#     non-oscillatory schemes for hyperbolic conservation laws.
+#     In: A. Quarteroni (ed.), Advanced Numerical Approximation of Nonlinear
+#     Hyperbolic Equations, Lecture Notes in Math. 1697, pp. 325-432,
+#     Springer, 1998. DOI 10.1007/BFb0096355
 #
 ##
 

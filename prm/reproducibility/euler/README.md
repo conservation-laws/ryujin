@@ -13,22 +13,28 @@ Euler equations with polytropic gas equation of state):
 > [2021-MK] M. Maier, M. Kronbichler. Efficient parallel 3D computation of
 > the compressible Euler equations with an invariant-domain preserving
 > second-order finite-element scheme. ACM Trans. Parallel Comput.,
-> 8(3):16:1–30, 2021. [arXiv:2007.00094](https://arxiv.org/abs/2007.00094)
+> 8(3):16:1–30, 2021.
+> [DOI:10.1145/3470637](https://doi.org/10.1145/3470637),
+> [arXiv:2007.00094](https://arxiv.org/abs/2007.00094)
 
 > [2024-GMPST] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
 > First-order greedy invariant-domain preserving approximation for
 > hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
-> Comput., 100:46, 2024.
+> Comput., 100(2):46, 2024.
+> [DOI:10.1007/s10915-024-02592-4](https://doi.org/10.1007/s10915-024-02592-4),
 > [arXiv:2310.01713](https://arxiv.org/abs/2310.01713)
 
 > [2025-KMT] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
 > hyperbolic systems of conservation laws using discontinuous space
-> discretizations. Commun. Comput. Phys., 38:74–108, 2025.
+> discretizations. Commun. Comput. Phys., 38(1):74–108, 2025.
+> [DOI:10.4208/cicp.OA-2024-0225](https://doi.org/10.4208/cicp.OA-2024-0225),
 > [arXiv:2402.04514](https://arxiv.org/abs/2402.04514)
 
 > [2026-HKMT] J. J. Harmon, M. Kronbichler, M. Maier, E. J. Tovar. A
 > conservative invariant-domain preserving projection technique for
-> hyperbolic systems under adaptive mesh refinement. Preprint, 2025.
+> hyperbolic systems under adaptive mesh refinement. SIAM J. Sci. Comput.,
+> 48(5):A2910–A2933, 2026.
+> [DOI:10.1137/25M1785885](https://doi.org/10.1137/25M1785885),
 > [arXiv:2507.18717](https://arxiv.org/abs/2507.18717)
 
 The file names start with the key of the publication followed by the
@@ -39,6 +45,9 @@ obtain the other refinement levels and variants. Run a configuration with
 ```
 mpirun -np <n> ryujin 2025-KMT-6.2-isentropic_vortex.prm
 ```
+
+Section, figure and table numbers of [2026-HKMT] refer to the arXiv
+preprint; the numbering of the journal version may differ.
 
 All configurations should be run with double precision (`NUMBER=double`).
 The files are reconstructions; differences to the published numbers are

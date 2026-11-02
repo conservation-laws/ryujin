@@ -1,6 +1,6 @@
 ##
 #
-# Sod shock problem with gravity, Section 4.1.5 (Figure 4.3) of [1]:
+# Sod shock problem with gravity [1], Section 4.1.5 (Figure 4.3) of [2]:
 #
 #   (rho, v, theta) = (1, 0, 1)        for x < 0.5,
 #   (rho, v, theta) = (0.125, 0, 1.54) for x >= 0.5,
@@ -10,9 +10,13 @@
 # boundary conditions, CFL 0.5. The solution is evaluated at t = 0.2 with
 # 200 cells; the reference solution uses 3200 cells (mesh refinement 4).
 #
-# [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+# [1] K. Xu, J. Luo, S. Chen. A well-balanced kinetic scheme for gas dynamic
+#     equations under gravitational field. Adv. Appl. Math. Mech.,
+#     2(2):200-210, 2010. DOI 10.4208/aamm.09-m0964
+#
+# [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.
-#     arXiv:2606.19764, 2026.
+#     Preprint, 2026. arXiv:2606.19764
 #
 ##
 

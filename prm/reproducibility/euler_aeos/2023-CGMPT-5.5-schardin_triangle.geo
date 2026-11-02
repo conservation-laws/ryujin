@@ -11,7 +11,8 @@
 //
 // [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
 //     second-order approximation of the compressible Euler equations with
-//     an arbitrary equation of state. J. Comput. Phys. 478, 111926, 2023.
+//     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+//     DOI 10.1016/j.jcp.2023.111926, arXiv:2207.12832
 
 lc = 0.072;
 

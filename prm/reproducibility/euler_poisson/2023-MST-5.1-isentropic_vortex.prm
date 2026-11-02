@@ -35,7 +35,10 @@
 # differences to the published numbers are expected.
 #
 # [1] C.-W. Shu. Essentially non-oscillatory and weighted essentially
-#     non-oscillatory schemes for hyperbolic conservation laws. 1998.
+#     non-oscillatory schemes for hyperbolic conservation laws.
+#     In: A. Quarteroni (ed.), Advanced Numerical Approximation of Nonlinear
+#     Hyperbolic Equations, Lecture Notes in Math. 1697, pp. 325-432,
+#     Springer, 1998. DOI 10.1007/BFb0096355
 #
 # [2] M. Maier, J. N. Shadid, I. Tomas. Structure-preserving finite-element
 #     schemes for the Euler-Poisson equations. Commun. Comput. Phys.,

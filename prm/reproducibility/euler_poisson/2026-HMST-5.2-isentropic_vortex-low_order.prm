@@ -22,11 +22,15 @@
 # 5.1 (4096 dofs per component); levels 6, 7, 8 give the other rows.
 #
 # [1] C.-W. Shu. Essentially non-oscillatory and weighted essentially
-#     non-oscillatory schemes for hyperbolic conservation laws. 1998.
+#     non-oscillatory schemes for hyperbolic conservation laws.
+#     In: A. Quarteroni (ed.), Advanced Numerical Approximation of Nonlinear
+#     Hyperbolic Equations, Lecture Notes in Math. 1697, pp. 325-432,
+#     Springer, 1998. DOI 10.1007/BFb0096355
 #
 # [2] J. Hoffart, M. Maier, J. N. Shadid, I. Tomas. Structure-preserving
-#     finite-element approximations of the magnetic Euler-Poisson
-#     equations. arXiv:2510.11808, 2025.
+#     finite-element approximations of the magnetic Euler-Poisson equations.
+#     J. Comput. Phys., 566:115269, 2026. DOI 10.1016/j.jcp.2026.115269,
+#     arXiv:2510.11808
 #
 ##
 

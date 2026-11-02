@@ -6,12 +6,15 @@ This directory contains parameter files for the numerical results of
 > [2021-GMPT] J.-L. Guermond, M. Maier, B. Popov, I. Tomas. Second-order
 > invariant domain preserving approximation of the compressible
 > Navier-Stokes equations. Comput. Methods Appl. Mech. Engrg., 375:113608,
-> 2021. [arXiv:2009.06022](https://arxiv.org/abs/2009.06022)
+> 2021.
+> [DOI:10.1016/j.cma.2020.113608](https://doi.org/10.1016/j.cma.2020.113608),
+> [arXiv:2009.06022](https://arxiv.org/abs/2009.06022)
 
 > [2022-GKMPT] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov,
 > I. Tomas. On the implementation of a robust and efficient finite
 > element-based parallel solver for the compressible Navier-Stokes
 > equations. Comput. Methods Appl. Mech. Engrg., 389:114250, 2022.
+> [DOI:10.1016/j.cma.2021.114250](https://doi.org/10.1016/j.cma.2021.114250),
 > [arXiv:2106.02159](https://arxiv.org/abs/2106.02159)
 
 The file names start with the year and the author initials of the paper,

@@ -1,7 +1,7 @@
 ##
 #
-# Schardin's problem: a Mach 1.3 shock hits a triangular obstacle, Section
-# 5.5 (Figure 3) of [1].
+# Schardin's problem [2]: a Mach 1.3 shock hits a triangular obstacle,
+# Section 5.5 (Figure 3) of [1].
 #
 # Van der Waals EOS (5.2) with gamma = 864.7/577.8, a = 0.14, b = 3.258e-5.
 # Initial state (rho, v_1, v_2, p) = (1.82039, 148.597, 0, 185145) for
@@ -18,9 +18,12 @@
 # reconstruction of the mesh of [1].
 #
 # [1] B. Clayton, J.-L. Guermond, M. Maier, B. Popov, E. J. Tovar. Robust
-#     second-order approximation of the compressible Euler equations with
-#     an arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
-#     arXiv:2207.12832
+#     second-order approximation of the compressible Euler equations with an
+#     arbitrary equation of state. J. Comput. Phys., 478:111926, 2023.
+#     DOI 10.1016/j.jcp.2023.111926, arXiv:2207.12832
+#
+# [2] H. Schardin. High frequency cinematography in the shock tube.
+#     J. Photogr. Sci., 5(2):17-19, 1957. DOI 10.1080/00223638.1957.11736588
 #
 ##
 

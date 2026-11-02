@@ -27,14 +27,14 @@
 # erk 33, CFL 0.9) the high-order computation requires around 320 time
 # steps and runs for about (12min / #n_cores) on a modern system.
 #
-# [1] Kurganov, Petrova, Popov: Adaptive Semidiscrete Central-Upwind
-#     Schemes for Nonconvex Hyperbolic Conservation Laws. SIAM Journal on
-#     Scientific Computing 2007, vol. 29. DOI 10.1137/040614189.
+# [1] A. Kurganov, G. Petrova, B. Popov. Adaptive semidiscrete
+#     central-upwind schemes for nonconvex hyperbolic conservation laws.
+#     SIAM J. Sci. Comput., 29(6):2381-2401, 2007. DOI 10.1137/040614189
 #
-# [2] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas.
-#     First-order greedy invariant-domain preserving approximation for
-#     hyperbolic problems: scalar conservation laws, and p-system. J. Sci.
-#     Comput., 100:46, 2024. arXiv:2310.01713
+# [2] J.-L. Guermond, M. Maier, B. Popov, L. Saavedra, I. Tomas. First-order
+#     greedy invariant-domain preserving approximation for hyperbolic
+#     problems: scalar conservation laws, and p-system. J. Sci. Comput.,
+#     100(2):46, 2024. DOI 10.1007/s10915-024-02592-4, arXiv:2310.01713
 #
 ##
 

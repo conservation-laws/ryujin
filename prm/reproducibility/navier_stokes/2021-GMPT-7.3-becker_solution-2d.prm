@@ -22,13 +22,13 @@
 # code, not with ryujin. This file sets up the same problem in ryujin; the
 # errors are close to, but not identical with, Table 2 of [2].
 #
-# [1] R. Becker. Stosswelle und Detonation. Zeitschrift fuer Physik,
-#     8(1):321-362, 1922.
+# [1] R. Becker. Stosswelle und Detonation. Z. Phys., 8(1):321-362, 1922.
+#     DOI 10.1007/BF01329605
 #
 # [2] J.-L. Guermond, M. Maier, B. Popov, I. Tomas. Second-order invariant
 #     domain preserving approximation of the compressible Navier-Stokes
 #     equations. Comput. Methods Appl. Mech. Engrg., 375:113608, 2021.
-#     arXiv:2009.06022
+#     DOI 10.1016/j.cma.2020.113608, arXiv:2009.06022
 #
 ##
 

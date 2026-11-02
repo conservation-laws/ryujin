@@ -24,10 +24,10 @@
 # were done. The L1 errors are 2-9 times larger than in Table 4 and
 # converge with rates 1.1-1.9 instead of 2.1-2.3 (levels 0-3).
 #
-# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for
-#     hyperbolic systems of conservation laws using discontinuous space
-#     discretizations. Commun. Comput. Phys., 38:74-108, 2025.
-#     arXiv:2402.04514
+# [1] M. Kronbichler, M. Maier, I. Tomas. Graph-based methods for hyperbolic
+#     systems of conservation laws using discontinuous space
+#     discretizations. Commun. Comput. Phys., 38(1):74-108, 2025.
+#     DOI 10.4208/cicp.OA-2024-0225, arXiv:2402.04514
 #
 ##
 

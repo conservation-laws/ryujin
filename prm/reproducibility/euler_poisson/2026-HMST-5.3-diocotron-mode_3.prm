@@ -47,8 +47,9 @@
 # output (set "trigger multiplier = 1" for an output every dt = 0.01).
 #
 # [1] J. Hoffart, M. Maier, J. N. Shadid, I. Tomas. Structure-preserving
-#     finite-element approximations of the magnetic Euler-Poisson
-#     equations. arXiv:2510.11808, 2025.
+#     finite-element approximations of the magnetic Euler-Poisson equations.
+#     J. Comput. Phys., 566:115269, 2026. DOI 10.1016/j.jcp.2026.115269,
+#     arXiv:2510.11808
 #
 ##
 

@@ -8,11 +8,13 @@ and `euler poisson barotropic`) for the numerical results of
 > [2023-MST] M. Maier, J. N. Shadid, I. Tomas. Structure-preserving
 > finite-element schemes for the Euler-Poisson equations. Commun. Comput.
 > Phys., 33(3):647–691, 2023.
+> [DOI:10.4208/cicp.OA-2022-0205](https://doi.org/10.4208/cicp.OA-2022-0205),
 > [arXiv:2207.07860](https://arxiv.org/abs/2207.07860)
 
 > [2026-HMST] J. Hoffart, M. Maier, J. N. Shadid, I. Tomas.
 > Structure-preserving finite-element approximations of the magnetic
-> Euler-Poisson equations. Preprint, 2025.
+> Euler-Poisson equations. J. Comput. Phys., 566:115269, 2026.
+> [DOI:10.1016/j.jcp.2026.115269](https://doi.org/10.1016/j.jcp.2026.115269),
 > [arXiv:2510.11808](https://arxiv.org/abs/2510.11808)
 
 The results of [2023-MST] were computed with a deal.II code that predates
@@ -28,6 +30,9 @@ problem setup. Run a configuration with
 ```
 mpirun -np <n> ryujin 2026-HMST-5.3-diocotron-mode_5.prm
 ```
+
+Section, figure and table numbers of [2026-HMST] refer to the arXiv
+preprint; the numbering of the journal version may differ.
 
 All configurations should be run with double precision (`NUMBER=double`).
 

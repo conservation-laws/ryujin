@@ -12,7 +12,7 @@
 //
 // [1] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 //     approximation of the compressible atmospheric Euler equations.
-//     arXiv:2606.19764, 2026.
+//     Preprint, 2026. arXiv:2606.19764
 
 h0 = 1.16;
 a = 3.4;

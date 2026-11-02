@@ -38,16 +38,17 @@
 #
 # [1] L. Jacquin, P. Molton, S. Deck, B. Maury, D. Soulevant. Experimental
 #     study of shock oscillation over a transonic supercritical profile.
-#     AIAA J. 47:1985-1994, 2009.
+#     AIAA J., 47(9):1985-1994, 2009. DOI 10.2514/1.30190
 #
 # [2] S. Deck, N. Renard. Towards an enhanced protection of attached
-#     boundary layers in hybrid RANS/LES methods. J. Comput. Phys.
-#     400:108970, 2020.
+#     boundary layers in hybrid RANS/LES methods. J. Comput. Phys.,
+#     400:108970, 2020. DOI 10.1016/j.jcp.2019.108970
 #
 # [3] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov, I. Tomas. On the
-#     implementation of a robust and efficient finite element-based
-#     parallel solver for the compressible Navier-Stokes equations. Comput.
-#     Methods Appl. Mech. Engrg., 389:114250, 2022. arXiv:2106.02159
+#     implementation of a robust and efficient finite element-based parallel
+#     solver for the compressible Navier-Stokes equations. Comput. Methods
+#     Appl. Mech. Engrg., 389:114250, 2022. DOI 10.1016/j.cma.2021.114250,
+#     arXiv:2106.02159
 #
 ##
 

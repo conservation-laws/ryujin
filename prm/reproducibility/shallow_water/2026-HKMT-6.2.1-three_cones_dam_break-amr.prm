@@ -27,11 +27,12 @@
 #
 # [1] J. J. Harmon, M. Kronbichler, M. Maier, E. J. Tovar. A conservative
 #     invariant-domain preserving projection technique for hyperbolic
-#     systems under adaptive mesh refinement. arXiv:2507.18717, 2025.
+#     systems under adaptive mesh refinement. SIAM J. Sci. Comput.,
+#     48(5):A2910-A2933, 2026. DOI 10.1137/25M1785885, arXiv:2507.18717
 #
-# [2] M. Kawahara and T. Umetsu. Finite element method for moving boundary
-#     problems in river flow. International Journal for Numerical Methods
-#     in Fluids, 6(6):365-386, 1986.
+# [2] M. Kawahara, T. Umetsu. Finite element method for moving boundary
+#     problems in river flow. Int. J. Numer. Methods Fluids, 6(6):365-386,
+#     1986. DOI 10.1002/fld.1650060605
 #
 ##
 

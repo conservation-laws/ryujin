@@ -1,9 +1,9 @@
 ##
 #
 # Vortex leaving the domain through non-reflecting boundaries, test of
-# Fosso et al. [1] as used in Section 6.2 (Figure 1) of [2]. This is an
-# inviscid computation (compressible Euler equations); it is part of this
-# directory because it belongs to [2].
+# Fosso Pouangué et al. [1] as used in Section 6.2 (Figure 1) of [2]. This
+# is an inviscid computation (compressible Euler equations); it is part of
+# this directory because it belongs to [2].
 #
 # A vortex is advected with the background velocity v_infty = (1, 0)
 # through the domain [-1,1]^2 and leaves it through the right boundary:
@@ -35,14 +35,16 @@
 # Figure 1 of [2] is computed. delta_2(t) (relative Linf norm of the
 # vorticity) is obtained from the same data or the vtu output.
 #
-# [1] P. A. Fosso, H. Deniau, N. Lamarque, T. Poinsot. Comparison of
+# [1] A. Fosso Pouangué, H. Deniau, N. Lamarque, T. Poinsot. Comparison of
 #     outflow boundary conditions for subsonic aeroacoustic simulations.
-#     Int. J. Numer. Meth. Fluids 68(10):1207-1233, 2012.
+#     Int. J. Numer. Methods Fluids, 68(10):1207-1233, 2012.
+#     DOI 10.1002/fld.2597
 #
 # [2] J.-L. Guermond, M. Kronbichler, M. Maier, B. Popov, I. Tomas. On the
-#     implementation of a robust and efficient finite element-based
-#     parallel solver for the compressible Navier-Stokes equations. Comput.
-#     Methods Appl. Mech. Engrg., 389:114250, 2022. arXiv:2106.02159
+#     implementation of a robust and efficient finite element-based parallel
+#     solver for the compressible Navier-Stokes equations. Comput. Methods
+#     Appl. Mech. Engrg., 389:114250, 2022. DOI 10.1016/j.cma.2021.114250,
+#     arXiv:2106.02159
 #
 ##
 

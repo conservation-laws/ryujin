@@ -1,6 +1,6 @@
 ##
 #
-# 2D Schaer mountain, Section 4.2.3 (Figure 4.6) of [2]:
+# 2D Schaer mountain [1], Section 4.2.3 (Figure 4.6) of [3]:
 #
 #   h(x) = h_c exp(-(x / a_c)^2) cos^2(pi x / lambda_c),
 #   h_c = 250 m, a_c = 5000 m, lambda_c = 4000 m,
@@ -21,18 +21,24 @@
 # conditions); the mesh is aligned with the profile and cut cells are
 # replaced by triangles. The left, right, and top boundaries prescribe the
 # initial state (Dirichlet). Reflections are suppressed with sponge layers
-# as in [1, Sec. 7.4.3]: the last 8 km in the vertical direction and the
+# as in [2, Sec. 7.4.3]: the last 8 km in the vertical direction and the
 # last 5 km near both lateral boundaries, with damping coefficient
-# alpha = 0.03 1/s and the sin^2 profile of [1, (173)].
+# alpha = 0.03 1/s and the sin^2 profile of [2, (173)] (section and
+# equation numbers of arXiv:2509.10311).
 #
-# [1] M. Artiano, O. Knoth, P. Spichtinger, H. Ranocha.
-#     Structure-preserving high-order methods for the compressible Euler
-#     equations in potential temperature formulation for atmospheric flows.
-#     arXiv:2509.10311, 2025.
+# [1] C. Schär, D. Leuenberger, O. Fuhrer, D. Lüthi, C. Girard. A new
+#     terrain-following vertical coordinate formulation for atmospheric
+#     prediction models. Mon. Weather Rev., 130(10):2459-2480, 2002.
+#     DOI 10.1175/1520-0493(2002)130<2459:ANTFVC>2.0.CO;2
 #
-# [2] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
+# [2] M. Artiano, O. Knoth, P. Spichtinger, H. Ranocha. Structure-preserving
+#     high-order methods for the compressible Euler equations in potential
+#     temperature formulation for atmospheric flows. J. Comput. Phys.,
+#     566:115221, 2026. DOI 10.1016/j.jcp.2026.115221, arXiv:2509.10311
+#
+# [3] C. Farris, M. Maier, E. J. Tovar. Well-balanced second-order
 #     approximation of the compressible atmospheric Euler equations.
-#     arXiv:2606.19764, 2026.
+#     Preprint, 2026. arXiv:2606.19764
 #
 ##
 
