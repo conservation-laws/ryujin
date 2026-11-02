@@ -32,9 +32,9 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <int dim>
-  Discretization<dim>::Discretization(const MPIEnsemble &mpi_ensemble,
-                                      const std::string &subsection)
+  template <int structdim, int dim>
+  Discretization<structdim, dim>::Discretization(
+      const MPIEnsemble &mpi_ensemble, const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
   {
@@ -46,8 +46,8 @@ namespace ryujin
                   "The finite element ansatz used for discretization. Valid "
                   "choices are cG Q1, cG Q2, cG Q3.");
 
-    mesh_type_ =
-        (dim == 1 ? MeshType::parallel_shared : MeshType::parallel_distributed);
+    mesh_type_ = (structdim == 1 ? MeshType::parallel_shared
+                                 : MeshType::parallel_distributed);
     add_parameter("mesh type",
                   mesh_type_,
                   "The triangulation class used. Valid choices are \"serial\", "
@@ -60,14 +60,14 @@ namespace ryujin
       geometry_ = "cylinder";
     }
 
-    geometry_list_ = GeometryLibrary<dim>::create(subsection);
+    geometry_list_ = GeometryLibrary<structdim, dim>::create(subsection);
 
     add_parameter("geometry",
                   geometry_,
                   "Name of the geometry used to create the mesh. Valid names "
                   "are given by any of the subsections defined below.",
                   this->prm,
-                  GeometryLibrary<dim>::selection(geometry_list_));
+                  GeometryLibrary<structdim, dim>::selection(geometry_list_));
 
     refinement_ = 5;
     add_parameter("mesh refinement",
@@ -85,11 +85,11 @@ namespace ryujin
   }
 
 
-  template <int dim>
-  void Discretization<dim>::prepare(const std::string &base_name)
+  template <int structdim, int dim>
+  void Discretization<structdim, dim>::prepare(const std::string &base_name)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Discretization<dim>::prepare()" << std::endl;
+    std::cout << "Discretization<structdim, dim>::prepare()" << std::endl;
 #endif
 
     AssertThrow(
@@ -101,23 +101,24 @@ namespace ryujin
     /* Select geometry: */
 
     selected_geometry_ =
-        &GeometryLibrary<dim>::select(geometry_list_, geometry_);
+        &GeometryLibrary<structdim, dim>::select(geometry_list_, geometry_);
 
     /* Set up Triangulation object: */
 
     const auto smoothing =
-        dealii::Triangulation<dim>::limit_level_difference_at_vertices;
+        dealii::Triangulation<structdim,
+                              dim>::limit_level_difference_at_vertices;
 
     switch (mesh_type_) {
     case MeshType::parallel_fullydistributed: {
       const auto settings = dealii::TriangulationDescription::Settings::
           construct_multigrid_hierarchy;
       auto triangulation = std::make_unique<
-          dealii::parallel::fullydistributed::Triangulation<dim>>(
+          dealii::parallel::fullydistributed::Triangulation<structdim, dim>>(
           mpi_ensemble_.ensemble_communicator());
       triangulation->set_mesh_smoothing(smoothing);
       triangulation->set_partitioner(
-          [](dealii::Triangulation<dim> &tria,
+          [](dealii::Triangulation<structdim, dim> &tria,
              const unsigned int n_partitions) {
             GridTools::partition_triangulation_zorder(n_partitions, tria);
           },
@@ -126,26 +127,29 @@ namespace ryujin
     } break;
 
     case MeshType::parallel_distributed: {
-      const auto settings = dealii::parallel::distributed::Triangulation<
-          dim>::Settings::construct_multigrid_hierarchy;
-      triangulation_ =
-          std::make_unique<dealii::parallel::distributed::Triangulation<dim>>(
-              mpi_ensemble_.ensemble_communicator(), smoothing, settings);
+      const auto settings =
+          dealii::parallel::distributed::Triangulation<structdim, dim>::
+              Settings::construct_multigrid_hierarchy;
+      triangulation_ = std::make_unique<
+          dealii::parallel::distributed::Triangulation<structdim, dim>>(
+          mpi_ensemble_.ensemble_communicator(), smoothing, settings);
     } break;
 
     case MeshType::parallel_shared: {
-      const auto settings = static_cast<
-          typename dealii::parallel::shared::Triangulation<dim>::Settings>(
-          dealii::parallel::shared::Triangulation<dim>::partition_auto |
-          dealii::parallel::shared::Triangulation<
-              dim>::construct_multigrid_hierarchy);
+      const auto settings =
+          static_cast<typename dealii::parallel::shared::
+                          Triangulation<structdim, dim>::Settings>(
+              dealii::parallel::shared::Triangulation<structdim,
+                                                      dim>::partition_auto |
+              dealii::parallel::shared::Triangulation<structdim, dim>::
+                  construct_multigrid_hierarchy);
       /* Beware of the boolean: */
-      triangulation_ =
-          std::make_unique<dealii::parallel::shared::Triangulation<dim>>(
-              mpi_ensemble_.ensemble_communicator(),
-              smoothing,
-              /*artificial cells*/ true,
-              settings);
+      triangulation_ = std::make_unique<
+          dealii::parallel::shared::Triangulation<structdim, dim>>(
+          mpi_ensemble_.ensemble_communicator(),
+          smoothing,
+          /*artificial cells*/ true,
+          settings);
     } break;
 
     case MeshType::serial: {
@@ -157,7 +161,8 @@ namespace ryujin
               "rank per ensemble, then please set \"mesh type\" to one of the "
               "parallel triangulations supported by deal.II"));
 
-      triangulation_ = std::make_unique<dealii::Triangulation<dim>>(smoothing);
+      triangulation_ =
+          std::make_unique<dealii::Triangulation<structdim, dim>>(smoothing);
 
     } break;
 
@@ -212,7 +217,7 @@ namespace ryujin
         selected_geometry_->populate_hp_collections(fe_degree, collection_);
 
     switch (collection_type_) {
-    case Geometry<dim>::HP_Collection::populated_by_geometry: {
+    case Geometry<structdim, dim>::HP_Collection::populated_by_geometry: {
       /*
        * The geometry already populated the hp::*Collections
        */
@@ -229,16 +234,18 @@ namespace ryujin
       Assert(collection_.face_nodal_quadrature, dealii::ExcInternalError());
     } break;
 
-    case Geometry<dim>::HP_Collection::standard_quadrilaterals: {
+    case Geometry<structdim, dim>::HP_Collection::standard_quadrilaterals: {
       /*
        * Populate all collections with appropriate objects for the cG Qk, dG
        * Qk finite element on purely quadrilateral, or hexahedral meshes:
        */
 
       collection_.finite_element_cg =
-          std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
+          std::make_unique<hp::FECollection<structdim, dim>>(
+              FE_Q<structdim, dim>(fe_degree));
       collection_.finite_element_dg =
-          std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
+          std::make_unique<hp::FECollection<structdim, dim>>(
+              FE_DGQ<structdim, dim>(fe_degree));
 
       /*
        * If the geometry describes the mesh via a forward transformation of
@@ -249,61 +256,70 @@ namespace ryujin
         create_mapping_cache();
       } else {
         collection_.mapping =
-            std::make_unique<dealii::hp::MappingCollection<dim>>(
-                MappingQ<dim>(mapping_degree));
+            std::make_unique<dealii::hp::MappingCollection<structdim, dim>>(
+                MappingQ<structdim, dim>(mapping_degree));
       }
 
-      collection_.quadrature = std::make_unique<hp::QCollection<dim>>(
-          QGauss<dim>(quadrature_degree));
+      collection_.quadrature = std::make_unique<hp::QCollection<structdim>>(
+          QGauss<structdim>(quadrature_degree));
       collection_.quadrature_high_order =
-          std::make_unique<hp::QCollection<dim>>(
-              QGauss<dim>(quadrature_degree + 1));
-      collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
-          QGaussLobatto<dim>(quadrature_degree));
+          std::make_unique<hp::QCollection<structdim>>(
+              QGauss<structdim>(quadrature_degree + 1));
+      collection_.nodal_quadrature =
+          std::make_unique<hp::QCollection<structdim>>(
+              QGaussLobatto<structdim>(quadrature_degree));
       collection_.quadrature_1d =
           std::make_unique<hp::QCollection<1>>(QGauss<1>(quadrature_degree));
       collection_.nodal_quadrature_1d = std::make_unique<hp::QCollection<1>>(
           QGaussLobatto<1>(quadrature_degree));
-      using QCF = hp::QCollection<dim - 1>;
+      using QCF = hp::QCollection<structdim - 1>;
       collection_.face_quadrature = std::make_unique<std::vector<QCF>>(
-          1, QCF(QGauss<dim - 1>(quadrature_degree)));
+          1, QCF(QGauss<structdim - 1>(quadrature_degree)));
       collection_.face_nodal_quadrature = std::make_unique<std::vector<QCF>>(
-          1, QCF(QGaussLobatto<dim - 1>(quadrature_degree)));
+          1, QCF(QGaussLobatto<structdim - 1>(quadrature_degree)));
     } break;
 
-    case Geometry<dim>::HP_Collection::standard_simplices: {
+    case Geometry<structdim, dim>::HP_Collection::standard_simplices: {
       /*
        * Populate all collections with appropriate objects for the cG Pk, dG
        * Pk finite element on purely quadrilateral, or hexahedral meshes:
        */
 
       collection_.finite_element_cg =
-          std::make_unique<hp::FECollection<dim>>(FE_SimplexP<dim>(fe_degree));
-      collection_.finite_element_dg = std::make_unique<hp::FECollection<dim>>(
-          FE_SimplexDGP<dim>(fe_degree));
+          std::make_unique<hp::FECollection<structdim, dim>>(
+              FE_SimplexP<structdim, dim>(fe_degree));
+      collection_.finite_element_dg =
+          std::make_unique<hp::FECollection<structdim, dim>>(
+              FE_SimplexDGP<structdim, dim>(fe_degree));
 
       if (mapping_degree == 1) {
 #if DEAL_II_VERSION_GTE(9, 7, 0)
         collection_.mapping =
-            std::make_unique<hp::MappingCollection<dim>>(MappingP1<dim>());
+            std::make_unique<hp::MappingCollection<structdim, dim>>(
+                MappingP1<structdim, dim>());
 #else
-        collection_.mapping = std::make_unique<hp::MappingCollection<dim>>(
-            MappingFE<dim>(FE_SimplexP<dim>(fe_degree)));
+        collection_.mapping =
+            std::make_unique<hp::MappingCollection<structdim, dim>>(
+                MappingFE<structdim, dim>(
+                    FE_SimplexP<structdim, dim>(fe_degree)));
 #endif
       } else {
-        collection_.mapping = std::make_unique<hp::MappingCollection<dim>>(
-            MappingFE<dim>(FE_SimplexP<dim>(fe_degree)));
+        collection_.mapping =
+            std::make_unique<hp::MappingCollection<structdim, dim>>(
+                MappingFE<structdim, dim>(
+                    FE_SimplexP<structdim, dim>(fe_degree)));
       }
 
-      collection_.quadrature = std::make_unique<hp::QCollection<dim>>(
-          QGaussSimplex<dim>(quadrature_degree));
+      collection_.quadrature = std::make_unique<hp::QCollection<structdim>>(
+          QGaussSimplex<structdim>(quadrature_degree));
       collection_.quadrature_high_order =
-          std::make_unique<hp::QCollection<dim>>(
-              QGaussSimplex<dim>(quadrature_degree + 1));
+          std::make_unique<hp::QCollection<structdim>>(
+              QGaussSimplex<structdim>(quadrature_degree + 1));
 #if DEAL_II_VERSION_GTE(9, 7, 0)
-      collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
-          FETools::compute_nodal_quadrature(
-              FE_SimplexP<dim>(quadrature_degree)));
+      collection_.nodal_quadrature =
+          std::make_unique<hp::QCollection<structdim>>(
+              FETools::compute_nodal_quadrature(
+                  FE_SimplexP<structdim>(quadrature_degree)));
 #else
       AssertThrow(false,
                   dealii::ExcMessage("Discretization: Simplex support requires "
@@ -315,16 +331,16 @@ namespace ryujin
       collection_.nodal_quadrature_1d = std::make_unique<hp::QCollection<1>>(
           QGaussLobatto<1>(quadrature_degree));
 #endif
-      using QCF = hp::QCollection<dim - 1>;
+      using QCF = hp::QCollection<structdim - 1>;
       collection_.face_quadrature = std::make_unique<std::vector<QCF>>(
-          1, QCF(QGaussSimplex<dim - 1>(quadrature_degree)));
-      if constexpr (dim == 1) {
+          1, QCF(QGaussSimplex<structdim - 1>(quadrature_degree)));
+      if constexpr (structdim == 1) {
         collection_.face_nodal_quadrature = std::make_unique<std::vector<QCF>>(
-            1, QCF(QGaussLobatto<dim - 1>(quadrature_degree)));
+            1, QCF(QGaussLobatto<structdim - 1>(quadrature_degree)));
       } else {
 #if DEAL_II_VERSION_GTE(9, 7, 0)
         const auto quadrature = FETools::compute_nodal_quadrature(
-            FE_SimplexP<dim - 1>(quadrature_degree));
+            FE_SimplexP<structdim - 1>(quadrature_degree));
         collection_.face_nodal_quadrature =
             std::make_unique<std::vector<QCF>>(1, QCF(quadrature));
 #endif
@@ -338,17 +354,17 @@ namespace ryujin
   }
 
 
-  template <int dim>
-  void Discretization<dim>::update_mapping()
+  template <int structdim, int dim>
+  void Discretization<structdim, dim>::update_mapping()
   {
     if (!mapping_cache_) {
       if (!transformation_)
         return;
 
       /* The geometry or a MeshAdaptor has set a transformation: */
+      using HP_Collection = typename Geometry<structdim, dim>::HP_Collection;
       AssertThrow(
-          collection_type_ ==
-              Geometry<dim>::HP_Collection::standard_quadrilaterals,
+          collection_type_ == HP_Collection::standard_quadrilaterals,
           ExcMessage("Discretization: A transformation (set by the geometry "
                      "or a mesh adaptor) is only supported for the standard "
                      "Q_k setup on quadrilateral or hexahedral meshes. It "
@@ -357,7 +373,7 @@ namespace ryujin
       create_mapping_cache();
     }
 
-    const MappingQ<dim> mapping(mapping_cache_->get_degree());
+    const MappingQ<structdim, dim> mapping(mapping_cache_->get_degree());
     if (transformation_)
       mapping_cache_->initialize(mapping,
                                  *triangulation_,
@@ -369,13 +385,14 @@ namespace ryujin
   }
 
 
-  template <int dim>
-  void Discretization<dim>::create_mapping_cache()
+  template <int structdim, int dim>
+  void Discretization<structdim, dim>::create_mapping_cache()
   {
-    mapping_cache_ = std::make_shared<MappingQCache<dim>>(polynomial_degree());
+    mapping_cache_ =
+        std::make_shared<MappingQCache<structdim, dim>>(polynomial_degree());
 
-    auto mapping = std::make_unique<hp::MappingCollection<dim>>();
-    hp::Collection<Mapping<dim>> &base = *mapping;
+    auto mapping = std::make_unique<hp::MappingCollection<structdim, dim>>();
+    hp::Collection<Mapping<structdim, dim>> &base = *mapping;
     base.push_back(mapping_cache_);
     collection_.mapping = std::move(mapping);
   }

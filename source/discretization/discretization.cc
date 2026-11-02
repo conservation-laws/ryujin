@@ -11,5 +11,7 @@ namespace ryujin
   template class Discretization<1>;
   template class Discretization<2>;
   template class Discretization<3>;
+  template class Discretization<1, 2>;
+  template class Discretization<2, 3>;
 
 } // namespace ryujin

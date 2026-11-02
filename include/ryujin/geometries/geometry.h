@@ -19,7 +19,7 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   /* forward declaration */
-  template <int dim>
+  template <int structdim, int dim>
   class Discretization;
 #endif
 
@@ -27,9 +27,13 @@ namespace ryujin
    * A small abstract base class to group configuration options for a
    * number of geometries together.
    *
+   * A geometry creates a dealii::Triangulation<structdim, dim>. For
+   * @p structdim < @p dim it describes a curve or surface embedded in
+   * @p dim dimensional space.
+   *
    * @ingroup Geometries
    */
-  template <int dim>
+  template <int structdim, int dim = structdim>
   class Geometry : public dealii::ParameterAcceptor
   {
   public:
@@ -49,7 +53,7 @@ namespace ryujin
      * This virtual method needs to be implemented in a derived classes.
      */
     virtual void create_coarse_triangulation(
-        dealii::Triangulation<dim> &triangulation) const = 0;
+        dealii::Triangulation<structdim, dim> &triangulation) const = 0;
 
     /**
      * This method is called before we distribute dofs and can be used to
@@ -61,8 +65,8 @@ namespace ryujin
      * reimplemented for geometries that use hp capabilities, such as
      * meshes with mixed finite elements, or meshes with FE_Nothing.
      */
-    virtual void
-    update_dof_handler(dealii::DoFHandler<dim> & /*dof_handler*/) const
+    virtual void update_dof_handler(
+        dealii::DoFHandler<structdim, dim> & /*dof_handler*/) const
     {
     }
 
@@ -95,7 +99,8 @@ namespace ryujin
      */
     virtual HP_Collection populate_hp_collections(
         const unsigned int /*fe_degree*/,
-        typename ryujin::Discretization<dim>::Collection & /*collection*/) const
+        typename ryujin::Discretization<structdim, dim>::Collection
+            & /*collection*/) const
     {
       /*
        * Signal, that we did nothing. In this case the Discretization
@@ -131,7 +136,7 @@ namespace ryujin
      * MappingQCache to be set up.
      */
     mutable std::function<dealii::Point<dim>(
-        const typename dealii::Triangulation<dim>::cell_iterator &,
+        const typename dealii::Triangulation<structdim, dim>::cell_iterator &,
         const dealii::Point<dim> &)>
         transformation_;
 

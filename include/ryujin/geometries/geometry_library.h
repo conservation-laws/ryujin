@@ -25,8 +25,9 @@ namespace ryujin
    *
    * @ingroup Geometries
    */
-  template <int dim>
-  using GeometryLibrary = Library<Geometry<dim>, const std::string &>;
+  template <int structdim, int dim = structdim>
+  using GeometryLibrary =
+      Library<Geometry<structdim, dim>, const std::string &>;
 
 #ifndef DOXYGEN
   template <>
@@ -35,9 +36,15 @@ namespace ryujin
   auto GeometryLibrary<2>::defaults() -> std::vector<Creator>;
   template <>
   auto GeometryLibrary<3>::defaults() -> std::vector<Creator>;
+  template <>
+  auto GeometryLibrary<1, 2>::defaults() -> std::vector<Creator>;
+  template <>
+  auto GeometryLibrary<2, 3>::defaults() -> std::vector<Creator>;
 
   extern template class Library<Geometry<1>, const std::string &>;
   extern template class Library<Geometry<2>, const std::string &>;
   extern template class Library<Geometry<3>, const std::string &>;
+  extern template class Library<Geometry<1, 2>, const std::string &>;
+  extern template class Library<Geometry<2, 3>, const std::string &>;
 #endif
 } // namespace ryujin
