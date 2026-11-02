@@ -11,5 +11,7 @@ namespace ryujin
   template class VTUOutput<1, 1, NUMBER>;
   template class VTUOutput<2, 2, NUMBER>;
   template class VTUOutput<3, 3, NUMBER>;
+  template class VTUOutput<1, 2, NUMBER>;
+  template class VTUOutput<2, 3, NUMBER>;
 
 } // namespace ryujin

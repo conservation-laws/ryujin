@@ -11,4 +11,6 @@ namespace ryujin
   template class Checkpointing<1, 1, NUMBER>;
   template class Checkpointing<2, 2, NUMBER>;
   template class Checkpointing<3, 3, NUMBER>;
+  template class Checkpointing<1, 2, NUMBER>;
+  template class Checkpointing<2, 3, NUMBER>;
 } // namespace ryujin

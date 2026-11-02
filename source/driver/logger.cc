@@ -11,4 +11,6 @@ namespace ryujin
   template class Logger<1, 1, NUMBER>;
   template class Logger<2, 2, NUMBER>;
   template class Logger<3, 3, NUMBER>;
+  template class Logger<1, 2, NUMBER>;
+  template class Logger<2, 3, NUMBER>;
 } // namespace ryujin

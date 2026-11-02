@@ -11,5 +11,7 @@ namespace ryujin
   template class MeshAdaptor<1, 1, NUMBER>;
   template class MeshAdaptor<2, 2, NUMBER>;
   template class MeshAdaptor<3, 3, NUMBER>;
+  template class MeshAdaptor<1, 2, NUMBER>;
+  template class MeshAdaptor<2, 3, NUMBER>;
 
 } // namespace ryujin
