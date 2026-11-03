@@ -231,8 +231,10 @@ namespace ryujin
     auto data_out = std::make_unique<dealii::DataOut<structdim, dim>>();
 
     const auto attach_data_vector = [&](auto &data, const auto &name) {
-      const auto &dof_handler_cg = offline_data_->dof_handler_cg();
-      const auto &dof_handler_dg = offline_data_->dof_handler_dg();
+      const auto &dof_handler_cg =
+          offline_data_->discretization().dof_handler_cg();
+      const auto &dof_handler_dg =
+          offline_data_->discretization().dof_handler_dg();
 
       if (data.size() == dof_handler_cg.n_dofs()) {
         offline_data_->affine_constraints_cg().distribute(data);

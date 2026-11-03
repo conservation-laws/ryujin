@@ -135,7 +135,7 @@ namespace ryujin
     this->handle_ = triangulation.register_data_attach(
         [this, &old_state_vector](const auto cell,
                                   const dealii::CellStatus status) {
-          const auto &dof_handler = offline_data_->dof_handler();
+          const auto &dof_handler = discretization_->dof_handler();
           const auto dof_cell =
               typename dealii::DoFHandler<structdim, dim>::cell_iterator(
                   &cell->get_triangulation(),
@@ -423,7 +423,7 @@ namespace ryujin
                     &cell->get_triangulation(),
                     cell->level(),
                     cell->index(),
-                    &offline_data_->dof_handler_cg());
+                    &discretization_->dof_handler_cg());
 
             const auto n_dofs_per_cell_cg =
                 dof_cell_cg->get_fe().n_dofs_per_cell();
@@ -511,7 +511,7 @@ namespace ryujin
             const auto &cell,
             const dealii::CellStatus status,
             const auto &data_range) {
-          const auto &dof_handler = offline_data_->dof_handler();
+          const auto &dof_handler = discretization_->dof_handler();
           const auto dof_cell =
               typename dealii::DoFHandler<structdim, dim>::cell_iterator(
                   &cell->get_triangulation(),
@@ -547,7 +547,7 @@ namespace ryujin
                     &cell->get_triangulation(),
                     cell->level(),
                     cell->index(),
-                    &offline_data_->dof_handler_cg());
+                    &discretization_->dof_handler_cg());
 
             const auto n_dofs_per_cell_cg =
                 dof_cell_cg->get_fe().n_dofs_per_cell();

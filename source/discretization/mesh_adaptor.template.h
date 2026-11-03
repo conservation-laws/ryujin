@@ -255,7 +255,7 @@ namespace ryujin
     const auto smoothness_indicators_view =
         smoothness_indicators_.template view<1>();
 
-    const auto &dof_handler = offline_data_->dof_handler();
+    const auto &dof_handler = offline_data_->discretization().dof_handler();
     for (const auto &cell : dof_handler.active_cell_iterators()) {
       if (!cell->is_locally_owned())
         continue;

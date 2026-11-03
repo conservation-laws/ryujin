@@ -103,7 +103,13 @@ namespace ryujin
     selected_geometry_ =
         &GeometryLibrary<structdim, dim>::select(geometry_list_, geometry_);
 
-    /* Set up Triangulation object: */
+    /*
+     * Set up Triangulation object. DoFHandler objects attached to a
+     * previous triangulation have to be released first:
+     */
+
+    dof_handler_cg_.reset();
+    dof_handler_dg_.reset();
 
     const auto smoothing =
         dealii::Triangulation<structdim,
@@ -382,6 +388,32 @@ namespace ryujin
                                  false);
     else
       mapping_cache_->initialize(mapping, *triangulation_);
+  }
+
+
+  template <int structdim, int dim>
+  void Discretization<structdim, dim>::distribute_dofs()
+  {
+    if (!dof_handler_cg_)
+      dof_handler_cg_ =
+          std::make_unique<dealii::DoFHandler<structdim, dim>>(*triangulation_);
+
+    if (!dof_handler_dg_)
+      dof_handler_dg_ =
+          std::make_unique<dealii::DoFHandler<structdim, dim>>(*triangulation_);
+
+    /*
+     * Set active FE indices: This information depends on the selected
+     * geometry. Therefore, let the selected geometry object handle the
+     * setup. For a standard geometry that has only one reference element
+     * the method simply does nothing.
+     */
+
+    selected_geometry_->update_dof_handler(*dof_handler_cg_);
+    selected_geometry_->update_dof_handler(*dof_handler_dg_);
+
+    dof_handler_cg_->distribute_dofs(finite_element_cg());
+    dof_handler_dg_->distribute_dofs(finite_element_dg());
   }
 
 

@@ -176,7 +176,7 @@ namespace ryujin
 
     if (mpi_ensemble_.ensemble_rank() == 0)
       n_global_dofs_ = dealii::Utilities::MPI::sum(
-          simulation_.offline_data().dof_handler().n_dofs(),
+          simulation_.discretization().dof_handler().n_dofs(),
           mpi_ensemble_.ensemble_leader_communicator());
 
 #if defined(WITH_FTXUI)

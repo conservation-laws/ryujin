@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
   const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
   const auto positions = DoFTools::map_dofs_to_support_points(
-      discretization.mapping(), offline_data.dof_handler());
+      discretization.mapping(), discretization.dof_handler());
 
   /*
    * We populate the state vector on the host and accumulate statistics on

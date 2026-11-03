@@ -18,6 +18,7 @@
 #include <deal.II/distributed/fully_distributed_tria.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
+#include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/mapping_q_cache.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/hp/fe_collection.h>
@@ -318,6 +319,17 @@ namespace ryujin
      */
     void update_mapping();
 
+    /**
+     * Create the DoFHandler objects (if necessary) and distribute degrees
+     * of freedom for the continuous ("cG") and discontinuous ("dG")
+     * variant of the selected finite element space. This function has to
+     * be called again after the triangulation has changed.
+     *
+     * @note OfflineData::prepare() calls this function and subsequently
+     * renumbers the degrees of freedom.
+     */
+    void distribute_dofs();
+
     //@}
     /**
      * @name Information and statistics
@@ -408,6 +420,54 @@ namespace ryujin
      * Return a read-only const reference to the triangulation.
      */
     ACCESSOR_READ_ONLY(triangulation)
+
+    /**
+     * Return a mutable reference to the DoFHandler for the continuous
+     * ("cG") variant of the selected finite element space.
+     */
+    ACCESSOR(dof_handler_cg)
+
+    /**
+     * Return a read-only const reference to the DoFHandler for the
+     * continuous ("cG") variant of the selected finite element space.
+     *
+     * @note If the selected finite element space is continuous then this
+     * method simply returns the same object as dof_handler().
+     */
+    ACCESSOR_READ_ONLY(dof_handler_cg)
+
+    /**
+     * Return a mutable reference to the DoFHandler for the discontinuous
+     * ("dG") variant of the selected finite element space.
+     */
+    ACCESSOR(dof_handler_dg)
+
+    /**
+     * Return a read-only const reference to the DoFHandler for the
+     * discontinuous ("dG") variant of the selected finite element space.
+     *
+     * @note If the selected finite element space is discontinuous then
+     * this method simply returns the same object as dof_handler().
+     */
+    ACCESSOR_READ_ONLY(dof_handler_dg)
+
+    /**
+     * Return a mutable reference to the DoFHandler of the selected finite
+     * element space.
+     */
+    dealii::DoFHandler<structdim, dim> &dof_handler()
+    {
+      return have_discontinuous_ansatz() ? dof_handler_dg() : dof_handler_cg();
+    }
+
+    /**
+     * Return a read-only const reference to the DoFHandler of the selected
+     * finite element space.
+     */
+    const dealii::DoFHandler<structdim, dim> &dof_handler() const
+    {
+      return have_discontinuous_ansatz() ? dof_handler_dg() : dof_handler_cg();
+    }
 
     /**
      * Return a mutable reference to the transformation used for the
@@ -557,6 +617,9 @@ namespace ryujin
     Geometry<structdim, dim> *selected_geometry_ = nullptr;
 
     std::unique_ptr<dealii::Triangulation<structdim, dim>> triangulation_;
+
+    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_cg_;
+    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_dg_;
 
     Collection collection_;
     typename Geometry<structdim, dim>::HP_Collection collection_type_ =

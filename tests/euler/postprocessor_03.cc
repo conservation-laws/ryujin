@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
   {
     const auto U_view = U.view<SystemView::problem_dimension>();
 
-    const auto &dof_handler = offline_data.dof_handler();
+    const auto &dof_handler = discretization.dof_handler();
     const auto &support_points = dof_handler.get_fe().get_unit_support_points();
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 

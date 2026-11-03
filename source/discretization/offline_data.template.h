@@ -32,7 +32,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   OfflineData<structdim, dim, Number>::OfflineData(
       const MPIEnsemble &mpi_ensemble,
-      const Discretization<structdim, dim> &discretization,
+      Discretization<structdim, dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : Interface::OfflineData<dim, Number>(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -78,7 +78,7 @@ namespace ryujin
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
-    create_dof_handlers();
+    discretization_->distribute_dofs();
 
     renumber_for_simd();
 
@@ -95,43 +95,15 @@ namespace ryujin
 
     create_matrices();
 
-    if (!dof_handler().has_hp_capabilities())
+    if (!discretization_->dof_handler().has_hp_capabilities())
       create_multigrid_data();
-  }
-
-
-  template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::create_dof_handlers()
-  {
-    const auto &triangulation = discretization_->triangulation();
-
-    if (!dof_handler_cg_)
-      dof_handler_cg_ =
-          std::make_unique<dealii::DoFHandler<structdim, dim>>(triangulation);
-
-    if (!dof_handler_dg_)
-      dof_handler_dg_ =
-          std::make_unique<dealii::DoFHandler<structdim, dim>>(triangulation);
-
-    /*
-     * Set active FE indices: This information depends on the selected
-     * geometry. Therefore, let the selected geometry object handle the
-     * setup. For a standard geometry that has only one reference element
-     * the method simply does nothing.
-     */
-
-    discretization_->selected_geometry().update_dof_handler(*dof_handler_cg_);
-    discretization_->selected_geometry().update_dof_handler(*dof_handler_dg_);
-
-    dof_handler_cg_->distribute_dofs(discretization_->finite_element_cg());
-    dof_handler_dg_->distribute_dofs(discretization_->finite_element_dg());
   }
 
 
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::renumber_for_simd()
   {
-    auto &dof_handler = writable_dof_handler();
+    auto &dof_handler = discretization_->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     this->n_locally_owned_ = locally_owned.n_elements();
 
@@ -275,17 +247,17 @@ namespace ryujin
 #endif
         };
 
-    populate_affine_constraints(*dof_handler_cg_,
+    populate_affine_constraints(discretization_->dof_handler_cg(),
                                 *this->affine_constraints_cg_);
     /* Note: for dG the affine constraints object will be empty. */
-    populate_affine_constraints(*dof_handler_dg_,
+    populate_affine_constraints(discretization_->dof_handler_dg(),
                                 *this->affine_constraints_dg_);
 
     /*
      * Next, set up the (hyperbolic) sparsity pattern:
      */
 
-    const auto &dof_handler = this->dof_handler();
+    const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(this->n_locally_owned_ == locally_owned.n_elements(),
@@ -332,7 +304,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency()
   {
-    auto &dof_handler = writable_dof_handler();
+    auto &dof_handler = discretization_->dof_handler();
 
     /*
      * A small lambda to check for stride-level consistency of the internal
@@ -421,7 +393,7 @@ namespace ryujin
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
-    const auto &dof_handler = this->dof_handler();
+    const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(this->n_locally_owned_ == locally_owned.n_elements(),
@@ -518,8 +490,10 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_index_maps()
   {
-    const auto &fe_collection_dg = dof_handler_dg_->get_fe_collection();
-    const auto &fe_collection_cg = dof_handler_cg_->get_fe_collection();
+    const auto &fe_collection_dg =
+        discretization_->dof_handler_dg().get_fe_collection();
+    const auto &fe_collection_cg =
+        discretization_->dof_handler_cg().get_fe_collection();
     Assert(fe_collection_dg.size() == fe_collection_cg.size(),
            dealii::ExcInternalError());
 
@@ -556,8 +530,10 @@ namespace ryujin
      * ghosts which we skip:
      */
 
-    const auto &locally_owned_dg = dof_handler_dg_->locally_owned_dofs();
-    const auto &locally_owned_cg = dof_handler_cg_->locally_owned_dofs();
+    const auto &locally_owned_dg =
+        discretization_->dof_handler_dg().locally_owned_dofs();
+    const auto &locally_owned_cg =
+        discretization_->dof_handler_cg().locally_owned_dofs();
 
     this->dg_to_cg_index_map_.resize(locally_owned_dg.n_elements());
     this->cg_to_dg_index_map_.resize(locally_owned_cg.n_elements());
@@ -565,7 +541,8 @@ namespace ryujin
     std::vector<types::global_dof_index> indices_dg;
     std::vector<types::global_dof_index> indices_cg;
 
-    for (const auto &cell : dof_handler_dg_->active_cell_iterators()) {
+    for (const auto &cell :
+         discretization_->dof_handler_dg().active_cell_iterators()) {
       if (!cell->is_locally_owned())
         continue;
 
@@ -573,7 +550,7 @@ namespace ryujin
       indices_dg.resize(map.size());
       indices_cg.resize(map.size());
       cell->get_dof_indices(indices_dg);
-      cell->as_dof_handler_iterator(*dof_handler_cg_)
+      cell->as_dof_handler_iterator(discretization_->dof_handler_cg())
           ->get_dof_indices(indices_cg);
 
       for (unsigned int i = 0; i < map.size(); ++i) {
@@ -594,7 +571,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_support_points()
   {
-    const auto &dof_handler = this->dof_handler();
+    const auto &dof_handler = discretization_->dof_handler();
     const auto &fe_collection = dof_handler.get_fe_collection();
     const auto &partitioner = *this->scalar_partitioner_;
 
@@ -692,7 +669,7 @@ namespace ryujin
      * Now, assemble all matrices:
      */
 
-    const auto &dof_handler = this->dof_handler();
+    const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
 
     this->measure_of_omega_ = 0.;
@@ -1353,15 +1330,17 @@ namespace ryujin
               << std::endl;
 #endif
 
-    Assert(!dof_handler_cg_->has_hp_capabilities(), dealii::ExcInternalError());
-    Assert(!dof_handler_dg_->has_hp_capabilities(), dealii::ExcInternalError());
+    Assert(!discretization_->dof_handler_cg().has_hp_capabilities(),
+           dealii::ExcInternalError());
+    Assert(!discretization_->dof_handler_dg().has_hp_capabilities(),
+           dealii::ExcInternalError());
 
-    dof_handler_cg_->distribute_mg_dofs();
-    dof_handler_dg_->distribute_mg_dofs();
+    discretization_->dof_handler_cg().distribute_mg_dofs();
+    discretization_->dof_handler_dg().distribute_mg_dofs();
 
     /* Now, work on data structures for hyperbolic update: */
 
-    auto &dof_handler = writable_dof_handler();
+    auto &dof_handler = discretization_->dof_handler();
 
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
 

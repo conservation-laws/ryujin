@@ -138,7 +138,7 @@ namespace ryujin
     dealii::types::global_dof_index n_global_dofs = 0;
     if (mpi_ensemble_.ensemble_rank() == 0)
       n_global_dofs = dealii::Utilities::MPI::sum(
-          offline_data_->dof_handler().n_dofs(),
+          offline_data_->discretization().dof_handler().n_dofs(),
           mpi_ensemble_.ensemble_leader_communicator());
 
     if (mpi_ensemble_.world_rank() != 0)
@@ -168,7 +168,7 @@ namespace ryujin
 #endif
 
     const auto &discretization = offline_data_->discretization();
-    const auto &dof_handler = offline_data_->dof_handler();
+    const auto &dof_handler = offline_data_->discretization().dof_handler();
 
     Vector<Number> difference_per_cell(
         discretization.triangulation().n_active_cells());

@@ -30,10 +30,10 @@ namespace ryujin
    *  - it implements a local mass matrix projection with convex limiting
    *    for the hyperbolic state,
    *  - it interpolates the dynamic state, without limiting, on the
-   *    continuous finite element space of OfflineData::dof_handler_cg().
+   *    continuous finite element space of Discretization::dof_handler_cg().
    *
    * @todo generalize the transfer of the dynamic state to support
-   * OfflineData::dof_handler_cg() and OfflineData::dof_handler_dg()
+   * Discretization::dof_handler_cg() and Discretization::dof_handler_dg()
    *
    * @ingroup Typed
    */

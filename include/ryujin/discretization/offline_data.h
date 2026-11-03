@@ -13,7 +13,6 @@
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/interface/offline_data.h>
 
-#include <deal.II/dofs/dof_handler.h>
 
 #include <memory>
 #include <string>
@@ -25,9 +24,11 @@ namespace ryujin
    * A class to store all data that can be precomputed offline.
    *
    * This class takes a reference to a Discretization object (that itself
-   * holds a Triangulation, FiniteElement, Mapping, and Quadrature object).
+   * holds a Triangulation, FiniteElement, Mapping, Quadrature, and
+   * DoFHandler objects).
    *
-   * Most notably this class sets up a DoFHandler, the
+   * Most notably this class distributes and renumbers degrees of freedom
+   * of the DoFHandler objects owned by the Discretization, sets up the
    * SparsityPattern, various IndexSet objects to hold locally
    * owned and locally relevant indices, and precomputes all matrices (mass
    * matrix, lumped mass matrix, $c_{ij}$ matrices, and $n_{ij}$ matrices).
@@ -76,12 +77,13 @@ namespace ryujin
      * Constructor
      */
     OfflineData(const MPIEnsemble &mpi_ensemble,
-                const Discretization<structdim, dim> &discretization,
+                Discretization<structdim, dim> &discretization,
                 const std::string &subsection = "/OfflineData");
 
     /**
-     * Prepare offline data. A call to prepare() sets up storage, dof
-     * handlers, sparsity patterns, and assembles all matrices.
+     * Prepare offline data. A call to prepare() distributes and renumbers
+     * the degrees of freedom of the Discretization, sets up storage,
+     * sparsity patterns, and assembles all matrices.
      *
      * The problem_dimension and n_precomputed_values parameters is used to
      * set up appropriately sized vector partitioners for the state and
@@ -95,38 +97,6 @@ namespace ryujin
      * @name Information and statistics
      */
     //@{
-
-    /**
-     * Return a read-only const reference to the DoFHandler for the
-     * continuous ("cG") variant of the selected finite element space.
-     *
-     * @note If the selected finite element space is continuous then this
-     * method simply returns the same object as dof_handler().
-     */
-    ACCESSOR_READ_ONLY(dof_handler_cg)
-
-    /**
-     * Return a read-only const reference to the DoFHandler for the
-     * discontinuous ("dG") variant of the selected finite element space.
-     *
-     * @note If the selected finite element space is discontinuous then
-     * this method simply returns the same object as dof_handler().
-     */
-    ACCESSOR_READ_ONLY(dof_handler_dg)
-
-    /**
-     * Return a read-only const reference to the dof handler.
-     */
-    const dealii::DoFHandler<structdim, dim> &dof_handler() const
-    {
-      if (discretization_->have_discontinuous_ansatz()) {
-        Assert(dof_handler_dg_, dealii::ExcInternalError());
-        return *dof_handler_dg_;
-      } else {
-        Assert(dof_handler_cg_, dealii::ExcInternalError());
-        return *dof_handler_cg_;
-      }
-    }
 
     /**
      * The boundary map on all levels of the grid in case multilevel
@@ -165,11 +135,7 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const Discretization<structdim, dim>>
-        discretization_;
-
-    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_cg_;
-    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_dg_;
+    dealii::ObserverPointer<Discretization<structdim, dim>> discretization_;
 
     std::vector<BoundaryMap> level_boundary_map_;
 
@@ -180,27 +146,6 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
-
-    /**
-     * Return a writable reference to the dof handler.
-     */
-    dealii::DoFHandler<structdim, dim> &writable_dof_handler()
-    {
-      if (this->discretization_->have_discontinuous_ansatz()) {
-        Assert(this->dof_handler_dg_, dealii::ExcInternalError());
-        return *this->dof_handler_dg_;
-      } else {
-        Assert(this->dof_handler_cg_, dealii::ExcInternalError());
-        return *this->dof_handler_cg_;
-      }
-    }
-
-    /**
-     * Set up DoFHandlers. Internally used in prepare().
-     *
-     * @note This method populates various OfflineData internal data structures.
-     */
-    void create_dof_handlers();
 
     /**
      * Renumber the hyperbolic DoFHandler for use with our SIMD sparsity
