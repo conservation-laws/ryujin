@@ -9,7 +9,7 @@
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/discretization/discretization.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/solution_transfer.h>
 #include <ryujin/linear_algebra/state_vector.h>
@@ -82,7 +82,7 @@ namespace ryujin
      */
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
                      Discretization<structdim, dim> &discretization, /*mutable*/
-                     const OfflineData<structdim, dim, Number> &offline_data,
+                     const Interface::OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
                      const Interface::ParabolicSystem &parabolic_system,
                      const std::string &subsection = "/SolutionTransfer");
@@ -140,7 +140,7 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     dealii::ObserverPointer<Discretization<structdim, dim>> discretization_;
-    dealii::ObserverPointer<const OfflineData<structdim, dim, Number>>
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
         offline_data_;
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const Interface::ParabolicSystem> parabolic_system_;

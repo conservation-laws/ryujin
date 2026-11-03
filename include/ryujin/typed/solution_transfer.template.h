@@ -28,7 +28,7 @@ namespace ryujin
   SolutionTransfer<HD, structdim, dim, Number>::SolutionTransfer(
       const MPIEnsemble &mpi_ensemble,
       Discretization<structdim, dim> &discretization,
-      const OfflineData<structdim, dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection /* = "/SolutionTransfer" */)
@@ -191,7 +191,7 @@ namespace ryujin
 
             Assert(dof_cell->has_children(), dealii::ExcInternalError());
 
-            const auto &discretization = offline_data_->discretization();
+            const auto &discretization = *discretization_;
             const auto index = dof_cell->active_fe_index();
             const auto &finite_element = discretization.finite_element()[index];
             const auto &mapping = discretization.mapping()[index];
@@ -587,7 +587,7 @@ namespace ryujin
             Assert(dof_cell->is_active(), dealii::ExcInternalError());
             dof_cell->get_dof_indices(dof_indices);
 
-            const auto &discretization = offline_data_->discretization();
+            const auto &discretization = *discretization_;
             const auto index = dof_cell->active_fe_index();
             const auto &finite_element = discretization.finite_element()[index];
             const auto &mapping = discretization.mapping()[index];
@@ -625,7 +625,7 @@ namespace ryujin
 
             Assert(dof_cell->has_children(), dealii::ExcInternalError());
 
-            const auto &discretization = offline_data_->discretization();
+            const auto &discretization = *discretization_;
             const auto index = dof_cell->active_fe_index();
             const auto &finite_element = discretization.finite_element()[index];
             const auto &mapping = discretization.mapping()[index];

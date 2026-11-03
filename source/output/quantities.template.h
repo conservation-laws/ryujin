@@ -220,8 +220,8 @@ namespace ryujin
       auto manifold = create_manifold(entry, /*boundary*/ false);
       FunctionParser<dim> level_set_function(std::get<1>(entry));
 
-      const auto &discretization = offline_data_->discretization();
-      const auto &dof_handler = offline_data_->discretization().dof_handler();
+      const auto &discretization = simulation_.discretization();
+      const auto &dof_handler = simulation_.discretization().dof_handler();
 
       const auto support_points =
           dof_handler.get_fe().get_unit_support_points();

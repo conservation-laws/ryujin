@@ -102,10 +102,11 @@ namespace ryujin
       this->discretization_ = std::make_unique<Discretization<structdim, dim>>(
           mpi_ensemble, "/C - Discretization");
 
-      this->offline_data_ =
+      auto offline_data_ptr =
           std::make_unique<OfflineData<structdim, dim, Number>>(
               mpi_ensemble, *this->discretization_, "/D - OfflineData");
-      const auto &offline_data = *this->offline_data_;
+      const auto &offline_data = *offline_data_ptr;
+      this->offline_data_ = std::move(offline_data_ptr);
 
       initial_values_container_ =
           std::make_unique<MPIEnsembleContainer<InitialValues>>(

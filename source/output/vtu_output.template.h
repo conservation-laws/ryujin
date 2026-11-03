@@ -232,9 +232,9 @@ namespace ryujin
 
     const auto attach_data_vector = [&](auto &data, const auto &name) {
       const auto &dof_handler_cg =
-          offline_data_->discretization().dof_handler_cg();
+          simulation_.discretization().dof_handler_cg();
       const auto &dof_handler_dg =
-          offline_data_->discretization().dof_handler_dg();
+          simulation_.discretization().dof_handler_dg();
 
       if (data.size() == dof_handler_cg.n_dofs()) {
         offline_data_->affine_constraints_cg().distribute(data);
@@ -262,7 +262,7 @@ namespace ryujin
         t, cycle, true, DataOutBase::CompressionLevel::best_speed);
     data_out->set_flags(flags);
 
-    const auto &discretization = offline_data_->discretization();
+    const auto &discretization = simulation_.discretization();
     const auto &mapping = discretization.mapping();
     const auto patch_order =
         std::max(1u, discretization.polynomial_degree()) - 1u;

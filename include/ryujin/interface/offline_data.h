@@ -89,6 +89,22 @@ namespace ryujin
 
       //@}
       /**
+       * @name Setup
+       */
+      //@{
+
+      /**
+       * Prepare offline data: set up index ranges, partitioners, sparsity
+       * patterns, and assemble all matrices. The problem_dimension and
+       * n_precomputed_values parameters are used to set up appropriately
+       * sized vector partitioners for the state and precomputed
+       * MultiComponentVector.
+       */
+      virtual void prepare(const unsigned int problem_dimension,
+                           const unsigned int n_precomputed_values) = 0;
+
+      //@}
+      /**
        * @name Information and statistics
        */
       //@{

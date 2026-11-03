@@ -10,10 +10,10 @@
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/discretization/discretization.h>
-#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/initial_values.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/parabolic_module.h>
 #include <ryujin/interface/parabolic_system.h>
 #include <ryujin/interface/postprocessor.h>
@@ -43,8 +43,9 @@ namespace ryujin
      *
      * The interface knows the intrinsic dimension @p structdim of the mesh
      * because the tasks (output, mesh adaptation, checkpointing) operate
-     * on the Discretization and OfflineData objects directly. The modules
-     * and the time integrator only depend on the space dimension @p dim.
+     * on the Discretization directly. The offline data is only accessible
+     * through Interface::OfflineData, and the modules and the time
+     * integrator only depend on the space dimension @p dim.
      *
      * @ingroup Interfaces
      */
@@ -141,8 +142,7 @@ namespace ryujin
 
       std::unique_ptr<MPIEnsemble> mpi_ensemble_;
       std::unique_ptr<ryujin::Discretization<structdim, dim>> discretization_;
-      std::unique_ptr<ryujin::OfflineData<structdim, dim, Number>>
-          offline_data_;
+      std::unique_ptr<OfflineData<dim, Number>> offline_data_;
 
       const HyperbolicSystem *hyperbolic_system_ = nullptr;
       const ParabolicSystem *parabolic_system_ = nullptr;

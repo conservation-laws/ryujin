@@ -90,7 +90,7 @@ namespace ryujin
      * precomputed MultiComponentVector.
      */
     void prepare(const unsigned int problem_dimension,
-                 const unsigned int n_precomputed_values);
+                 const unsigned int n_precomputed_values) override;
 
     //@}
     /**

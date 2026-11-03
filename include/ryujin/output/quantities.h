@@ -9,8 +9,8 @@
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/interface/task.h>
@@ -183,7 +183,7 @@ namespace ryujin
     const Interface::Simulation<structdim, dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<structdim, dim, Number>>
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
         offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
