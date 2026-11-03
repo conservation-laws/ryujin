@@ -184,7 +184,7 @@ void run(const std::string &time_loop_parameters,
   AssertThrowMPI(ierr);
 
   {
-    Simulation<HyperbolicDescription, ParabolicDescription, dim, dim, Number>
+    Simulation<dim, dim, Number, HyperbolicDescription, ParabolicDescription>
         simulation(MPI_COMM_WORLD);
     UserTaskComposition<dim, Number> task_composition(simulation);
 

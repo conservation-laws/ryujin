@@ -91,7 +91,7 @@ void test()
   std::cout << "  ParabolicDescription:        " << parabolic << std::endl;
 
   {
-    Simulation<HD, PD, dim, dim, NUMBER> simulation(MPI_COMM_SELF);
+    Simulation<dim, dim, NUMBER, HD, PD> simulation(MPI_COMM_SELF);
 
     std::stringstream parameters;
     parameters << "subsection B - Equation\n"

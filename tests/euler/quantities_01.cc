@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 
   /* Set up a small rectangular domain and the corresponding offline data: */
 
-  Simulation<HyperbolicDescription, StubParabolicDescription, dim, dim, Number>
+  Simulation<dim, dim, Number, HyperbolicDescription, StubParabolicDescription>
       simulation(MPI_COMM_WORLD);
   const auto &mpi_ensemble = simulation.mpi_ensemble();
   const auto &discretization = simulation.discretization();

@@ -29,10 +29,11 @@ namespace ryujin
    * {
    *   ryujin::Environment environment(argc, argv);
    *
-   *   ryujin::Simulation<HyperbolicDescription, ParabolicDescription, dim>
+   *   ryujin::Simulation<2, 2, double, HyperbolicDescription,
+   *                      ParabolicDescription>
    *       simulation(environment.mpi_communicator());
    *
-   *   ryujin::TaskComposition<2> task_composition(simulation);
+   *   ryujin::TaskComposition<2, 2> task_composition(simulation);
    *
    *   dealii::ParameterAcceptor::initialize("simulation.prm");
    *

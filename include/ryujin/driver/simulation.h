@@ -20,14 +20,18 @@
 #include <ryujin/typed/postprocessor.h>
 #include <ryujin/typed/solution_transfer.h>
 
+#include <concepts>
 #include <memory>
 
 namespace ryujin
 {
   /**
    * The Simulation constructs the core objects of a simulation for a given
-   * pairing of a hyperbolic and a parabolic description, and the time
-   * integrator @p TI, which defaults to the TimeIntegrator of ryujin.
+   * pairing of a hyperbolic and a parabolic description, the time
+   * integrator @p TI, which defaults to the TimeIntegrator of ryujin, and
+   * the OfflineData realization @p OD, which defaults to the OfflineData
+   * class of ryujin. A different realization must derive from
+   * ryujin::OfflineData<structdim, dim, Number>.
    *
    * In addition to the objects stored in Interface::Simulation it owns
    * the per-ensemble containers of the hyperbolic system, the parabolic
@@ -39,15 +43,18 @@ namespace ryujin
    *
    * @ingroup Driver
    */
-  template <typename HD,
-            typename PD,
-            int structdim,
+  template <int structdim,
             int dim,
-            typename Number = double,
-            template <int, typename> class TI = TimeIntegrator>
+            typename Number,
+            typename HD,
+            typename PD,
+            template <int, typename> class TI = TimeIntegrator,
+            template <int, int, typename> class OD = OfflineData>
     requires Concept::HyperbolicDescription<HD, dim, Number> &&
              Concept::ParabolicDescription<PD, HD, structdim, dim, Number> &&
-             Concept::TimeIntegrator<TI<dim, Number>, dim, Number>
+             Concept::TimeIntegrator<TI<dim, Number>, dim, Number> &&
+             std::derived_from<OD<structdim, dim, Number>,
+                               OfflineData<structdim, dim, Number>>
   class Simulation final : public Interface::Simulation<structdim, dim, Number>
   {
   public:
@@ -102,9 +109,8 @@ namespace ryujin
       this->discretization_ = std::make_unique<Discretization<structdim, dim>>(
           mpi_ensemble, "/C - Discretization");
 
-      auto offline_data_ptr =
-          std::make_unique<OfflineData<structdim, dim, Number>>(
-              mpi_ensemble, *this->discretization_, "/D - OfflineData");
+      auto offline_data_ptr = std::make_unique<OD<structdim, dim, Number>>(
+          mpi_ensemble, *this->discretization_, "/D - OfflineData");
       const auto &offline_data = *offline_data_ptr;
       this->offline_data_ = std::move(offline_data_ptr);
 

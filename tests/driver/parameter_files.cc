@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 
   write_parameter_files("test", true, [] {
     struct Objects {
-      Simulation<HyperbolicDescription, ParabolicDescription, dim, dim, Number>
+      Simulation<dim, dim, Number, HyperbolicDescription, ParabolicDescription>
           simulation{MPI_COMM_SELF};
       TaskComposition<dim, dim, Number> task_composition{simulation};
     };

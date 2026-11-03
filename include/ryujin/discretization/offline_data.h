@@ -52,7 +52,7 @@ namespace ryujin
    * @ingroup MeshAndOfflineData
    */
   template <int structdim, int dim, typename Number = double>
-  class OfflineData final : public Interface::OfflineData<dim, Number>
+  class OfflineData : public Interface::OfflineData<dim, Number>
   {
   public:
     /**

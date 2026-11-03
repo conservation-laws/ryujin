@@ -26,8 +26,8 @@
 
 using namespace ryujin;
 
-using HyperbolicDescription = Euler::HyperbolicDescription;
-using ParabolicDescription = StubParabolicDescription;
+using HD = Euler::HyperbolicDescription;
+using PD = StubParabolicDescription;
 constexpr int dim = 2;
 using Number = NUMBER;
 
@@ -56,8 +56,7 @@ int main(int argc, char *argv[])
   {
     [[maybe_unused]] const auto objects = populate_parameters([] {
       struct Objects {
-        Simulation<HyperbolicDescription, ParabolicDescription, dim, dim, Number>
-            simulation{MPI_COMM_SELF};
+        Simulation<dim, dim, Number, HD, PD> simulation{MPI_COMM_SELF};
         TaskComposition<dim, dim, Number> task_composition{simulation};
       };
       return std::make_unique<Objects>();

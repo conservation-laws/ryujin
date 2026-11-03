@@ -317,7 +317,7 @@ void test()
             << has_kernels<SecondDescription, dim> << std::endl;
 
   {
-    Simulation<Description, PD, dim, dim, NUMBER> simulation(MPI_COMM_SELF);
+    Simulation<dim, dim, NUMBER, Description, PD> simulation(MPI_COMM_SELF);
 
     /* A single entry sets the parameter of both hyperbolic systems: */
     std::stringstream parameters;
