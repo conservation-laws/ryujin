@@ -332,6 +332,23 @@ namespace ryujin
        */
       ACCESSOR_READ_ONLY(measure_of_omega)
 
+      /**
+       * The support points of all locally owned degrees of freedom in
+       * (MPI rank) local numbering, i.e., the vector has n_locally_owned()
+       * entries.
+       *
+       * All finite element spaces used in ryujin are nodal: the state
+       * U_i is the value of the discrete solution at support_points()[i].
+       * Interpolating a function into the finite element space thus
+       * amounts to evaluating it at the support points.
+       *
+       * @note Only locally owned degrees of freedom are covered: the
+       * ghost range of scalar_partitioner() also contains coupling
+       * degrees of freedom on artificial cells whose position is not
+       * known on this rank.
+       */
+      ACCESSOR_READ_ONLY(support_points)
+
       //@}
 
     protected:
@@ -402,6 +419,8 @@ namespace ryujin
       std::unique_ptr<SparseMatrix<Number>> incidence_matrix_;
 
       Number measure_of_omega_ = 0.;
+
+      std::vector<dealii::Point<dim>> support_points_;
     };
   } // namespace Interface
 } // namespace ryujin

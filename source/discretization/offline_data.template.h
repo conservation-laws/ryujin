@@ -91,6 +91,8 @@ namespace ryujin
 
     create_index_maps();
 
+    create_support_points();
+
     create_matrices();
 
     if (!dof_handler().has_hp_capabilities())
@@ -584,6 +586,71 @@ namespace ryujin
           this->cg_to_dg_index_map_[local_cg] = global_dg;
       }
     }
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::create_support_points()
+  {
+    const auto &dof_handler = this->dof_handler();
+    const auto &fe_collection = dof_handler.get_fe_collection();
+    const auto &partitioner = *this->scalar_partitioner_;
+
+    /*
+     * Map the unit support points of every finite element of the (hp)
+     * collection to real space by using them as quadrature points:
+     */
+
+    dealii::hp::QCollection<dim> q_collection;
+    for (unsigned int k = 0; k < fe_collection.size(); ++k)
+      q_collection.push_back(
+          dealii::Quadrature<dim>(fe_collection[k].get_unit_support_points()));
+
+    dealii::hp::FEValues<dim> hp_fe_values(discretization_->mapping(),
+                                           fe_collection,
+                                           q_collection,
+                                           dealii::update_quadrature_points);
+
+    this->support_points_.resize(this->n_locally_owned_);
+
+#ifdef DEBUG
+    std::vector<bool> is_set(this->n_locally_owned_, false);
+#endif
+
+    /*
+     * Every locally owned degree of freedom is located on a locally owned
+     * cell. Skip all other cells and cells without degrees of freedom
+     * (FE_Nothing):
+     */
+
+    std::vector<dealii::types::global_dof_index> dof_indices;
+    for (const auto &cell : dof_handler.active_cell_iterators()) {
+      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+      if (!cell->is_locally_owned() || dofs_per_cell == 0)
+        continue;
+
+      hp_fe_values.reinit(cell);
+      const auto &points =
+          hp_fe_values.get_present_fe_values().get_quadrature_points();
+
+      dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(dof_indices);
+
+      for (unsigned int k = 0; k < dofs_per_cell; ++k) {
+        if (!partitioner.in_local_range(dof_indices[k]))
+          continue;
+        const auto i = partitioner.global_to_local(dof_indices[k]);
+        this->support_points_[i] = points[k];
+#ifdef DEBUG
+        is_set[i] = true;
+#endif
+      }
+    }
+
+#ifdef DEBUG
+    Assert(std::find(is_set.begin(), is_set.end(), false) == is_set.end(),
+           dealii::ExcInternalError());
+#endif
   }
 
 

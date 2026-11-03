@@ -238,6 +238,13 @@ namespace ryujin
     void create_index_maps();
 
     /**
+     * Set up support_points(). Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_support_points();
+
+    /**
      * Assemble all matrices. Internally used in prepare().
      *
      * @note This method populates various OfflineData internal data structures.
