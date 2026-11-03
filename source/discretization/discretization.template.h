@@ -54,12 +54,7 @@ namespace ryujin
                   "\"parallel shared\", \"parallel distributed\", \"parallel "
                   "fullydistributed\".");
 
-    if constexpr (dim == 1) {
-      geometry_ = "rectangular domain";
-    } else {
-      geometry_ = "cylinder";
-    }
-
+    geometry_ = "rectangular domain";
     geometry_list_ = GeometryLibrary<structdim, dim>::create(subsection);
 
     add_parameter("geometry",

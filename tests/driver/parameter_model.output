@@ -21,10 +21,10 @@ read 4 values
 dashboard max width: integer, value = 140, valid = true
 cfl max: floating, value = 0.5, valid = true
 dashboard max width: integer, value = wide, valid = false
-cylinder
+rectangular domain
 modified: false
-geometry: selection, value = cylinder, valid = true, choices = »airfoil« »annulus« »cylinder« »disk« »elevation profile« »geotiff profile« »reader« »rectangular domain« »step« »two tanks« »wall« »wave tank«
-active: »cylinder«
+geometry: selection, value = rectangular domain, valid = true, choices = »airfoil« »annulus« »cylinder« »disk« »elevation profile« »geotiff profile« »reader« »rectangular domain« »step« »two tanks« »wall« »wave tank«
+active: »rectangular domain«
 active: »disk«
 invalid: 0
 written:  subsection disk
