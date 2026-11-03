@@ -119,7 +119,7 @@ namespace ryujin
 
     //@}
 
-  private:
+  protected:
     /**
      * @name Run time options
      */
