@@ -305,10 +305,23 @@ namespace ryujin
                    const std::string &subsection = "/Discretization");
 
     /**
-     * Create the triangulation and set up the finite element, mapping and
-     * quadrature objects.
+     * Create the triangulation, set up the finite element, mapping and
+     * quadrature objects, distribute degrees of freedom, and update the
+     * mapping. After prepare() the object is fully set up.
      */
     void prepare(const std::string &base_name);
+
+    /**
+     * Create the DoFHandler objects (if necessary) and distribute degrees
+     * of freedom for the continuous ("cG") and discontinuous ("dG")
+     * variant of the selected finite element space. This function has to
+     * be called again after the topology of the triangulation has changed
+     * (after a mesh adaptation, or after loading a checkpoint).
+     *
+     * @note OfflineData::prepare() subsequently renumbers the degrees of
+     * freedom.
+     */
+    void distribute_dofs();
 
     /**
      * Recompute the cached mapping after the triangulation, or the
@@ -318,17 +331,6 @@ namespace ryujin
      * Geometry::transformation(), or once a transformation has been set.
      */
     void update_mapping();
-
-    /**
-     * Create the DoFHandler objects (if necessary) and distribute degrees
-     * of freedom for the continuous ("cG") and discontinuous ("dG")
-     * variant of the selected finite element space. This function has to
-     * be called again after the triangulation has changed.
-     *
-     * @note OfflineData::prepare() calls this function and subsequently
-     * renumbers the degrees of freedom.
-     */
-    void distribute_dofs();
 
     //@}
     /**

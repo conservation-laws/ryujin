@@ -351,12 +351,13 @@ namespace ryujin
             std::make_unique<std::vector<QCF>>(1, QCF(quadrature));
 #endif
       }
-
-      return;
     } break;
     default:
       __builtin_trap();
     }
+
+    distribute_dofs();
+    update_mapping();
   }
 
 

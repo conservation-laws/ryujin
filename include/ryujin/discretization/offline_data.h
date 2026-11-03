@@ -27,8 +27,8 @@ namespace ryujin
    * holds a Triangulation, FiniteElement, Mapping, Quadrature, and
    * DoFHandler objects).
    *
-   * Most notably this class distributes and renumbers degrees of freedom
-   * of the DoFHandler objects owned by the Discretization, sets up the
+   * Most notably this class renumbers the degrees of freedom of the
+   * DoFHandler objects owned by the Discretization, sets up the
    * SparsityPattern, various IndexSet objects to hold locally
    * owned and locally relevant indices, and precomputes all matrices (mass
    * matrix, lumped mass matrix, $c_{ij}$ matrices, and $n_{ij}$ matrices).
@@ -81,9 +81,11 @@ namespace ryujin
                 const std::string &subsection = "/OfflineData");
 
     /**
-     * Prepare offline data. A call to prepare() distributes and renumbers
-     * the degrees of freedom of the Discretization, sets up storage,
-     * sparsity patterns, and assembles all matrices.
+     * Prepare offline data. A call to prepare() renumbers the degrees of
+     * freedom of the Discretization, sets up storage, sparsity patterns,
+     * and assembles all matrices. The degrees of freedom must have been
+     * distributed with Discretization::prepare() or
+     * Discretization::distribute_dofs().
      *
      * The problem_dimension and n_precomputed_values parameters is used to
      * set up appropriately sized vector partitioners for the state and

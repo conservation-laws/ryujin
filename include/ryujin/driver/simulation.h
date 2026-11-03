@@ -216,10 +216,12 @@ namespace ryujin
           context.info("setting up MPI ensemble");
         context.info("creating mesh and interpolating initial values");
         discretization.prepare(mpi_ensemble.base_name(context.base_name));
+      } else {
+        discretization.distribute_dofs();
+        discretization.update_mapping();
       }
 
       context.info("preparing compute kernels");
-      discretization.update_mapping();
       this->offline_data_->prepare(
           this->hyperbolic_module_->problem_dimension(),
           this->hyperbolic_module_->n_precomputed_values());

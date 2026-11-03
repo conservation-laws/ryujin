@@ -78,8 +78,6 @@ namespace ryujin
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
-    discretization_->distribute_dofs();
-
     renumber_for_simd();
 
     create_constraints_and_sparsity_pattern();
