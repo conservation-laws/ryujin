@@ -18,6 +18,12 @@ namespace ryujin
      * A simple rectangular domain that is used for most validation and
      * benchmark configurations.
      *
+     * For @p structdim < @p dim the rectangle is embedded into the plane
+     * spanned by the first @p structdim coordinate axes. The corners are
+     * given in these intrinsic coordinates; an optional transformation
+     * (given as dim expressions in the coordinates of the embedding space)
+     * deforms the rectangle into a curved manifold.
+     *
      * The rectangular domain is defined by two points, the bottom left
      * corner \f$(x_1,y_1,z_1)\f$ and the top right corner
      * \f$(x_2,y_2,z_2)\f$.
@@ -39,31 +45,32 @@ namespace ryujin
      *
      * @ingroup Geometries
      */
-    template <int dim>
-    class RectangularDomain : public Geometry<dim>
+    template <int structdim, int dim = structdim>
+    class RectangularDomain : public Geometry<structdim, dim>
     {
     public:
       RectangularDomain(const std::string &name, const std::string &subsection)
-          : Geometry<dim>(name, subsection)
+          : Geometry<structdim, dim>(name, subsection)
       {
         this->add_parameter("position bottom left",
                             point_left_,
                             "Position of bottom left corner");
 
-        for (unsigned int d = 0; d < dim; ++d)
+        for (unsigned int d = 0; d < structdim; ++d)
           point_right_[d] = 20.0;
         this->add_parameter(
             "position top right", point_right_, "Position of top right corner");
 
         grading_push_forward_ = dim == 1 ? "x" : (dim == 2 ? "x;y" : "x;y;z;");
-        this->add_parameter("grading push forward",
-                            grading_push_forward_,
-                            "push forward of grading manifold");
-
         grading_pull_back_ = grading_push_forward_;
-        this->add_parameter("grading pull back",
-                            grading_pull_back_,
-                            "pull back of grading manifold");
+        if constexpr (structdim == dim) {
+          this->add_parameter("grading push forward",
+                              grading_push_forward_,
+                              "push forward of grading manifold");
+          this->add_parameter("grading pull back",
+                              grading_pull_back_,
+                              "pull back of grading manifold");
+        }
 
         this->add_parameter(
             "transformation",
@@ -96,7 +103,7 @@ namespace ryujin
             "Type of boundary condition enforced on the right side of the "
             "domain (faces with normal in positive x direction)");
 
-        if constexpr (dim >= 2) {
+        if constexpr (structdim >= 2) {
           this->add_parameter("subdivisions y",
                               subdivisions_y_,
                               "number of subdivisions in y direction");
@@ -112,7 +119,7 @@ namespace ryujin
               "domain (faces with normal in positive y direction)");
         }
 
-        if constexpr (dim == 3) {
+        if constexpr (structdim == 3) {
           this->add_parameter("subdivisions z",
                               subdivisions_z_,
                               "number of subdivisions in z direction");
@@ -143,27 +150,28 @@ namespace ryujin
 
 
       void create_coarse_triangulation(
-          dealii::Triangulation<dim> &triangulation) const override
+          dealii::Triangulation<structdim, dim> &triangulation) const override
       {
         /* create mesh: */
 
-        dealii::Triangulation<dim, dim> tria1;
-        tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+        dealii::Triangulation<structdim> tria1;
+        if constexpr (structdim == dim)
+          tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
         if (use_simplices_) {
           /* Mesh with simplices: */
 
-          if constexpr (dim == 1) {
+          if constexpr (structdim == 1) {
             dealii::GridGenerator::
-                subdivided_hyper_rectangle_with_simplices<dim, dim>(
+                subdivided_hyper_rectangle_with_simplices<1, 1>(
                     tria1, {subdivisions_x_}, point_left_, point_right_);
-          } else if constexpr (dim == 2) {
+          } else if constexpr (structdim == 2) {
             dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices(
                 tria1,
                 {subdivisions_x_, subdivisions_y_},
                 point_left_,
                 point_right_);
-          } else if constexpr (dim == 3) {
+          } else if constexpr (structdim == 3) {
             dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices(
                 tria1,
                 {subdivisions_x_, subdivisions_y_, subdivisions_z_},
@@ -174,16 +182,16 @@ namespace ryujin
         } else {
           /* Regular mesh with quadrilaterals/hexahedra: */
 
-          if constexpr (dim == 1) {
-            dealii::GridGenerator::subdivided_hyper_rectangle<dim, dim>(
+          if constexpr (structdim == 1) {
+            dealii::GridGenerator::subdivided_hyper_rectangle<1, 1>(
                 tria1, {subdivisions_x_}, point_left_, point_right_);
-          } else if constexpr (dim == 2) {
+          } else if constexpr (structdim == 2) {
             dealii::GridGenerator::subdivided_hyper_rectangle(
                 tria1,
                 {subdivisions_x_, subdivisions_y_},
                 point_left_,
                 point_right_);
-          } else if constexpr (dim == 3) {
+          } else if constexpr (structdim == 3) {
             dealii::GridGenerator::subdivided_hyper_rectangle(
                 tria1,
                 {subdivisions_x_, subdivisions_y_, subdivisions_z_},
@@ -192,7 +200,10 @@ namespace ryujin
           }
         }
 
-        triangulation.copy_triangulation(tria1);
+        if constexpr (structdim == dim)
+          triangulation.copy_triangulation(tria1);
+        else
+          dealii::GridGenerator::flatten_triangulation(tria1, triangulation);
 
         /* create transformation: */
 
@@ -212,7 +223,8 @@ namespace ryujin
 
           this->transformation_ =
               [transformation](
-                  const typename dealii::Triangulation<dim>::cell_iterator &,
+                  const typename dealii::Triangulation<structdim,
+                                                       dim>::cell_iterator &,
                   const dealii::Point<dim> &point) {
                 dealii::Point<dim> result;
                 for (unsigned int d = 0; d < dim; ++d)
@@ -225,11 +237,13 @@ namespace ryujin
 
         // FIXME: We should ideally check the push forward and pull back
         // for compatiblity.
-        if (grading_push_forward_ != grading_pull_back_) {
-          dealii::FunctionManifold<dim> grading(grading_push_forward_,
-                                                grading_pull_back_);
-          triangulation.set_all_manifold_ids(1);
-          triangulation.set_manifold(1, grading);
+        if constexpr (structdim == dim) {
+          if (grading_push_forward_ != grading_pull_back_) {
+            dealii::FunctionManifold<dim> grading(grading_push_forward_,
+                                                  grading_pull_back_);
+            triangulation.set_all_manifold_ids(1);
+            triangulation.set_manifold(1, grading);
+          }
         }
 
         /* set boundary ids: */
@@ -246,14 +260,14 @@ namespace ryujin
             if (position[0] > point_right_[0] - 1.e-8)
               face->set_boundary_id(boundary_right_);
 
-            if constexpr (dim >= 2) {
+            if constexpr (structdim >= 2) {
               if (position[1] < point_left_[1] + 1.e-8)
                 face->set_boundary_id(boundary_bottom_);
               if (position[1] > point_right_[1] - 1.e-8)
                 face->set_boundary_id(boundary_top_);
             }
 
-            if constexpr (dim == 3) {
+            if constexpr (structdim == 3) {
               if (position[2] < point_left_[2] + 1.e-8)
                 face->set_boundary_id(boundary_back_);
               if (position[2] > point_right_[2] - 1.e-8)
@@ -274,7 +288,7 @@ namespace ryujin
           directions.push_back(0);
         }
 
-        if (dim >= 2 && (boundary_bottom_ == Boundary::periodic ||
+        if (structdim >= 2 && (boundary_bottom_ == Boundary::periodic ||
                          boundary_top_ == Boundary::periodic)) {
           AssertThrow(boundary_bottom_ == boundary_top_,
                       dealii::ExcMessage(
@@ -284,7 +298,7 @@ namespace ryujin
           directions.push_back(1);
         }
 
-        if (dim == 3 && (boundary_back_ == Boundary::periodic ||
+        if (structdim == 3 && (boundary_back_ == Boundary::periodic ||
                          boundary_front_ == Boundary::periodic)) {
           AssertThrow(boundary_back_ == boundary_front_,
                       dealii::ExcMessage(
@@ -297,7 +311,7 @@ namespace ryujin
 #ifndef BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
         if (!directions.empty()) {
           std::vector<dealii::GridTools::PeriodicFacePair<
-              typename dealii::Triangulation<dim>::cell_iterator>>
+              typename dealii::Triangulation<structdim, dim>::cell_iterator>>
               periodic_faces;
 
           for (const auto direction : directions)
@@ -313,22 +327,24 @@ namespace ryujin
       }
 
 
-      typename Geometry<dim>::HP_Collection
+      using HP_Collection = typename Geometry<structdim, dim>::HP_Collection;
+      using Collection = typename Discretization<structdim, dim>::Collection;
+
+      HP_Collection
       populate_hp_collections(const unsigned int /*fe_degree*/,
-                              typename ryujin::Discretization<dim>::Collection
-                                  & /*collection*/) const override
+                              Collection & /*collection*/) const override
       {
         if (use_simplices_) {
-          return Geometry<dim>::HP_Collection::standard_simplices;
+          return HP_Collection::standard_simplices;
         } else {
-          return Geometry<dim>::HP_Collection::standard_quadrilaterals;
+          return HP_Collection::standard_quadrilaterals;
         }
       }
 
 
     protected:
-      dealii::Point<dim> point_left_;
-      dealii::Point<dim> point_right_;
+      dealii::Point<structdim> point_left_;
+      dealii::Point<structdim> point_right_;
 
       unsigned int subdivisions_x_;
       unsigned int subdivisions_y_;

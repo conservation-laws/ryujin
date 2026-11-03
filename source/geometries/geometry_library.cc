@@ -63,19 +63,21 @@ namespace ryujin
   }
 
   /*
-   * There are no built-in co-dimension geometries yet:
+   * Co-dimension geometries:
    */
 
   template <>
   auto GeometryLibrary<1, 2>::defaults() -> std::vector<Creator>
   {
-    return {};
+    using Geometries::RectangularDomain;
+    return {creator<RectangularDomain<1, 2>>()};
   }
 
   template <>
   auto GeometryLibrary<2, 3>::defaults() -> std::vector<Creator>
   {
-    return {};
+    using Geometries::RectangularDomain;
+    return {creator<RectangularDomain<2, 3>>()};
   }
 
   /* instantiations */
