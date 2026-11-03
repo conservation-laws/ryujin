@@ -31,7 +31,7 @@ namespace ryujin
     template <int dim, typename Number>
     ParabolicModule<dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const OfflineData<dim, dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
         const InitialValues &initial_values,
@@ -147,7 +147,7 @@ namespace ryujin
                   dealii::ExcMessage("The Navier-Stokes module currently only "
                                      "supports cG Q1 finite elements."));
 
-      AssertThrow(!offline_data_->dof_handler().has_hp_capabilities(),
+      AssertThrow(!discretization.dof_handler().has_hp_capabilities(),
                   dealii::ExcMessage(
                       "The Navier-Stokes module currently does not support "
                       "DoFHandlers set up with hp capabilities."));
@@ -159,7 +159,7 @@ namespace ryujin
           MatrixFree<dim, Number>::AdditionalData::none;
 
       matrix_free_.reinit(discretization.mapping(),
-                          offline_data_->dof_handler(),
+                          discretization.dof_handler(),
                           offline_data_->affine_constraints(),
                           discretization.quadrature_1d(),
                           additional_data);
@@ -185,20 +185,20 @@ namespace ryujin
         return;
 
       const unsigned int n_levels =
-          offline_data_->dof_handler().get_triangulation().n_global_levels();
+          discretization.triangulation().n_global_levels();
       const unsigned int min_level = std::min(gmg_min_level_, n_levels - 1);
       MGLevelObject<IndexSet> relevant_sets(0, n_levels - 1);
       for (unsigned int level = 0; level < n_levels; ++level)
         relevant_sets[level] =
             dealii::DoFTools::extract_locally_relevant_level_dofs(
-                offline_data_->dof_handler(), level);
-      mg_constrained_dofs_.initialize(offline_data_->dof_handler(),
+                discretization.dof_handler(), level);
+      mg_constrained_dofs_.initialize(discretization.dof_handler(),
                                       relevant_sets);
       std::set<types::boundary_id> boundary_ids;
       boundary_ids.insert(Boundary::dirichlet);
       boundary_ids.insert(Boundary::no_slip);
       mg_constrained_dofs_.make_zero_boundary_constraints(
-          offline_data_->dof_handler(), boundary_ids);
+          discretization.dof_handler(), boundary_ids);
 
       typename MatrixFree<dim, float>::AdditionalData additional_data_level;
       additional_data_level.tasks_parallel_scheme =
@@ -214,17 +214,17 @@ namespace ryujin
         // constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
         constraints.close();
         level_matrix_free_[level].reinit(discretization.mapping(),
-                                         offline_data_->dof_handler(),
+                                         discretization.dof_handler(),
                                          constraints,
                                          discretization.quadrature_1d(),
                                          additional_data_level);
         level_matrix_free_[level].initialize_dof_vector(level_density_[level]);
       }
 
-      mg_transfer_velocity_.build(offline_data_->dof_handler(),
+      mg_transfer_velocity_.build(discretization.dof_handler(),
                                   mg_constrained_dofs_,
                                   level_matrix_free_);
-      mg_transfer_energy_.build(offline_data_->dof_handler(),
+      mg_transfer_energy_.build(discretization.dof_handler(),
                                 level_matrix_free_);
     }
 
@@ -567,7 +567,9 @@ namespace ryujin
 
         if ((use_gmg_velocity_ || use_gmg_internal_energy_) && reinitialize_gmg)
           mg_transfer_velocity_.interpolate_to_mg(
-              offline_data_->dof_handler(), level_density_, density_);
+              offline_data_->discretization().dof_handler(),
+              level_density_,
+              density_);
 
         if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
@@ -673,7 +675,8 @@ namespace ryujin
                                   level_velocity_matrices_.min_level(),
                                   level_velocity_matrices_.max_level());
 
-          const auto &dof_handler = offline_data_->dof_handler();
+          const auto &dof_handler =
+              offline_data_->discretization().dof_handler();
           PreconditionMG<dim, bvt_float, MGTransferVelocity<dim, float>>
               preconditioner(dof_handler, mg, mg_transfer_velocity_);
 
@@ -900,7 +903,8 @@ namespace ryujin
                                  level_energy_matrices_.min_level(),
                                  level_energy_matrices_.max_level());
 
-          const auto &dof_handler = offline_data_->dof_handler();
+          const auto &dof_handler =
+              offline_data_->discretization().dof_handler();
           PreconditionMG<dim, vt_float, MGTransferEnergy<dim, float>>
               preconditioner(dof_handler, mg, mg_transfer_energy_);
 

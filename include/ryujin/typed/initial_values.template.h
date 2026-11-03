@@ -8,9 +8,6 @@
 #include <ryujin/base/random.h>
 #include <ryujin/typed/initial_values.h>
 
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/vector_tools.templates.h>
-
 #include <random>
 
 namespace ryujin
@@ -20,7 +17,7 @@ namespace ryujin
   template <typename HyperbolicSystem, int dim, typename Number>
   InitialValues<HyperbolicSystem, dim, Number>::InitialValues(
       const MPIEnsemble &mpi_ensemble,
-      const OfflineData<dim, Number> &offline_data,
+      const Interface::OfflineData<dim, Number> &offline_data,
       const HyperbolicSystem &hyperbolic_system,
       const Interface::ParabolicSystem &parabolic_system,
       const std::string &subsection)
@@ -245,29 +242,17 @@ namespace ryujin
               << "interpolate_hyperbolic_vector(t = " << t << ")" << std::endl;
 #endif
 
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
     const auto &vector_partitioner =
         offline_data_->hyperbolic_vector_partitioner();
 
     MultiComponentVector<Number> U;
     U.reinit_with_vector_partitioner(vector_partitioner, problem_dimension);
 
-    ScalarHostVector<Number> temp;
-    temp.reinit(scalar_partitioner);
-
-    // FIXME: it is not particularly efficient to call
-    // VectorTools::interpolate for every component separately. If this
-    // gets too slow, we should consider writing out to a temporary (block)
-    // vector and then inserting into the MultiComponentVector.
+    /* Evaluate the initial state at the support points: */
+    const auto &support_points = offline_data_->support_points();
     const auto U_view = U.template view<problem_dimension>();
-    const auto callable = [&](const auto &p) { return initial_state(p, t); };
-    for (unsigned int d = 0; d < problem_dimension; ++d) {
-      VectorTools::interpolate(offline_data_->discretization().mapping(),
-                               offline_data_->dof_handler(),
-                               to_function<dim, Number>(callable, d),
-                               temp);
-      U_view.insert_component(temp, d);
-    }
+    for (unsigned int i = 0; i < offline_data_->n_locally_owned(); ++i)
+      U_view.write_tensor(initial_state(support_points[i], t), i);
 
     U_view.update_ghost_values();
 
@@ -294,23 +279,12 @@ namespace ryujin
     if constexpr (n_initial_precomputed_values == 0)
       return precomputed;
 
-    ScalarHostVector<Number> temp;
-    temp.reinit(scalar_partitioner);
-
-    // FIXME: it is not particularly efficient to call
-    // VectorTools::interpolate for every component separately. If this
-    // gets too slow, we should consider writing out to a temporary (block)
-    // vector and then inserting into the MultiComponentVector.
+    /* Evaluate the initial precomputed values at the support points: */
+    const auto &support_points = offline_data_->support_points();
     const auto precomputed_view =
         precomputed.template view<n_initial_precomputed_values>();
-    const auto callable = [&](const auto &p) { return initial_precomputed(p); };
-    for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
-      VectorTools::interpolate(offline_data_->discretization().mapping(),
-                               offline_data_->dof_handler(),
-                               to_function<dim, Number>(callable, d),
-                               temp);
-      precomputed_view.insert_component(temp, d);
-    }
+    for (unsigned int i = 0; i < offline_data_->n_locally_owned(); ++i)
+      precomputed_view.write_tensor(initial_precomputed(support_points[i]), i);
 
     precomputed_view.update_ghost_values();
     return precomputed;

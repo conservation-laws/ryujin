@@ -18,9 +18,9 @@ namespace ryujin
   using namespace dealii;
 
 
-  template <int dim, typename Number>
-  VTUOutput<dim, Number>::VTUOutput(
-      const Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  VTUOutput<structdim, dim, Number>::VTUOutput(
+      const Interface::Simulation<structdim, dim, Number> &simulation,
       bool levelsets /*= false*/,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
@@ -91,11 +91,12 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void VTUOutput<dim, Number>::prepare(TaskContext<Number> & /*context*/)
+  template <int structdim, int dim, typename Number>
+  void
+  VTUOutput<structdim, dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
+    std::cout << "VTUOutput<structdim, dim, Number>::prepare()" << std::endl;
 #endif
 
     selection_ = postprocessor_.prepare(vtu_output_quantities_);
@@ -103,15 +104,15 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void VTUOutput<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void VTUOutput<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     if (!this->trigger_->fire(context))
       return;
 
 #ifdef DEBUG_OUTPUT
-    std::cout << "VTUOutput<dim, Number>::execute(t = " << context.t << ")"
-              << std::endl;
+    std::cout << "VTUOutput<structdim, dim, Number>::execute(t = " << context.t
+              << ")" << std::endl;
 #endif
 
     ComputingTimer::Scope scope("time step [X]   - perform vtu output");
@@ -143,15 +144,16 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void VTUOutput<dim, Number>::schedule_output(
+  template <int structdim, int dim, typename Number>
+  void VTUOutput<structdim, dim, Number>::schedule_output(
       const StateVector<Number> &state_vector,
       std::string name,
       Number t,
       unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
+    std::cout << "VTUOutput<structdim, dim, Number>::schedule_output()"
+              << std::endl;
 #endif
 
     /*
@@ -226,11 +228,13 @@ namespace ryujin
      * Attach data vectors to DataOut object:
      */
 
-    auto data_out = std::make_unique<dealii::DataOut<dim>>();
+    auto data_out = std::make_unique<dealii::DataOut<structdim, dim>>();
 
     const auto attach_data_vector = [&](auto &data, const auto &name) {
-      const auto &dof_handler_cg = offline_data_->dof_handler_cg();
-      const auto &dof_handler_dg = offline_data_->dof_handler_dg();
+      const auto &dof_handler_cg =
+          simulation_.discretization().dof_handler_cg();
+      const auto &dof_handler_dg =
+          simulation_.discretization().dof_handler_dg();
 
       if (data.size() == dof_handler_cg.n_dofs()) {
         offline_data_->affine_constraints_cg().distribute(data);
@@ -258,7 +262,7 @@ namespace ryujin
         t, cycle, true, DataOutBase::CompressionLevel::best_speed);
     data_out->set_flags(flags);
 
-    const auto &discretization = offline_data_->discretization();
+    const auto &discretization = simulation_.discretization();
     const auto &mapping = discretization.mapping();
     const auto patch_order =
         std::max(1u, discretization.polynomial_degree()) - 1u;
@@ -267,7 +271,7 @@ namespace ryujin
 
     if (!levelsets_) {
       data_out->build_patches(
-          mapping, patch_order, DataOut<dim>::curved_inner_cells);
+          mapping, patch_order, DataOut<structdim, dim>::curved_inner_cells);
 
       if (use_mpi_io_) {
         /* MPI-based synchronous IO */
@@ -315,7 +319,7 @@ namespace ryujin
       });
 
       data_out->build_patches(
-          mapping, patch_order, DataOut<dim>::curved_inner_cells);
+          mapping, patch_order, DataOut<structdim, dim>::curved_inner_cells);
 
       if (use_mpi_io_) {
         /* MPI-based synchronous IO */

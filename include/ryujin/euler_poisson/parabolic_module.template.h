@@ -30,7 +30,7 @@ namespace ryujin
     template <typename HyperbolicDescription, int dim, typename Number>
     ParabolicModule<HyperbolicDescription, dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
-        const OfflineData<dim, Number> &offline_data,
+        const OfflineData<dim, dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
         const InitialValues &initial_values,
@@ -135,7 +135,7 @@ namespace ryujin
                   dealii::ExcMessage("The Euler-Poisson module currently only "
                                      "supports cG/dg Q1 finite elements."));
 
-      AssertThrow(!offline_data_->dof_handler().has_hp_capabilities(),
+      AssertThrow(!discretization.dof_handler().has_hp_capabilities(),
                   dealii::ExcMessage(
                       "The Euler-Poisson module currently does not support "
                       "DoFHandlers set up with hp capabilities."));
@@ -152,7 +152,7 @@ namespace ryujin
 
       // First index CG, second index hyperbolic ansatz
       std::vector<const dealii::DoFHandler<dim> *> dof_handlers = {
-          &offline_data_->dof_handler_cg(), &offline_data_->dof_handler()};
+          &discretization.dof_handler_cg(), &discretization.dof_handler()};
 
       create_constraints();
       std::vector<const dealii::AffineConstraints<Number> *>
@@ -441,7 +441,7 @@ namespace ryujin
 #endif
 
       const auto &discretization = offline_data_->discretization();
-      const auto &dof_handler = offline_data_->dof_handler_cg();
+      const auto &dof_handler = discretization.dof_handler_cg();
 
       affine_constraints_potential_.clear();
 
@@ -451,7 +451,7 @@ namespace ryujin
       const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
       affine_constraints_potential_.reinit(locally_owned, locally_relevant);
 
-      DoFTools::make_hanging_node_constraints(offline_data_->dof_handler_cg(),
+      DoFTools::make_hanging_node_constraints(discretization.dof_handler_cg(),
                                               affine_constraints_potential_);
 
       /*
@@ -493,7 +493,7 @@ namespace ryujin
       for (const auto &it :
            selected_electrostatic_configuration_->dirichlet_boundaries())
         DoFTools::make_zero_boundary_constraints(
-            offline_data_->dof_handler_cg(), it, affine_constraints_potential_);
+            discretization.dof_handler_cg(), it, affine_constraints_potential_);
 
       affine_constraints_potential_.close();
     }
@@ -533,7 +533,7 @@ namespace ryujin
       background_density_.zero_out_ghost_values();
       dealii::VectorTools::interpolate(
           discretization.mapping(),
-          offline_data_->dof_handler(),
+          discretization.dof_handler(),
           dealii::ScalarFunctionFromFunctionObject<dim, Number>(
               [&](const dealii::Point<dim> &p) {
                 return selected_electrostatic_configuration_
@@ -582,7 +582,7 @@ namespace ryujin
         magnetic_field_.block(k).zero_out_ghost_values();
         dealii::VectorTools::interpolate(
             discretization.mapping(),
-            offline_data_->dof_handler(),
+            discretization.dof_handler(),
             to_function<dim, Number>(
                 [&](const dealii::Point<dim> &p) {
                   return selected_electrostatic_configuration_->magnetic_field(

@@ -8,8 +8,10 @@
 namespace ryujin
 {
   /* instantiations */
-  template class Quantities<1, NUMBER>;
-  template class Quantities<2, NUMBER>;
-  template class Quantities<3, NUMBER>;
+  template class Quantities<1, 1, NUMBER>;
+  template class Quantities<2, 2, NUMBER>;
+  template class Quantities<3, 3, NUMBER>;
+  template class Quantities<1, 2, NUMBER>;
+  template class Quantities<2, 3, NUMBER>;
 
 } // namespace ryujin

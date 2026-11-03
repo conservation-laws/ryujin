@@ -62,9 +62,27 @@ namespace ryujin
     return Geometries::defaults<3>();
   }
 
+  /*
+   * There are no built-in co-dimension geometries yet:
+   */
+
+  template <>
+  auto GeometryLibrary<1, 2>::defaults() -> std::vector<Creator>
+  {
+    return {};
+  }
+
+  template <>
+  auto GeometryLibrary<2, 3>::defaults() -> std::vector<Creator>
+  {
+    return {};
+  }
+
   /* instantiations */
 
   template class Library<Geometry<1>, const std::string &>;
   template class Library<Geometry<2>, const std::string &>;
   template class Library<Geometry<3>, const std::string &>;
+  template class Library<Geometry<1, 2>, const std::string &>;
+  template class Library<Geometry<2, 3>, const std::string &>;
 } // namespace ryujin

@@ -27,7 +27,7 @@ namespace ryujin
    *
    * @ingroup Driver
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class Checkpointing final : public dealii::ParameterAcceptor,
                               public Interface::Task<Number>
   {
@@ -35,7 +35,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Checkpointing(Interface::Simulation<dim, Number> &simulation,
+    Checkpointing(Interface::Simulation<structdim, dim, Number> &simulation,
                   const std::string &subsection = "/Checkpointing");
 
     /**
@@ -78,7 +78,7 @@ namespace ryujin
      */
     //@{
 
-    Interface::Simulation<dim, Number> &simulation_;
+    Interface::Simulation<structdim, dim, Number> &simulation_;
 
     //@}
     /**

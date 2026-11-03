@@ -174,7 +174,7 @@ namespace ryujin
        * Constructor.
        */
       ParabolicModule(const MPIEnsemble &mpi_ensemle,
-                      const OfflineData<dim, Number> &offline_data,
+                      const OfflineData<dim, dim, Number> &offline_data,
                       const HyperbolicSystem &hyperbolic_system,
                       const ParabolicSystem &parabolic_system,
                       const InitialValues &initial_values,
@@ -293,7 +293,7 @@ namespace ryujin
 
       dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
       dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
-      dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
+      dealii::ObserverPointer<const ryujin::OfflineData<dim, dim, Number>>
           offline_data_;
       dealii::ObserverPointer<const InitialValues> initial_values_;
 

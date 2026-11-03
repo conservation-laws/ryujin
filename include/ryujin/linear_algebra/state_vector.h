@@ -16,12 +16,6 @@
 
 namespace ryujin
 {
-#ifndef DOXYGEN
-  /* Forward declaration */
-  template <int dim, typename Number>
-  class OfflineData;
-#endif
-
   /**
    * A scalar vector representing a single component given by a deal.II
    * data type that is compatible with deal.II functions and methods and

@@ -21,17 +21,18 @@ namespace ryujin
    *
    * @ingroup MeshAndOfflineData
    */
-  template <int dim>
+  template <int structdim, int dim>
   class AssemblyScratchData
   {
   public:
-    AssemblyScratchData(const AssemblyScratchData<dim> &assembly_scratch_data)
+    AssemblyScratchData(
+        const AssemblyScratchData<structdim, dim> &assembly_scratch_data)
         : AssemblyScratchData(assembly_scratch_data.discretization_)
     {
     }
 
 
-    AssemblyScratchData(const Discretization<dim> &discretization)
+    AssemblyScratchData(const Discretization<structdim, dim> &discretization)
         : discretization_(discretization)
         , hp_fe_values_(discretization_.mapping(),
                         discretization_.finite_element(),
@@ -62,13 +63,13 @@ namespace ryujin
     {
     }
 
-    const Discretization<dim> &discretization_;
+    const Discretization<structdim, dim> &discretization_;
 
-    dealii::hp::FEValues<dim> hp_fe_values_;
-    dealii::hp::FEFaceValues<dim> hp_fe_face_values_;
-    dealii::hp::FEFaceValues<dim> hp_fe_face_values_nodal_;
-    dealii::hp::FEFaceValues<dim> hp_fe_neighbor_face_values_;
-    dealii::hp::FEFaceValues<dim> hp_fe_neighbor_face_values_nodal_;
+    dealii::hp::FEValues<structdim, dim> hp_fe_values_;
+    dealii::hp::FEFaceValues<structdim, dim> hp_fe_face_values_;
+    dealii::hp::FEFaceValues<structdim, dim> hp_fe_face_values_nodal_;
+    dealii::hp::FEFaceValues<structdim, dim> hp_fe_neighbor_face_values_;
+    dealii::hp::FEFaceValues<structdim, dim> hp_fe_neighbor_face_values_nodal_;
   };
 
   /**
@@ -77,7 +78,7 @@ namespace ryujin
    *
    * @ingroup MeshAndOfflineData
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class AssemblyCopyData
   {
   public:
@@ -89,7 +90,7 @@ namespace ryujin
     std::array<dealii::FullMatrix<Number>, dim> cell_cij_matrix_;
     Number cell_measure_;
 
-    static constexpr unsigned int n_faces = 2 * dim;
+    static constexpr unsigned int n_faces = 2 * structdim;
     std::array<std::vector<dealii::types::global_dof_index>, n_faces>
         neighbor_local_dof_indices_;
     std::array<std::array<dealii::FullMatrix<Number>, dim>, n_faces>

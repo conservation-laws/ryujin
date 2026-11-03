@@ -18,6 +18,7 @@
 #include <deal.II/distributed/fully_distributed_tria.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
+#include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/mapping_q_cache.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/hp/fe_collection.h>
@@ -202,13 +203,15 @@ namespace ryujin
    * @ingroup MeshAndOfflineData
    */
   enum class MeshType {
-    /** Use serial dealii::Triangulation<dim> */
+    /** Use serial dealii::Triangulation<structdim, dim> */
     serial,
-    /** Use parallel dealii::parallel::shared::Triangulation<dim> */
+    /** Use parallel dealii::parallel::shared::Triangulation<structdim, dim> */
     parallel_shared,
-    /** Use parallel dealii::parallel::distributed::Triangulation<dim> */
+    /** Use parallel dealii::parallel::distributed::Triangulation<structdim,
+       dim> */
     parallel_distributed,
-    /** Use parallel dealii::parallel::fullydistributed::Triangulation<dim> */
+    /** Use parallel
+       dealii::parallel::fullydistributed::Triangulation<structdim, dim> */
     parallel_fullydistributed
   };
 } // namespace ryujin
@@ -238,9 +241,15 @@ namespace ryujin
    * benchmark configurations and to read in meshes in one of the formats
    * supported by the deal.II library.
    *
+   * The template parameters follow the deal.II convention for
+   * dealii::Triangulation<structdim, dim>: @p structdim is the intrinsic
+   * dimension of the mesh and @p dim the dimension of the space it is
+   * embedded in. For @p structdim < @p dim the mesh describes a curve or
+   * surface (co-dimension one or two).
+   *
    * @ingroup MeshAndOfflineData
    */
-  template <int dim>
+  template <int structdim, int dim = structdim>
   class Discretization final : public dealii::ParameterAcceptor
   {
   public:
@@ -256,17 +265,22 @@ namespace ryujin
      * Geometry::populate_hp_collections() sane.
      */
     struct Collection {
-      std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping;
-      std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg;
-      std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_dg;
-      std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature;
-      std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order;
-      std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature;
+      std::unique_ptr<const dealii::hp::MappingCollection<structdim, dim>>
+          mapping;
+      std::unique_ptr<const dealii::hp::FECollection<structdim, dim>>
+          finite_element_cg;
+      std::unique_ptr<const dealii::hp::FECollection<structdim, dim>>
+          finite_element_dg;
+      std::unique_ptr<const dealii::hp::QCollection<structdim>> quadrature;
+      std::unique_ptr<const dealii::hp::QCollection<structdim>>
+          quadrature_high_order;
+      std::unique_ptr<const dealii::hp::QCollection<structdim>>
+          nodal_quadrature;
       std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d;
       std::unique_ptr<const dealii::hp::QCollection<1>> nodal_quadrature_1d;
-      std::unique_ptr<const std::vector<dealii::hp::QCollection<dim - 1>>>
+      std::unique_ptr<const std::vector<dealii::hp::QCollection<structdim - 1>>>
           face_quadrature;
-      std::unique_ptr<const std::vector<dealii::hp::QCollection<dim - 1>>>
+      std::unique_ptr<const std::vector<dealii::hp::QCollection<structdim - 1>>>
           face_nodal_quadrature;
     };
 
@@ -275,7 +289,7 @@ namespace ryujin
      * the actual geometry, see Geometry::transformation().
      */
     using Transformation = std::function<dealii::Point<dim>(
-        const typename dealii::Triangulation<dim>::cell_iterator &,
+        const typename dealii::Triangulation<structdim, dim>::cell_iterator &,
         const dealii::Point<dim> &)>;
 
     //@}
@@ -291,10 +305,23 @@ namespace ryujin
                    const std::string &subsection = "/Discretization");
 
     /**
-     * Create the triangulation and set up the finite element, mapping and
-     * quadrature objects.
+     * Create the triangulation, set up the finite element, mapping and
+     * quadrature objects, distribute degrees of freedom, and update the
+     * mapping. After prepare() the object is fully set up.
      */
     void prepare(const std::string &base_name);
+
+    /**
+     * Create the DoFHandler objects (if necessary) and distribute degrees
+     * of freedom for the continuous ("cG") and discontinuous ("dG")
+     * variant of the selected finite element space. This function has to
+     * be called again after the topology of the triangulation has changed
+     * (after a mesh adaptation, or after loading a checkpoint).
+     *
+     * @note OfflineData::prepare() subsequently renumbers the degrees of
+     * freedom.
+     */
+    void distribute_dofs();
 
     /**
      * Recompute the cached mapping after the triangulation, or the
@@ -397,6 +424,54 @@ namespace ryujin
     ACCESSOR_READ_ONLY(triangulation)
 
     /**
+     * Return a mutable reference to the DoFHandler for the continuous
+     * ("cG") variant of the selected finite element space.
+     */
+    ACCESSOR(dof_handler_cg)
+
+    /**
+     * Return a read-only const reference to the DoFHandler for the
+     * continuous ("cG") variant of the selected finite element space.
+     *
+     * @note If the selected finite element space is continuous then this
+     * method simply returns the same object as dof_handler().
+     */
+    ACCESSOR_READ_ONLY(dof_handler_cg)
+
+    /**
+     * Return a mutable reference to the DoFHandler for the discontinuous
+     * ("dG") variant of the selected finite element space.
+     */
+    ACCESSOR(dof_handler_dg)
+
+    /**
+     * Return a read-only const reference to the DoFHandler for the
+     * discontinuous ("dG") variant of the selected finite element space.
+     *
+     * @note If the selected finite element space is discontinuous then
+     * this method simply returns the same object as dof_handler().
+     */
+    ACCESSOR_READ_ONLY(dof_handler_dg)
+
+    /**
+     * Return a mutable reference to the DoFHandler of the selected finite
+     * element space.
+     */
+    dealii::DoFHandler<structdim, dim> &dof_handler()
+    {
+      return have_discontinuous_ansatz() ? dof_handler_dg() : dof_handler_cg();
+    }
+
+    /**
+     * Return a read-only const reference to the DoFHandler of the selected
+     * finite element space.
+     */
+    const dealii::DoFHandler<structdim, dim> &dof_handler() const
+    {
+      return have_discontinuous_ansatz() ? dof_handler_dg() : dof_handler_cg();
+    }
+
+    /**
      * Return a mutable reference to the transformation used for the
      * MappingQCache object.
      *
@@ -449,7 +524,7 @@ namespace ryujin
      *
      * @note The accessor returns an FECollection object.
      */
-    const dealii::hp::FECollection<dim> &finite_element() const
+    const dealii::hp::FECollection<structdim, dim> &finite_element() const
     {
       if (have_discontinuous_ansatz())
         return *collection_.finite_element_dg;
@@ -540,16 +615,19 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    std::vector<std::unique_ptr<Geometry<dim>>> geometry_list_;
-    Geometry<dim> *selected_geometry_ = nullptr;
+    std::vector<std::unique_ptr<Geometry<structdim, dim>>> geometry_list_;
+    Geometry<structdim, dim> *selected_geometry_ = nullptr;
 
-    std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
+    std::unique_ptr<dealii::Triangulation<structdim, dim>> triangulation_;
+
+    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_cg_;
+    std::unique_ptr<dealii::DoFHandler<structdim, dim>> dof_handler_dg_;
 
     Collection collection_;
-    typename Geometry<dim>::HP_Collection collection_type_ =
-        Geometry<dim>::HP_Collection::standard_quadrilaterals;
+    typename Geometry<structdim, dim>::HP_Collection collection_type_ =
+        Geometry<structdim, dim>::HP_Collection::standard_quadrilaterals;
 
-    std::shared_ptr<dealii::MappingQCache<dim>> mapping_cache_;
+    std::shared_ptr<dealii::MappingQCache<structdim, dim>> mapping_cache_;
     Transformation transformation_;
 
     //@}

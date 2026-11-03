@@ -39,9 +39,9 @@ int main(int argc, char *argv[])
 
   write_parameter_files("test", true, [] {
     struct Objects {
-      Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+      Simulation<dim, dim, Number, HyperbolicDescription, ParabolicDescription>
           simulation{MPI_COMM_SELF};
-      TaskComposition<dim, Number> task_composition{simulation};
+      TaskComposition<dim, dim, Number> task_composition{simulation};
     };
     return std::make_unique<Objects>();
   });

@@ -9,7 +9,7 @@
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/interface/task.h>
@@ -90,7 +90,7 @@ namespace ryujin
    *
    * @ingroup MeshAndOfflineData
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class MeshAdaptor final : public dealii::ParameterAcceptor,
                             public Interface::Task<Number>
   {
@@ -103,7 +103,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    MeshAdaptor(Interface::Simulation<dim, Number> &simulation,
+    MeshAdaptor(Interface::Simulation<structdim, dim, Number> &simulation,
                 const std::string &subsection = "/MeshAdaptor");
 
     //@}
@@ -153,10 +153,11 @@ namespace ryujin
      */
     //@{
 
-    Interface::Simulation<dim, Number> &simulation_;
+    Interface::Simulation<structdim, dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 

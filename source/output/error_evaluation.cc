@@ -8,8 +8,10 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ErrorEvaluation<1, NUMBER>;
-  template class ErrorEvaluation<2, NUMBER>;
-  template class ErrorEvaluation<3, NUMBER>;
+  template class ErrorEvaluation<1, 1, NUMBER>;
+  template class ErrorEvaluation<2, 2, NUMBER>;
+  template class ErrorEvaluation<3, 3, NUMBER>;
+  template class ErrorEvaluation<1, 2, NUMBER>;
+  template class ErrorEvaluation<2, 3, NUMBER>;
 
 } // namespace ryujin

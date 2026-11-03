@@ -20,14 +20,18 @@
 #include <ryujin/typed/postprocessor.h>
 #include <ryujin/typed/solution_transfer.h>
 
+#include <concepts>
 #include <memory>
 
 namespace ryujin
 {
   /**
    * The Simulation constructs the core objects of a simulation for a given
-   * pairing of a hyperbolic and a parabolic description, and the time
-   * integrator @p TI, which defaults to the TimeIntegrator of ryujin.
+   * pairing of a hyperbolic and a parabolic description, the time
+   * integrator @p TI, which defaults to the TimeIntegrator of ryujin, and
+   * the OfflineData realization @p OD, which defaults to the OfflineData
+   * class of ryujin. A different realization must derive from
+   * ryujin::OfflineData<structdim, dim, Number>.
    *
    * In addition to the objects stored in Interface::Simulation it owns
    * the per-ensemble containers of the hyperbolic system, the parabolic
@@ -39,15 +43,19 @@ namespace ryujin
    *
    * @ingroup Driver
    */
-  template <typename HD,
-            typename PD,
+  template <int structdim,
             int dim,
-            typename Number = double,
-            template <int, typename> class TI = TimeIntegrator>
+            typename Number,
+            typename HD,
+            typename PD,
+            template <int, typename> class TI = TimeIntegrator,
+            template <int, int, typename> class OD = OfflineData>
     requires Concept::HyperbolicDescription<HD, dim, Number> &&
-             Concept::ParabolicDescription<PD, HD, dim, Number> &&
-             Concept::TimeIntegrator<TI<dim, Number>, dim, Number>
-  class Simulation final : public Interface::Simulation<dim, Number>
+             Concept::ParabolicDescription<PD, HD, structdim, dim, Number> &&
+             Concept::TimeIntegrator<TI<dim, Number>, dim, Number> &&
+             std::derived_from<OD<structdim, dim, Number>,
+                               OfflineData<structdim, dim, Number>>
+  class Simulation final : public Interface::Simulation<structdim, dim, Number>
   {
   public:
     /**
@@ -98,12 +106,13 @@ namespace ryujin
           parabolic_system_container_->get();
       this->parabolic_system_ = &parabolic_system;
 
-      this->discretization_ = std::make_unique<Discretization<dim>>(
+      this->discretization_ = std::make_unique<Discretization<structdim, dim>>(
           mpi_ensemble, "/C - Discretization");
 
-      this->offline_data_ = std::make_unique<OfflineData<dim, Number>>(
+      auto offline_data_ptr = std::make_unique<OD<structdim, dim, Number>>(
           mpi_ensemble, *this->discretization_, "/D - OfflineData");
-      const auto &offline_data = *this->offline_data_;
+      const auto &offline_data = *offline_data_ptr;
+      this->offline_data_ = std::move(offline_data_ptr);
 
       initial_values_container_ =
           std::make_unique<MPIEnsembleContainer<InitialValues>>(
@@ -149,7 +158,7 @@ namespace ryujin
                                                            initial_precomputed);
 
       this->solution_transfer_ =
-          std::make_unique<SolutionTransfer<HD, dim, Number>>(
+          std::make_unique<SolutionTransfer<HD, structdim, dim, Number>>(
               mpi_ensemble,
               *this->discretization_,
               offline_data,
@@ -207,10 +216,12 @@ namespace ryujin
           context.info("setting up MPI ensemble");
         context.info("creating mesh and interpolating initial values");
         discretization.prepare(mpi_ensemble.base_name(context.base_name));
+      } else {
+        discretization.distribute_dofs();
+        discretization.update_mapping();
       }
 
       context.info("preparing compute kernels");
-      discretization.update_mapping();
       this->offline_data_->prepare(
           this->hyperbolic_module_->problem_dimension(),
           this->hyperbolic_module_->n_precomputed_values());

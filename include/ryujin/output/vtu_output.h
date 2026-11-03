@@ -8,8 +8,8 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
-#include <ryujin/discretization/offline_data.h>
 #include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/interface/task.h>
@@ -41,7 +41,7 @@ namespace ryujin
    *
    * @ingroup Output
    */
-  template <int dim, typename Number = double>
+  template <int structdim, int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor,
                           public Interface::Task<Number>
   {
@@ -54,7 +54,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    VTUOutput(const Interface::Simulation<dim, Number> &simulation,
+    VTUOutput(const Interface::Simulation<structdim, dim, Number> &simulation,
               bool levelsets = false,
               const std::string &subsection = "/VTUOutput");
 
@@ -102,10 +102,11 @@ namespace ryujin
     //@{
 
     const bool levelsets_;
-    const Interface::Simulation<dim, Number> &simulation_;
+    const Interface::Simulation<structdim, dim, Number> &simulation_;
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
+        offline_data_;
 
     const Interface::Postprocessor<dim, Number> &postprocessor_;
 

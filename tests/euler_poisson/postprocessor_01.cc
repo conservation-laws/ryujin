@@ -78,7 +78,7 @@ void run(const std::string &ansatz)
   HyperbolicSystem hyperbolic_system;
   ParabolicSystem parabolic_system;
   Discretization<dim> discretization(mpi_ensemble);
-  OfflineData<dim, Number> offline_data(mpi_ensemble, discretization);
+  OfflineData<dim, dim, Number> offline_data(mpi_ensemble, discretization);
 
   std::stringstream parameters;
   parameters << "subsection Discretization\n"
@@ -113,8 +113,8 @@ void run(const std::string &ansatz)
   /* Store phi in the other finite element space: */
 
   const auto &other_dof_handler = discretization.have_discontinuous_ansatz()
-                                      ? offline_data.dof_handler_cg()
-                                      : offline_data.dof_handler_dg();
+                                      ? discretization.dof_handler_cg()
+                                      : discretization.dof_handler_dg();
 
   const auto other_partitioner = std::make_shared<Utilities::MPI::Partitioner>(
       other_dof_handler.locally_owned_dofs(),
@@ -131,7 +131,7 @@ void run(const std::string &ansatz)
   ScalarVector<Number> exact;
   exact.reinit_with_scalar_partitioner(
       scalar_partitioner, 1, TransferPolicy::implicit_transfers);
-  interpolate(discretization, offline_data.dof_handler(), exact);
+  interpolate(discretization, discretization.dof_handler(), exact);
 
   Postprocessor<HyperbolicDescription, dim, Number> postprocessor(
       offline_data, hyperbolic_system, parabolic_system, initial_precomputed);

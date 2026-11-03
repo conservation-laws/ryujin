@@ -418,7 +418,7 @@ namespace ryujin
       double gmg_coarse_tolerance;
     };
 
-    void initialize(const OfflineData<dim, Number> &offline_data,
+    void initialize(const OfflineData<dim, dim, Number> &offline_data,
                     const std::set<dealii::types::boundary_id> boundary_ids,
                     const MultigridParameters parameters)
     {
@@ -435,7 +435,7 @@ namespace ryujin
           std::min(parameters.gmg_min_level, n_levels - 1);
       MGLevelObject<IndexSet> relevant_sets(0, n_levels - 1);
 
-      const auto &dof_handler = offline_data.dof_handler_cg();
+      const auto &dof_handler = discretization.dof_handler_cg();
       for (unsigned int level = 0; level < n_levels; ++level) {
         relevant_sets[level] =
             dealii::DoFTools::extract_locally_relevant_level_dofs( //
@@ -445,7 +445,7 @@ namespace ryujin
 
       // First index CG, second index hyperbolic ansatz
       std::vector<const dealii::DoFHandler<dim> *> dof_handlers = {
-          &dof_handler, &offline_data.dof_handler()};
+          &dof_handler, &discretization.dof_handler()};
 
       mg_constrained_dofs_.initialize(dof_handler, relevant_sets);
       /* FIXME: handle periodic boundary conditions and hanging nodes... */

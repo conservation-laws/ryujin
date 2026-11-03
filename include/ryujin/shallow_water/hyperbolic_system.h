@@ -15,6 +15,7 @@
 #include <ryujin/base/simd.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/interface/hyperbolic_system.h>
+#include <ryujin/interface/offline_data.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 #include <ryujin/linear_algebra/state_vector.h>
 
@@ -100,7 +101,7 @@ namespace ryujin
                 int dim,
                 typename ScalarNumber>
       void fill_precomputed_values(
-          const OfflineData<dim, ScalarNumber> &offline_data,
+          const Interface::OfflineData<dim, ScalarNumber> &offline_data,
           StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
@@ -685,7 +686,7 @@ namespace ryujin
 
     template <typename MemorySpace, int dim, typename ScalarNumber>
     inline void HyperbolicSystem::fill_precomputed_values(
-        const OfflineData<dim, ScalarNumber> &offline_data,
+        const Interface::OfflineData<dim, ScalarNumber> &offline_data,
         StateVector<ScalarNumber> &state_vector,
         const bool skip_constrained_dofs) const
     {

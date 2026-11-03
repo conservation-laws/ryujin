@@ -58,9 +58,9 @@ namespace ryujin
    * @code
    * ryujin::write_parameter_files("euler-2d", true, [] {
    *   struct Objects {
-   *     Simulation<HyperbolicDescription, ParabolicDescription, 2> simulation{
-   *         MPI_COMM_SELF};
-   *     TaskComposition<2> task_composition{simulation};
+   *     Simulation<2, 2, double, HyperbolicDescription, ParabolicDescription>
+   *         simulation{MPI_COMM_SELF};
+   *     TaskComposition<2, 2> task_composition{simulation};
    *   };
    *   return std::make_unique<Objects>();
    * });
@@ -217,8 +217,8 @@ namespace ryujin
     static void run_simulation(const std::string &parameter_file,
                                const MPI_Comm &mpi_comm)
     {
-      Simulation<HD, PD, dim, NUMBER, TI> simulation(mpi_comm);
-      TaskComposition<dim, NUMBER> task_composition(simulation);
+      Simulation<dim, dim, NUMBER, HD, PD, TI> simulation(mpi_comm);
+      TaskComposition<dim, dim, NUMBER> task_composition(simulation);
 
       dealii::ParameterAcceptor::initialize(parameter_file);
 
@@ -251,8 +251,8 @@ namespace ryujin
       prm.leave_subsection();
 
       struct Objects {
-        Simulation<HD, PD, dim, NUMBER, TI> simulation{MPI_COMM_SELF};
-        TaskComposition<dim, NUMBER> task_composition{simulation};
+        Simulation<dim, dim, NUMBER, HD, PD, TI> simulation{MPI_COMM_SELF};
+        TaskComposition<dim, dim, NUMBER> task_composition{simulation};
       };
       return std::make_unique<Objects>();
     }

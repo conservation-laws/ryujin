@@ -99,11 +99,12 @@ namespace ryujin
      *
      * @ingroup FiniteElement
      */
-    template <int dim>
-    unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
-                                      const MPI_Comm &mpi_communicator,
-                                      const unsigned int n_locally_internal,
-                                      const std::size_t warp_size)
+    template <int structdim, int dim>
+    unsigned int
+    export_indices_first(dealii::DoFHandler<structdim, dim> &dof_handler,
+                         const MPI_Comm &mpi_communicator,
+                         const unsigned int n_locally_internal,
+                         const std::size_t warp_size)
     {
       using namespace dealii;
 
@@ -211,9 +212,9 @@ namespace ryujin
      *
      * @ingroup FiniteElement
      */
-    template <int dim>
+    template <int structdim, int dim>
     unsigned int
-    inconsistent_strides_last(dealii::DoFHandler<dim> &dof_handler,
+    inconsistent_strides_last(dealii::DoFHandler<structdim, dim> &dof_handler,
                               const dealii::DynamicSparsityPattern &sparsity,
                               const unsigned int n_locally_internal,
                               const std::size_t warp_size)
@@ -312,8 +313,8 @@ namespace ryujin
      *
      * @ingroup FiniteElement
      */
-    template <int dim>
-    unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler,
+    template <int structdim, int dim>
+    unsigned int internal_range(dealii::DoFHandler<structdim, dim> &dof_handler,
                                 const dealii::DynamicSparsityPattern &sparsity,
                                 const std::size_t warp_size)
     {
@@ -403,9 +404,9 @@ namespace ryujin
      *
      * @ingroup FiniteElement
      */
-    template <int dim, typename Number, typename SPARSITY>
+    template <int structdim, int dim, typename Number, typename SPARSITY>
     void make_extended_sparsity_pattern_dg(
-        const dealii::DoFHandler<dim> &dof_handler,
+        const dealii::DoFHandler<structdim, dim> &dof_handler,
         SPARSITY &dsp,
         const dealii::AffineConstraints<Number> &affine_constraints,
         bool keep_constrained)

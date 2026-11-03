@@ -35,8 +35,8 @@
 using namespace ryujin;
 using namespace dealii;
 
-using HyperbolicDescription = Euler::HyperbolicDescription;
-using ParabolicDescription = StubParabolicDescription;
+using HD = Euler::HyperbolicDescription;
+using PD = StubParabolicDescription;
 
 constexpr int dim = 2;
 using Number = NUMBER;
@@ -134,8 +134,7 @@ std::pair<double, double> run(const std::string &name)
   std::pair<double, double> norms;
 
   {
-    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number, TI>
-        simulation(MPI_COMM_WORLD);
+    Simulation<dim, dim, Number, HD, PD, TI> simulation(MPI_COMM_WORLD);
     Scheduler<Number> scheduler(
         MPI_COMM_WORLD, {&simulation}, {}, [](const std::string &) {});
 

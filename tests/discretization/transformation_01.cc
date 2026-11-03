@@ -68,7 +68,6 @@ int main(int argc, char *argv[])
   ParameterAcceptor::initialize(parameters);
 
   discretization.prepare("test");
-  discretization.update_mapping();
   print("geometry:              ");
 
   discretization.transformation() =

@@ -105,7 +105,7 @@ private:
  */
 template <int dim, typename Number>
 struct UserTaskComposition {
-  UserTaskComposition(Interface::Simulation<dim, Number> &simulation)
+  UserTaskComposition(Interface::Simulation<dim, dim, Number> &simulation)
       : simulation(simulation)
       , logger(simulation, "/M - Logger")
       , checkpointing(simulation, "/N - Checkpointing")
@@ -121,9 +121,9 @@ struct UserTaskComposition {
     scheduler.run();
   }
 
-  Interface::Simulation<dim, Number> &simulation;
-  Logger<dim, Number> logger;
-  Checkpointing<dim, Number> checkpointing;
+  Interface::Simulation<dim, dim, Number> &simulation;
+  Logger<dim, dim, Number> logger;
+  Checkpointing<dim, dim, Number> checkpointing;
   TestTask test_task;
   Scheduler<Number> scheduler;
 };
@@ -184,7 +184,7 @@ void run(const std::string &time_loop_parameters,
   AssertThrowMPI(ierr);
 
   {
-    Simulation<HyperbolicDescription, ParabolicDescription, dim, Number>
+    Simulation<dim, dim, Number, HyperbolicDescription, ParabolicDescription>
         simulation(MPI_COMM_WORLD);
     UserTaskComposition<dim, Number> task_composition(simulation);
 

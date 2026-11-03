@@ -180,7 +180,7 @@ namespace ryujin
 
       void initialize(
           const ParabolicSystem &parabolic_system,
-          const OfflineData<dim, Number2> &offline_data,
+          const OfflineData<dim, dim, Number2> &offline_data,
           const dealii::MatrixFree<dim, Number> &matrix_free,
           const dealii::LinearAlgebra::distributed::Vector<Number> &density,
           const Number theta_x_tau,
@@ -389,7 +389,7 @@ namespace ryujin
 
     private:
       const ParabolicSystem *parabolic_system_;
-      const OfflineData<dim, Number2> *offline_data_;
+      const OfflineData<dim, dim, Number2> *offline_data_;
       const dealii::MatrixFree<dim, Number> *matrix_free_;
       const vector_type *density_;
       Number theta_x_tau_;
@@ -550,7 +550,7 @@ namespace ryujin
       EnergyMatrix() = default;
 
       void initialize(
-          const OfflineData<dim, Number2> &offline_data,
+          const OfflineData<dim, dim, Number2> &offline_data,
           const dealii::MatrixFree<dim, Number> &matrix_free,
           const dealii::LinearAlgebra::distributed::Vector<Number> &density,
           const Number time_factor,
@@ -708,7 +708,7 @@ namespace ryujin
       }
 
     private:
-      const OfflineData<dim, Number2> *offline_data_;
+      const OfflineData<dim, dim, Number2> *offline_data_;
       const dealii::MatrixFree<dim, Number> *matrix_free_;
       const dealii::LinearAlgebra::distributed::Vector<Number> *density_;
       Number factor_;

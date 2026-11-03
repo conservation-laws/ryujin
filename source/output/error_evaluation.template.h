@@ -19,9 +19,9 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <int dim, typename Number>
-  ErrorEvaluation<dim, Number>::ErrorEvaluation(
-      const Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  ErrorEvaluation<structdim, dim, Number>::ErrorEvaluation(
+      const Interface::Simulation<structdim, dim, Number> &simulation,
       const std::string &subsection /*= "ErrorEvaluation"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("error evaluation", TaskPhase::pre_step)
@@ -55,11 +55,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::initialize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void ErrorEvaluation<structdim, dim, Number>::initialize(
+      TaskContext<Number> &context)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<dim, Number>::initialize()" << std::endl;
+    std::cout << "ErrorEvaluation<structdim, dim, Number>::initialize()"
+              << std::endl;
 #endif
 
     base_name_ = context.base_name;
@@ -98,8 +100,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void
+  ErrorEvaluation<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     if (!this->trigger_->fire(context))
       return;
@@ -124,8 +127,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void ErrorEvaluation<dim, Number>::finalize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void ErrorEvaluation<structdim, dim, Number>::finalize(
+      TaskContext<Number> &context)
   {
     StateVector<Number> analytic;
     simulation_.interpolate_analytic_solution(analytic, context.t);
@@ -134,7 +138,7 @@ namespace ryujin
     dealii::types::global_dof_index n_global_dofs = 0;
     if (mpi_ensemble_.ensemble_rank() == 0)
       n_global_dofs = dealii::Utilities::MPI::sum(
-          offline_data_->dof_handler().n_dofs(),
+          simulation_.discretization().dof_handler().n_dofs(),
           mpi_ensemble_.ensemble_leader_communicator());
 
     if (mpi_ensemble_.world_rank() != 0)
@@ -153,17 +157,18 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  std::vector<Number> ErrorEvaluation<dim, Number>::compute(
+  template <int structdim, int dim, typename Number>
+  std::vector<Number> ErrorEvaluation<structdim, dim, Number>::compute(
       const StateVector<Number> &state_vector,
       const StateVector<Number> &analytic) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<dim, Number>::compute()" << std::endl;
+    std::cout << "ErrorEvaluation<structdim, dim, Number>::compute()"
+              << std::endl;
 #endif
 
-    const auto &discretization = offline_data_->discretization();
-    const auto &dof_handler = offline_data_->dof_handler();
+    const auto &discretization = simulation_.discretization();
+    const auto &dof_handler = simulation_.discretization().dof_handler();
 
     Vector<Number> difference_per_cell(
         discretization.triangulation().n_active_cells());
@@ -229,8 +234,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  std::string ErrorEvaluation<dim, Number>::description() const
+  template <int structdim, int dim, typename Number>
+  std::string ErrorEvaluation<structdim, dim, Number>::description() const
   {
     std::string result =
         error_normalize_ ? "Normalized consolidated " : "Consolidated ";

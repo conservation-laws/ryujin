@@ -33,9 +33,9 @@ using namespace dealii;
 
 namespace ryujin
 {
-  template <int dim, typename Number>
-  Logger<dim, Number>::Logger(
-      const Interface::Simulation<dim, Number> &simulation,
+  template <int structdim, int dim, typename Number>
+  Logger<structdim, dim, Number>::Logger(
+      const Interface::Simulation<structdim, dim, Number> &simulation,
       const std::string &subsection /*= "/Logger"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("logger", TaskPhase::post_step)
@@ -128,8 +128,8 @@ namespace ryujin
    */
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::initialize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::initialize(TaskContext<Number> &context)
   {
     last_terminal_output_ = terminal_update_interval_ == Number(0.)
                                 ? std::numeric_limits<Number>::max()
@@ -161,21 +161,22 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::start(TaskContext<Number> & /*context*/)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::start(TaskContext<Number> & /*context*/)
   {
     print_device_information();
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::prepare(TaskContext<Number> & /*context*/)
+  template <int structdim, int dim, typename Number>
+  void
+  Logger<structdim, dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
     print_mpi_partition(logfile_);
 
     if (mpi_ensemble_.ensemble_rank() == 0)
       n_global_dofs_ = dealii::Utilities::MPI::sum(
-          simulation_.offline_data().dof_handler().n_dofs(),
+          simulation_.discretization().dof_handler().n_dofs(),
           mpi_ensemble_.ensemble_leader_communicator());
 
 #if defined(WITH_FTXUI)
@@ -189,8 +190,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::execute(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
     const bool write_to_logfile =
         (terminal_update_interval_ != Number(0.)) && /* suppress output */
@@ -208,8 +209,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  bool Logger<dim, Number>::interactive_terminal() const
+  template <int structdim, int dim, typename Number>
+  bool Logger<structdim, dim, Number>::interactive_terminal() const
   {
 #if defined(DEBUG_OUTPUT)
     return false;
@@ -223,8 +224,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::finalize(TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::finalize(TaskContext<Number> &context)
   {
     /* Write final timing statistics to screen and logfile: */
 
@@ -245,8 +246,8 @@ namespace ryujin
    */
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::print_debug_output()
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::print_debug_output()
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -263,9 +264,10 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::print_parameters(const std::string &base_name,
-                                             std::ostream &stream)
+  template <int structdim, int dim, typename Number>
+  void
+  Logger<structdim, dim, Number>::print_parameters(const std::string &base_name,
+                                                   std::ostream &stream)
   {
     if (mpi_ensemble_.world_rank() != 0)
       return;
@@ -288,8 +290,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::print_mpi_partition(std::ostream &stream)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::print_mpi_partition(std::ostream &stream)
   {
     /*
      * Fixme: this conversion to double is really not elegant. We should
@@ -366,8 +368,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::print_device_information()
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::print_device_information()
   {
     /* Device information is only meaningful for a device build: */
     if constexpr (!have_separate_memory_spaces)
@@ -462,8 +464,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::print_cycle_statistics(
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::print_cycle_statistics(
       const TaskContext<Number> &context,
       bool write_to_logfile,
       bool final_time)
@@ -493,9 +495,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  Logger<dim, Number>::collect_information(const TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::collect_information(
+      const TaskContext<Number> &context)
   {
     static const std::string backend_name = [] {
       const auto precision = [] {
@@ -544,8 +546,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::collect_memory_statistics()
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::collect_memory_statistics()
   {
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
@@ -555,8 +557,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::collect_timers()
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::collect_timers()
   {
     const auto &communicator = mpi_ensemble_.world_communicator();
 
@@ -586,8 +588,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Logger<dim, Number>::collect_tasks(const TaskContext<Number> &context)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::collect_tasks(
+      const TaskContext<Number> &context)
   {
     const auto format_duration = [](double seconds) {
       const auto s =
@@ -688,10 +691,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void
-  Logger<dim, Number>::collect_throughput(const TaskContext<Number> &context,
-                                          bool final_time)
+  template <int structdim, int dim, typename Number>
+  void Logger<structdim, dim, Number>::collect_throughput(
+      const TaskContext<Number> &context, bool final_time)
   {
     /* Update statistics: */
 

@@ -48,7 +48,7 @@ using SystemView = typename HyperbolicSystem::template View<dim, Number>;
  * factor f_n = sin(n * pi / 2), i.e., by 0, 1, 0, -1, 0, ...
  */
 void populate(StateVector<Number> &state_vector,
-              const OfflineData<dim, Number> &offline_data,
+              const Interface::OfflineData<dim, Number> &offline_data,
               const std::map<types::global_dof_index, Point<dim>> &positions,
               const unsigned int n)
 {
@@ -91,13 +91,13 @@ int main(int argc, char *argv[])
 
   /* Set up a small rectangular domain and the corresponding offline data: */
 
-  Simulation<HyperbolicDescription, StubParabolicDescription, dim, Number>
+  Simulation<dim, dim, Number, HyperbolicDescription, StubParabolicDescription>
       simulation(MPI_COMM_WORLD);
   const auto &mpi_ensemble = simulation.mpi_ensemble();
   const auto &discretization = simulation.discretization();
   const auto &offline_data = simulation.offline_data();
 
-  Quantities<dim, Number> quantities(simulation);
+  Quantities<dim, dim, Number> quantities(simulation);
 
   std::stringstream parameters;
   parameters
@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
   const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
   const auto positions = DoFTools::map_dofs_to_support_points(
-      discretization.mapping(), offline_data.dof_handler());
+      discretization.mapping(), discretization.dof_handler());
 
   /*
    * We populate the state vector on the host and accumulate statistics on
