@@ -1,7 +1,7 @@
 first sections:
   1 A - Scheduler (6 entries)
   1 B - Equation (4 entries)
-  1 C - Discretization (6 entries)
+  1 C - Discretization (8 entries)
   2 airfoil (14 entries)
 dashboard location: selection, value = center, valid = true, choices = »top left« »center« »screen saver«
 dashboard color scheme: selection, value = ryujin, valid = true, choices = »ryujin« »ansi16« »gruvbox« »light« »monochrome« »okabe-ito« »rainbow« »solarized« »tamu«
