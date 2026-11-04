@@ -697,7 +697,20 @@ namespace ryujin
             (ScalarNumber(1.) - relax) * filtered_h_l * filtered_h_l * v2_max -
             ScalarNumber(100.) * eps -
             ScalarNumber(100.) * eps * eps * view_.gravity() * h_cubed;
-        if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
+
+        /*
+         * Skip the test if a bar state is dry up to the cutoff of
+         * filter_dry_water_depth(): The bound v2_max is computed from a
+         * mollified velocity that is not comparable to |q|^2 / h^2 then.
+         */
+        const auto test =
+            ryujin::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+                view_.filter_dry_water_depth(h_min),
+                Number(0.),
+                Number(0.),
+                psi_l - lower_bound);
+
+        if (!(std::min(Number(0.), test) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
           std::cout
