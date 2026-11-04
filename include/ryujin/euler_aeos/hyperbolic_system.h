@@ -669,12 +669,12 @@ namespace ryujin
        *    depending on the flow state (supersonic versus subsonic, outflow
        *    versus inflow).
        *
-       * @note This function calls into the selected equation of state for
-       * dynamic boundary conditions and is thus only available on the
-       * host.
+       * @note Dynamic boundary conditions call into the selected equation of
+       * state and are thus only available for views on the host memory
+       * space.
        */
       template <typename Lambda>
-      state_type
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE state_type
       apply_boundary_conditions(const dealii::types::boundary_id id,
                                 const state_type &U,
                                 const dealii::Tensor<1, dim, Number> &normal,
@@ -1543,7 +1543,7 @@ namespace ryujin
 
     template <int dim, typename Number, typename MemorySpace>
     template <typename Lambda>
-    DEAL_II_ALWAYS_INLINE inline auto
+    DEAL_II_HOST_DEVICE_ALWAYS_INLINE auto
     HyperbolicSystemView<dim, Number, MemorySpace>::apply_boundary_conditions(
         dealii::types::boundary_id id,
         const state_type &U,
@@ -1596,64 +1596,68 @@ namespace ryujin
           result[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
-        /*
-         * On dynamic boundary conditions, we distinguish four cases:
-         *
-         *  - supersonic inflow: prescribe full state
-         *  - subsonic inflow:
-         *      decompose into Riemann invariants and leave R_2
-         *      characteristic untouched.
-         *  - supersonic outflow: do nothing
-         *  - subsonic outflow:
-         *      decompose into Riemann invariants and prescribe incoming
-         *      R_1 characteristic.
-         */
-        const auto m = momentum(U);
-        const auto rho = density(U);
-        const auto rho_e = internal_energy(U);
+        if constexpr (std::is_same_v<MemorySpace, dealii::MemorySpace::Host>) {
+          /*
+           * On dynamic boundary conditions, we distinguish four cases:
+           *
+           *  - supersonic inflow: prescribe full state
+           *  - subsonic inflow:
+           *      decompose into Riemann invariants and leave R_2
+           *      characteristic untouched.
+           *  - supersonic outflow: do nothing
+           *  - subsonic outflow:
+           *      decompose into Riemann invariants and prescribe incoming
+           *      R_1 characteristic.
+           */
+          const auto m = momentum(U);
+          const auto rho = density(U);
+          const auto rho_e = internal_energy(U);
 
-        /*
-         * We do not have precomputed values available. Thus, simply query
-         * the pressure oracle and compute a surrogate speed of sound from
-         * there:
-         */
-        const auto p = eos_pressure(rho, rho_e / rho);
-        const auto gamma = surrogate_gamma(U, p);
-        const auto a = surrogate_speed_of_sound(U, gamma);
-        const auto vn = m * normal / rho;
+          /*
+           * We do not have precomputed values available. Thus, simply query
+           * the pressure oracle and compute a surrogate speed of sound from
+           * there:
+           */
+          const auto p = eos_pressure(rho, rho_e / rho);
+          const auto gamma = surrogate_gamma(U, p);
+          const auto a = surrogate_speed_of_sound(U, gamma);
+          const auto vn = m * normal / rho;
 
-        /* Supersonic inflow: */
-        if (vn < -a) {
-          result = get_dirichlet_data();
+          /* Supersonic inflow: */
+          if (vn < -a) {
+            result = get_dirichlet_data();
+          }
+
+          /* Subsonic inflow: */
+          if (vn >= -a && vn <= 0.) {
+            const auto U_dirichlet = get_dirichlet_data();
+            const auto rho_dirichlet = density(U_dirichlet);
+            const auto rho_e_dirichlet = internal_energy(U_dirichlet);
+            const auto p_dirichlet =
+                eos_pressure(rho_dirichlet, rho_e_dirichlet / rho_dirichlet);
+
+            result = prescribe_riemann_characteristic<2>(
+                U_dirichlet, p_dirichlet, U, p, normal);
+          }
+
+          /* Subsonic outflow: */
+          if (vn > 0. && vn <= a) {
+            const auto U_dirichlet = get_dirichlet_data();
+            const auto rho_dirichlet = density(U_dirichlet);
+            const auto rho_e_dirichlet = internal_energy(U_dirichlet);
+            const auto p_dirichlet =
+                eos_pressure(rho_dirichlet, rho_e_dirichlet / rho_dirichlet);
+
+            result = prescribe_riemann_characteristic<1>(
+                U, p, U_dirichlet, p_dirichlet, normal);
+          }
+          /* Supersonic outflow: do nothing, i.e., keep U as is */
+        } else {
+          Assert(false, dealii::ExcNotImplemented());
         }
-
-        /* Subsonic inflow: */
-        if (vn >= -a && vn <= 0.) {
-          const auto U_dirichlet = get_dirichlet_data();
-          const auto rho_dirichlet = density(U_dirichlet);
-          const auto rho_e_dirichlet = internal_energy(U_dirichlet);
-          const auto p_dirichlet =
-              eos_pressure(rho_dirichlet, rho_e_dirichlet / rho_dirichlet);
-
-          result = prescribe_riemann_characteristic<2>(
-              U_dirichlet, p_dirichlet, U, p, normal);
-        }
-
-        /* Subsonic outflow: */
-        if (vn > 0. && vn <= a) {
-          const auto U_dirichlet = get_dirichlet_data();
-          const auto rho_dirichlet = density(U_dirichlet);
-          const auto rho_e_dirichlet = internal_energy(U_dirichlet);
-          const auto p_dirichlet =
-              eos_pressure(rho_dirichlet, rho_e_dirichlet / rho_dirichlet);
-
-          result = prescribe_riemann_characteristic<1>(
-              U, p, U_dirichlet, p_dirichlet, normal);
-        }
-        /* Supersonic outflow: do nothing, i.e., keep U as is */
 
       } else {
-        AssertThrow(false, dealii::ExcNotImplemented());
+        Assert(false, dealii::ExcNotImplemented());
       }
 
       return result;
