@@ -11,6 +11,7 @@
 
 #include <boost/random/detail/polynomial.hpp>
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_nothing.h>
@@ -68,6 +69,19 @@ namespace ryujin
     add_parameter("mesh refinement",
                   refinement_,
                   "number of refinement of global refinement steps");
+
+    local_refinement_ = 0;
+    add_parameter("mesh local refinement",
+                  local_refinement_,
+                  "number of local refinement steps performed after global "
+                  "refinement on the region given by \"mesh local refinement "
+                  "region\"");
+
+    local_refinement_region_ = "1";
+    add_parameter("mesh local refinement region",
+                  local_refinement_region_,
+                  "expression in x, y, z: cells with a positive value at the "
+                  "cell center are locally refined");
 
     mesh_writeout_ = true;
     add_parameter("mesh writeout",
@@ -191,6 +205,16 @@ namespace ryujin
     }
 
     triangulation.refine_global(refinement_);
+
+    if (local_refinement_ > 0) {
+      const FunctionParser<dim> region(local_refinement_region_);
+      for (unsigned int step = 0; step < local_refinement_; ++step) {
+        for (const auto &cell : triangulation.active_cell_iterators())
+          if (cell->is_locally_owned() && region.value(cell->center()) > 0.)
+            cell->set_refine_flag();
+        triangulation.execute_coarsening_and_refinement();
+      }
+    }
 
     if (std::abs(mesh_distortion_) > 1.0e-10) {
       /*
