@@ -686,11 +686,17 @@ namespace ryujin
          * We use a non-scaled eps here to force the lower_bound to be
          * negative so that we do not accidentally trigger in "perfect" dry
          * states with h_l equal to zero.
+         *
+         * Round-off in the low-order momentum update scales with eps times
+         * the pressure, which at rest exceeds the non-scaled eps in single
+         * precision. We thus also allow for |q| up to 10 eps sqrt(g h) h.
          */
         const auto filtered_h_l = view_.filter_dry_water_depth(h_l);
+        const auto h_cubed = filtered_h_l * filtered_h_l * filtered_h_l;
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * filtered_h_l * v2_max -
-            ScalarNumber(100.) * eps;
+            ScalarNumber(100.) * eps -
+            ScalarNumber(100.) * eps * eps * view_.gravity() * h_cubed;
         if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
