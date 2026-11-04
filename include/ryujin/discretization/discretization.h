@@ -604,6 +604,10 @@ namespace ryujin
 
     unsigned int refinement_;
 
+    unsigned int local_refinement_;
+
+    std::string local_refinement_region_;
+
     bool mesh_writeout_;
     double mesh_distortion_;
 

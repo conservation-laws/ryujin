@@ -32,6 +32,46 @@ namespace ryujin
    *  - it interpolates the dynamic state, without limiting, on the
    *    continuous finite element space of Discretization::dof_handler_cg().
    *
+   * Mass redistribution, cf. Section 4.3 of @cite ryujin-2025-8. For a
+   * constraint \f$(j,\{c^j_i\})\f$ with \f$\sum_i c^j_i=1\f$ and intermediate
+   * masses and states \f$\tilde m_i\f$, \f$\tilde U_i\f$:
+   * \f{align*}
+   *   D_j &:= \tilde U_j - \sum_{k} c^j_k \tilde U_k,
+   *   \\
+   *   m_i &:= \tilde m_i + \sum_{j\in\mathcal{I}^{AC}(i)} c^j_i \tilde m_j,
+   *   \\
+   *   W^j_i(l) &:= \tilde U_j
+   *     + l \Big(\tilde U_i - \sum_{k} c^j_k \tilde U_k\Big),
+   *   \\
+   *   U_i &:= \frac{1}{m_i}\Big(\tilde m_i \tilde U_i
+   *     + \sum_{j\in\mathcal{I}^{AC}(i)} c^j_i \tilde m_j W^j_i(l_j)\Big),
+   *   \quad i\notin AC,
+   *   \\
+   *   U_j &:= 0, \quad j\in AC.
+   * \f}
+   * With \f$l_j\f$ and \f$\mathcal{B}_j\f$ the relaxed bounds of
+   * \f$\{\tilde U_j\}\cup\{\tilde U_k: c^j_k\neq 0\}\f$:
+   * \f{align*}
+   *   l_j &:= 1 \quad\text{if}\quad |(D_j)_\nu| \le 100\,\varepsilon\,
+   *     \max\big(|(\tilde U_j)_\nu|,\max_{k}|(\tilde U_k)_\nu|\big)
+   *     \;\forall\nu,
+   *   \\
+   *   l_j &:= \min_{i:\,c^j_i\neq 0}\,
+   *     \max\big\{l\in[0,1]: W^j_i(l)\in\mathcal{B}_j\big\}
+   *     \quad\text{otherwise}.
+   * \f}
+   * Moreover,
+   * \f{align*}
+   *   l_j = 0 &: \; W^j_i = \tilde U_j \;\Rightarrow\; U_i = U_i^L,
+   *   \\
+   *   l_j = 1 &: \; W^j_i = \tilde U_i + D_j \;\Rightarrow\; U_i = U_i^H,
+   *   \\
+   *   D_j = 0,\; l_j = 1 &: \; U_i = \tilde U_i,
+   *   \\
+   *   \sum_{i\notin AC} m_i U_i &= \sum_{i} \tilde m_i \tilde U_i
+   *     \quad\forall\, l_j.
+   * \f}
+   *
    * @todo generalize the transfer of the dynamic state to support
    * Discretization::dof_handler_cg() and Discretization::dof_handler_dg()
    *

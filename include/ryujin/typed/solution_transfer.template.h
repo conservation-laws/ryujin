@@ -478,19 +478,6 @@ namespace ryujin
         offline_data_->hyperbolic_vector_partitioner(), problem_dimension);
 
     /*
-     * We only need to construct entries in a pik_matrix for a small subset
-     * of affected degrees of freedom for which we have to construct the
-     * entire pik_matrix first for the limiting process (in contrast to the
-     * entirely cell-local limiting done before). Let's simply use a map.
-     */
-    std::map<std::tuple<unsigned int /*i*/, unsigned int /*k*/>, state_type>
-        pik_matrix;
-    std::map<unsigned int /*i*/, Bounds> bounds_map;
-
-    ScalarHostVector<Number> kappa;
-    kappa.reinit(offline_data_->scalar_partitioner());
-
-    /*
      * -----------------------------------------------------------------------
      * Unpacking data and cell-level interpolation/projection to child cells:
      * -----------------------------------------------------------------------
@@ -825,19 +812,48 @@ namespace ryujin
     const auto limiter_view = limiter_.template view<dim, Number>();
 
     /*
-     * Step 1: compute low-order update P_ij matrix, and bounds:
-     *
-     * We compute limiter bounds as a single value over the constraint
-     * line. This makes sense as we need to limit the update for each
-     * affected (unconstrained) degree of freedom of a constraint line with
-     * a single limiter value anyway to ensure mass conservation.
-     * (Incidentally, this avoids having to update a global, distributed
-     * bounds vector over all MPI ranks.)
+     * Step 1: Add the mass of every constrained degree of freedom to the
+     * degrees of freedom on its constraint line.
      */
 
     for (const auto &line : affine_constraints.get_lines()) {
-      const auto global_i = line.index;
-      const auto local_i = scalar_partitioner->global_to_local(global_i);
+      const auto local_i = scalar_partitioner->global_to_local(line.index);
+
+      /* Only operate on a locally owned, constrained degree of freedom: */
+      if (local_i >= n_locally_owned)
+        continue;
+
+      const auto m_i_star = projected_mass.local_element(local_i);
+      for (const auto &[global_k, c_k] : line.entries) {
+        const auto local_k = scalar_partitioner->global_to_local(global_k);
+        projected_mass.local_element(local_k) += c_k * m_i_star;
+      }
+    }
+
+    projected_mass.compress(dealii::VectorOperation::add);
+    projected_mass.update_ghost_values();
+
+    /*
+     * Step 2: Redistribute the state of every constrained degree of
+     * freedom. With U_i_star the result of the mass projection and
+     * U_i_interp the value obtained from the affine constraints object,
+     * the degree of freedom k on the constraint line receives
+     *
+     *   c_k m_i_star (U_i_star + l (U_k - U_i_interp))
+     *
+     * This is conservative for any limiter value l because the c_k sum up
+     * to one. For l = 1 the contribution is U_k plus the defect
+     * U_i_star - U_i_interp. For l = 0 the contribution is the convex
+     * average U_i_star.
+     *
+     * If the defect vanishes up to round-off (which is the case for all
+     * constraint lines of cells that were not coarsened, in particular
+     * when resuming from a checkpoint) we use the high-order update l = 1
+     * without invoking the limiter.
+     */
+
+    for (const auto &line : affine_constraints.get_lines()) {
+      const auto local_i = scalar_partitioner->global_to_local(line.index);
 
       /* Only operate on a locally owned, constrained degree of freedom: */
       if (local_i >= n_locally_owned)
@@ -848,120 +864,63 @@ namespace ryujin
       const auto U_i_star =
           projected_state_view.read_tensor(local_i) / m_i_star;
 
-      auto &bounds = bounds_map[local_i]; /* by reference */
-      bounds = limiter_view.projection_bounds_from_state(
+      auto bounds = limiter_view.projection_bounds_from_state(
           precomputed_view, local_i, U_i_star);
 
       /* The value obtained from the affine constraints object: */
       state_type U_i_interp;
-      for (const auto &[global_k, c_k] : line.entries) {
-        const auto local_k = scalar_partitioner->global_to_local(global_k);
-        U_i_interp += c_k * new_U_view.read_tensor(local_k);
-      }
-
-      /* And redistribute low order update: */
+      auto total_mass = Number(0.);
       for (const auto &[global_k, c_k] : line.entries) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
         const auto U_k = new_U_view.read_tensor(local_k);
+        U_i_interp += c_k * U_k;
+        total_mass += projected_mass.local_element(local_k);
 
         const auto bounds_k = limiter_view.projection_bounds_from_state(
             precomputed_view, local_k, U_k);
         bounds = limiter_view.combine_bounds(bounds, bounds_k);
-
-        projected_state_view.add_tensor(c_k * m_i_star * U_i_star, local_k);
-        projected_mass.local_element(local_k) += c_k * m_i_star;
-
-        kappa.local_element(local_k) += Number(1.);
-        pik_matrix[{local_i, local_k}] = c_k * m_i_star * (U_k - U_i_interp);
       }
-    }
 
-    /* Compress vectors, recalculate unconstrained states: */
-    projected_mass.compress(dealii::VectorOperation::add);
-    projected_state_view.compress(dealii::VectorOperation::add);
-    kappa.compress(dealii::VectorOperation::add);
-    update_new_state_vector();
-
-    /* Redistribute ghost layer for masses and kappa: */
-    projected_mass.update_ghost_values();
-    kappa.update_ghost_values();
-
-    /* Step 2: Apply limiter: */
-
-    const auto n_iterations = limiter_view.iterations();
-    for (unsigned int pass = 0; pass < n_iterations; ++pass) {
-
-      /* Update precomputed values for bounds correction: */
-      update_precomputed_values();
-
-      for (const auto &line : affine_constraints.get_lines()) {
-        const auto global_i = line.index;
-        const auto local_i = scalar_partitioner->global_to_local(global_i);
-
-        /* Only operate on a locally owned, constrained degree of freedom: */
-        if (local_i >= n_locally_owned)
-          continue;
-
-        /*
-         * We are computing bounds only over a local constraint line
-         * without recombining such bounds per (unconstrained) degree of
-         * freedom globally. We avoid doing the latter because it would
-         * require a custom "VectorOperation" invoking
-         * LimiterView::combine_bounds(), which we currently do not have at our
-         * disposal.
-         *
-         * As a simple workaround we simply recompute bounds for the
-         * constraint line after the low-order update and each limiter pass
-         * and recombine those into the stored value.
-         */
-
-        auto &bounds = bounds_map[local_i]; /* by reference */
-        auto total_mass = Number(0.);
+      /* Check whether the defect vanishes up to round-off: */
+      constexpr auto eps = std::numeric_limits<Number>::epsilon();
+      bool has_defect = false;
+      for (unsigned int c = 0; c < problem_dimension; ++c) {
+        auto scale = std::abs(U_i_star[c]);
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
           const auto U_k = new_U_view.read_tensor(local_k);
-          const auto bounds_k = limiter_view.projection_bounds_from_state(
-              precomputed_view, local_k, U_k);
-          bounds = limiter_view.combine_bounds(bounds, bounds_k);
-
-          const auto m_k = projected_mass.local_element(local_k);
-          total_mass += m_k;
+          scale = std::max(scale, std::abs(U_k[c]));
         }
+        if (std::abs(U_i_star[c] - U_i_interp[c]) > Number(100.) * eps * scale)
+          has_defect = true;
+      }
 
-        auto l = Number(1.);
-
-        /* Apply relaxation: */
+      /* Compute a single limiter value for the constraint line: */
+      auto l = Number(1.);
+      if (has_defect) {
         const auto relaxed_bounds =
             limiter_view.fully_relax_bounds(bounds, total_mass);
 
-        /* Compute limiter values: */
-
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
-          const auto kappa_k = kappa.local_element(local_k);
-          const auto m_k = projected_mass.local_element(local_k);
           const auto U_k = new_U_view.read_tensor(local_k);
-          const auto P_ik = pik_matrix[{local_i, local_k}] * kappa_k / m_k;
-
           const auto &[l_k, check] =
-              limiter_view.limit(relaxed_bounds, U_k, P_ik);
+              limiter_view.limit(relaxed_bounds, U_i_star, U_k - U_i_interp);
           l = std::min(l, l_k);
-        }
-
-        /* Apply limiter values: */
-
-        for (const auto &[global_k, c_k] : line.entries) {
-          const auto local_k = scalar_partitioner->global_to_local(global_k);
-          auto &mP_ik = pik_matrix[{local_i, local_k}];
-          projected_state_view.add_tensor(l * mP_ik, local_k);
-          mP_ik -= l * mP_ik;
         }
       }
 
-      /* Compress state vector, recalculate unconstrained states: */
-      projected_state_view.compress(dealii::VectorOperation::add);
-      update_new_state_vector();
+      for (const auto &[global_k, c_k] : line.entries) {
+        const auto local_k = scalar_partitioner->global_to_local(global_k);
+        const auto U_k = new_U_view.read_tensor(local_k);
+        projected_state_view.add_tensor(
+            c_k * m_i_star * (U_i_star + l * (U_k - U_i_interp)), local_k);
+      }
     }
+
+    /* Compress state vector, recalculate unconstrained states: */
+    projected_state_view.compress(dealii::VectorOperation::add);
+    update_new_state_vector();
 
     /* Zero out constrained degrees of freedom: */
     for (unsigned int local_i = 0; local_i < n_locally_owned; ++local_i) {
