@@ -152,27 +152,29 @@ namespace ryujin
       void create_coarse_triangulation(
           dealii::Triangulation<structdim, dim> &triangulation) const override
       {
+        using dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices;
+
         /* create mesh: */
 
         dealii::Triangulation<structdim> tria1;
         if constexpr (structdim == dim)
+
           tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
         if (use_simplices_) {
           /* Mesh with simplices: */
 
           if constexpr (structdim == 1) {
-            dealii::GridGenerator::
-                subdivided_hyper_rectangle_with_simplices<1, 1>(
-                    tria1, {subdivisions_x_}, point_left_, point_right_);
+            subdivided_hyper_rectangle_with_simplices<1, 1>(
+                tria1, {subdivisions_x_}, point_left_, point_right_);
           } else if constexpr (structdim == 2) {
-            dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices(
+            subdivided_hyper_rectangle_with_simplices(
                 tria1,
                 {subdivisions_x_, subdivisions_y_},
                 point_left_,
                 point_right_);
           } else if constexpr (structdim == 3) {
-            dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices(
+            subdivided_hyper_rectangle_with_simplices(
                 tria1,
                 {subdivisions_x_, subdivisions_y_, subdivisions_z_},
                 point_left_,
@@ -289,7 +291,7 @@ namespace ryujin
         }
 
         if (structdim >= 2 && (boundary_bottom_ == Boundary::periodic ||
-                         boundary_top_ == Boundary::periodic)) {
+                               boundary_top_ == Boundary::periodic)) {
           AssertThrow(boundary_bottom_ == boundary_top_,
                       dealii::ExcMessage(
                           "For prescribing periodic boundaries in y-direction, "
@@ -299,7 +301,7 @@ namespace ryujin
         }
 
         if (structdim == 3 && (boundary_back_ == Boundary::periodic ||
-                         boundary_front_ == Boundary::periodic)) {
+                               boundary_front_ == Boundary::periodic)) {
           AssertThrow(boundary_back_ == boundary_front_,
                       dealii::ExcMessage(
                           "For prescribing periodic boundaries in z-direction, "

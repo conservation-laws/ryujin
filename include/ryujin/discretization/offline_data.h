@@ -214,12 +214,15 @@ namespace ryujin
 
     /**
      * Construct a boundary map for a given set of DoFHandler iterators.
+     * The boundary contributions of constrained degrees of freedom are
+     * added to their constraining degrees of freedom.
      */
     template <typename ITERATOR1, typename ITERATOR2>
     BoundaryMap construct_boundary_map(
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
-        const dealii::Utilities::MPI::Partitioner &partitioner) const;
+        const dealii::Utilities::MPI::Partitioner &partitioner,
+        const dealii::AffineConstraints<Number> &affine_constraints) const;
 
     /**
      * Collect coupling pairs of locally owned (and locally relevant)
