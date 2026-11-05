@@ -202,9 +202,112 @@ namespace ryujin
           }
         }
 
-        if constexpr (structdim == dim)
+        /* Set boundary ids and periodicity on a given triangulation: */
+
+        const auto set_boundary_ids = [this](auto &tria) {
+          for (auto cell : tria.active_cell_iterators()) {
+            for (auto f : cell->face_indices()) {
+              auto face = cell->face(f);
+              if (!face->at_boundary())
+                continue;
+              const auto position = face->center();
+
+              /*
+               * The local part of a fully distributed mesh has spurious
+               * boundary faces that do not lie on the boundary of the global
+               * domain. Do not let these inherit a default boundary id:
+               */
+              face->set_boundary_id(Boundary::do_nothing);
+
+              if (position[0] < point_left_[0] + 1.e-8)
+                face->set_boundary_id(boundary_left_);
+              if (position[0] > point_right_[0] - 1.e-8)
+                face->set_boundary_id(boundary_right_);
+
+              if constexpr (structdim >= 2) {
+                if (position[1] < point_left_[1] + 1.e-8)
+                  face->set_boundary_id(boundary_bottom_);
+                if (position[1] > point_right_[1] - 1.e-8)
+                  face->set_boundary_id(boundary_top_);
+              }
+
+              if constexpr (structdim == 3) {
+                if (position[2] < point_left_[2] + 1.e-8)
+                  face->set_boundary_id(boundary_back_);
+                if (position[2] > point_right_[2] - 1.e-8)
+                  face->set_boundary_id(boundary_front_);
+              }
+            } /*for*/
+          } /*for*/
+        };
+
+        const auto add_periodicity = [this](auto &tria [[maybe_unused]]) {
+          std::vector<int> directions;
+
+          if (boundary_left_ == Boundary::periodic ||
+              boundary_right_ == Boundary::periodic) {
+            AssertThrow(
+                boundary_left_ == boundary_right_,
+                dealii::ExcMessage(
+                    "For prescribing periodic boundaries in x-direction, "
+                    "both, the left and right boundary conditions must "
+                    "be set to periodic"));
+            directions.push_back(0);
+          }
+
+          if (structdim >= 2 && (boundary_bottom_ == Boundary::periodic ||
+                                 boundary_top_ == Boundary::periodic)) {
+            AssertThrow(
+                boundary_bottom_ == boundary_top_,
+                dealii::ExcMessage(
+                    "For prescribing periodic boundaries in y-direction, "
+                    "both, the bottom and top boundary conditions must "
+                    "be set to periodic"));
+            directions.push_back(1);
+          }
+
+          if (structdim == 3 && (boundary_back_ == Boundary::periodic ||
+                                 boundary_front_ == Boundary::periodic)) {
+            AssertThrow(
+                boundary_back_ == boundary_front_,
+                dealii::ExcMessage(
+                    "For prescribing periodic boundaries in z-direction, "
+                    "both, the back and front boundary conditions must "
+                    "be set to periodic"));
+            directions.push_back(2);
+          }
+
+#ifndef BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
+          if (!directions.empty()) {
+            std::vector<dealii::GridTools::PeriodicFacePair<
+                typename std::remove_cvref_t<decltype(tria)>::cell_iterator>>
+                periodic_faces;
+
+            for (const auto direction : directions)
+              dealii::GridTools::collect_periodic_faces(
+                  tria,
+                  /*b_id */ Boundary::periodic,
+                  /*direction*/ direction,
+                  periodic_faces);
+
+            tria.add_periodicity(periodic_faces);
+          }
+#endif
+        };
+
+        if constexpr (structdim == dim) {
+          /*
+           * A parallel::fullydistributed::Triangulation only stores locally
+           * relevant cells and determines them when copying, so the source
+           * mesh must already know about periodic neighbors:
+           */
+          using FD = dealii::parallel::fullydistributed::Triangulation<dim>;
+          if (dynamic_cast<FD *>(&triangulation) != nullptr) {
+            set_boundary_ids(tria1);
+            add_periodicity(tria1);
+          }
           triangulation.copy_triangulation(tria1);
-        else
+        } else
           dealii::GridGenerator::flatten_triangulation(tria1, triangulation);
 
         /* create transformation: */
@@ -248,84 +351,8 @@ namespace ryujin
           }
         }
 
-        /* set boundary ids: */
-
-        for (auto cell : triangulation.active_cell_iterators()) {
-          for (auto f : cell->face_indices()) {
-            auto face = cell->face(f);
-            if (!face->at_boundary())
-              continue;
-            const auto position = face->center();
-
-            if (position[0] < point_left_[0] + 1.e-8)
-              face->set_boundary_id(boundary_left_);
-            if (position[0] > point_right_[0] - 1.e-8)
-              face->set_boundary_id(boundary_right_);
-
-            if constexpr (structdim >= 2) {
-              if (position[1] < point_left_[1] + 1.e-8)
-                face->set_boundary_id(boundary_bottom_);
-              if (position[1] > point_right_[1] - 1.e-8)
-                face->set_boundary_id(boundary_top_);
-            }
-
-            if constexpr (structdim == 3) {
-              if (position[2] < point_left_[2] + 1.e-8)
-                face->set_boundary_id(boundary_back_);
-              if (position[2] > point_right_[2] - 1.e-8)
-                face->set_boundary_id(boundary_front_);
-            }
-          } /*for*/
-        }   /*for*/
-
-        std::vector<int> directions;
-
-        if (boundary_left_ == Boundary::periodic ||
-            boundary_right_ == Boundary::periodic) {
-          AssertThrow(boundary_left_ == boundary_right_,
-                      dealii::ExcMessage(
-                          "For prescribing periodic boundaries in x-direction, "
-                          "both, the left and right boundary conditions must "
-                          "be set to periodic"));
-          directions.push_back(0);
-        }
-
-        if (structdim >= 2 && (boundary_bottom_ == Boundary::periodic ||
-                               boundary_top_ == Boundary::periodic)) {
-          AssertThrow(boundary_bottom_ == boundary_top_,
-                      dealii::ExcMessage(
-                          "For prescribing periodic boundaries in y-direction, "
-                          "both, the bottom and top boundary conditions must "
-                          "be set to periodic"));
-          directions.push_back(1);
-        }
-
-        if (structdim == 3 && (boundary_back_ == Boundary::periodic ||
-                               boundary_front_ == Boundary::periodic)) {
-          AssertThrow(boundary_back_ == boundary_front_,
-                      dealii::ExcMessage(
-                          "For prescribing periodic boundaries in z-direction, "
-                          "both, the back and front boundary conditions must "
-                          "be set to periodic"));
-          directions.push_back(2);
-        }
-
-#ifndef BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
-        if (!directions.empty()) {
-          std::vector<dealii::GridTools::PeriodicFacePair<
-              typename dealii::Triangulation<structdim, dim>::cell_iterator>>
-              periodic_faces;
-
-          for (const auto direction : directions)
-            dealii::GridTools::collect_periodic_faces(
-                triangulation,
-                /*b_id */ Boundary::periodic,
-                /*direction*/ direction,
-                periodic_faces);
-
-          triangulation.add_periodicity(periodic_faces);
-        }
-#endif
+        set_boundary_ids(triangulation);
+        add_periodicity(triangulation);
       }
 
 
