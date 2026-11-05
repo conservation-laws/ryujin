@@ -1,0 +1,78 @@
+subsection A - Scheduler
+  set basename             = verification
+
+  set tasks                = error evaluation
+
+  set final time = 0.2
+  set timer granularity = 0.2
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = scalar conservation
+  set flux      = function
+  subsection function
+    set derivative approximation delta = 1e-10
+    set expression                     = u;u
+  end
+end
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+
+  set geometry            = rectangular domain
+
+  set mesh refinement = 0
+  set mesh type = parallel fullydistributed
+
+  subsection rectangular domain
+    set boundary condition bottom = periodic
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set boundary condition top    = periodic
+    set position bottom left      = 0, 0
+    set position top right        = 6.28318530718, 6.28318530718
+    set subdivisions x = 64
+    set subdivisions y = 64
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  subsection function
+    set expression = sin(x+y-2*t)
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0
+  end
+  subsection limiter
+    set iterations        = 2
+    set relaxation factor = 1
+  end
+  subsection wave speed estimator
+    set use averaged entropy = false
+    set use greedy wavespeed = false
+    set random entropies = 0
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.80
+  set cfl min               = 0.80
+  set time stepping scheme  = ssprk 33
+  set cfl recovery strategy = none
+end
+
+subsection K - ErrorEvaluation
+  set error normalize = true
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end
