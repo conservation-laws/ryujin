@@ -1781,7 +1781,7 @@ namespace ryujin
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!cell->get_fe().has_support_on_face(j, f_index))
+          if (!DoFTools::has_support_on_face(cell->get_fe(), j, f_index))
             continue;
 
           const auto global_index = local_dof_indices[j];
