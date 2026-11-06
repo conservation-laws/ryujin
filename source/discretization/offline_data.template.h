@@ -1473,8 +1473,6 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
-
     /*
      * Create a temporary multimap with the (local) dof index as key:
      */
@@ -1602,12 +1600,7 @@ namespace ryujin
           const auto index = partitioner.global_to_local(global_index);
 
           /* Skip nonlocal degrees of freedom: */
-          if (index >= this->n_locally_owned_)
-            continue;
-
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd_view.row_length(index);
-          if (row_length == 1)
+          if (index >= partitioner.locally_owned_size())
             continue;
 
           Point<dim> position =

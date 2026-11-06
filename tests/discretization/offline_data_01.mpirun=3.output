@@ -29,16 +29,16 @@ cG Q1
   cg_to_dg: 1.5300000000e+02
   level_0_size: 6.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 2.6000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.0000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 1.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 3.6000000000e+01
-  level_1_boundary_mass: 1.3000000000e+01
+  level_1_boundary_map: 1.6000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 4.5000000000e+01
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 4.2000000000e+01
-  level_2_boundary_mass: 8.5000000000e+00
+  level_2_boundary_map: 2.8000000000e+01
+  level_2_boundary_mass: 6.0000000000e+00
   level_3_size: 1.5300000000e+02
   level_3_mass: 2.0000000000e+00
   level_3_boundary_map: 5.2000000000e+01
@@ -74,12 +74,12 @@ cG Q2
   cg_to_dg: 1.5300000000e+02
   level_0_size: 1.5000000000e+01
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 4.1000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.6000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 4.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 5.9000000000e+01
-  level_1_boundary_mass: 1.2333333333e+01
+  level_1_boundary_map: 2.8000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 1.5300000000e+02
   level_2_mass: 2.0000000000e+00
   level_2_boundary_map: 5.2000000000e+01
@@ -115,12 +115,12 @@ cG Q3
   cg_to_dg: 3.2500000000e+02
   level_0_size: 2.8000000000e+01
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 5.6000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 2.2000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 9.1000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 8.8000000000e+01
-  level_1_boundary_mass: 1.3083333333e+01
+  level_1_boundary_map: 4.0000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 3.2500000000e+02
   level_2_mass: 2.0000000000e+00
   level_2_boundary_map: 7.6000000000e+01
@@ -155,20 +155,20 @@ cG Q1 periodic
   cg_to_dg: 1.5300000000e+02
   level_0_size: 6.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 1.6000000000e+01
-  level_0_boundary_mass: 1.0000000000e+01
+  level_0_boundary_map: 6.0000000000e+00
+  level_0_boundary_mass: 4.0000000000e+00
   level_1_size: 1.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 3.0000000000e+01
-  level_1_boundary_mass: 1.1000000000e+01
+  level_1_boundary_map: 1.0000000000e+01
+  level_1_boundary_mass: 4.0000000000e+00
   level_2_size: 4.5000000000e+01
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 3.8000000000e+01
-  level_2_boundary_mass: 7.2500000000e+00
+  level_2_boundary_map: 1.8000000000e+01
+  level_2_boundary_mass: 4.0000000000e+00
   level_3_size: 1.5300000000e+02
   level_3_mass: 2.0000000000e+00
-  level_3_boundary_map: 3.3000000000e+01
-  level_3_boundary_mass: 3.8750000000e+00
+  level_3_boundary_map: 3.4000000000e+01
+  level_3_boundary_mass: 4.0000000000e+00
 cG Q1 hanging
   n_dofs: 1.0300000000e+02
   n_entries: 7.5500000000e+02
@@ -200,20 +200,20 @@ cG Q1 hanging
   cg_to_dg: 1.0300000000e+02
   level_0_size: 6.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 2.6000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.0000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 1.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 3.1000000000e+01
-  level_1_boundary_mass: 1.1000000000e+01
+  level_1_boundary_map: 1.6000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 4.5000000000e+01
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 3.7000000000e+01
-  level_2_boundary_mass: 7.6250000000e+00
+  level_2_boundary_map: 2.8000000000e+01
+  level_2_boundary_mass: 6.0000000000e+00
   level_3_size: 8.5000000000e+01
   level_3_mass: 1.0000000000e+00
-  level_3_boundary_map: 2.6000000000e+01
-  level_3_boundary_mass: 2.8125000000e+00
+  level_3_boundary_map: 2.7000000000e+01
+  level_3_boundary_mass: 3.0000000000e+00
 cG Q2 hanging
   n_dofs: 3.7300000000e+02
   n_entries: 5.1930000000e+03
@@ -245,20 +245,20 @@ cG Q2 hanging
   cg_to_dg: 3.7300000000e+02
   level_0_size: 1.5000000000e+01
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 4.1000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.6000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 4.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 5.3000000000e+01
-  level_1_boundary_mass: 1.1000000000e+01
+  level_1_boundary_map: 2.8000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 1.5300000000e+02
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 6.7000000000e+01
-  level_2_boundary_mass: 7.3750000000e+00
+  level_2_boundary_map: 5.2000000000e+01
+  level_2_boundary_mass: 6.0000000000e+00
   level_3_size: 2.9700000000e+02
   level_3_mass: 1.0000000000e+00
-  level_3_boundary_map: 4.9000000000e+01
-  level_3_boundary_mass: 2.8750000000e+00
+  level_3_boundary_map: 5.1000000000e+01
+  level_3_boundary_mass: 3.0000000000e+00
 cG Q1 hanging periodic
   n_dofs: 1.0300000000e+02
   n_entries: 7.4300000000e+02
@@ -289,20 +289,20 @@ cG Q1 hanging periodic
   cg_to_dg: 1.0300000000e+02
   level_0_size: 6.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 1.2000000000e+01
-  level_0_boundary_mass: 8.0000000000e+00
+  level_0_boundary_map: 6.0000000000e+00
+  level_0_boundary_mass: 4.0000000000e+00
   level_1_size: 1.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 2.3000000000e+01
-  level_1_boundary_mass: 8.7500000000e+00
+  level_1_boundary_map: 1.0000000000e+01
+  level_1_boundary_mass: 4.0000000000e+00
   level_2_size: 4.5000000000e+01
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 3.2000000000e+01
-  level_2_boundary_mass: 5.8750000000e+00
+  level_2_boundary_map: 1.8000000000e+01
+  level_2_boundary_mass: 4.0000000000e+00
   level_3_size: 8.5000000000e+01
   level_3_mass: 1.0000000000e+00
-  level_3_boundary_map: 1.5000000000e+01
-  level_3_boundary_mass: 1.6875000000e+00
+  level_3_boundary_map: 1.7000000000e+01
+  level_3_boundary_mass: 2.0000000000e+00
 cG Q2 transformed
   n_dofs: 5.6100000000e+02
   n_entries: 8.3850000000e+03
@@ -334,16 +334,16 @@ cG Q2 transformed
   cg_to_dg: 5.6100000000e+02
   level_0_size: 1.5000000000e+01
   level_0_mass: 1.9909000000e+00
-  level_0_boundary_map: 4.1000000000e+01
-  level_0_boundary_mass: 1.5050158898e+01
+  level_0_boundary_map: 1.6000000000e+01
+  level_0_boundary_mass: 6.0213453758e+00
   level_1_size: 4.5000000000e+01
   level_1_mass: 1.9909000000e+00
-  level_1_boundary_map: 6.2000000000e+01
-  level_1_boundary_mass: 1.3043274514e+01
+  level_1_boundary_map: 2.8000000000e+01
+  level_1_boundary_mass: 6.0213475344e+00
   level_2_size: 1.5300000000e+02
   level_2_mass: 1.9909000000e+00
-  level_2_boundary_map: 7.6000000000e+01
-  level_2_boundary_mass: 8.5256781256e+00
+  level_2_boundary_map: 5.2000000000e+01
+  level_2_boundary_mass: 6.0213477045e+00
   level_3_size: 5.6100000000e+02
   level_3_mass: 1.9909000000e+00
   level_3_boundary_map: 1.0000000000e+02
@@ -383,16 +383,16 @@ dG Q1
   cg_to_dg: 1.5300000000e+02
   level_0_size: 8.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 3.0000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.2000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 3.2000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 5.2000000000e+01
-  level_1_boundary_mass: 1.3000000000e+01
+  level_1_boundary_map: 2.4000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 1.2800000000e+02
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 6.8000000000e+01
-  level_2_boundary_mass: 8.5000000000e+00
+  level_2_boundary_map: 4.8000000000e+01
+  level_2_boundary_mass: 6.0000000000e+00
   level_3_size: 5.1200000000e+02
   level_3_mass: 2.0000000000e+00
   level_3_boundary_map: 9.6000000000e+01
@@ -432,12 +432,12 @@ dG Q2
   cg_to_dg: 1.5300000000e+02
   level_0_size: 1.8000000000e+01
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 4.5000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.8000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 7.2000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 8.4000000000e+01
-  level_1_boundary_mass: 1.4000000000e+01
+  level_1_boundary_map: 3.6000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 2.8800000000e+02
   level_2_mass: 2.0000000000e+00
   level_2_boundary_map: 7.2000000000e+01
@@ -476,16 +476,16 @@ dG Q1 periodic
   cg_to_dg: 1.5300000000e+02
   level_0_size: 8.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 2.0000000000e+01
-  level_0_boundary_mass: 1.0000000000e+01
+  level_0_boundary_map: 8.0000000000e+00
+  level_0_boundary_mass: 4.0000000000e+00
   level_1_size: 3.2000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 4.4000000000e+01
-  level_1_boundary_mass: 1.1000000000e+01
+  level_1_boundary_map: 1.6000000000e+01
+  level_1_boundary_mass: 4.0000000000e+00
   level_2_size: 1.2800000000e+02
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 6.0000000000e+01
-  level_2_boundary_mass: 7.5000000000e+00
+  level_2_boundary_map: 3.2000000000e+01
+  level_2_boundary_mass: 4.0000000000e+00
   level_3_size: 5.1200000000e+02
   level_3_mass: 2.0000000000e+00
   level_3_boundary_map: 6.4000000000e+01
@@ -524,12 +524,12 @@ cG Q1 3D
   cg_to_dg: 2.2500000000e+02
   level_0_size: 1.2000000000e+01
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 8.4000000000e+01
-  level_0_boundary_mass: 2.5000000000e+01
+  level_0_boundary_map: 3.2000000000e+01
+  level_0_boundary_mass: 1.0000000000e+01
   level_1_size: 4.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 1.9200000000e+02
-  level_1_boundary_mass: 2.3000000000e+01
+  level_1_boundary_map: 7.8000000000e+01
+  level_1_boundary_mass: 1.0000000000e+01
   level_2_size: 2.2500000000e+02
   level_2_mass: 2.0000000000e+00
   level_2_boundary_map: 2.3000000000e+02
@@ -568,12 +568,12 @@ cG Q2 3D hanging
   cg_to_dg: 1.4800000000e+02
   level_0_size: 4.5000000000e+01
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 8.7000000000e+01
-  level_0_boundary_mass: 1.3458333333e+01
+  level_0_boundary_map: 7.8000000000e+01
+  level_0_boundary_mass: 1.0000000000e+01
   level_1_size: 1.2500000000e+02
   level_1_mass: 1.0000000000e+00
-  level_1_boundary_map: 1.2700000000e+02
-  level_1_boundary_mass: 4.5937500000e+00
+  level_1_boundary_map: 1.2500000000e+02
+  level_1_boundary_mass: 5.0000000000e+00
 cG Q1 3D transformed
   n_dofs: 2.2500000000e+02
   n_entries: 4.2250000000e+03
@@ -608,12 +608,12 @@ cG Q1 3D transformed
   cg_to_dg: 2.2500000000e+02
   level_0_size: 1.2000000000e+01
   level_0_mass: 2.1875000000e+00
-  level_0_boundary_map: 8.4000000000e+01
-  level_0_boundary_mass: 2.7968276406e+01
+  level_0_boundary_map: 3.2000000000e+01
+  level_0_boundary_mass: 1.1015388203e+01
   level_1_size: 4.5000000000e+01
   level_1_mass: 2.1719000000e+00
-  level_1_boundary_map: 1.9200000000e+02
-  level_1_boundary_mass: 2.5181836305e+01
+  level_1_boundary_map: 7.8000000000e+01
+  level_1_boundary_mass: 1.0989699639e+01
   level_2_size: 2.2500000000e+02
   level_2_mass: 2.1680000000e+00
   level_2_boundary_map: 2.3000000000e+02
@@ -649,32 +649,32 @@ cG Q1 large
   cg_to_dg: 3.3153000000e+04
   level_0_size: 6.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 2.6000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.0000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 1.5000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 3.6000000000e+01
-  level_1_boundary_mass: 1.3000000000e+01
+  level_1_boundary_map: 1.6000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 4.5000000000e+01
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 4.1000000000e+01
-  level_2_boundary_mass: 8.2500000000e+00
+  level_2_boundary_map: 2.8000000000e+01
+  level_2_boundary_mass: 6.0000000000e+00
   level_3_size: 1.5300000000e+02
   level_3_mass: 2.0000000000e+00
-  level_3_boundary_map: 6.5000000000e+01
-  level_3_boundary_mass: 7.1250000000e+00
+  level_3_boundary_map: 5.2000000000e+01
+  level_3_boundary_mass: 6.0000000000e+00
   level_4_size: 5.6100000000e+02
   level_4_mass: 2.0000000000e+00
-  level_4_boundary_map: 1.1300000000e+02
-  level_4_boundary_mass: 6.5625000000e+00
+  level_4_boundary_map: 1.0000000000e+02
+  level_4_boundary_mass: 6.0000000000e+00
   level_5_size: 2.1450000000e+03
   level_5_mass: 2.0000000000e+00
-  level_5_boundary_map: 2.0900000000e+02
-  level_5_boundary_mass: 6.2812500000e+00
+  level_5_boundary_map: 1.9600000000e+02
+  level_5_boundary_mass: 6.0000000000e+00
   level_6_size: 8.3850000000e+03
   level_6_mass: 2.0000000000e+00
-  level_6_boundary_map: 4.0200000000e+02
-  level_6_boundary_mass: 6.1562500000e+00
+  level_6_boundary_map: 3.8800000000e+02
+  level_6_boundary_mass: 6.0000000000e+00
   level_7_size: 3.3153000000e+04
   level_7_mass: 2.0000000000e+00
   level_7_boundary_map: 7.7200000000e+02
@@ -714,32 +714,32 @@ dG Q1 large
   cg_to_dg: 3.3153000000e+04
   level_0_size: 8.0000000000e+00
   level_0_mass: 2.0000000000e+00
-  level_0_boundary_map: 3.0000000000e+01
-  level_0_boundary_mass: 1.5000000000e+01
+  level_0_boundary_map: 1.2000000000e+01
+  level_0_boundary_mass: 6.0000000000e+00
   level_1_size: 3.2000000000e+01
   level_1_mass: 2.0000000000e+00
-  level_1_boundary_map: 5.2000000000e+01
-  level_1_boundary_mass: 1.3000000000e+01
+  level_1_boundary_map: 2.4000000000e+01
+  level_1_boundary_mass: 6.0000000000e+00
   level_2_size: 1.2800000000e+02
   level_2_mass: 2.0000000000e+00
-  level_2_boundary_map: 6.6000000000e+01
-  level_2_boundary_mass: 8.2500000000e+00
+  level_2_boundary_map: 4.8000000000e+01
+  level_2_boundary_mass: 6.0000000000e+00
   level_3_size: 5.1200000000e+02
   level_3_mass: 2.0000000000e+00
-  level_3_boundary_map: 1.1400000000e+02
-  level_3_boundary_mass: 7.1250000000e+00
+  level_3_boundary_map: 9.6000000000e+01
+  level_3_boundary_mass: 6.0000000000e+00
   level_4_size: 2.0480000000e+03
   level_4_mass: 2.0000000000e+00
-  level_4_boundary_map: 2.1000000000e+02
-  level_4_boundary_mass: 6.5625000000e+00
+  level_4_boundary_map: 1.9200000000e+02
+  level_4_boundary_mass: 6.0000000000e+00
   level_5_size: 8.1920000000e+03
   level_5_mass: 2.0000000000e+00
-  level_5_boundary_map: 4.0200000000e+02
-  level_5_boundary_mass: 6.2812500000e+00
+  level_5_boundary_map: 3.8400000000e+02
+  level_5_boundary_mass: 6.0000000000e+00
   level_6_size: 3.2768000000e+04
   level_6_mass: 2.0000000000e+00
-  level_6_boundary_map: 7.8800000000e+02
-  level_6_boundary_mass: 6.1562500000e+00
+  level_6_boundary_map: 7.6800000000e+02
+  level_6_boundary_mass: 6.0000000000e+00
   level_7_size: 1.3107200000e+05
   level_7_mass: 2.0000000000e+00
   level_7_boundary_map: 1.5360000000e+03
