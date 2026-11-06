@@ -398,7 +398,7 @@ namespace ryujin
       } else {
 #if DEAL_II_VERSION_GTE(9, 7, 0)
         const auto quadrature = FETools::compute_nodal_quadrature(
-            FE_SimplexP<structdim - 1>(quadrature_degree));
+            FE_SimplexP<structdim - 1>(fe_degree));
         collection_.face_nodal_quadrature =
             std::make_unique<std::vector<QCF>>(1, QCF(quadrature));
 #endif

@@ -839,10 +839,17 @@ namespace ryujin
 
           /* index j for neighbor, index i for current cell: */
           for (unsigned int j : fe_neighbor_face_values.dof_indices()) {
+            if (!DoFTools::has_support_on_face(
+                    neighbor_cell->get_fe(), j, f_index_neighbor))
+              continue;
+
             const auto value_JxW =
                 fe_neighbor_face_values.shape_value(j, q) * JxW;
 
             for (unsigned int i : fe_face_values.dof_indices()) {
+              if (!DoFTools::has_support_on_face(cell->get_fe(), i, f_index))
+                continue;
+
               const auto value = fe_face_values.shape_value(i, q);
 
               for (unsigned int d = 0; d < dim; ++d)
@@ -1781,7 +1788,7 @@ namespace ryujin
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!cell->get_fe().has_support_on_face(j, f_index))
+          if (!DoFTools::has_support_on_face(cell->get_fe(), j, f_index))
             continue;
 
           const auto global_index = local_dof_indices[j];

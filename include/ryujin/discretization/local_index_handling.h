@@ -397,6 +397,39 @@ namespace ryujin
 
 
     /**
+     * Same as FiniteElement::has_support_on_face() but with the correct
+     * answer for simplices: deal.II does not override the default
+     * implementation for FE_SimplexP and FE_SimplexDGP, which always returns
+     * true. A nodal shape function on a simplex vanishes on a face if and
+     * only if its support point is not located on that face.
+     *
+     * @ingroup FiniteElement
+     */
+    template <int structdim, int dim>
+    bool has_support_on_face(const dealii::FiniteElement<structdim, dim> &fe,
+                             const unsigned int i,
+                             const unsigned int f_index)
+    {
+      const auto reference_cell = fe.reference_cell();
+      if (reference_cell.is_hyper_cube())
+        return fe.has_support_on_face(i, f_index);
+
+#if DEAL_II_VERSION_GTE(9, 8, 0)
+      const auto vertex = reference_cell.face_vertex_location(f_index, 0);
+      const auto normal = reference_cell.face_normal_vector(f_index);
+#else
+      const auto vertex =
+          reference_cell.template face_vertex_location<structdim>(f_index, 0);
+      const auto normal =
+          reference_cell.template unit_normal_vectors<structdim>(f_index);
+#endif
+
+      const auto offset = fe.get_unit_support_points()[i] - vertex;
+      return std::abs(offset * normal) < 1.e-10;
+    }
+
+
+    /**
      * Given a @p dof_handler, and constraints @p affine_constraints this
      * function creates an extended sparsity pattern for the discontinuous
      * Galerkin formulation that also includes locally relevant to locally
@@ -468,13 +501,13 @@ namespace ryujin
 
           coupling_indices.resize(0);
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
-            if (cell->get_fe().has_support_on_face(i, f_index))
+            if (has_support_on_face(cell->get_fe(), i, f_index))
               coupling_indices.push_back(dof_indices[i]);
 
           neighbor_coupling_indices.resize(0);
           for (unsigned int j = 0; j < neighbor_dofs_per_cell; ++j)
-            if (neighbor_cell->get_fe().has_support_on_face(j,
-                                                            f_index_neighbor))
+            if (has_support_on_face(
+                    neighbor_cell->get_fe(), j, f_index_neighbor))
               neighbor_coupling_indices.push_back(neighbor_dof_indices[j]);
 
           affine_constraints.add_entries_local_to_global(
