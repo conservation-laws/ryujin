@@ -226,6 +226,39 @@ namespace ryujin
       GridTools::distort_random(mesh_distortion_, triangulation, false, seed);
     }
 
+#ifdef DEBUG
+    /*
+     * Without a partner cell for a periodic face we would silently end up
+     * with an open boundary. This checks for a bug in deal.II, see
+     * https://github.com/dealii/dealii/pull/20359
+     */
+
+    using cell_iterator =
+        typename dealii::Triangulation<structdim, dim>::cell_iterator;
+    const auto &periodic_faces = triangulation.get_periodic_face_map();
+
+    for (const auto &cell : triangulation.active_cell_iterators()) {
+      if (!cell->is_locally_owned())
+        continue;
+
+      for (const auto f : cell->face_indices()) {
+        const auto face = cell->face(f);
+        if (!face->at_boundary() || face->boundary_id() != Boundary::periodic)
+          continue;
+
+        const auto it = periodic_faces.find({cell_iterator(cell), f});
+        Assert(it != periodic_faces.end(),
+               ExcMessage("The partner cell of a periodic face is not "
+                          "available on this MPI rank."));
+
+        const auto &partner = it->second.first.first;
+        Assert(!partner->is_active() || !partner->is_artificial(),
+               ExcMessage("The partner cell of a periodic face is an "
+                          "artificial cell on this MPI rank."));
+      }
+    }
+#endif
+
     const auto fe_degree = polynomial_degree();
     const auto mapping_degree = fe_degree;
     const auto quadrature_degree = fe_degree + 1;
