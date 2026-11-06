@@ -90,9 +90,13 @@ namespace ryujin
      * The problem_dimension and n_precomputed_values parameters is used to
      * set up appropriately sized vector partitioners for the state and
      * precomputed MultiComponentVector.
+     *
+     * Multigrid level data can be disabled with @p with_multigrid_data if
+     * no parabolic solver requires it.
      */
     void prepare(const unsigned int problem_dimension,
-                 const unsigned int n_precomputed_values) override;
+                 const unsigned int n_precomputed_values,
+                 const bool with_multigrid_data = true) override;
 
     //@}
     /**

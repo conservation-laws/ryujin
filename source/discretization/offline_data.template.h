@@ -69,7 +69,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::prepare(
       const unsigned int problem_dimension,
-      const unsigned int n_precomputed_values)
+      const unsigned int n_precomputed_values,
+      const bool with_multigrid_data)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<structdim, dim, Number>::prepare()" << std::endl;
@@ -93,7 +94,8 @@ namespace ryujin
 
     create_matrices();
 
-    if (!discretization_->dof_handler().has_hp_capabilities())
+    if (with_multigrid_data &&
+        !discretization_->dof_handler().has_hp_capabilities())
       create_multigrid_data();
   }
 

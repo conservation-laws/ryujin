@@ -224,7 +224,8 @@ namespace ryujin
       context.info("preparing compute kernels");
       this->offline_data_->prepare(
           this->hyperbolic_module_->problem_dimension(),
-          this->hyperbolic_module_->n_precomputed_values());
+          this->hyperbolic_module_->n_precomputed_values(),
+          /*with_multigrid_data*/ !this->parabolic_system_->is_identity());
       this->hyperbolic_module_->prepare();
       this->parabolic_module_->prepare();
       this->time_integrator_->prepare();
