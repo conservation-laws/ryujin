@@ -1165,7 +1165,8 @@ namespace ryujin
     {
       this->boundary_map_ = construct_boundary_map(dof_handler.begin_active(),
                                                    dof_handler.end(),
-                                                   *this->scalar_partitioner_);
+                                                   *this->scalar_partitioner_,
+                                                   affine_constraints);
 
       /*
        * Compact the degrees of freedom stored in the boundary map into a
@@ -1388,10 +1389,35 @@ namespace ryujin
 
       /* Populate boundary map: */
 
-      level_boundary_map_[level] = construct_boundary_map(
-          dof_handler.begin_mg(level), dof_handler.end_mg(level), *partitioner);
+      level_boundary_map_[level] =
+          construct_boundary_map(dof_handler.begin_mg(level),
+                                 dof_handler.end_mg(level),
+                                 *partitioner,
+                                 AffineConstraints<Number>());
     }
   }
+
+
+  namespace
+  {
+    /**
+     * The boundary contribution of a constrained degree of freedom to one
+     * of its constraining degrees of freedom.
+     */
+    template <int dim, typename Number>
+    struct BoundaryContribution {
+      dealii::types::global_dof_index index;
+      dealii::Tensor<1, dim, Number> normal;
+      Number boundary_mass;
+      dealii::types::boundary_id id;
+
+      template <class Archive>
+      void serialize(Archive &ar, const unsigned int /*version*/)
+      {
+        ar &index &normal &boundary_mass &id;
+      }
+    };
+  } // namespace
 
 
   template <int structdim, int dim, typename Number>
@@ -1399,7 +1425,8 @@ namespace ryujin
   auto OfflineData<structdim, dim, Number>::construct_boundary_map(
       const ITERATOR1 &begin,
       const ITERATOR2 &end,
-      const Utilities::MPI::Partitioner &partitioner) const -> BoundaryMap
+      const Utilities::MPI::Partitioner &partitioner,
+      const AffineConstraints<Number> &affine_constraints) const -> BoundaryMap
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<structdim, dim, Number>::construct_boundary_map()"
@@ -1419,6 +1446,9 @@ namespace ryujin
                                     dealii::Point<dim>> /*position*/;
     std::multimap<unsigned int, BoundaryData> preliminary_map;
 
+    using Contribution = BoundaryContribution<dim, Number>;
+    std::vector<Contribution> contributions;
+
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
     dealii::hp::FEFaceValues<structdim, dim> hp_fe_face_values(
@@ -1431,10 +1461,8 @@ namespace ryujin
     for (auto cell = begin; cell != end; ++cell) {
 
       /*
-       * Workaround: Make sure to iterate over the entire locally relevant
-       * set so that we compute normals between cells with differing owners
-       * correctly. This strategy works for 2D but will fail in 3D with
-       * locally refined meshes and hanging nodes situated at the boundary.
+       * Make sure to iterate over the entire locally relevant set so that
+       * we compute normals between cells with differing owners correctly.
        */
       if ((cell->is_active() && cell->is_artificial()) ||
           (!cell->is_active() && cell->is_artificial_on_level()))
@@ -1512,6 +1540,25 @@ namespace ryujin
             continue;
 
           const auto global_index = local_dof_indices[j];
+
+          /*
+           * Hand the contribution of a constrained degree of freedom to
+           * its constraining degrees of freedom. Such a degree of freedom
+           * might not be owned by the current rank and we might have to
+           * send the information over to a neighbor.
+           */
+          const auto *entries =
+              affine_constraints.get_constraint_entries(global_index);
+          if (entries != nullptr) {
+            if (cell->is_locally_owned())
+              for (const auto &[master, weight] : *entries)
+                contributions.push_back({master,
+                                         Number(weight) * normal,
+                                         Number(weight) * boundary_mass,
+                                         id});
+            continue;
+          }
+
           const auto index = partitioner.global_to_local(global_index);
 
           /* Skip nonlocal degrees of freedom: */
@@ -1535,6 +1582,40 @@ namespace ryujin
         } /* j */
       }   /* f */
     }     /* cell */
+
+    /*
+     * Send all contributions to the owner of the constraining degree of
+     * freedom and add them to the (already populated) preliminary map:
+     */
+
+    dealii::IndexSet indices(partitioner.size());
+    for (const auto &contribution : contributions)
+      indices.add_index(contribution.index);
+    indices.compress();
+
+    const auto communicator = partitioner.get_mpi_communicator();
+    const auto owners = Utilities::MPI::compute_index_owner(
+        partitioner.locally_owned_range(), indices, communicator);
+
+    std::map<unsigned int, std::vector<Contribution>> outgoing;
+    for (const auto &contribution : contributions) {
+      const auto position = indices.index_within_set(contribution.index);
+      outgoing[owners[position]].push_back(contribution);
+    }
+
+    const auto incoming = Utilities::MPI::some_to_some(communicator, outgoing);
+    for (const auto &[rank, received] : incoming) {
+      (void)rank;
+      for (const auto &entry : received) {
+        const auto index = partitioner.global_to_local(entry.index);
+        preliminary_map.insert({index,
+                                {entry.normal,
+                                 entry.boundary_mass,
+                                 entry.boundary_mass,
+                                 entry.id,
+                                 this->support_points_[index]}});
+      }
+    }
 
     /*
      * Filter boundary map:
@@ -1565,7 +1646,17 @@ namespace ryujin
 
         Assert(point.distance(new_point) < 1.0e-14, dealii::ExcInternalError());
 
-        if (normal * new_normal / normal.norm() / new_normal.norm() > 0.50) {
+        /*
+         * The contribution of a constrained degree of freedom has a
+         * reversed orientation if its constraint weight is negative:
+         */
+        const auto orientation =
+            boundary_mass * new_boundary_mass > 0. ? 1 : -1;
+
+        const auto projection =
+            (normal * new_normal) / (normal.norm() * new_normal.norm());
+
+        if (orientation * projection > 0.5) {
           /*
            * Both normals describe an acute angle of 85 degrees or less.
            * Merge the entries and continue.
@@ -1573,7 +1664,7 @@ namespace ryujin
           normal += new_normal;
           boundary_mass += new_boundary_mass;
           inserted = true;
-          continue;
+          break;
 
         } else if constexpr (structdim == 2) {
           /*
