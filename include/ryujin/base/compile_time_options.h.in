@@ -14,6 +14,7 @@
 #cmakedefine DEBUG_OUTPUT
 #cmakedefine DEBUG_EXPENSIVE_BOUNDS_CHECK
 #cmakedefine DEBUG_SYMMETRY_CHECK
+#cmakedefine OFFLINE_DATA_DEBUG_TIMINGS
 
 /* Compile-time parameters: */
 
