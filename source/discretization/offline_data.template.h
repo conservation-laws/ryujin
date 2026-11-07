@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ryujin/base/computing_timer.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/discretization/discretization.h>
@@ -23,6 +24,12 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
+
+#ifdef OFFLINE_DATA_DEBUG_TIMINGS
+#define OFFLINE_DATA_TIMER_SCOPE(name) ComputingTimer::Scope scope(name)
+#else
+#define OFFLINE_DATA_TIMER_SCOPE(name)
+#endif
 
 namespace ryujin
 {
@@ -69,7 +76,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::prepare(
       const unsigned int problem_dimension,
-      const unsigned int n_precomputed_values)
+      const unsigned int n_precomputed_values,
+      const bool with_multigrid_data)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<structdim, dim, Number>::prepare()" << std::endl;
@@ -78,23 +86,36 @@ namespace ryujin
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
-    renumber_for_simd();
-
-    create_constraints_and_sparsity_pattern();
-
-    ensure_simd_stride_consistency();
-
-    create_partitioner_and_simd_sparsity(problem_dimension,
-                                         n_precomputed_values);
-
-    create_index_maps();
-
-    create_support_points();
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1 - renumber dofs");
+      renumber_for_simd();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 2 - sparsity pattern");
+      create_constraints_and_sparsity_pattern();
+      ensure_simd_stride_consistency();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 3 - SIMD sparsity pattern");
+      create_partitioner_and_simd_sparsity(problem_dimension,
+                                           n_precomputed_values);
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 4 - index maps");
+      create_index_maps();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 5 - support points");
+      create_support_points();
+    }
 
     create_matrices();
 
-    if (!discretization_->dof_handler().has_hp_capabilities())
+    if (with_multigrid_data &&
+        !discretization_->dof_handler().has_hp_capabilities()) {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 8 - multigrid data");
       create_multigrid_data();
+    }
   }
 
 
@@ -640,6 +661,12 @@ namespace ryujin
               << std::endl;
 #endif
 
+#ifdef OFFLINE_DATA_DEBUG_TIMINGS
+    auto &assembly_timer =
+        ComputingTimer::timer("offline data 6 - assemble matrices");
+    assembly_timer.start();
+#endif
+
     /*
      * First, (re)initialize all local matrices. All of them are assembled
      * on the host memory space and read on either memory space, so we
@@ -1166,10 +1193,16 @@ namespace ryujin
       this->incidence_matrix_->view().compress(VectorOperation::add);
     }
 
+#ifdef OFFLINE_DATA_DEBUG_TIMINGS
+    assembly_timer.stop();
+#endif
+
     /*
      * Populate boundary map and collect coupling boundary pairs:
      */
     {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 7 - boundary map");
+
       this->boundary_map_ = construct_boundary_map(dof_handler.begin_active(),
                                                    dof_handler.end(),
                                                    *this->scalar_partitioner_,
@@ -1440,8 +1473,6 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
-
     /*
      * Create a temporary multimap with the (local) dof index as key:
      */
@@ -1569,12 +1600,7 @@ namespace ryujin
           const auto index = partitioner.global_to_local(global_index);
 
           /* Skip nonlocal degrees of freedom: */
-          if (index >= this->n_locally_owned_)
-            continue;
-
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd_view.row_length(index);
-          if (row_length == 1)
+          if (index >= partitioner.locally_owned_size())
             continue;
 
           Point<dim> position =
@@ -1839,3 +1865,5 @@ namespace ryujin
   }
 
 } // namespace ryujin
+
+#undef OFFLINE_DATA_TIMER_SCOPE

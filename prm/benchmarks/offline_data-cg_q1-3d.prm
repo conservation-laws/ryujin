@@ -1,0 +1,33 @@
+subsection A - Scheduler
+  set basename          = offline_data-cg_q1-3d
+  set tasks             =
+  set final time        = 0.0
+  set timer granularity = 1.0
+end
+subsection B - Equation
+  set dimension = 3
+  set equation  = euler
+  set gamma     = 1.4
+end
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 7
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+    set position bottom left      = -5, -5, -5
+    set position top right        =  5,  5,  5
+    set subdivisions x            = 2
+    set subdivisions y            = 2
+    set subdivisions z            = 1
+    set boundary condition front  = dirichlet
+    set boundary condition back   = dirichlet
+  end
+end
+subsection E - InitialValues
+  set configuration = uniform
+  set direction     = 1, 1, 1
+  set position      = -1, -1, -1
+end

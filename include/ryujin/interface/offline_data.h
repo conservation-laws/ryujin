@@ -101,7 +101,8 @@ namespace ryujin
        * MultiComponentVector.
        */
       virtual void prepare(const unsigned int problem_dimension,
-                           const unsigned int n_precomputed_values) = 0;
+                           const unsigned int n_precomputed_values,
+                           const bool with_multigrid_data = true) = 0;
 
       //@}
       /**
