@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/driver/simulation.h>
 #include <ryujin/driver/task_composition.h>
 #include <ryujin/stub/parabolic_module.h>
@@ -217,6 +218,8 @@ namespace ryujin
     static void run_simulation(const std::string &parameter_file,
                                const MPI_Comm &mpi_comm)
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       Simulation<dim, dim, NUMBER, HD, PD, TI> simulation(mpi_comm);
       TaskComposition<dim, dim, NUMBER> task_composition(simulation);
 

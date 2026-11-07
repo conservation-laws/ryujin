@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/driver/scheduler.h>
 
 #include <deal.II/base/mpi.h>
@@ -86,9 +87,7 @@ namespace ryujin
   template <typename Number>
   void Scheduler<Number>::run()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Scheduler<Number>::run()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     ComputingTimer::reinit();
 

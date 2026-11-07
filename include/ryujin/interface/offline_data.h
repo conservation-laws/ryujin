@@ -104,6 +104,13 @@ namespace ryujin
                            const unsigned int n_precomputed_values,
                            const bool with_multigrid_data = true) = 0;
 
+      /**
+       * Recompute everything that depends on the geometry of the mesh
+       * without changing the numbering of degrees of freedom, sparsity
+       * patterns, or partitioners. Requires a prior call to prepare().
+       */
+      virtual void update_geometry() = 0;
+
       //@}
       /**
        * @name Information and statistics

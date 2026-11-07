@@ -120,9 +120,7 @@ namespace ryujin
     template <typename HyperbolicDescription, int dim, typename Number>
     void ParabolicModule<HyperbolicDescription, dim, Number>::prepare()
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
       /*
        * The cycle_ variabe is only used for gmg reinitialization, simply
        * reset it to zero on prepare().
@@ -233,10 +231,7 @@ namespace ryujin
     ParabolicModule<HyperbolicDescription, dim, Number>::reinit_state_vector(
         StateVector<Number> &state_vector) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::reinit_state_vector()"
-                << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
 
       auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
       U_dynamic.resize(1);
@@ -252,10 +247,7 @@ namespace ryujin
     ParabolicModule<HyperbolicDescription, dim, Number>::prepare_state_vector(
         StateVector<Number> &state_vector, Number t) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::prepare_state_vector()"
-                << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
 
       AssertThrow(gauss_law_restart_strategy_ !=
                       GaussLawRestartStrategy::correction,
@@ -370,6 +362,8 @@ namespace ryujin
         Number t,
         Number tau) const
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       step(old_state_vector,
            new_state_vector,
            t,
@@ -387,6 +381,8 @@ namespace ryujin
         Number tau,
         Number /*tau_max*/) const
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       AssertThrow(tau != Number(0.),
                   dealii::ExcMessage("A parabolic module cannot choose the "
                                      "time step size: tau must be nonzero."));
@@ -435,10 +431,7 @@ namespace ryujin
     void
     ParabolicModule<HyperbolicDescription, dim, Number>::create_constraints()
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::create_constraints()"
-                << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
 
       const auto &discretization = offline_data_->discretization();
       const auto &dof_handler = discretization.dof_handler_cg();
@@ -503,10 +496,7 @@ namespace ryujin
     void ParabolicModule<HyperbolicDescription, dim, Number>::
         update_background_density(const Number t) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::update_background_density()"
-                << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
 
       /*
        * Skip updating the background density if t > 0 and if the fields
@@ -551,10 +541,7 @@ namespace ryujin
     ParabolicModule<HyperbolicDescription, dim, Number>::update_magnetic_field(
         const Number t) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::update_magnetic_field()"
-                << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
 
       /*
        * Skip updating the background density if t > 0 and if the fields
@@ -601,10 +588,7 @@ namespace ryujin
     void ParabolicModule<HyperbolicDescription, dim, Number>::compute_potential(
         const Number t, StateVector<Number> &state_vector) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::compute_potential()"
-                << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
       using HostSpace = dealii::MemorySpace::Host;
 
       copy_to_memory_space<HostSpace>(std::as_const(state_vector),
@@ -751,11 +735,7 @@ namespace ryujin
     void ParabolicModule<HyperbolicDescription, dim, Number>::
         enforce_magnetic_drift_velocity(StateVector<Number> &state_vector) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout
-          << "ParabolicModule<dim, Number>::enforce_magnetic_drift_velocity()"
-          << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
 
       using HostSpace = dealii::MemorySpace::Host;
 
@@ -866,8 +846,9 @@ namespace ryujin
         Number tau [[maybe_unused]],
         const bool crank_nicolson_extrapolation [[maybe_unused]]) const
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
 #ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
       std::cout << "        perform time-step with tau = " << tau << std::endl;
       if (crank_nicolson_extrapolation)
         std::cout << "        and extrapolate to t + 2 * tau" << std::endl;

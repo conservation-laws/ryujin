@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/discretization/discretization.h>
@@ -25,11 +26,7 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
-#ifdef OFFLINE_DATA_DEBUG_TIMINGS
-#define OFFLINE_DATA_TIMER_SCOPE(name) ComputingTimer::Scope scope(name)
-#else
-#define OFFLINE_DATA_TIMER_SCOPE(name)
-#endif
+#include <atomic>
 
 namespace ryujin
 {
@@ -79,42 +76,82 @@ namespace ryujin
       const unsigned int n_precomputed_values,
       const bool with_multigrid_data)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    setup_topology(
+        problem_dimension, n_precomputed_values, with_multigrid_data);
+    update_geometry();
+  }
+
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::setup_topology(
+      const unsigned int problem_dimension,
+      const unsigned int n_precomputed_values,
+      const bool with_multigrid_data)
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
 
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1 - renumber dofs");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.1 topology - renumber dofs");
       renumber_for_simd();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 2 - sparsity pattern");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.2 topology - sparsity pattern");
       create_constraints_and_sparsity_pattern();
       ensure_simd_stride_consistency();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 3 - SIMD sparsity pattern");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.3 topology - SIMD sparsity");
       create_partitioner_and_simd_sparsity(problem_dimension,
                                            n_precomputed_values);
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 4 - index maps");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - index maps");
       create_index_maps();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 5 - support points");
-      create_support_points();
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - matrix storage");
+      allocate_matrices();
+    }
+    {
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - coupling pairs");
+      create_coupling_boundary_pairs();
     }
 
-    create_matrices();
-
+    level_boundary_map_.clear();
+    level_lumped_mass_matrix_.clear();
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 8 - multigrid data");
-      create_multigrid_data();
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.7 topology - multigrid data");
+      allocate_multigrid_data();
+    }
+  }
+
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::update_geometry()
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    {
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.1 geometry - support points");
+      create_support_points();
+    }
+    {
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.2 geometry - assemble matrices");
+      assemble_matrices();
+    }
+    {
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.3 geometry - boundary map");
+      create_boundary_map();
+    }
+    {
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.4 geometry - multigrid data");
+      assemble_multigrid_data();
     }
   }
 
@@ -122,6 +159,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::renumber_for_simd()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     auto &dof_handler = discretization_->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     this->n_locally_owned_ = locally_owned.n_elements();
@@ -186,6 +225,8 @@ namespace ryujin
   void
   OfflineData<structdim, dim, Number>::create_constraints_and_sparsity_pattern()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     /*
      * First, we set up the (globally indexed) affine constraints object
      * for the continuous dof handler. The affine constraints object solely
@@ -323,6 +364,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     auto &dof_handler = discretization_->dof_handler();
 
     /*
@@ -412,6 +455,8 @@ namespace ryujin
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
@@ -509,6 +554,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_index_maps()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &fe_collection_dg =
         discretization_->dof_handler_dg().get_fe_collection();
     const auto &fe_collection_cg =
@@ -534,10 +581,10 @@ namespace ryujin
         unsigned int j = 0;
         while (j < support_cg.size() && point.distance(support_cg[j]) > 1.e-10)
           ++j;
-        AssertThrow(j < support_cg.size(),
-                    dealii::ExcMessage("The continuous and discontinuous "
-                                       "finite elements do not share the "
-                                       "same unit support points."));
+        Assert(j < support_cg.size(),
+               dealii::ExcMessage(
+                   "The continuous and discontinuous finite elements do not "
+                   "share the same unit support points."));
         local_index_map[k].push_back(j);
       }
     }
@@ -590,6 +637,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_support_points()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &dof_handler = discretization_->dof_handler();
     const auto &fe_collection = dof_handler.get_fe_collection();
     const auto &partitioner = *this->scalar_partitioner_;
@@ -654,21 +703,12 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::create_matrices()
+  void OfflineData<structdim, dim, Number>::allocate_matrices()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::create_matrices()"
-              << std::endl;
-#endif
-
-#ifdef OFFLINE_DATA_DEBUG_TIMINGS
-    auto &assembly_timer =
-        ComputingTimer::timer("offline data 6 - assemble matrices");
-    assembly_timer.start();
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
-     * First, (re)initialize all local matrices. All of them are assembled
+     * (Re)initialize all local matrices. All of them are assembled
      * on the host memory space and read on either memory space, so we
      * select the implicit_transfers policy and let the first view() on the
      * default memory space perform the transfer:
@@ -689,15 +729,28 @@ namespace ryujin
     this->cij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
     if (discretization_->have_discontinuous_ansatz())
       this->incidence_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+  }
 
-    /*
-     * Now, assemble all matrices:
-     */
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::assemble_matrices()
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
 
+    this->mass_matrix_->zero_out();
+    this->betaij_matrix_->zero_out();
+    this->cij_matrix_->zero_out();
+    if (discretization_->have_discontinuous_ansatz()) {
+      this->mass_matrix_inverse_->zero_out();
+      this->incidence_matrix_->zero_out();
+    }
+
     this->measure_of_omega_ = 0.;
+
+    std::atomic<bool> have_inverted_cell = false;
 
     /* The local, per-cell assembly routine: */
     const auto local_assemble_system = [&](const auto &cell,
@@ -753,6 +806,9 @@ namespace ryujin
 
       for (unsigned int q : fe_values.quadrature_point_indices()) {
         const auto JxW = fe_values.JxW(q);
+
+        if (dofs_per_cell != 0 && JxW <= 0.)
+          have_inverted_cell = true;
 
         /* skip cells that have no active cells when computing domain size: */
         if (dofs_per_cell != 0 && cell->is_locally_owned())
@@ -956,6 +1012,18 @@ namespace ryujin
                     copy_local_to_global,
                     AssemblyScratchData<structdim, dim>(*discretization_),
                     AssemblyCopyData<structdim, dim, Number>());
+
+    /*
+     * Check on all ranks so that all of them throw the same exception:
+     */
+    const auto n_ranks_with_inverted_cell = Utilities::MPI::sum<unsigned int>(
+        have_inverted_cell ? 1 : 0, mpi_ensemble_.ensemble_communicator());
+    AssertThrow(n_ranks_with_inverted_cell == 0,
+                dealii::ExcMessage(
+                    "OfflineData: The mesh contains a cell with a non-positive "
+                    "Jacobian determinant. The mapping is inverted or "
+                    "degenerate, for example because of a tangled moving "
+                    "mesh or an invalid transformation."));
 
     this->mass_matrix_->view().compress(VectorOperation::add);
     this->mass_matrix_->view().update_ghost_rows();
@@ -1193,63 +1261,6 @@ namespace ryujin
       this->incidence_matrix_->view().compress(VectorOperation::add);
     }
 
-#ifdef OFFLINE_DATA_DEBUG_TIMINGS
-    assembly_timer.stop();
-#endif
-
-    /*
-     * Populate boundary map and collect coupling boundary pairs:
-     */
-    {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 7 - boundary map");
-
-      this->boundary_map_ = construct_boundary_map(dof_handler.begin_active(),
-                                                   dof_handler.end(),
-                                                   *this->scalar_partitioner_,
-                                                   affine_constraints);
-
-      /*
-       * Compact the degrees of freedom stored in the boundary map into a
-       * strictly increasing index list (that is mirrored into the default
-       * memory space) and record for every entry of the boundary map the
-       * position of its degree of freedom in that index list. Note that the
-       * boundary map can contain more than one entry for the same degree of
-       * freedom.
-       */
-
-      std::vector<unsigned int> boundary_indices;
-      std::map<unsigned int, unsigned int> position_of_index;
-
-      this->boundary_slots_.clear();
-      this->boundary_slots_.reserve(this->boundary_map_.size());
-
-      for (const auto &entry : this->boundary_map_) {
-        const auto index = std::get<0>(entry);
-        const auto [it, inserted] =
-            position_of_index.try_emplace(index, boundary_indices.size());
-        if (inserted)
-          boundary_indices.push_back(index);
-        this->boundary_slots_.push_back(it->second);
-      }
-
-      this->boundary_indices_->reinit(boundary_indices.size(),
-                                      TransferPolicy::implicit_transfers);
-      std::copy(boundary_indices.begin(),
-                boundary_indices.end(),
-                this->boundary_indices_->view());
-
-      const auto coupling_boundary_pairs =
-          collect_coupling_boundary_pairs(dof_handler.begin_active(),
-                                          dof_handler.end(),
-                                          *this->scalar_partitioner_);
-
-      this->coupling_boundary_pairs_->reinit(
-          coupling_boundary_pairs.size(), TransferPolicy::implicit_transfers);
-      std::copy(coupling_boundary_pairs.begin(),
-                coupling_boundary_pairs.end(),
-                this->coupling_boundary_pairs_->view());
-    }
-
 #ifdef DEBUG_SYMMETRY_CHECK
     /*
      * Verify that we have consistent mass:
@@ -1361,13 +1372,84 @@ namespace ryujin
   }
 
 
+  /*
+   * Populates:
+   *     coupling_boundary_pairs_
+   */
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::create_multigrid_data()
+  void OfflineData<structdim, dim, Number>::create_coupling_boundary_pairs()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::create_multigrid_data()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
+        discretization_->dof_handler().active_cell_iterators(),
+        *this->scalar_partitioner_);
+
+    this->coupling_boundary_pairs_->reinit(coupling_boundary_pairs.size(),
+                                           TransferPolicy::implicit_transfers);
+    std::copy(coupling_boundary_pairs.begin(),
+              coupling_boundary_pairs.end(),
+              this->coupling_boundary_pairs_->view());
+  }
+
+
+  /*
+   * Populates:
+   *     boundary_map_
+   *     boundary_slots_
+   *     boundary_indices_
+   */
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_boundary_map()
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    this->boundary_map_ = construct_boundary_map(
+        discretization_->dof_handler().active_cell_iterators(),
+        *this->scalar_partitioner_,
+        this->affine_constraints());
+
+    /*
+     * Compact the degrees of freedom stored in the boundary map into a
+     * strictly increasing index list (that is mirrored into the default
+     * memory space) and record for every entry of the boundary map the
+     * position of its degree of freedom in that index list. Note that the
+     * boundary map can contain more than one entry for the same degree of
+     * freedom.
+     */
+
+    std::vector<unsigned int> boundary_indices;
+    std::map<unsigned int, unsigned int> position_of_index;
+
+    this->boundary_slots_.clear();
+    this->boundary_slots_.reserve(this->boundary_map_.size());
+
+    for (const auto &entry : this->boundary_map_) {
+      const auto index = std::get<0>(entry);
+      const auto [it, inserted] =
+          position_of_index.try_emplace(index, boundary_indices.size());
+      if (inserted)
+        boundary_indices.push_back(index);
+      this->boundary_slots_.push_back(it->second);
+    }
+
+    this->boundary_indices_->reinit(boundary_indices.size(),
+                                    TransferPolicy::implicit_transfers);
+    std::copy(boundary_indices.begin(),
+              boundary_indices.end(),
+              this->boundary_indices_->view());
+  }
+
+
+  /*
+   * Populates:
+   *     level_lumped_mass_matrix_ (storage)
+   *     level_boundary_map_ (storage)
+   */
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::allocate_multigrid_data()
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(!discretization_->dof_handler_cg().has_hp_capabilities(),
            dealii::ExcInternalError());
@@ -1377,21 +1459,13 @@ namespace ryujin
     discretization_->dof_handler_cg().distribute_mg_dofs();
     discretization_->dof_handler_dg().distribute_mg_dofs();
 
-    /* Now, work on data structures for hyperbolic update: */
-
-    auto &dof_handler = discretization_->dof_handler();
-
+    const auto &dof_handler = discretization_->dof_handler();
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
-
-    AffineConstraints<float> level_constraints;
-    // TODO not yet thread-parallel and without periodicity
 
     level_boundary_map_.resize(n_levels);
     level_lumped_mass_matrix_.resize(n_levels);
 
     for (unsigned int level = 0; level < n_levels; ++level) {
-      /* Assemble lumped mass matrix vector: */
-
       const auto relevant_dofs =
           dealii::DoFTools::extract_locally_relevant_level_dofs(dof_handler,
                                                                 level);
@@ -1401,6 +1475,27 @@ namespace ryujin
           relevant_dofs,
           mpi_ensemble_.ensemble_communicator());
       level_lumped_mass_matrix_[level].reinit(partitioner);
+    }
+  }
+
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::assemble_multigrid_data()
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    const auto &dof_handler = discretization_->dof_handler();
+
+    AffineConstraints<float> level_constraints;
+    // TODO not yet thread-parallel and without periodicity
+
+    for (unsigned int level = 0; level < level_lumped_mass_matrix_.size();
+         ++level) {
+      /* Assemble lumped mass matrix vector: */
+
+      auto &level_lumped_mass_matrix = level_lumped_mass_matrix_[level];
+      level_lumped_mass_matrix = 0.;
+
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);
       dealii::Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
@@ -1423,16 +1518,15 @@ namespace ryujin
           }
           cell->get_mg_dof_indices(dof_indices);
           level_constraints.distribute_local_to_global(
-              mass_values, dof_indices, level_lumped_mass_matrix_[level]);
+              mass_values, dof_indices, level_lumped_mass_matrix);
         }
-      level_lumped_mass_matrix_[level].compress(VectorOperation::add);
+      level_lumped_mass_matrix.compress(VectorOperation::add);
 
       /* Populate boundary map: */
 
       level_boundary_map_[level] =
-          construct_boundary_map(dof_handler.begin_mg(level),
-                                 dof_handler.end_mg(level),
-                                 *partitioner,
+          construct_boundary_map(dof_handler.mg_cell_iterators_on_level(level),
+                                 *level_lumped_mass_matrix.get_partitioner(),
                                  AffineConstraints<Number>());
     }
   }
@@ -1461,17 +1555,13 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  template <typename ITERATOR1, typename ITERATOR2>
+  template <typename RANGE>
   auto OfflineData<structdim, dim, Number>::construct_boundary_map(
-      const ITERATOR1 &begin,
-      const ITERATOR2 &end,
+      const RANGE &cells,
       const Utilities::MPI::Partitioner &partitioner,
       const AffineConstraints<Number> &affine_constraints) const -> BoundaryMap
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::construct_boundary_map()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * Create a temporary multimap with the (local) dof index as key:
@@ -1496,7 +1586,7 @@ namespace ryujin
         dealii::update_normal_vectors | dealii::update_values |
             dealii::update_JxW_values);
 
-    for (auto cell = begin; cell != end; ++cell) {
+    for (const auto &cell : cells) {
 
       /*
        * Make sure to iterate over the entire locally relevant set so that
@@ -1756,18 +1846,12 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  template <typename ITERATOR1, typename ITERATOR2>
+  template <typename RANGE>
   auto OfflineData<structdim, dim, Number>::collect_coupling_boundary_pairs(
-      const ITERATOR1 &begin,
-      const ITERATOR2 &end,
-      const Utilities::MPI::Partitioner &partitioner) const
+      const RANGE &cells, const Utilities::MPI::Partitioner &partitioner) const
       -> CouplingBoundaryPairs
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, "
-                 "Number>::collect_coupling_boundary_pairs()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * First, collect *all* locally relevant degrees of freedom that are
@@ -1779,7 +1863,7 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    for (auto cell = begin; cell != end; ++cell) {
+    for (const auto &cell : cells) {
 
       /* Make sure to iterate over the entire locally relevant set: */
       if (cell->is_artificial())
@@ -1865,5 +1949,3 @@ namespace ryujin
   }
 
 } // namespace ryujin
-
-#undef OFFLINE_DATA_TIMER_SCOPE

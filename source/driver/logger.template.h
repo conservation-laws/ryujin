@@ -8,6 +8,7 @@
 #include <driver/dashboard_text.h>
 #include <driver/terminal.h>
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/logger.h>
@@ -164,6 +165,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void Logger<structdim, dim, Number>::start(TaskContext<Number> & /*context*/)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     print_device_information();
   }
 
@@ -172,6 +175,8 @@ namespace ryujin
   void
   Logger<structdim, dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     print_mpi_partition(logfile_);
 
     if (mpi_ensemble_.ensemble_rank() == 0)
@@ -193,6 +198,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void Logger<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const bool write_to_logfile =
         (terminal_update_interval_ != Number(0.)) && /* suppress output */
         context.timer_tick;
@@ -227,6 +234,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void Logger<structdim, dim, Number>::finalize(TaskContext<Number> &context)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     /* Write final timing statistics to screen and logfile: */
 
     if (terminal_update_interval_ != Number(0.))

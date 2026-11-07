@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
@@ -48,6 +49,8 @@ namespace ryujin
       const bool symmetrize_ghost_range,
       const TransferPolicy transfer_policy)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     /*
      * Drop the transfer policy for the duration of the reinit so that a
      * pinned memory space of a previous policy does not interfere:

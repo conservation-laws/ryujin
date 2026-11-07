@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/discretization/mesh_adaptor.h>
 #include <ryujin/driver/checkpointing.h>
 #include <ryujin/driver/logger.h>
@@ -62,6 +63,8 @@ namespace ryujin
      */
     void run()
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       scheduler.run();
     }
 

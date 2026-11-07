@@ -34,7 +34,8 @@ namespace ryujin
    * matrix, lumped mass matrix, $c_{ij}$ matrices, and $n_{ij}$ matrices).
    *
    * After @p prepare() is called, all getter functions return valid
-   * references.
+   * references. For a moved mesh with unchanged connectivity call
+   * @p update_geometry().
    *
    * @note The offline data precomputed in this class is problem
    * independent, it only depends on the chosen geometry and ansatz stored
@@ -98,6 +99,20 @@ namespace ryujin
                  const unsigned int n_precomputed_values,
                  const bool with_multigrid_data = true) override;
 
+    /**
+     * Recompute everything that depends on the mapping: support points,
+     * all matrices, the boundary map, and multigrid level data.
+     *
+     * The function requires a prior call to prepare() and an up-to-date
+     * Discretization::mapping(). It keeps the numbering of degrees of
+     * freedom, sparsity patterns, partitioners, and the storage of all
+     * matrices, so that vectors created with these partitioners remain
+     * valid. The set of boundary degrees of freedom remains the same, but
+     * the number of entries of the boundary map can change because merging
+     * entries depends on the geometry.
+     */
+    void update_geometry() override;
+
     //@}
     /**
      * @name Information and statistics
@@ -154,6 +169,16 @@ namespace ryujin
     //@{
 
     /**
+     * Set up everything that does not depend on the mapping: numbering of
+     * degrees of freedom, affine constraints, sparsity patterns,
+     * partitioners, index maps, coupling boundary pairs, and storage for
+     * matrices and multigrid data. Internally used in prepare().
+     */
+    void setup_topology(const unsigned int problem_dimension,
+                        const unsigned int n_precomputed_values,
+                        const bool with_multigrid_data);
+
+    /**
      * Renumber the hyperbolic DoFHandler for use with our SIMD sparsity
      * pattern. Internally used in prepare().
      *
@@ -196,35 +221,64 @@ namespace ryujin
     void create_index_maps();
 
     /**
-     * Set up support_points(). Internally used in prepare().
+     * Set up support_points(). Internally used in update_geometry().
      *
      * @note This method populates various OfflineData internal data structures.
      */
     void create_support_points();
 
     /**
-     * Assemble all matrices. Internally used in prepare().
+     * Set up storage for all matrices. Internally used in prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void create_matrices();
+    void allocate_matrices();
 
     /**
-     * Create multigrid data. Internally used in prepare().
+     * Assemble all matrices. Internally used in update_geometry().
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void create_multigrid_data();
+    void assemble_matrices();
 
     /**
-     * Construct a boundary map for a given set of DoFHandler iterators.
+     * Set up coupling_boundary_pairs(). Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_coupling_boundary_pairs();
+
+    /**
+     * Set up boundary_map(), boundary_slots(), and boundary_indices().
+     * Internally used in update_geometry().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_boundary_map();
+
+    /**
+     * Distribute multigrid degrees of freedom and set up storage for
+     * multigrid data. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void allocate_multigrid_data();
+
+    /**
+     * Assemble multigrid data. Internally used in update_geometry().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void assemble_multigrid_data();
+
+    /**
+     * Construct a boundary map for a given range of DoFHandler iterators.
      * The boundary contributions of constrained degrees of freedom are
      * added to their constraining degrees of freedom.
      */
-    template <typename ITERATOR1, typename ITERATOR2>
+    template <typename RANGE>
     BoundaryMap construct_boundary_map(
-        const ITERATOR1 &begin,
-        const ITERATOR2 &end,
+        const RANGE &cells,
         const dealii::Utilities::MPI::Partitioner &partitioner,
         const dealii::AffineConstraints<Number> &affine_constraints) const;
 
@@ -232,10 +286,9 @@ namespace ryujin
      * Collect coupling pairs of locally owned (and locally relevant)
      * boundary degrees of freedom.
      */
-    template <typename ITERATOR1, typename ITERATOR2>
+    template <typename RANGE>
     CouplingBoundaryPairs collect_coupling_boundary_pairs(
-        const ITERATOR1 &begin,
-        const ITERATOR2 &end,
+        const RANGE &cells,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
 
     //@}

@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/gpu.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/mpi_ensemble.h>
@@ -76,11 +77,7 @@ namespace ryujin
   template <typename HD, int dim, typename Number>
   void HyperbolicModule<HD, dim, Number>::prepare()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout
-        << "HyperbolicModule<HyperbolicDescription, dim, Number>::prepare()"
-        << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     const auto limiter_view = limiter_.template view<dim, Number>();
     AssertThrow(limiter_view.iterations() <= 2,
@@ -186,10 +183,7 @@ namespace ryujin
   void HyperbolicModule<HD, dim, Number>::reinit_state_vector(
       StateVector<Number> &state_vector) const
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<dim, Number>::reinit_state_vector()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
     U.reinit_with_vector_partitioner(
@@ -219,11 +213,7 @@ namespace ryujin
   void HyperbolicModule<HD, dim, Number>::prepare_state_vector(
       StateVector<Number> &state_vector, Number t) const
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<HyperbolicDescription, dim, "
-                 "Number>::prepare_state_vector()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     using MemorySpace = selected_memory_space_t;
 
@@ -258,11 +248,7 @@ namespace ryujin
   void HyperbolicModule<HD, dim, Number>::fill_precomputed_values(
       StateVector<Number> &state_vector) const
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<HyperbolicDescription, dim, "
-                 "Number>::fill_precomputed_values()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     using MemorySpace = selected_memory_space_t;
 
@@ -282,6 +268,8 @@ namespace ryujin
   void HyperbolicModule<HD, dim, Number>::apply_boundary_conditions(
       MultiComponentVector<Number> &U, const Number t) const
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     constexpr auto n_comp = problem_dimension;
 
     const auto &boundary_indices = offline_data_->boundary_indices();
@@ -504,11 +492,7 @@ namespace ryujin
            dealii::ExcMessage("The number of stage state vectors and stage "
                               "weights must match the number of stages."));
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<HyperbolicDescription, dim, "
-                 "Number>::forward_euler_step()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     using MemorySpace = selected_memory_space_t;
 

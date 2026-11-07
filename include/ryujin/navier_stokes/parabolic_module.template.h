@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/navier_stokes/parabolic_module.h>
@@ -129,9 +130,7 @@ namespace ryujin
     template <int dim, typename Number>
     void ParabolicModule<dim, Number>::prepare()
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
       /*
        * The cycle_ variabe is only used for gmg reinitialization, simply
        * reset it to zero on prepare().
@@ -233,6 +232,8 @@ namespace ryujin
     void ParabolicModule<dim, Number>::prepare_state_vector(
         StateVector<Number> & /*state_vector*/, Number /*t*/) const
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       /*
        * There is no parabolic part of the state vector for Navier-Stokes,
        * so we do nothing.
@@ -313,6 +314,8 @@ namespace ryujin
         Number t,
         Number tau) const
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       /* Backward Euler step to half time step, and extrapolate: */
 
       step(old_state_vector,
@@ -331,6 +334,8 @@ namespace ryujin
         Number tau,
         Number /*tau_max*/) const
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       AssertThrow(tau != Number(0.),
                   dealii::ExcMessage("A parabolic module cannot choose the "
                                      "time step size: tau must be nonzero."));
@@ -384,9 +389,7 @@ namespace ryujin
         Number tau,
         const bool crank_nicolson_extrapolation) const
     {
-#ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
-#endif
+      RYUJIN_DEBUG_ANNOUNCE();
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       using HostSpace = dealii::MemorySpace::Host;

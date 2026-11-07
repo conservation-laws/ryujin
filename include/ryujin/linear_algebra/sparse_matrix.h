@@ -98,6 +98,13 @@ namespace ryujin
                     TransferPolicy::explicit_transfers);
 
     /**
+     * Set all entries of the locally owned and ghost ranges to zero without
+     * reallocating. The function operates on the host memory space and
+     * follows the same residency rules as a writable view on the host.
+     */
+    void zero_out();
+
+    /**
      * Return the underlying sparsity pattern.
      */
     ACCESSOR_READ_ONLY(sparsity_pattern);
@@ -599,6 +606,14 @@ namespace ryujin
                           /*default*/ !have_separate_memory_spaces);
 
     this->set_transfer_policy(transfer_policy);
+  }
+
+
+  template <typename Number, int n_components, int warp_size, int simd_length>
+  void SparseMatrix<Number, n_components, warp_size, simd_length>::zero_out()
+  {
+    this->template prepare_write_access<dealii::MemorySpace::Host>();
+    Kokkos::deep_copy(data_host_, Number(0.));
   }
 
 

@@ -18,6 +18,18 @@
 #include <iostream>
 #endif
 
+/**
+ * Open a ComputingTimer::Scope for the given section in the current scope if
+ * the `DEBUG_SETUP_TIMINGS` option is set; expands to nothing otherwise.
+ *
+ * @ingroup Utilities
+ */
+#ifdef DEBUG_SETUP_TIMINGS
+#define RYUJIN_SETUP_TIMER_SCOPE(name) ryujin::ComputingTimer::Scope scope(name)
+#else
+#define RYUJIN_SETUP_TIMER_SCOPE(name)
+#endif
+
 namespace ryujin
 {
   /**
