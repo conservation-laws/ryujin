@@ -203,11 +203,33 @@ namespace ryujin
     void create_support_points();
 
     /**
+     * Set up storage for all matrices. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void allocate_matrices();
+
+    /**
      * Assemble all matrices. Internally used in prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void create_matrices();
+    void assemble_matrices();
+
+    /**
+     * Set up coupling_boundary_pairs(). Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_coupling_boundary_pairs();
+
+    /**
+     * Set up boundary_map(), boundary_slots(), and boundary_indices().
+     * Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_boundary_map();
 
     /**
      * Create multigrid data. Internally used in prepare().

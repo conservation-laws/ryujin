@@ -109,7 +109,16 @@ namespace ryujin
       create_support_points();
     }
 
-    create_matrices();
+    allocate_matrices();
+    create_coupling_boundary_pairs();
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 6 - assemble matrices");
+      assemble_matrices();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 7 - boundary map");
+      create_boundary_map();
+    }
 
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
@@ -654,21 +663,10 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::create_matrices()
+  void OfflineData<structdim, dim, Number>::allocate_matrices()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::create_matrices()"
-              << std::endl;
-#endif
-
-#ifdef OFFLINE_DATA_DEBUG_TIMINGS
-    auto &assembly_timer =
-        ComputingTimer::timer("offline data 6 - assemble matrices");
-    assembly_timer.start();
-#endif
-
     /*
-     * First, (re)initialize all local matrices. All of them are assembled
+     * (Re)initialize all local matrices. All of them are assembled
      * on the host memory space and read on either memory space, so we
      * select the implicit_transfers policy and let the first view() on the
      * default memory space perform the transfer:
@@ -689,10 +687,16 @@ namespace ryujin
     this->cij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
     if (discretization_->have_discontinuous_ansatz())
       this->incidence_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+  }
 
-    /*
-     * Now, assemble all matrices:
-     */
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::assemble_matrices()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<structdim, dim, Number>::assemble_matrices()"
+              << std::endl;
+#endif
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
@@ -1193,62 +1197,6 @@ namespace ryujin
       this->incidence_matrix_->view().compress(VectorOperation::add);
     }
 
-#ifdef OFFLINE_DATA_DEBUG_TIMINGS
-    assembly_timer.stop();
-#endif
-
-    /*
-     * Populate boundary map and collect coupling boundary pairs:
-     */
-    {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 7 - boundary map");
-
-      this->boundary_map_ =
-          construct_boundary_map(dof_handler.active_cell_iterators(),
-                                 *this->scalar_partitioner_,
-                                 affine_constraints);
-
-      /*
-       * Compact the degrees of freedom stored in the boundary map into a
-       * strictly increasing index list (that is mirrored into the default
-       * memory space) and record for every entry of the boundary map the
-       * position of its degree of freedom in that index list. Note that the
-       * boundary map can contain more than one entry for the same degree of
-       * freedom.
-       */
-
-      std::vector<unsigned int> boundary_indices;
-      std::map<unsigned int, unsigned int> position_of_index;
-
-      this->boundary_slots_.clear();
-      this->boundary_slots_.reserve(this->boundary_map_.size());
-
-      for (const auto &entry : this->boundary_map_) {
-        const auto index = std::get<0>(entry);
-        const auto [it, inserted] =
-            position_of_index.try_emplace(index, boundary_indices.size());
-        if (inserted)
-          boundary_indices.push_back(index);
-        this->boundary_slots_.push_back(it->second);
-      }
-
-      this->boundary_indices_->reinit(boundary_indices.size(),
-                                      TransferPolicy::implicit_transfers);
-      std::copy(boundary_indices.begin(),
-                boundary_indices.end(),
-                this->boundary_indices_->view());
-
-      const auto coupling_boundary_pairs =
-          collect_coupling_boundary_pairs(dof_handler.active_cell_iterators(),
-                                          *this->scalar_partitioner_);
-
-      this->coupling_boundary_pairs_->reinit(
-          coupling_boundary_pairs.size(), TransferPolicy::implicit_transfers);
-      std::copy(coupling_boundary_pairs.begin(),
-                coupling_boundary_pairs.end(),
-                this->coupling_boundary_pairs_->view());
-    }
-
 #ifdef DEBUG_SYMMETRY_CHECK
     /*
      * Verify that we have consistent mass:
@@ -1357,6 +1305,71 @@ namespace ryujin
       Assert(sum.norm() < 1.e-12, dealii::ExcInternalError());
     }
 #endif
+  }
+
+
+  /*
+   * Populates:
+   *     coupling_boundary_pairs_
+   */
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_coupling_boundary_pairs()
+  {
+    const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
+        discretization_->dof_handler().active_cell_iterators(),
+        *this->scalar_partitioner_);
+
+    this->coupling_boundary_pairs_->reinit(coupling_boundary_pairs.size(),
+                                           TransferPolicy::implicit_transfers);
+    std::copy(coupling_boundary_pairs.begin(),
+              coupling_boundary_pairs.end(),
+              this->coupling_boundary_pairs_->view());
+  }
+
+
+  /*
+   * Populates:
+   *     boundary_map_
+   *     boundary_slots_
+   *     boundary_indices_
+   */
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_boundary_map()
+  {
+    this->boundary_map_ = construct_boundary_map(
+        discretization_->dof_handler().active_cell_iterators(),
+        *this->scalar_partitioner_,
+        this->affine_constraints());
+
+    /*
+     * Compact the degrees of freedom stored in the boundary map into a
+     * strictly increasing index list (that is mirrored into the default
+     * memory space) and record for every entry of the boundary map the
+     * position of its degree of freedom in that index list. Note that the
+     * boundary map can contain more than one entry for the same degree of
+     * freedom.
+     */
+
+    std::vector<unsigned int> boundary_indices;
+    std::map<unsigned int, unsigned int> position_of_index;
+
+    this->boundary_slots_.clear();
+    this->boundary_slots_.reserve(this->boundary_map_.size());
+
+    for (const auto &entry : this->boundary_map_) {
+      const auto index = std::get<0>(entry);
+      const auto [it, inserted] =
+          position_of_index.try_emplace(index, boundary_indices.size());
+      if (inserted)
+        boundary_indices.push_back(index);
+      this->boundary_slots_.push_back(it->second);
+    }
+
+    this->boundary_indices_->reinit(boundary_indices.size(),
+                                    TransferPolicy::implicit_transfers);
+    std::copy(boundary_indices.begin(),
+              boundary_indices.end(),
+              this->boundary_indices_->view());
   }
 
 
