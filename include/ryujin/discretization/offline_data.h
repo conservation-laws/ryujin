@@ -232,11 +232,19 @@ namespace ryujin
     void create_boundary_map();
 
     /**
-     * Create multigrid data. Internally used in prepare().
+     * Distribute multigrid degrees of freedom and set up storage for
+     * multigrid data. Internally used in prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void create_multigrid_data();
+    void allocate_multigrid_data();
+
+    /**
+     * Assemble multigrid data. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void assemble_multigrid_data();
 
     /**
      * Construct a boundary map for a given range of DoFHandler iterators.

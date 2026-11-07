@@ -120,10 +120,13 @@ namespace ryujin
       create_boundary_map();
     }
 
+    level_boundary_map_.clear();
+    level_lumped_mass_matrix_.clear();
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
       OFFLINE_DATA_TIMER_SCOPE("offline data 8 - multigrid data");
-      create_multigrid_data();
+      allocate_multigrid_data();
+      assemble_multigrid_data();
     }
   }
 
@@ -1373,14 +1376,14 @@ namespace ryujin
   }
 
 
+  /*
+   * Populates:
+   *     level_lumped_mass_matrix_ (storage)
+   *     level_boundary_map_ (storage)
+   */
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::create_multigrid_data()
+  void OfflineData<structdim, dim, Number>::allocate_multigrid_data()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::create_multigrid_data()"
-              << std::endl;
-#endif
-
     Assert(!discretization_->dof_handler_cg().has_hp_capabilities(),
            dealii::ExcInternalError());
     Assert(!discretization_->dof_handler_dg().has_hp_capabilities(),
@@ -1389,21 +1392,13 @@ namespace ryujin
     discretization_->dof_handler_cg().distribute_mg_dofs();
     discretization_->dof_handler_dg().distribute_mg_dofs();
 
-    /* Now, work on data structures for hyperbolic update: */
-
-    auto &dof_handler = discretization_->dof_handler();
-
+    const auto &dof_handler = discretization_->dof_handler();
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
-
-    AffineConstraints<float> level_constraints;
-    // TODO not yet thread-parallel and without periodicity
 
     level_boundary_map_.resize(n_levels);
     level_lumped_mass_matrix_.resize(n_levels);
 
     for (unsigned int level = 0; level < n_levels; ++level) {
-      /* Assemble lumped mass matrix vector: */
-
       const auto relevant_dofs =
           dealii::DoFTools::extract_locally_relevant_level_dofs(dof_handler,
                                                                 level);
@@ -1413,6 +1408,31 @@ namespace ryujin
           relevant_dofs,
           mpi_ensemble_.ensemble_communicator());
       level_lumped_mass_matrix_[level].reinit(partitioner);
+    }
+  }
+
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::assemble_multigrid_data()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout
+        << "OfflineData<structdim, dim, Number>::assemble_multigrid_data()"
+        << std::endl;
+#endif
+
+    const auto &dof_handler = discretization_->dof_handler();
+
+    AffineConstraints<float> level_constraints;
+    // TODO not yet thread-parallel and without periodicity
+
+    for (unsigned int level = 0; level < level_lumped_mass_matrix_.size();
+         ++level) {
+      /* Assemble lumped mass matrix vector: */
+
+      auto &level_lumped_mass_matrix = level_lumped_mass_matrix_[level];
+      level_lumped_mass_matrix = 0.;
+
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);
       dealii::Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
@@ -1435,15 +1455,15 @@ namespace ryujin
           }
           cell->get_mg_dof_indices(dof_indices);
           level_constraints.distribute_local_to_global(
-              mass_values, dof_indices, level_lumped_mass_matrix_[level]);
+              mass_values, dof_indices, level_lumped_mass_matrix);
         }
-      level_lumped_mass_matrix_[level].compress(VectorOperation::add);
+      level_lumped_mass_matrix.compress(VectorOperation::add);
 
       /* Populate boundary map: */
 
       level_boundary_map_[level] =
           construct_boundary_map(dof_handler.mg_cell_iterators_on_level(level),
-                                 *partitioner,
+                                 *level_lumped_mass_matrix.get_partitioner(),
                                  AffineConstraints<Number>());
     }
   }
