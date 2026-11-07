@@ -1,0 +1,64 @@
+cG Q1
+  measure of omega: 2 -> 2
+  boundary map entries: 52 -> 52
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+cG Q2
+  measure of omega: 2 -> 2
+  boundary map entries: 52 -> 52
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+cG Q1 periodic
+  measure of omega: 2 -> 2
+  boundary map entries: 32 -> 32
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+cG Q2 hanging
+  measure of omega: 2 -> 2
+  boundary map entries: 76 -> 76
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+cG Q1 merging corners
+  measure of omega: 2 -> 2
+  boundary map entries: 52 -> 50
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+dG Q1
+  measure of omega: 2 -> 2
+  boundary map entries: 96 -> 96
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+dG Q2 periodic
+  measure of omega: 2 -> 2
+  boundary map entries: 48 -> 48
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
+cG Q1 3D
+  measure of omega: 2 -> 2.17188
+  boundary map entries: 150 -> 150
+  partitioner kept: 1
+  topology unchanged: ok
+  topology matches prepare: ok
+  geometry matches prepare: ok
+  geometry restored: ok
