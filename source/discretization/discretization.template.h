@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/geometries/geometry_library.h>
 
@@ -97,9 +98,7 @@ namespace ryujin
   template <int structdim, int dim>
   void Discretization<structdim, dim>::prepare(const std::string &base_name)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Discretization<structdim, dim>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     AssertThrow(
         mesh_type_ != MeshType::parallel_fullydistributed || refinement_ == 0,
@@ -416,6 +415,8 @@ namespace ryujin
   template <int structdim, int dim>
   void Discretization<structdim, dim>::update_mapping()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     if (!mapping_cache_) {
       if (!transformation_)
         return;
@@ -447,6 +448,8 @@ namespace ryujin
   template <int structdim, int dim>
   void Discretization<structdim, dim>::distribute_dofs()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     if (!dof_handler_cg_)
       dof_handler_cg_ =
           std::make_unique<dealii::DoFHandler<structdim, dim>>(*triangulation_);
@@ -473,6 +476,8 @@ namespace ryujin
   template <int structdim, int dim>
   void Discretization<structdim, dim>::create_mapping_cache()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     mapping_cache_ =
         std::make_shared<MappingQCache<structdim, dim>>(polynomial_degree());
 

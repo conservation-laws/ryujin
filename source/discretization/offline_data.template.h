@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
 #include <ryujin/discretization/discretization.h>
@@ -81,9 +82,7 @@ namespace ryujin
       const unsigned int n_precomputed_values,
       const bool with_multigrid_data)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     setup_topology(
         problem_dimension, n_precomputed_values, with_multigrid_data);
@@ -97,6 +96,8 @@ namespace ryujin
       const unsigned int n_precomputed_values,
       const bool with_multigrid_data)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
@@ -140,10 +141,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::update_geometry()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::update_geometry()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     {
       OFFLINE_DATA_TIMER_SCOPE("offline data 2.1 geometry - support points");
@@ -167,6 +165,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::renumber_for_simd()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     auto &dof_handler = discretization_->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     this->n_locally_owned_ = locally_owned.n_elements();
@@ -231,6 +231,8 @@ namespace ryujin
   void
   OfflineData<structdim, dim, Number>::create_constraints_and_sparsity_pattern()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     /*
      * First, we set up the (globally indexed) affine constraints object
      * for the continuous dof handler. The affine constraints object solely
@@ -368,6 +370,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     auto &dof_handler = discretization_->dof_handler();
 
     /*
@@ -457,6 +461,8 @@ namespace ryujin
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
@@ -554,6 +560,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_index_maps()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &fe_collection_dg =
         discretization_->dof_handler_dg().get_fe_collection();
     const auto &fe_collection_cg =
@@ -635,6 +643,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_support_points()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &dof_handler = discretization_->dof_handler();
     const auto &fe_collection = dof_handler.get_fe_collection();
     const auto &partitioner = *this->scalar_partitioner_;
@@ -701,6 +711,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::allocate_matrices()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     /*
      * (Re)initialize all local matrices. All of them are assembled
      * on the host memory space and read on either memory space, so we
@@ -729,10 +741,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::assemble_matrices()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::assemble_matrices()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
@@ -1376,6 +1385,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_coupling_boundary_pairs()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto coupling_boundary_pairs = collect_coupling_boundary_pairs(
         discretization_->dof_handler().active_cell_iterators(),
         *this->scalar_partitioner_);
@@ -1397,6 +1408,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::create_boundary_map()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     this->boundary_map_ = construct_boundary_map(
         discretization_->dof_handler().active_cell_iterators(),
         *this->scalar_partitioner_,
@@ -1442,6 +1455,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::allocate_multigrid_data()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     Assert(!discretization_->dof_handler_cg().has_hp_capabilities(),
            dealii::ExcInternalError());
     Assert(!discretization_->dof_handler_dg().has_hp_capabilities(),
@@ -1473,11 +1488,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::assemble_multigrid_data()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout
-        << "OfflineData<structdim, dim, Number>::assemble_multigrid_data()"
-        << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &dof_handler = discretization_->dof_handler();
 
@@ -1556,10 +1567,7 @@ namespace ryujin
       const Utilities::MPI::Partitioner &partitioner,
       const AffineConstraints<Number> &affine_constraints) const -> BoundaryMap
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, Number>::construct_boundary_map()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * Create a temporary multimap with the (local) dof index as key:
@@ -1849,11 +1857,7 @@ namespace ryujin
       const RANGE &cells, const Utilities::MPI::Partitioner &partitioner) const
       -> CouplingBoundaryPairs
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<structdim, dim, "
-                 "Number>::collect_coupling_boundary_pairs()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * First, collect *all* locally relevant degrees of freedom that are

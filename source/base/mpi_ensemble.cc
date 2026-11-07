@@ -3,6 +3,7 @@
 // Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble.h>
 
 #ifdef DEBUG_OUTPUT
@@ -28,9 +29,7 @@ namespace ryujin
       , ensemble_leader_communicator_(MPI_COMM_NULL)
       , peer_communicator_(MPI_COMM_NULL)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "MPIEnsemble::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     n_ensembles_ = n_ensembles;
     global_synchronization_ = global_synchronization;

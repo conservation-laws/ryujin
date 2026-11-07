@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/driver/checkpointing.h>
 
 #include <deal.II/base/mpi.h>
@@ -51,9 +52,7 @@ namespace ryujin
     if (!resume_)
       return;
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "Checkpointing<structdim, dim, Number>::start()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     context.info("resume: reading mesh and loading state vector");
 
@@ -125,6 +124,8 @@ namespace ryujin
     if (!this->trigger_->fire(context))
       return;
 
+    RYUJIN_DEBUG_ANNOUNCE();
+
     write_checkpoint(context);
   }
 
@@ -133,6 +134,8 @@ namespace ryujin
   void
   Checkpointing<structdim, dim, Number>::finalize(TaskContext<Number> &context)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     write_checkpoint(context);
   }
 
@@ -141,10 +144,7 @@ namespace ryujin
   void Checkpointing<structdim, dim, Number>::write_checkpoint(
       const TaskContext<Number> &context)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Checkpointing<structdim, dim, Number>::write_checkpoint()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     ComputingTimer::Scope scope("time step [X]   - perform checkpointing");
     context.info("scheduling checkpointing");

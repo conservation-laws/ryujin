@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/discretization/tensor_product_point_kernels.h>
 #include <ryujin/typed/solution_transfer.h>
 
@@ -105,11 +106,7 @@ namespace ryujin
   void SolutionTransfer<HD, structdim, dim, Number>::prepare_projection(
       const StateVector<Number> &old_state_vector [[maybe_unused]])
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<HD, structdim, dim, "
-                 "Number>::prepare_projection()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     copy_to_memory_space<dealii::MemorySpace::Host>(
         old_state_vector,
@@ -448,10 +445,7 @@ namespace ryujin
   void SolutionTransfer<HD, structdim, dim, Number>::project(
       StateVector<Number> &new_state_vector [[maybe_unused]])
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "SolutionTransfer<HD, structdim, dim, Number>::project()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     move_to_memory_space<dealii::MemorySpace::Host>(
         new_state_vector,

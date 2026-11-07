@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/output/quantities.h>
 
@@ -113,9 +114,7 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void Quantities<structdim, dim, Number>::prepare(TaskContext<Number> &context)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<structdim, dim, Number>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     base_name_ = mpi_ensemble_.base_name(context.base_name);
 
@@ -316,6 +315,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void Quantities<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &state_vector = simulation_.state_vector();
 
     {
@@ -358,10 +359,7 @@ namespace ryujin
   void Quantities<structdim, dim, Number>::accumulate(
       const StateVector<Number> &state_vector, const Number t)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<structdim, dim, Number>::accumulate()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     using MemorySpace = selected_memory_space_t;
 
@@ -431,9 +429,7 @@ namespace ryujin
       const Number t,
       unsigned int cycle)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<structdim, dim, Number>::write_out()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * First, write out mesh files if this hasn't happened yet.
@@ -531,6 +527,8 @@ namespace ryujin
   template <int structdim, int dim, typename Number>
   void Quantities<structdim, dim, Number>::write_mesh_files(unsigned int cycle)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     for (const auto &manifold : manifolds_) {
       /* Skip outputting the point map for spatial averages. */
       if (!manifold.instantaneous && !manifold.time_averaged)

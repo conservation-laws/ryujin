@@ -7,6 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/mpi_ensemble_container.h>
 #include <ryujin/concept/hyperbolic_description.h>
 #include <ryujin/concept/parabolic_description.h>
@@ -207,6 +208,8 @@ namespace ryujin
      */
     void prepare(TaskContext<Number> &context) override
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       auto &mpi_ensemble = *this->mpi_ensemble_;
       auto &discretization = *this->discretization_;
       auto &state_vector = this->state_vector_;
@@ -260,6 +263,8 @@ namespace ryujin
      */
     void execute(TaskContext<Number> &context) override
     {
+      RYUJIN_DEBUG_ANNOUNCE();
+
       auto &state_vector = this->state_vector_;
 
       context.tau = this->time_integrator_->step(

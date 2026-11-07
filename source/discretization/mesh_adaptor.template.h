@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/simd.h>
@@ -147,9 +148,7 @@ namespace ryujin
   void MeshAdaptor<structdim, dim, Number>::prepare(
       TaskContext<Number> & /*context*/)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "MeshAdaptor<structdim, dim, Number>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     selection_ = postprocessor_.prepare(smoothness_selected_quantities_);
   }
@@ -162,9 +161,7 @@ namespace ryujin
     if (!this->trigger_->fire(context))
       return;
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "MeshAdaptor<structdim, dim, Number>::execute()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     AssertThrow(mpi_ensemble_.n_ensembles() == 1, dealii::ExcNotImplemented());
 
@@ -199,9 +196,7 @@ namespace ryujin
   void MeshAdaptor<structdim, dim, Number>::analyze(
       const StateVector<Number> &state_vector)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "MeshAdaptor<structdim, dim, Number>::analyze()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * Some adaptation strategies require us to prepare some internal
@@ -233,6 +228,8 @@ namespace ryujin
   void MeshAdaptor<structdim, dim, Number>::
       populate_cell_indicators_with_random_values()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
       static std::uniform_real_distribution<double> distribution(0.0, 10.0);
       return distribution(mersenne_twister_);
@@ -244,6 +241,8 @@ namespace ryujin
   void MeshAdaptor<structdim, dim, Number>::
       populate_cell_indicators_from_smoothness_indicators()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
     /*
@@ -285,6 +284,8 @@ namespace ryujin
   void MeshAdaptor<structdim, dim, Number>::
       mark_cells_for_coarsening_and_refinement()
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     auto &triangulation = simulation_.discretization().triangulation();
 
     /*
@@ -391,6 +392,8 @@ namespace ryujin
   void MeshAdaptor<structdim, dim, Number>::compute_smoothness_indicators(
       const StateVector<Number> &state_vector)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();

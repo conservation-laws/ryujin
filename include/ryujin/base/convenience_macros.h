@@ -9,6 +9,10 @@
 
 #include <deal.II/base/function.h>
 
+#ifdef DEBUG_OUTPUT
+#include <iostream>
+#endif
+
 namespace ryujin
 {
 #ifndef DOXYGEN
@@ -258,5 +262,20 @@ namespace
  * @ingroup Utilities
  */
 #define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
+
+
+/**
+ * Print the signature of the enclosing function to `std::cout` if the
+ * `DEBUG_OUTPUT` option is set; expands to nothing otherwise. Place it at
+ * the top of a function body and not inside a lambda, where it would
+ * announce `operator()`.
+ *
+ * @ingroup Utilities
+ */
+#ifdef DEBUG_OUTPUT
+#define RYUJIN_DEBUG_ANNOUNCE() std::cout << __PRETTY_FUNCTION__ << std::endl
+#else
+#define RYUJIN_DEBUG_ANNOUNCE()
+#endif
 
 //@}

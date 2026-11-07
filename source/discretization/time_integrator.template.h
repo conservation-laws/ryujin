@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/discretization/time_integrator.h>
 
 #include <utility>
@@ -77,9 +78,7 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeIntegrator<dim, Number>::prepare()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     this->time_stepping_scheme_name_ =
         Patterns::Tools::Convert<TimeSteppingScheme>::to_string(
@@ -233,8 +232,9 @@ namespace ryujin
   {
     tau_max = std::min(tau_max_, tau_max);
 
+    RYUJIN_DEBUG_ANNOUNCE();
+
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
     std::cout << "        enforcing tau_max <= " << tau_max << std::endl;
 #endif
 
@@ -343,9 +343,7 @@ namespace ryujin
   {
     /* SSP-RK2, see @cite Shu1988, Eq. 2.15. */
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_ssprk_22()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 1., dealii::ExcInternalError());
 
@@ -373,9 +371,7 @@ namespace ryujin
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_ssprk_33()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 1., dealii::ExcInternalError());
 
@@ -410,9 +406,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_erk_11(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 1., dealii::ExcInternalError());
 
@@ -429,9 +423,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_erk_22(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 2., dealii::ExcInternalError());
 
@@ -458,9 +450,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_erk_33(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 3., dealii::ExcInternalError());
 
@@ -499,9 +489,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_erk_43(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 4., dealii::ExcInternalError());
 
@@ -545,9 +533,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_erk_54(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_erk_54()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 5., dealii::ExcInternalError());
 
@@ -630,10 +616,7 @@ namespace ryujin
   {
     // FIXME: avoid code duplication with step_ssprk_33
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_strang_ssprk_33_cn()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 2., dealii::ExcInternalError());
 
@@ -699,10 +682,7 @@ namespace ryujin
   {
     // FIXME: refactor to avoid code duplication with step_erk_33
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_strang_erk_33_cn()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 6., dealii::ExcInternalError());
 
@@ -772,10 +752,7 @@ namespace ryujin
   {
     // FIXME: refactor to avoid code duplication with step_erk_43
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_strang_erk_43_cn()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 8., dealii::ExcInternalError());
 
@@ -851,9 +828,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_imex_11(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_imex_11()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 1., dealii::ExcInternalError());
 
@@ -874,9 +849,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_imex_22(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_imex_22()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 2., dealii::ExcInternalError());
 
@@ -910,9 +883,7 @@ namespace ryujin
   Number TimeIntegrator<dim, Number>::step_imex_33(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "TimeIntegrator<dim, Number>::step_imex_33()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     Assert(this->efficiency_ == 3., dealii::ExcInternalError());
 

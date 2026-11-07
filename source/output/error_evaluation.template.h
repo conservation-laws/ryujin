@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/output/error_evaluation.h>
 
 #include <deal.II/numerics/vector_tools.h>
@@ -59,10 +60,7 @@ namespace ryujin
   void ErrorEvaluation<structdim, dim, Number>::initialize(
       TaskContext<Number> &context)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<structdim, dim, Number>::initialize()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     base_name_ = context.base_name;
 
@@ -107,6 +105,8 @@ namespace ryujin
     if (!this->trigger_->fire(context))
       return;
 
+    RYUJIN_DEBUG_ANNOUNCE();
+
     StateVector<Number> analytic;
     simulation_.interpolate_analytic_solution(analytic, context.t);
 
@@ -131,6 +131,8 @@ namespace ryujin
   void ErrorEvaluation<structdim, dim, Number>::finalize(
       TaskContext<Number> &context)
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
     StateVector<Number> analytic;
     simulation_.interpolate_analytic_solution(analytic, context.t);
     const auto norms = compute(simulation_.state_vector(), analytic);
@@ -162,10 +164,7 @@ namespace ryujin
       const StateVector<Number> &state_vector,
       const StateVector<Number> &analytic) const
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "ErrorEvaluation<structdim, dim, Number>::compute()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &discretization = simulation_.discretization();
     const auto &dof_handler = simulation_.discretization().dof_handler();

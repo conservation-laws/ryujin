@@ -6,6 +6,7 @@
 #pragma once
 
 #include <ryujin/base/computing_timer.h>
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/output/vtu_output.h>
 
 #include <deal.II/base/function_parser.h>
@@ -95,9 +96,7 @@ namespace ryujin
   void
   VTUOutput<structdim, dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "VTUOutput<structdim, dim, Number>::prepare()" << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     selection_ = postprocessor_.prepare(vtu_output_quantities_);
     bounds_.clear();
@@ -110,9 +109,10 @@ namespace ryujin
     if (!this->trigger_->fire(context))
       return;
 
+    RYUJIN_DEBUG_ANNOUNCE();
+
 #ifdef DEBUG_OUTPUT
-    std::cout << "VTUOutput<structdim, dim, Number>::execute(t = " << context.t
-              << ")" << std::endl;
+    std::cout << "        t = " << context.t << std::endl;
 #endif
 
     ComputingTimer::Scope scope("time step [X]   - perform vtu output");
@@ -151,10 +151,7 @@ namespace ryujin
       Number t,
       unsigned int cycle)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "VTUOutput<structdim, dim, Number>::schedule_output()"
-              << std::endl;
-#endif
+    RYUJIN_DEBUG_ANNOUNCE();
 
     /*
      * Extract quantities and store in ScalarHostVectors so that we can

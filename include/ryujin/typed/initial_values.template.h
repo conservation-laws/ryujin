@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/random.h>
 #include <ryujin/typed/initial_values.h>
 
@@ -237,9 +238,10 @@ namespace ryujin
   InitialValues<HyperbolicSystem, dim, Number>::interpolate_hyperbolic_vector(
       Number t) const -> MultiComponentVector<Number>
   {
+    RYUJIN_DEBUG_ANNOUNCE();
+
 #ifdef DEBUG_OUTPUT
-    std::cout << "InitialValues<dim, Number>::"
-              << "interpolate_hyperbolic_vector(t = " << t << ")" << std::endl;
+    std::cout << "        t = " << t << std::endl;
 #endif
 
     const auto &vector_partitioner =
