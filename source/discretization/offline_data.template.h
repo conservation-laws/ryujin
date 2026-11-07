@@ -1203,10 +1203,10 @@ namespace ryujin
     {
       OFFLINE_DATA_TIMER_SCOPE("offline data 7 - boundary map");
 
-      this->boundary_map_ = construct_boundary_map(dof_handler.begin_active(),
-                                                   dof_handler.end(),
-                                                   *this->scalar_partitioner_,
-                                                   affine_constraints);
+      this->boundary_map_ =
+          construct_boundary_map(dof_handler.active_cell_iterators(),
+                                 *this->scalar_partitioner_,
+                                 affine_constraints);
 
       /*
        * Compact the degrees of freedom stored in the boundary map into a
@@ -1239,8 +1239,7 @@ namespace ryujin
                 this->boundary_indices_->view());
 
       const auto coupling_boundary_pairs =
-          collect_coupling_boundary_pairs(dof_handler.begin_active(),
-                                          dof_handler.end(),
+          collect_coupling_boundary_pairs(dof_handler.active_cell_iterators(),
                                           *this->scalar_partitioner_);
 
       this->coupling_boundary_pairs_->reinit(
@@ -1430,8 +1429,7 @@ namespace ryujin
       /* Populate boundary map: */
 
       level_boundary_map_[level] =
-          construct_boundary_map(dof_handler.begin_mg(level),
-                                 dof_handler.end_mg(level),
+          construct_boundary_map(dof_handler.mg_cell_iterators_on_level(level),
                                  *partitioner,
                                  AffineConstraints<Number>());
     }
@@ -1461,10 +1459,9 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  template <typename ITERATOR1, typename ITERATOR2>
+  template <typename RANGE>
   auto OfflineData<structdim, dim, Number>::construct_boundary_map(
-      const ITERATOR1 &begin,
-      const ITERATOR2 &end,
+      const RANGE &cells,
       const Utilities::MPI::Partitioner &partitioner,
       const AffineConstraints<Number> &affine_constraints) const -> BoundaryMap
   {
@@ -1496,7 +1493,7 @@ namespace ryujin
         dealii::update_normal_vectors | dealii::update_values |
             dealii::update_JxW_values);
 
-    for (auto cell = begin; cell != end; ++cell) {
+    for (const auto &cell : cells) {
 
       /*
        * Make sure to iterate over the entire locally relevant set so that
@@ -1756,11 +1753,9 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  template <typename ITERATOR1, typename ITERATOR2>
+  template <typename RANGE>
   auto OfflineData<structdim, dim, Number>::collect_coupling_boundary_pairs(
-      const ITERATOR1 &begin,
-      const ITERATOR2 &end,
-      const Utilities::MPI::Partitioner &partitioner) const
+      const RANGE &cells, const Utilities::MPI::Partitioner &partitioner) const
       -> CouplingBoundaryPairs
   {
 #ifdef DEBUG_OUTPUT
@@ -1779,7 +1774,7 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    for (auto cell = begin; cell != end; ++cell) {
+    for (const auto &cell : cells) {
 
       /* Make sure to iterate over the entire locally relevant set: */
       if (cell->is_artificial())

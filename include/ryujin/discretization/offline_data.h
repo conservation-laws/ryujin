@@ -217,14 +217,13 @@ namespace ryujin
     void create_multigrid_data();
 
     /**
-     * Construct a boundary map for a given set of DoFHandler iterators.
+     * Construct a boundary map for a given range of DoFHandler iterators.
      * The boundary contributions of constrained degrees of freedom are
      * added to their constraining degrees of freedom.
      */
-    template <typename ITERATOR1, typename ITERATOR2>
+    template <typename RANGE>
     BoundaryMap construct_boundary_map(
-        const ITERATOR1 &begin,
-        const ITERATOR2 &end,
+        const RANGE &cells,
         const dealii::Utilities::MPI::Partitioner &partitioner,
         const dealii::AffineConstraints<Number> &affine_constraints) const;
 
@@ -232,10 +231,9 @@ namespace ryujin
      * Collect coupling pairs of locally owned (and locally relevant)
      * boundary degrees of freedom.
      */
-    template <typename ITERATOR1, typename ITERATOR2>
+    template <typename RANGE>
     CouplingBoundaryPairs collect_coupling_boundary_pairs(
-        const ITERATOR1 &begin,
-        const ITERATOR2 &end,
+        const RANGE &cells,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
 
     //@}
