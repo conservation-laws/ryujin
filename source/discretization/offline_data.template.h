@@ -83,49 +83,80 @@ namespace ryujin
     std::cout << "OfflineData<structdim, dim, Number>::prepare()" << std::endl;
 #endif
 
+    setup_topology(
+        problem_dimension, n_precomputed_values, with_multigrid_data);
+    update_geometry();
+  }
+
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::setup_topology(
+      const unsigned int problem_dimension,
+      const unsigned int n_precomputed_values,
+      const bool with_multigrid_data)
+  {
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1 - renumber dofs");
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.1 topology - renumber dofs");
       renumber_for_simd();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 2 - sparsity pattern");
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.2 topology - sparsity pattern");
       create_constraints_and_sparsity_pattern();
       ensure_simd_stride_consistency();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 3 - SIMD sparsity pattern");
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.3 topology - SIMD sparsity");
       create_partitioner_and_simd_sparsity(problem_dimension,
                                            n_precomputed_values);
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 4 - index maps");
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.4 topology - index maps");
       create_index_maps();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 5 - support points");
-      create_support_points();
-    }
-
-    allocate_matrices();
-    create_coupling_boundary_pairs();
-    {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 6 - assemble matrices");
-      assemble_matrices();
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.5 topology - matrix storage");
+      allocate_matrices();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 7 - boundary map");
-      create_boundary_map();
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.6 topology - coupling pairs");
+      create_coupling_boundary_pairs();
     }
 
     level_boundary_map_.clear();
     level_lumped_mass_matrix_.clear();
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 8 - multigrid data");
+      OFFLINE_DATA_TIMER_SCOPE("offline data 1.7 topology - multigrid data");
       allocate_multigrid_data();
+    }
+  }
+
+
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::update_geometry()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<structdim, dim, Number>::update_geometry()"
+              << std::endl;
+#endif
+
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 2.1 geometry - support points");
+      create_support_points();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 2.2 geometry - assemble matrices");
+      assemble_matrices();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 2.3 geometry - boundary map");
+      create_boundary_map();
+    }
+    {
+      OFFLINE_DATA_TIMER_SCOPE("offline data 2.4 geometry - multigrid data");
       assemble_multigrid_data();
     }
   }
@@ -703,6 +734,14 @@ namespace ryujin
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
+
+    this->mass_matrix_->zero_out();
+    this->betaij_matrix_->zero_out();
+    this->cij_matrix_->zero_out();
+    if (discretization_->have_discontinuous_ansatz()) {
+      this->mass_matrix_inverse_->zero_out();
+      this->incidence_matrix_->zero_out();
+    }
 
     this->measure_of_omega_ = 0.;
 

@@ -34,7 +34,8 @@ namespace ryujin
    * matrix, lumped mass matrix, $c_{ij}$ matrices, and $n_{ij}$ matrices).
    *
    * After @p prepare() is called, all getter functions return valid
-   * references.
+   * references. For a moved mesh with unchanged connectivity call
+   * @p update_geometry().
    *
    * @note The offline data precomputed in this class is problem
    * independent, it only depends on the chosen geometry and ansatz stored
@@ -98,6 +99,20 @@ namespace ryujin
                  const unsigned int n_precomputed_values,
                  const bool with_multigrid_data = true) override;
 
+    /**
+     * Recompute everything that depends on the mapping: support points,
+     * all matrices, the boundary map, and multigrid level data.
+     *
+     * The function requires a prior call to prepare() and an up-to-date
+     * Discretization::mapping(). It keeps the numbering of degrees of
+     * freedom, sparsity patterns, partitioners, and the storage of all
+     * matrices, so that vectors created with these partitioners remain
+     * valid. The set of boundary degrees of freedom remains the same, but
+     * the number of entries of the boundary map can change because merging
+     * entries depends on the geometry.
+     */
+    void update_geometry() override;
+
     //@}
     /**
      * @name Information and statistics
@@ -154,6 +169,16 @@ namespace ryujin
     //@{
 
     /**
+     * Set up everything that does not depend on the mapping: numbering of
+     * degrees of freedom, affine constraints, sparsity patterns,
+     * partitioners, index maps, coupling boundary pairs, and storage for
+     * matrices and multigrid data. Internally used in prepare().
+     */
+    void setup_topology(const unsigned int problem_dimension,
+                        const unsigned int n_precomputed_values,
+                        const bool with_multigrid_data);
+
+    /**
      * Renumber the hyperbolic DoFHandler for use with our SIMD sparsity
      * pattern. Internally used in prepare().
      *
@@ -196,7 +221,7 @@ namespace ryujin
     void create_index_maps();
 
     /**
-     * Set up support_points(). Internally used in prepare().
+     * Set up support_points(). Internally used in update_geometry().
      *
      * @note This method populates various OfflineData internal data structures.
      */
@@ -210,7 +235,7 @@ namespace ryujin
     void allocate_matrices();
 
     /**
-     * Assemble all matrices. Internally used in prepare().
+     * Assemble all matrices. Internally used in update_geometry().
      *
      * @note This method populates various OfflineData internal data structures.
      */
@@ -225,7 +250,7 @@ namespace ryujin
 
     /**
      * Set up boundary_map(), boundary_slots(), and boundary_indices().
-     * Internally used in prepare().
+     * Internally used in update_geometry().
      *
      * @note This method populates various OfflineData internal data structures.
      */
@@ -240,7 +265,7 @@ namespace ryujin
     void allocate_multigrid_data();
 
     /**
-     * Assemble multigrid data. Internally used in prepare().
+     * Assemble multigrid data. Internally used in update_geometry().
      *
      * @note This method populates various OfflineData internal data structures.
      */
