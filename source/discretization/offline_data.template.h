@@ -26,12 +26,6 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
-#ifdef OFFLINE_DATA_DEBUG_TIMINGS
-#define OFFLINE_DATA_TIMER_SCOPE(name) ComputingTimer::Scope scope(name)
-#else
-#define OFFLINE_DATA_TIMER_SCOPE(name)
-#endif
-
 #include <atomic>
 
 namespace ryujin
@@ -102,29 +96,29 @@ namespace ryujin
         discretization_->have_discontinuous_ansatz();
 
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.1 topology - renumber dofs");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.1 topology - renumber dofs");
       renumber_for_simd();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.2 topology - sparsity pattern");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.2 topology - sparsity pattern");
       create_constraints_and_sparsity_pattern();
       ensure_simd_stride_consistency();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.3 topology - SIMD sparsity");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.3 topology - SIMD sparsity");
       create_partitioner_and_simd_sparsity(problem_dimension,
                                            n_precomputed_values);
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.4 topology - index maps");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - index maps");
       create_index_maps();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.5 topology - matrix storage");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - matrix storage");
       allocate_matrices();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.6 topology - coupling pairs");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - coupling pairs");
       create_coupling_boundary_pairs();
     }
 
@@ -132,7 +126,7 @@ namespace ryujin
     level_lumped_mass_matrix_.clear();
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 1.7 topology - multigrid data");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.7 topology - multigrid data");
       allocate_multigrid_data();
     }
   }
@@ -144,19 +138,19 @@ namespace ryujin
     RYUJIN_DEBUG_ANNOUNCE();
 
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 2.1 geometry - support points");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.1 geometry - support points");
       create_support_points();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 2.2 geometry - assemble matrices");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.2 geometry - assemble matrices");
       assemble_matrices();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 2.3 geometry - boundary map");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.3 geometry - boundary map");
       create_boundary_map();
     }
     {
-      OFFLINE_DATA_TIMER_SCOPE("offline data 2.4 geometry - multigrid data");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 2.4 geometry - multigrid data");
       assemble_multigrid_data();
     }
   }
@@ -1956,4 +1950,3 @@ namespace ryujin
 
 } // namespace ryujin
 
-#undef OFFLINE_DATA_TIMER_SCOPE
