@@ -43,19 +43,3 @@ of the publication, followed by the section number:
    (2024-GMPST)
  - `./reproducibility/shallow_water`: high-order explicit Runge-Kutta
    schemes, adaptive mesh refinement (2025-GMT, 2026-HKMT)
-
-Benchmarks
-----------
-
-The `./benchmarks` subdirectory contains configurations for timing the setup
-of the `OfflineData` class. They run no time steps and have about 9 million
-degrees of freedom:
-
- - `offline_data-cg_q1-2d.prm`: 9,443,329 degrees of freedom
- - `offline_data-dg_q1-2d.prm`: 9,437,184 degrees of freedom
- - `offline_data-cg_q1-3d.prm`: 8,520,321 degrees of freedom
-
-Configure with `-DOFFLINE_DATA_DEBUG_TIMINGS=ON` to get the time per phase in
-the sections named `offline data ...` of the timer output. To assess strong
-scaling run with an increasing number of MPI ranks and `DEAL_II_NUM_THREADS=1`,
-and with one rank and an increasing number of threads.
