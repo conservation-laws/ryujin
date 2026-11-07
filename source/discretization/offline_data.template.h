@@ -31,6 +31,8 @@
 #define OFFLINE_DATA_TIMER_SCOPE(name)
 #endif
 
+#include <atomic>
+
 namespace ryujin
 {
   using namespace dealii;
@@ -577,10 +579,10 @@ namespace ryujin
         unsigned int j = 0;
         while (j < support_cg.size() && point.distance(support_cg[j]) > 1.e-10)
           ++j;
-        AssertThrow(j < support_cg.size(),
-                    dealii::ExcMessage("The continuous and discontinuous "
-                                       "finite elements do not share the "
-                                       "same unit support points."));
+        Assert(j < support_cg.size(),
+               dealii::ExcMessage(
+                   "The continuous and discontinuous finite elements do not "
+                   "share the same unit support points."));
         local_index_map[k].push_back(j);
       }
     }
@@ -745,6 +747,8 @@ namespace ryujin
 
     this->measure_of_omega_ = 0.;
 
+    std::atomic<bool> have_inverted_cell = false;
+
     /* The local, per-cell assembly routine: */
     const auto local_assemble_system = [&](const auto &cell,
                                            auto &scratch,
@@ -799,6 +803,9 @@ namespace ryujin
 
       for (unsigned int q : fe_values.quadrature_point_indices()) {
         const auto JxW = fe_values.JxW(q);
+
+        if (dofs_per_cell != 0 && JxW <= 0.)
+          have_inverted_cell = true;
 
         /* skip cells that have no active cells when computing domain size: */
         if (dofs_per_cell != 0 && cell->is_locally_owned())
@@ -1002,6 +1009,18 @@ namespace ryujin
                     copy_local_to_global,
                     AssemblyScratchData<structdim, dim>(*discretization_),
                     AssemblyCopyData<structdim, dim, Number>());
+
+    /*
+     * Check on all ranks so that all of them throw the same exception:
+     */
+    const auto n_ranks_with_inverted_cell = Utilities::MPI::sum<unsigned int>(
+        have_inverted_cell ? 1 : 0, mpi_ensemble_.ensemble_communicator());
+    AssertThrow(n_ranks_with_inverted_cell == 0,
+                dealii::ExcMessage(
+                    "OfflineData: The mesh contains a cell with a non-positive "
+                    "Jacobian determinant. The mapping is inverted or "
+                    "degenerate, for example because of a tangled moving "
+                    "mesh or an invalid transformation."));
 
     this->mass_matrix_->view().compress(VectorOperation::add);
     this->mass_matrix_->view().update_ghost_rows();
