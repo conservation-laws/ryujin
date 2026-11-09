@@ -48,48 +48,6 @@ namespace ryujin
         , t_background_density_(std::numeric_limits<Number>::lowest())
         , t_magnetic_field_(std::numeric_limits<Number>::lowest())
     {
-      gauss_law_restart_strategy_ = GaussLawRestartStrategy::no_restart;
-      this->add_parameter(
-          "gauss law restart strategy",
-          gauss_law_restart_strategy_,
-          "Strategy used when restarting the gauss law. Options are "
-          "\'no restart\', \'full restart\', \'correction\', "
-          "\'static no restart\', and \'static full restart\'.");
-
-      gmg_max_iter_ = 15;
-      this->add_parameter("multigrid - max iter",
-                          gmg_max_iter_,
-                          "Maximal number of CG iterations with GMG smoother");
-
-      gmg_smoother_range_ = 8.;
-      this->add_parameter("multigrid - chebyshev range",
-                          gmg_smoother_range_,
-                          "Chebyshev smoother: eigenvalue range parameter");
-
-      gmg_smoother_max_eig_ = 2.0;
-      this->add_parameter("multigrid - chebyshev max eig",
-                          gmg_smoother_max_eig_,
-                          "Chebyshev smoother: maximal eigenvalue");
-
-      gmg_smoother_degree_ = 3;
-      this->add_parameter("multigrid - chebyshev degree",
-                          gmg_smoother_degree_,
-                          "Chebyshev smoother: degree");
-
-      gmg_smoother_n_cg_iter_ = 10;
-      this->add_parameter(
-          "multigrid - chebyshev cg iter",
-          gmg_smoother_n_cg_iter_,
-          "Chebyshev smoother: number of CG iterations to approximate "
-          "eigenvalue");
-
-      gmg_min_level_ = 0;
-      this->add_parameter(
-          "multigrid - min level",
-          gmg_min_level_,
-          "Minimal mesh level to be visited in the geometric multigrid "
-          "cycle where the coarse grid solver (Chebyshev) is called");
-
       tolerance_ = Number(1.0e-12);
       this->add_parameter(
           "tolerance", tolerance_, "Tolerance for linear solvers");
@@ -100,6 +58,48 @@ namespace ryujin
           tolerance_linfty_norm_,
           "Use the l_infty norm instead of the l_2 norm for the "
           "stopping criterion");
+
+      gauss_law_restart_strategy_ = GaussLawRestartStrategy::no_restart;
+      this->add_parameter(
+          "gauss law restart strategy",
+          gauss_law_restart_strategy_,
+          "Strategy used when restarting the gauss law. Options are "
+          "\'no restart\', \'full restart\', \'correction\', "
+          "\'static no restart\', and \'static full restart\'.");
+
+      gmg_smoother_n_cg_iter_ = 10;
+      this->add_parameter(
+          "multigrid - chebyshev cg iter",
+          gmg_smoother_n_cg_iter_,
+          "Chebyshev smoother: number of CG iterations to approximate "
+          "eigenvalue");
+
+      gmg_smoother_degree_ = 3;
+      this->add_parameter("multigrid - chebyshev degree",
+                          gmg_smoother_degree_,
+                          "Chebyshev smoother: degree");
+
+      gmg_smoother_max_eig_ = 2.0;
+      this->add_parameter("multigrid - chebyshev max eig",
+                          gmg_smoother_max_eig_,
+                          "Chebyshev smoother: maximal eigenvalue");
+
+      gmg_smoother_range_ = 8.;
+      this->add_parameter("multigrid - chebyshev range",
+                          gmg_smoother_range_,
+                          "Chebyshev smoother: eigenvalue range parameter");
+
+      gmg_max_iter_ = 15;
+      this->add_parameter("multigrid - max iter",
+                          gmg_max_iter_,
+                          "Maximal number of CG iterations with GMG smoother");
+
+      gmg_min_level_ = 0;
+      this->add_parameter(
+          "multigrid - min level",
+          gmg_min_level_,
+          "Minimal mesh level to be visited in the geometric multigrid "
+          "cycle where the coarse grid solver (Chebyshev) is called");
 
       electrostatic_configuration_list_ =
           ElectrostaticConfigurationLibrary<dim, Number>::create(

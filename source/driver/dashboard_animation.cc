@@ -801,7 +801,7 @@ namespace ryujin::animation
     switch (kind) {
     case DashboardAnimation::none:
       return nullptr;
-    case DashboardAnimation::sparkle:
+    case DashboardAnimation::ryujin:
       return std::make_unique<Sparkle>();
     case DashboardAnimation::matthias:
       return std::make_unique<Snakes>();

@@ -29,6 +29,18 @@ namespace ryujin
       , hyperbolic_module_(&hyperbolic_module)
       , parabolic_module_(&parabolic_module)
   {
+    if (parabolic_system_->is_identity())
+      time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    else
+      time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
+    this->add_parameter(
+        "time stepping scheme",
+        time_stepping_scheme_,
+        "Time stepping scheme: ssprk 22, ssprk 33, erk 11, erk 22, "
+        "erk 33, erk 43, erk "
+        "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn, "
+        "imex 11, imex 22, imex 33");
+
     cfl_min_ = Number(0.45);
     this->add_parameter(
         "cfl min",
@@ -60,18 +72,6 @@ namespace ryujin
 
     tau_max_ = std::numeric_limits<Number>::max();
     this->add_parameter("tau_max", tau_max_, "Largest time step size allowed.");
-
-    if (parabolic_system_->is_identity())
-      time_stepping_scheme_ = TimeSteppingScheme::erk_33;
-    else
-      time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
-    this->add_parameter(
-        "time stepping scheme",
-        time_stepping_scheme_,
-        "Time stepping scheme: ssprk 22, ssprk 33, erk 11, erk 22, "
-        "erk 33, erk 43, erk "
-        "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn, "
-        "imex 11, imex 22, imex 33");
   }
 
 

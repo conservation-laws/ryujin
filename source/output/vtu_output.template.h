@@ -36,26 +36,6 @@ namespace ryujin
     this->trigger_ = std::make_unique<Trigger<Number>>();
     this->trigger_->add_parameters(*this);
 
-    use_mpi_io_ = true;
-    add_parameter("use mpi io",
-                  use_mpi_io_,
-                  "If enabled write out one vtu file via MPI IO using "
-                  "write_vtu_in_parallel() instead of independent output files "
-                  "via write_vtu_with_pvtu_record()");
-
-    if (levelsets_)
-      add_parameter("manifolds",
-                    manifolds_,
-                    "List of level set functions. The description is used to "
-                    "only output cells that intersect the given level set.");
-
-    output_analytic_solution_ = false;
-    add_parameter(
-        "output analytic solution",
-        output_analytic_solution_,
-        "Also write out the analytic solution (as provided by the initial "
-        "values) with file name prefix \"<basename>-analytic_solution\"");
-
     const auto &hyperbolic_system = simulation.hyperbolic_system();
     const auto &state_names = hyperbolic_system.state_names(dim);
     vtu_output_quantities_ = state_names;
@@ -77,6 +57,19 @@ namespace ryujin
         "(schlieren_<name>, vorticity_<name>) quantities that will be "
         "written to the vtu files.");
 
+    if (levelsets_)
+      add_parameter("manifolds",
+                    manifolds_,
+                    "List of level set functions. The description is used to "
+                    "only output cells that intersect the given level set.");
+
+    output_analytic_solution_ = false;
+    add_parameter(
+        "output analytic solution",
+        output_analytic_solution_,
+        "Also write out the analytic solution (as provided by the initial "
+        "values) with file name prefix \"<basename>-analytic_solution\"");
+
     beta_ = 10.;
     add_parameter("schlieren beta",
                   beta_,
@@ -89,6 +82,13 @@ namespace ryujin
         recompute_bounds_,
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
+
+    use_mpi_io_ = true;
+    add_parameter("use mpi io",
+                  use_mpi_io_,
+                  "If enabled write out one vtu file via MPI IO using "
+                  "write_vtu_in_parallel() instead of independent output files "
+                  "via write_vtu_with_pvtu_record()");
   }
 
 

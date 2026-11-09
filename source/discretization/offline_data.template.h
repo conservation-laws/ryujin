@@ -42,16 +42,6 @@ namespace ryujin
       , mpi_ensemble_(mpi_ensemble)
       , discretization_(&discretization)
   {
-    treat_fe_nothing_as_boundary_ = true;
-    this->add_parameter(
-        "treat fe_nothing as boundary",
-        treat_fe_nothing_as_boundary_,
-        "If set to true, we treat cell with where the active finite element is "
-        "set to FE_Nothing as boundary: We do not assemble an interior jump "
-        "over such elements and add vertices touching such an element in the "
-        "boundary map. In this case, the boundary id of the interior face is "
-        "set via the material id of the cell with active FE_Nothing element.");
-
     incidence_relaxation_even_ = 0.5;
     this->add_parameter(
         "incidence matrix relaxation even degree",
@@ -67,6 +57,16 @@ namespace ryujin
         "Scaling exponent for incidence matrix used for "
         "discontinuous finite elements with even degree. The default "
         "value of 0.0 sets the jump penalization to a constant 1.");
+
+    treat_fe_nothing_as_boundary_ = true;
+    this->add_parameter(
+        "treat fe_nothing as boundary",
+        treat_fe_nothing_as_boundary_,
+        "If set to true, we treat cell with where the active finite element is "
+        "set to FE_Nothing as boundary: We do not assemble an interior jump "
+        "over such elements and add vertices touching such an element in the "
+        "boundary map. In this case, the boundary id of the interior face is "
+        "set via the material id of the cell with active FE_Nothing element.");
   }
 
 

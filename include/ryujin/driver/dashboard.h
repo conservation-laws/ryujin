@@ -157,7 +157,7 @@ namespace ryujin
     /**
      * Sparkles that twinkle in between two updates.
      */
-    sparkle,
+    ryujin,
 
     /**
      * Snakes that roam around the dashboard and hunt for food.
@@ -245,7 +245,7 @@ DECLARE_ENUM(ryujin::DashboardColorScheme,
 
 DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
-                  {ryujin::DashboardAnimation::sparkle, "sparkle"},
+                  {ryujin::DashboardAnimation::ryujin, "ryujin"},
                   {ryujin::DashboardAnimation::matthias, "matthias"},
                   {ryujin::DashboardAnimation::wyatt, "wyatt"}, ));
 
@@ -300,7 +300,7 @@ namespace ryujin
     /**
      * The animation in the space around the dashboard.
      */
-    DashboardAnimation animation = DashboardAnimation::sparkle;
+    DashboardAnimation animation = DashboardAnimation::ryujin;
 
     /**
      * The music played while the dashboard is drawn. DashboardMusic::none

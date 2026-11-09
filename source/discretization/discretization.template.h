@@ -49,14 +49,6 @@ namespace ryujin
                   "The finite element ansatz used for discretization. Valid "
                   "choices are cG Q1, cG Q2, cG Q3.");
 
-    mesh_type_ = (structdim == 1 ? MeshType::parallel_shared
-                                 : MeshType::parallel_distributed);
-    add_parameter("mesh type",
-                  mesh_type_,
-                  "The triangulation class used. Valid choices are \"serial\", "
-                  "\"parallel shared\", \"parallel distributed\", \"parallel "
-                  "fullydistributed\".");
-
     geometry_ = "rectangular domain";
     geometry_list_ = GeometryLibrary<structdim, dim>::create(subsection);
 
@@ -71,6 +63,18 @@ namespace ryujin
     add_parameter("mesh refinement",
                   refinement_,
                   "number of refinement of global refinement steps");
+
+    mesh_type_ = (structdim == 1 ? MeshType::parallel_shared
+                                 : MeshType::parallel_distributed);
+    add_parameter("mesh type",
+                  mesh_type_,
+                  "The triangulation class used. Valid choices are \"serial\", "
+                  "\"parallel shared\", \"parallel distributed\", \"parallel "
+                  "fullydistributed\".");
+
+    mesh_distortion_ = 0.;
+    add_parameter(
+        "mesh distortion", mesh_distortion_, "Strength of mesh distortion");
 
     local_refinement_ = 0;
     add_parameter("mesh local refinement",
@@ -89,10 +93,6 @@ namespace ryujin
     add_parameter("mesh writeout",
                   mesh_writeout_,
                   "Write out shared coarse mesh to a GMSH *.msh file.");
-
-    mesh_distortion_ = 0.;
-    add_parameter(
-        "mesh distortion", mesh_distortion_, "Strength of mesh distortion");
   }
 
 
