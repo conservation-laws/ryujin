@@ -821,15 +821,22 @@ namespace ryujin
                     parameters.gravity,
                     "Gravitational constant [proper units]");
 
+      parameters.reference_density = 1.;
+      add_parameter("reference density",
+                    parameters.reference_density,
+                    "Problem specific density reference");
+
       parameters.reference_pressure = 101325;
       add_parameter("reference pressure",
                     parameters.reference_pressure,
                     "Problem specific pressure reference");
 
-      parameters.reference_density = 1.;
-      add_parameter("reference density",
-                    parameters.reference_density,
-                    "Problem specific density reference");
+      sponge_damping_expression_ = "0";
+      add_parameter("sponge damping",
+                    sponge_damping_expression_,
+                    "A function expression in x, y, z describing the "
+                    "Rayleigh damping coefficient of the sponge layers "
+                    "[1/time]. Set to 0 to disable the sponge layers.");
 
       parameters.vacuum_state_relaxation_small = 1.e2;
       add_parameter("vacuum state relaxation small",
@@ -840,13 +847,6 @@ namespace ryujin
       add_parameter("vacuum state relaxation large",
                     parameters.vacuum_state_relaxation_large,
                     "Problem specific vacuum relaxation parameter");
-
-      sponge_damping_expression_ = "0";
-      add_parameter("sponge damping",
-                    sponge_damping_expression_,
-                    "A function expression in x, y, z describing the "
-                    "Rayleigh damping coefficient of the sponge layers "
-                    "[1/time]. Set to 0 to disable the sponge layers.");
 
       const auto set_up_muparser = [this] {
         sponge_damping_function_ = std::make_unique<dealii::FunctionParser<3>>(

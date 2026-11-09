@@ -125,7 +125,7 @@ set(_have_miniaudio OFF)
 if(WITH_FTXUI AND MINIAUDIO_INCLUDE_DIR)
   set(_have_miniaudio ON)
 endif()
-option(WITH_MINIAUDIO "Play music with the arcade splash screen with the miniaudio library (system header or checked out in miniaudio/)" ${_have_miniaudio})
+option(WITH_MINIAUDIO "Play music on the dashboard and the arcade splash screen with the miniaudio library (system header or checked out in miniaudio/)" ${_have_miniaudio})
 
 # likwid:
 

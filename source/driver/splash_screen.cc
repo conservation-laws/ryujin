@@ -3,10 +3,10 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/arcade_music.h>
+#include <driver/dashboard_music.h>
 #include <driver/splash_screen_logo.h>
 #include <driver/terminal.h>
-#include <ryujin/base/compile_time_options.h>
+
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/splash_screen.h>
 
@@ -1144,9 +1144,7 @@ namespace ryujin
       const auto previous_int = std::signal(SIGINT, restore);
       const auto previous_term = std::signal(SIGTERM, restore);
       tty.write(enter);
-#if defined(WITH_MINIAUDIO)
-      play_arcade_music();
-#endif
+      play_dashboard_music(DashboardMusic::ryujin);
 
       using clock = std::chrono::steady_clock;
       const auto start = clock::now();
@@ -1177,8 +1175,7 @@ namespace ryujin
                           unsigned int n_ranks,
                           SplashScreen splash_screen)
   {
-    if (splash_screen == SplashScreen::none ||
-        !terminal::stdout_reaches_terminal())
+    if (!terminal::stdout_reaches_terminal())
       return;
 
     const terminal::Output tty;

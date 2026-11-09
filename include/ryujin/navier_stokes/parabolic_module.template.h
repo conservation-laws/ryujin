@@ -47,25 +47,36 @@ namespace ryujin
         , n_iterations_velocity_(0.)
         , n_iterations_internal_energy_(0.)
     {
+      tolerance_ = Number(1.0e-12);
+      this->add_parameter(
+          "tolerance", tolerance_, "Tolerance for linear solvers");
+
+      tolerance_linfty_norm_ = false;
+      this->add_parameter(
+          "tolerance linfty norm",
+          tolerance_linfty_norm_,
+          "Use the l_infty norm instead of the l_2 norm for the "
+          "stopping criterion");
+
       use_gmg_velocity_ = false;
       this->add_parameter("multigrid velocity",
                           use_gmg_velocity_,
                           "Use geometric multigrid for velocity component");
 
-      gmg_max_iter_vel_ = 12;
-      this->add_parameter("multigrid velocity - max iter",
-                          gmg_max_iter_vel_,
-                          "Maximal number of CG iterations with GMG smoother");
+      gmg_smoother_max_eig_vel_ = 2.0;
+      this->add_parameter("multigrid velocity - chebyshev max eig",
+                          gmg_smoother_max_eig_vel_,
+                          "Chebyshev smoother: maximal eigenvalue");
 
       gmg_smoother_range_vel_ = 8.;
       this->add_parameter("multigrid velocity - chebyshev range",
                           gmg_smoother_range_vel_,
                           "Chebyshev smoother: eigenvalue range parameter");
 
-      gmg_smoother_max_eig_vel_ = 2.0;
-      this->add_parameter("multigrid velocity - chebyshev max eig",
-                          gmg_smoother_max_eig_vel_,
-                          "Chebyshev smoother: maximal eigenvalue");
+      gmg_max_iter_vel_ = 12;
+      this->add_parameter("multigrid velocity - max iter",
+                          gmg_max_iter_vel_,
+                          "Maximal number of CG iterations with GMG smoother");
 
       use_gmg_internal_energy_ = false;
       this->add_parameter(
@@ -73,25 +84,20 @@ namespace ryujin
           use_gmg_internal_energy_,
           "Use geometric multigrid for internal energy component");
 
-      gmg_max_iter_en_ = 15;
-      this->add_parameter("multigrid energy - max iter",
-                          gmg_max_iter_en_,
-                          "Maximal number of CG iterations with GMG smoother");
+      gmg_smoother_max_eig_en_ = 2.0;
+      this->add_parameter("multigrid energy - chebyshev max eig",
+                          gmg_smoother_max_eig_en_,
+                          "Chebyshev smoother: maximal eigenvalue");
 
       gmg_smoother_range_en_ = 15.;
       this->add_parameter("multigrid energy - chebyshev range",
                           gmg_smoother_range_en_,
                           "Chebyshev smoother: eigenvalue range parameter");
 
-      gmg_smoother_max_eig_en_ = 2.0;
-      this->add_parameter("multigrid energy - chebyshev max eig",
-                          gmg_smoother_max_eig_en_,
-                          "Chebyshev smoother: maximal eigenvalue");
-
-      gmg_smoother_degree_ = 3;
-      this->add_parameter("multigrid - chebyshev degree",
-                          gmg_smoother_degree_,
-                          "Chebyshev smoother: degree");
+      gmg_max_iter_en_ = 15;
+      this->add_parameter("multigrid energy - max iter",
+                          gmg_max_iter_en_,
+                          "Maximal number of CG iterations with GMG smoother");
 
       gmg_smoother_n_cg_iter_ = 10;
       this->add_parameter(
@@ -99,6 +105,11 @@ namespace ryujin
           gmg_smoother_n_cg_iter_,
           "Chebyshev smoother: number of CG iterations to approximate "
           "eigenvalue");
+
+      gmg_smoother_degree_ = 3;
+      this->add_parameter("multigrid - chebyshev degree",
+                          gmg_smoother_degree_,
+                          "Chebyshev smoother: degree");
 
       gmg_min_level_ = 0;
       this->add_parameter(
@@ -113,17 +124,6 @@ namespace ryujin
           gmg_reinitialization_interval_,
           "Reinitialize the level matrices and smoothers of the geometric "
           "multigrid every n-th time step");
-
-      tolerance_ = Number(1.0e-12);
-      this->add_parameter(
-          "tolerance", tolerance_, "Tolerance for linear solvers");
-
-      tolerance_linfty_norm_ = false;
-      this->add_parameter(
-          "tolerance linfty norm",
-          tolerance_linfty_norm_,
-          "Use the l_infty norm instead of the l_2 norm for the "
-          "stopping criterion");
     }
 
 

@@ -54,14 +54,6 @@ namespace ryujin
                   "recomputed and printed on the terminal. Setting the "
                   "interval to zero disables terminal output.");
 
-    terminal_correct_for_hyperthreading_ = true;
-    add_parameter(
-        "terminal correct for hyperthreading",
-        terminal_correct_for_hyperthreading_,
-        "If set to true, the CPU throughput is corrected by dividing the total "
-        "consumed CPU time by a factor of 2. This correction is only active if "
-        "the number of threads (per MPI rank) is 2.");
-
 #if defined(WITH_FTXUI)
     add_parameter("dashboard",
                   dashboard_settings_.mode,
@@ -69,18 +61,16 @@ namespace ryujin
                   "place: auto (if stdout reaches the terminal, also through "
                   "mpirun), on, off (print plain text instead).");
 
-    add_parameter("dashboard max width",
-                  dashboard_settings_.width,
-                  "Maximal width of the terminal dashboard in columns. The "
-                  "dashboard fills the terminal up to this width. Setting the "
-                  "width to zero removes the limit.");
+    add_parameter("dashboard animation",
+                  dashboard_settings_.animation,
+                  "Animation in the space around the terminal dashboard: "
+                  "ryujin, matthias, wyatt, none");
 
-    add_parameter("dashboard max height",
-                  dashboard_settings_.height,
-                  "Maximal height of the terminal dashboard in lines. If "
-                  "nonzero, the dashboard stretches to fill the terminal up to "
-                  "this height. Setting the height to zero keeps the natural "
-                  "height of the dashboard.");
+    add_parameter("dashboard color scheme",
+                  dashboard_settings_.color_scheme,
+                  "Color scheme of the terminal dashboard: ryujin, ansi16, "
+                  "gruvbox, light, monochrome, okabe-ito, rainbow, "
+                  "solarized, tamu");
 
     add_parameter(
         "dashboard location",
@@ -89,16 +79,24 @@ namespace ryujin
         "screen saver (move to a random position every ten seconds, in "
         "the parameter editor only while there is no input).");
 
-    add_parameter("dashboard color scheme",
-                  dashboard_settings_.color_scheme,
-                  "Color scheme of the terminal dashboard: ryujin, ansi16, "
-                  "gruvbox, light, monochrome, okabe-ito, rainbow, "
-                  "solarized, tamu");
+    add_parameter("dashboard max height",
+                  dashboard_settings_.height,
+                  "Maximal height of the terminal dashboard in lines. If "
+                  "nonzero, the dashboard stretches to fill the terminal up to "
+                  "this height. Setting the height to zero keeps the natural "
+                  "height of the dashboard.");
 
-    add_parameter("dashboard animation",
-                  dashboard_settings_.animation,
-                  "Animation in the space around the terminal dashboard: "
-                  "sparkle, matthias, wyatt, none");
+    add_parameter("dashboard max width",
+                  dashboard_settings_.width,
+                  "Maximal width of the terminal dashboard in columns. The "
+                  "dashboard fills the terminal up to this width. Setting the "
+                  "width to zero removes the limit.");
+
+    add_parameter("dashboard music",
+                  dashboard_settings_.music,
+                  "Music played while the terminal dashboard is drawn "
+                  "(requires ryujin compiled with miniaudio): none, ryujin, "
+                  "matthias, wyatt");
 
     add_parameter("dashboard throughput display",
                   dashboard_settings_.throughput_display,
@@ -119,6 +117,14 @@ namespace ryujin
                   "If set to a nonempty string then we output the contents of "
                   "this file at the end. This is mainly useful in the "
                   "testsuite to output files we wish to compare");
+
+    terminal_correct_for_hyperthreading_ = true;
+    add_parameter(
+        "terminal correct for hyperthreading",
+        terminal_correct_for_hyperthreading_,
+        "If set to true, the CPU throughput is corrected by dividing the total "
+        "consumed CPU time by a factor of 2. This correction is only active if "
+        "the number of threads (per MPI rank) is 2.");
   }
 
 

@@ -70,21 +70,13 @@ namespace ryujin
     this->trigger_ = std::make_unique<Trigger<Number>>();
     this->trigger_->add_parameters(*this);
 
-    quantities_ = simulation.hyperbolic_system().primitive_names(dim);
-
-    add_parameter("quantities",
-                  quantities_,
-                  "List of conserved, primitive, precomputed, initial, or "
-                  "parabolic quantities for which statistics are accumulated "
-                  "on all manifolds.");
-
-    n_moments_ = 2;
-    add_parameter("number of moments",
-                  n_moments_,
-                  "Number of moments computed for every selected quantity in "
-                  "the time averaged and space averaged statistics: 1 (mean), "
-                  "2 (mean and variance), 3 (additionally the third central "
-                  "moment), 4 (additionally the fourth central moment).");
+    add_parameter("boundary manifolds",
+                  boundary_manifolds_,
+                  "List of level set functions describing boundary. The "
+                  "description is used to only output point values for "
+                  "boundary vertices belonging to a certain level set. "
+                  "Format: '<name> : <level set formula> : <options> , [...] "
+                  "(options: time_averaged, space_averaged, instantaneous)");
 
     add_parameter("interior manifolds",
                   interior_manifolds_,
@@ -94,13 +86,12 @@ namespace ryujin
                   "Format: '<name> : <level set formula> : <options> , [...] "
                   "(options: time_averaged, space_averaged, instantaneous)");
 
-    add_parameter("boundary manifolds",
-                  boundary_manifolds_,
-                  "List of level set functions describing boundary. The "
-                  "description is used to only output point values for "
-                  "boundary vertices belonging to a certain level set. "
-                  "Format: '<name> : <level set formula> : <options> , [...] "
-                  "(options: time_averaged, space_averaged, instantaneous)");
+    quantities_ = simulation.hyperbolic_system().primitive_names(dim);
+    add_parameter("quantities",
+                  quantities_,
+                  "List of conserved, primitive, precomputed, initial, or "
+                  "parabolic quantities for which statistics are accumulated "
+                  "on all manifolds.");
 
     clear_temporal_statistics_on_writeout_ = true;
     add_parameter("clear statistics on writeout",
@@ -108,6 +99,14 @@ namespace ryujin
                   "If set to true then all temporal statistics (for "
                   "\"time_averaged\" quantities) accumulated so far are reset "
                   "each time a writeout of quantities is performed");
+
+    n_moments_ = 2;
+    add_parameter("number of moments",
+                  n_moments_,
+                  "Number of moments computed for every selected quantity in "
+                  "the time averaged and space averaged statistics: 1 (mean), "
+                  "2 (mean and variance), 3 (additionally the third central "
+                  "moment), 4 (additionally the fourth central moment).");
   }
 
 

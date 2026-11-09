@@ -80,24 +80,17 @@ int main(int argc, char *argv[])
    */
 
   /*
-   * Remove --edit, --editor, and --splash=<name> from the argument list
+   * Remove --edit, --editor, and --arcade from the argument list
    * before handing off to MPI, Kokkos, PETSc, etc...
    */
   bool invoke_editor = false;
   auto splash_screen = ryujin::SplashScreen::logo;
-  bool invalid_splash_screen = false;
   const auto end = std::remove_if(argv + 1, argv + argc, [&](const char *arg) {
     const std::string_view option = arg;
     if (option == "--edit" || option == "--editor")
       invoke_editor = true;
-    else if (option == "--splash=none")
-      splash_screen = ryujin::SplashScreen::none;
-    else if (option == "--splash=logo")
-      splash_screen = ryujin::SplashScreen::logo;
-    else if (option == "--splash=arcade")
+    else if (option == "--arcade")
       splash_screen = ryujin::SplashScreen::arcade;
-    else if (option.starts_with("--splash="))
-      invalid_splash_screen = true;
     else
       return false;
     return true;
@@ -117,17 +110,7 @@ int main(int argc, char *argv[])
     if (is_root) {
       std::cerr << "[ERROR] Invalid number of parameters. At most one argument "
                 << "supported which has to be a parameter file (and the "
-                << "options --edit or --editor, and --splash=<name>)."
-                << std::endl;
-    }
-    return 1;
-  }
-
-  if (invalid_splash_screen) {
-    if (is_root) {
-      std::cerr << "[ERROR] Invalid splash screen. Supported are "
-                << "--splash=none, --splash=logo, and --splash=arcade."
-                << std::endl;
+                << "options --edit or --editor, and --arcade)." << std::endl;
     }
     return 1;
   }

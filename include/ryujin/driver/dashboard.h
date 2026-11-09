@@ -157,7 +157,7 @@ namespace ryujin
     /**
      * Sparkles that twinkle in between two updates.
      */
-    sparkle,
+    ryujin,
 
     /**
      * Snakes that roam around the dashboard and hunt for food.
@@ -166,6 +166,37 @@ namespace ryujin
 
     /**
      * An aquarium around the dashboard.
+     */
+    wyatt,
+  };
+
+
+  /**
+   * The music played while the Dashboard is drawn.
+   *
+   * @ingroup Driver
+   */
+  enum class DashboardMusic : std::uint8_t {
+    /**
+     * No music.
+     */
+    none,
+
+    /**
+     * An original tune in the style of the arcade racing games of the
+     * eighties, also played by SplashScreen::arcade.
+     */
+    ryujin,
+
+    /**
+     * An original maze chase in the style of the arcade games of the
+     * eighties, for the snakes of DashboardAnimation::matthias.
+     */
+    matthias,
+
+    /**
+     * An original underwater tune in the style of the arcade games of the
+     * eighties, for the aquarium of DashboardAnimation::wyatt.
      */
     wyatt,
   };
@@ -214,9 +245,15 @@ DECLARE_ENUM(ryujin::DashboardColorScheme,
 
 DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
-                  {ryujin::DashboardAnimation::sparkle, "sparkle"},
+                  {ryujin::DashboardAnimation::ryujin, "ryujin"},
                   {ryujin::DashboardAnimation::matthias, "matthias"},
                   {ryujin::DashboardAnimation::wyatt, "wyatt"}, ));
+
+DECLARE_ENUM(ryujin::DashboardMusic,
+             LIST({ryujin::DashboardMusic::none, "none"},
+                  {ryujin::DashboardMusic::ryujin, "ryujin"},
+                  {ryujin::DashboardMusic::matthias, "matthias"},
+                  {ryujin::DashboardMusic::wyatt, "wyatt"}, ));
 
 DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
              LIST({ryujin::DashboardThroughputDisplay::speedometer,
@@ -263,7 +300,13 @@ namespace ryujin
     /**
      * The animation in the space around the dashboard.
      */
-    DashboardAnimation animation = DashboardAnimation::sparkle;
+    DashboardAnimation animation = DashboardAnimation::ryujin;
+
+    /**
+     * The music played while the dashboard is drawn. DashboardMusic::none
+     * keeps the music of SplashScreen::arcade playing.
+     */
+    DashboardMusic music = DashboardMusic::none;
 
     /**
      * The display of the wall throughput.

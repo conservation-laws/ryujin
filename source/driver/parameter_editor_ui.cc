@@ -4,6 +4,7 @@
 //
 
 #include <driver/dashboard_animation.h>
+#include <driver/dashboard_music.h>
 #include <driver/dashboard_theme.h>
 #include <ryujin/driver/dashboard.h>
 #include <ryujin/driver/parameter_editor.h>
@@ -44,13 +45,17 @@ namespace ryujin
         position_.postpone();
       }
 
-      /* Take over the size, location, colors, and animation of @p settings: */
+      /*
+       * Take over the size, location, colors, animation, and music of
+       * @p settings:
+       */
       void configure(const DashboardSettings &settings)
       {
         settings_ = settings;
         theme = make_palette(settings.color_scheme);
         animation_ = animation::create(settings.animation);
         stage_.reset();
+        play_dashboard_music(settings.music);
       }
 
       /* Size and place @p window on the terminal as configured: */
@@ -237,6 +242,7 @@ namespace ryujin
       read("dashboard location", settings.location);
       read("dashboard color scheme", settings.color_scheme);
       read("dashboard animation", settings.animation);
+      read("dashboard music", settings.music);
       return settings;
     }
 

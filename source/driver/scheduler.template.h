@@ -45,19 +45,6 @@ namespace ryujin
     t_final_ = Number(5.);
     add_parameter("final time", t_final_, "Final time");
 
-    max_cycles_ = 0;
-    add_parameter("max cycles",
-                  max_cycles_,
-                  "If set to a nonzero value the main loop is stopped after "
-                  "the given number of cycles (time steps), or when the "
-                  "final time is reached, whichever comes first");
-
-    align_time_steps_ = false;
-    add_parameter("align time steps",
-                  align_time_steps_,
-                  "If set to true, time steps are shortened so that every "
-                  "timer tick and the final time are reached exactly");
-
     timer_granularity_ = Number(0.01);
     add_parameter("timer granularity",
                   timer_granularity_,
@@ -81,6 +68,19 @@ namespace ryujin
                                0,
                                dealii::Patterns::List::max_int_value,
                                ","));
+
+    max_cycles_ = 0;
+    add_parameter("max cycles",
+                  max_cycles_,
+                  "If set to a nonzero value the main loop is stopped after "
+                  "the given number of cycles (time steps), or when the "
+                  "final time is reached, whichever comes first");
+
+    align_time_steps_ = false;
+    add_parameter("align time steps",
+                  align_time_steps_,
+                  "If set to true, time steps are shortened so that every "
+                  "timer tick and the final time are reached exactly");
   }
 
 
