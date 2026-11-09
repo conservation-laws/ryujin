@@ -100,6 +100,11 @@ namespace ryujin
                   "Animation in the space around the terminal dashboard: "
                   "sparkle, matthias, wyatt, none");
 
+    add_parameter("dashboard music",
+                  dashboard_settings_.music,
+                  "Music played while the terminal dashboard is drawn "
+                  "(requires ryujin compiled with miniaudio): none, ryujin");
+
     add_parameter("dashboard throughput display",
                   dashboard_settings_.throughput_display,
                   "Display of the wall throughput on the terminal dashboard: "

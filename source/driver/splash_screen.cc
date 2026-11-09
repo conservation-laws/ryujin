@@ -3,9 +3,10 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/arcade_music.h>
+#include <driver/dashboard_music.h>
 #include <driver/splash_screen_logo.h>
 #include <driver/terminal.h>
+
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/splash_screen.h>
@@ -1145,7 +1146,7 @@ namespace ryujin
       const auto previous_term = std::signal(SIGTERM, restore);
       tty.write(enter);
 #if defined(WITH_MINIAUDIO)
-      play_arcade_music();
+      play_dashboard_music();
 #endif
 
       using clock = std::chrono::steady_clock;

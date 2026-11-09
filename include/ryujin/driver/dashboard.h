@@ -172,6 +172,25 @@ namespace ryujin
 
 
   /**
+   * The music played while the Dashboard is drawn.
+   *
+   * @ingroup Driver
+   */
+  enum class DashboardMusic : std::uint8_t {
+    /**
+     * No music.
+     */
+    none,
+
+    /**
+     * An original tune in the style of the arcade racing games of the
+     * eighties.
+     */
+    ryujin,
+  };
+
+
+  /**
    * The display of the wall throughput on the Dashboard.
    *
    * @ingroup Driver
@@ -217,6 +236,10 @@ DECLARE_ENUM(ryujin::DashboardAnimation,
                   {ryujin::DashboardAnimation::sparkle, "sparkle"},
                   {ryujin::DashboardAnimation::matthias, "matthias"},
                   {ryujin::DashboardAnimation::wyatt, "wyatt"}, ));
+
+DECLARE_ENUM(ryujin::DashboardMusic,
+             LIST({ryujin::DashboardMusic::none, "none"},
+                  {ryujin::DashboardMusic::ryujin, "ryujin"}, ));
 
 DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
              LIST({ryujin::DashboardThroughputDisplay::speedometer,
@@ -264,6 +287,11 @@ namespace ryujin
      * The animation in the space around the dashboard.
      */
     DashboardAnimation animation = DashboardAnimation::sparkle;
+
+    /**
+     * The music played while the dashboard is drawn.
+     */
+    DashboardMusic music = DashboardMusic::none;
 
     /**
      * The display of the wall throughput.

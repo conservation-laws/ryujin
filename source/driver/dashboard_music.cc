@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/arcade_music.h>
+#include <driver/dashboard_music.h>
 
 #include <deal.II/base/exceptions.h>
 
@@ -393,7 +393,7 @@ namespace ryujin
   } // namespace
 
 
-  void play_arcade_music()
+  void play_dashboard_music()
   {
     static Player player;
   }

@@ -69,7 +69,7 @@ if(WITH_FTXUI)
 endif()
 
 if(WITH_MINIAUDIO)
-  list(APPEND CORE_SOURCE_FILES driver/arcade_music.cc)
+  list(APPEND CORE_SOURCE_FILES driver/dashboard_music.cc)
 endif()
 
 set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
