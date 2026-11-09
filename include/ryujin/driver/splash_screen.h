@@ -17,11 +17,6 @@ namespace ryujin
    */
   enum class SplashScreen : std::uint8_t {
     /**
-     * No splash screen.
-     */
-    none,
-
-    /**
      * The logo, the name and the version, the equation, the dimension, and
      * the number of MPI ranks, and the copyright of ryujin, centered on the
      * screen above a few free lines for the following output. The logo is
@@ -37,7 +32,9 @@ namespace ryujin
      * ranks as credits. The intro waits at "PRESS START" for a key press
      * on stdin (under mpirun: the return key), unless there is no input.
      * It is only shown if stdout reaches an interactive terminal of at
-     * least 80x24 characters.
+     * least 80x24 characters. The intro starts DashboardMusic::ryujin,
+     * which keeps playing unless the run time parameter "dashboard music"
+     * selects a different tune for the Dashboard.
      */
     arcade,
   };
@@ -53,5 +50,5 @@ namespace ryujin
   void play_splash_screen(const std::string &equation,
                           int dim,
                           unsigned int n_ranks,
-                          SplashScreen splash_screen = SplashScreen::none);
+                          SplashScreen splash_screen = SplashScreen::logo);
 } // namespace ryujin

@@ -7,7 +7,6 @@
 #include <driver/dashboard_music.h>
 #include <driver/dashboard_theme.h>
 #include <driver/terminal.h>
-#include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/random.h>
 #include <ryujin/base/version_info.h>
 #include <ryujin/driver/dashboard.h>
@@ -801,10 +800,9 @@ namespace ryujin
     settings_ = settings;
     theme = make_palette(settings.color_scheme);
     animation_ = animation::create(settings.animation);
-#if defined(WITH_MINIAUDIO)
-    if (settings.music == DashboardMusic::ryujin)
-      play_dashboard_music();
-#endif
+    /* Keep the music of the arcade splash screen if there is none: */
+    if (settings.music != DashboardMusic::none)
+      play_dashboard_music(settings.music);
     write(render());
 
     thread_ = std::jthread([this](std::stop_token token) {

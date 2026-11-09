@@ -103,7 +103,8 @@ namespace ryujin
     add_parameter("dashboard music",
                   dashboard_settings_.music,
                   "Music played while the terminal dashboard is drawn "
-                  "(requires ryujin compiled with miniaudio): none, ryujin");
+                  "(requires ryujin compiled with miniaudio): none, ryujin, "
+                  "matthias, wyatt");
 
     add_parameter("dashboard throughput display",
                   dashboard_settings_.throughput_display,

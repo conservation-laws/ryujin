@@ -374,8 +374,9 @@
  * starts from the first equation in 2D. Equation::with_parameters constructs
  * the Simulation and the TaskComposition to declare all parameters, which
  * the editor shows in a terminal editor (ParameterModel,
- * run_parameter_editor()) with the colors and the animation of the
- * Dashboard, as configured in the subsection "M - Logger". Changing the
+ * run_parameter_editor()) with the colors, the animation, and the music
+ * of the Dashboard, as configured in the subsection "M - Logger" (and
+ * changed right away when these parameters change). Changing the
  * equation or the dimension opens the editor again for the new equation,
  * keeping all values that still apply. "save" writes the parameter file,
  * "save as" writes it under a new name and continues with that file,
@@ -388,10 +389,11 @@
  *
  * Before running the equation, main() shows a splash screen on rank 0,
  * see play_splash_screen(), if stdout reaches an interactive terminal.
- * The option <code>--splash=&lt;name&gt;</code> selects it: "logo" (the
- * default) shows the logo, the name, and the copyright of ryujin, "arcade"
- * plays an intro in the style of an arcade game of the eighties and waits
- * for a key press, and "none" skips it.
+ * By default it shows the logo, the name, and the copyright of ryujin. The
+ * option <code>--arcade</code> plays an intro in the style of an arcade
+ * game of the eighties instead, waits for a key press, and starts the
+ * music "ryujin". The Dashboard keeps it playing, unless the run time
+ * parameter "dashboard music" selects a different tune.
  *
  * <h3>Scheduler</h3>
  *

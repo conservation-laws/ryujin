@@ -184,9 +184,21 @@ namespace ryujin
 
     /**
      * An original tune in the style of the arcade racing games of the
-     * eighties.
+     * eighties, also played by SplashScreen::arcade.
      */
     ryujin,
+
+    /**
+     * An original maze chase in the style of the arcade games of the
+     * eighties, for the snakes of DashboardAnimation::matthias.
+     */
+    matthias,
+
+    /**
+     * An original underwater tune in the style of the arcade games of the
+     * eighties, for the aquarium of DashboardAnimation::wyatt.
+     */
+    wyatt,
   };
 
 
@@ -239,7 +251,9 @@ DECLARE_ENUM(ryujin::DashboardAnimation,
 
 DECLARE_ENUM(ryujin::DashboardMusic,
              LIST({ryujin::DashboardMusic::none, "none"},
-                  {ryujin::DashboardMusic::ryujin, "ryujin"}, ));
+                  {ryujin::DashboardMusic::ryujin, "ryujin"},
+                  {ryujin::DashboardMusic::matthias, "matthias"},
+                  {ryujin::DashboardMusic::wyatt, "wyatt"}, ));
 
 DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
              LIST({ryujin::DashboardThroughputDisplay::speedometer,
@@ -289,7 +303,8 @@ namespace ryujin
     DashboardAnimation animation = DashboardAnimation::sparkle;
 
     /**
-     * The music played while the dashboard is drawn.
+     * The music played while the dashboard is drawn. DashboardMusic::none
+     * keeps the music of SplashScreen::arcade playing.
      */
     DashboardMusic music = DashboardMusic::none;
 
