@@ -165,6 +165,12 @@ namespace ryujin
     matthias,
 
     /**
+     * A barista brewing a pour-over coffee that is ready when the
+     * simulation finishes.
+     */
+    eric,
+
+    /**
      * An aquarium around the dashboard.
      */
     wyatt,
@@ -247,6 +253,7 @@ DECLARE_ENUM(ryujin::DashboardAnimation,
              LIST({ryujin::DashboardAnimation::none, "none"},
                   {ryujin::DashboardAnimation::ryujin, "ryujin"},
                   {ryujin::DashboardAnimation::matthias, "matthias"},
+                  {ryujin::DashboardAnimation::eric, "eric"},
                   {ryujin::DashboardAnimation::wyatt, "wyatt"}, ));
 
 DECLARE_ENUM(ryujin::DashboardMusic,

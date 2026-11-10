@@ -27,6 +27,15 @@ namespace ryujin::animation
     ftxui::Screen screen;
     /** The cells covered by the dashboard. */
     ftxui::Box dashboard;
+    /**
+     * The progress of the simulation from 0 to 1, negative if unknown.
+     */
+    double progress = -1.;
+    /**
+     * The estimated remaining wall time of the simulation in seconds,
+     * negative if unknown.
+     */
+    double eta = -1.;
     /** The cells changed by the animation since the last step. */
     std::vector<std::pair<int, int>> changed = {};
     /**
@@ -81,6 +90,12 @@ namespace ryujin::animation
      * Stage::pixel().
      */
     virtual void step(Stage &stage) = 0;
+
+    /**
+     * Fill the free cells of the freshly rendered final stage, after the
+     * simulation finished. By default, the final stage stays empty.
+     */
+    virtual void finish(Stage & /*stage*/) {}
   };
 
 
