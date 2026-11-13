@@ -837,8 +837,13 @@ namespace ryujin
         state_vector, {}, {}, temp_[0], t, tau, tau_max);
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
-    parabolic_module_->backward_euler_step(
-        temp_[0], {state_vector}, {Number(1.)}, {Number(0.)}, temp_[1], t, tau);
+    parabolic_module_->backward_euler_step(temp_[0],
+                                           {state_vector},
+                                           {Number(1.)},
+                                           {Number(0.), Number(1.)},
+                                           temp_[1],
+                                           t,
+                                           tau);
 
     std::swap(state_vector, temp_[1]);
     return tau;
@@ -863,8 +868,13 @@ namespace ryujin
                                                  tau_max / this->efficiency_);
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
-    parabolic_module_->backward_euler_step(
-        temp_[0], {state_vector}, {Number(1.)}, {Number(0.)}, temp_[1], t, tau);
+    parabolic_module_->backward_euler_step(temp_[0],
+                                           {state_vector},
+                                           {Number(1.)},
+                                           {Number(0.), Number(1.)},
+                                           temp_[1],
+                                           t,
+                                           tau);
 
     /* Explicit step 2: T2 <- {T1, 2} and {U_old, -1} at t + tau -> t + 2 tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
@@ -875,7 +885,7 @@ namespace ryujin
     parabolic_module_->backward_euler_step(temp_[2],
                                            {state_vector, temp_[1]},
                                            {Number(-1.), Number(2.)},
-                                           {Number(0.), Number(1.)},
+                                           {Number(0.), Number(1.), Number(0.)},
                                            temp_[3],
                                            t + 1.0 * tau,
                                            tau);
@@ -907,13 +917,14 @@ namespace ryujin
                                                  tau_max / this->efficiency_);
 
     /* Implicit step 1: T1 <- {U_old, 1 - 3*gamma} at time t -> t + tau */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {Number(1.)},
-                                           {Number(1. - 3. * gamma)},
-                                           temp_[1],
-                                           t,
-                                           tau);
+    parabolic_module_->backward_euler_step(
+        temp_[0],
+        {state_vector},
+        {Number(1.)},
+        {Number(1. - 3. * gamma), Number(3. * gamma)},
+        temp_[1],
+        t,
+        tau);
 
     /* Explicit step 2: T2 <- {U_old, -1} and {T1, 2} at time t -> t + 2 tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
@@ -928,7 +939,7 @@ namespace ryujin
         temp_[2],
         {state_vector, temp_[1]},
         {Number(-1.), Number(2.)},
-        {Number(6. * gamma - 1.), Number(2. - 9 * gamma)},
+        {Number(6. * gamma - 1.), Number(2. - 9 * gamma), Number(3. * gamma)},
         temp_[3],
         t + tau,
         tau);
@@ -949,7 +960,8 @@ namespace ryujin
         {Number(0.75), Number(-2.), Number(9. / 4.)},
         {Number(0.75 - 3. * gamma),
          Number(6. * gamma - 2.),
-         Number(9. / 4. - 3. * gamma)},
+         Number(9. / 4. - 3. * gamma),
+         Number(0.)},
         temp_[5],
         t + 2. * tau,
         tau);

@@ -56,16 +56,17 @@ namespace ryujin
        * \f$\boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U)\f$
        * denote its quasi-linearization around the state \f$\boldsymbol
        * U^n\f$ at the beginning of the time step. With the old state
-       * \f$\boldsymbol W\f$, the stage states \f$\boldsymbol U^{s}\f$,
-       * and the weights \f$\omega^{\text e}_s\f$, \f$\omega^{\text i}_s\f$
-       * the function solves
+       * \f$\boldsymbol W\f$, the \f$k\f$ stage states \f$\boldsymbol
+       * U^{s}\f$, the \f$k\f$ explicit weights \f$\omega^{\text e}_s\f$,
+       * and the \f$k+1\f$ implicit weights \f$\omega^{\text i}_s\f$ the
+       * function solves
        * \f{align}
        *   \boldsymbol U^{\text{new}}
-       *   - \tau\big(1-\sum_{s=1}^{\text{stages}}\omega^{\text i}_s\big)
+       *   - \tau\,\omega^{\text i}_{k+1}\,
        *   \boldsymbol G^{\text{lin}}(\boldsymbol U^n;
        *   \boldsymbol U^{\text{new}})
        *   \;=\;
-       *   \boldsymbol W + \tau\sum_{s=1}^{\text{stages}}\Big\{
+       *   \boldsymbol W + \tau\sum_{s=1}^{k}\Big\{
        *   \omega^{\text e}_s\,\boldsymbol G(\boldsymbol U^{s})
        *   + \big(\omega^{\text i}_s-\omega^{\text e}_s\big)\,
        *   \boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U^{s})
@@ -74,16 +75,24 @@ namespace ryujin
        * For a linear parabolic operator the explicit weights drop out and
        * only the implicit weights \f$\omega^{\text i}_s\f$ enter.
        *
-       * If stage state vectors are supplied then all prior stages of the
-       * time step have to be supplied and the first stage state vector
-       * has to be the state \f$\boldsymbol U^n\f$ at the beginning of the
-       * time step. In terms of the Butcher tableaux of the explicit and
-       * implicit schemes the weights for the stage \f$l\f$ are
-       * \f$\omega^{\text e}_s = (a^{\text e}_{l,s}-a^{\text e}_{l-1,s}) /
-       * (c_l - c_{l-1})\f$ and \f$\omega^{\text i}_s = (a^{\text i}_{l,s}
-       * -a^{\text i}_{l-1,s}) / (c_l - c_{l-1})\f$. In particular, the
-       * explicit weights sum up to one. If no stage state vectors are
-       * supplied the function performs a plain backward Euler step.
+       * The number of stage state vectors and the number of explicit
+       * weights have to agree. The list of implicit weights contains one
+       * additional entry: its last element \f$\omega^{\text i}_{k+1}\f$
+       * is the weight of the new state. Stages for which both weights
+       * vanish can be omitted. A plain backward Euler step is performed
+       * with no stage state vectors, no explicit weights, and the single
+       * implicit weight 1.
+       *
+       * In terms of the Butcher tableaux of the explicit and implicit
+       * schemes the weights for the stage \f$l\f$ are \f$\omega^{\text e}_s
+       * = (a^{\text e}_{l,s}-a^{\text e}_{l-1,s}) / (c_l - c_{l-1})\f$ and
+       * \f$\omega^{\text i}_s = (a^{\text i}_{l,s} -a^{\text i}_{l-1,s}) /
+       * (c_l - c_{l-1})\f$; the last implicit weight is the scaled
+       * diagonal entry \f$a^{\text i}_{l,l} / (c_l - c_{l-1})\f$.
+       *
+       * @note A parabolic module that makes use of the quasi-linearization
+       * expects the state \f$\boldsymbol U^n\f$ as first stage state
+       * vector.
        *
        * The function returns the time step size @p tau. A parabolic module
        * cannot choose the time step size: @p tau must be nonzero and @p
