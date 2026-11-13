@@ -139,61 +139,53 @@ namespace ryujin
     hyperbolic_module_->set_cfl(cfl_max_);
     hyperbolic_module_->set_acceptable_tau_max_ratio(acceptable_tau_max_ratio_);
 
-    const auto check_whether_timestepping_makes_sense = [&]() {
-      /*
-       * Make sure the user selects an appropriate time-stepping scheme.
-       */
+    /* Make sure the user selects an appropriate time-stepping scheme: */
 
-      switch (time_stepping_scheme_) {
-      case TimeSteppingScheme::ssprk_22:
-        [[fallthrough]];
-      case TimeSteppingScheme::ssprk_33:
-        [[fallthrough]];
-      case TimeSteppingScheme::erk_11:
-        [[fallthrough]];
-      case TimeSteppingScheme::erk_22:
-        [[fallthrough]];
-      case TimeSteppingScheme::erk_33:
-        [[fallthrough]];
-      case TimeSteppingScheme::erk_43:
-        [[fallthrough]];
-      case TimeSteppingScheme::erk_54: {
-        AssertThrow(
-            parabolic_system_->is_identity(),
-            dealii::ExcMessage(
-                "The selected equation consists of a hyperbolic and nontrivial "
-                "parabolic subsystem and requires an IMEX timestepping "
-                "scheme such as »strang erk 33 cn«."));
-        break;
-      }
-      case TimeSteppingScheme::imex_11:
-        [[fallthrough]];
-      case TimeSteppingScheme::imex_22:
-        [[fallthrough]];
-      case TimeSteppingScheme::imex_33:
-        [[fallthrough]];
-      case TimeSteppingScheme::gsa_imex_22:
-        [[fallthrough]];
-      case TimeSteppingScheme::gsa_imex_43:
-        [[fallthrough]];
-      case TimeSteppingScheme::strang_ssprk_33_cn:
-        [[fallthrough]];
-      case TimeSteppingScheme::strang_erk_33_cn:
-        [[fallthrough]];
-      case TimeSteppingScheme::strang_erk_43_cn: {
-        AssertThrow(
-            !parabolic_system_->is_identity(),
-            dealii::ExcMessage(
-                "The selected equation has a trivial parabolic subsystem and "
-                "should not be run with an IMEX timestepping scheme."));
-        break;
-      }
-      }
-    };
-
-    check_whether_timestepping_makes_sense();
-    this->parse_parameters_call_back.connect(
-        check_whether_timestepping_makes_sense);
+    switch (time_stepping_scheme_) {
+    case TimeSteppingScheme::ssprk_22:
+      [[fallthrough]];
+    case TimeSteppingScheme::ssprk_33:
+      [[fallthrough]];
+    case TimeSteppingScheme::erk_11:
+      [[fallthrough]];
+    case TimeSteppingScheme::erk_22:
+      [[fallthrough]];
+    case TimeSteppingScheme::erk_33:
+      [[fallthrough]];
+    case TimeSteppingScheme::erk_43:
+      [[fallthrough]];
+    case TimeSteppingScheme::erk_54: {
+      AssertThrow(
+          parabolic_system_->is_identity(),
+          dealii::ExcMessage(
+              "The selected equation consists of a hyperbolic and nontrivial "
+              "parabolic subsystem and requires an IMEX timestepping "
+              "scheme such as »strang erk 33 cn«."));
+      break;
+    }
+    case TimeSteppingScheme::imex_11:
+      [[fallthrough]];
+    case TimeSteppingScheme::imex_22:
+      [[fallthrough]];
+    case TimeSteppingScheme::imex_33:
+      [[fallthrough]];
+    case TimeSteppingScheme::gsa_imex_22:
+      [[fallthrough]];
+    case TimeSteppingScheme::gsa_imex_43:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_ssprk_33_cn:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_erk_33_cn:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_erk_43_cn: {
+      AssertThrow(
+          !parabolic_system_->is_identity(),
+          dealii::ExcMessage(
+              "The selected equation has a trivial parabolic subsystem and "
+              "should not be run with an IMEX timestepping scheme."));
+      break;
+    }
+    }
   }
 
 
