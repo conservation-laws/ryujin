@@ -269,6 +269,18 @@
 
 
 /**
+ * @defgroup ScalarDiffusionEquations The Scalar Diffusion Model
+ * @ingroup EquationsLayer
+ *
+ * This module contains classes and functions related to the power-law
+ * diffusion model for a scalar quantity
+ * (<code>include/ryujin/scalar_diffusion</code>). Paired with the scalar
+ * conservation equations it forms the <code>scalar convection
+ * diffusion</code> equation.
+ */
+
+
+/**
  * @defgroup ScalarConservationEquations The Scalar Conservation Equations
  * @ingroup EquationsLayer
  *
