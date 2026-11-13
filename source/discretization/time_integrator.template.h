@@ -838,7 +838,7 @@ namespace ryujin
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
     parabolic_module_->backward_euler_step(
-        temp_[0], {}, {}, {}, temp_[1], t, 1.0 * tau);
+        temp_[0], {state_vector}, {Number(1.)}, {Number(0.)}, temp_[1], t, tau);
 
     std::swap(state_vector, temp_[1]);
     return tau;
