@@ -202,14 +202,18 @@ namespace ryujin
        * backward euler step (and store the result in @p new_state_vector).
        *
        * The function takes an optional list of states @p
-       * stage_state_vectors together with a list of weights @p
-       * stage_weights to construct a modified high-order right-hand side /
-       * flux.
+       * stage_state_vectors together with two lists of weights @p
+       * stage_weights_explicit and @p stage_weights_implicit to construct
+       * a modified high-order right-hand side / flux, see
+       * Interface::ParabolicModule::backward_euler_step().
+       *
+       * @todo The stage state vectors and weights are currently ignored.
        */
       Number backward_euler_step(
           const StateVector<Number> &old_state_vector,
           StageVectors stage_state_vectors,
-          StageWeights stage_weights,
+          StageWeights stage_weights_explicit,
+          StageWeights stage_weights_implicit,
           StateVector<Number> &new_state_vector,
           Number t,
           Number tau,
@@ -337,7 +341,8 @@ namespace ryujin
       template <int stages>
       void backward_euler_step(const StateVector<Number> &old_state_vector,
                                StageVectors stage_state_vectors,
-                               StageWeights stage_weights,
+                               StageWeights stage_weights_explicit,
+                               StageWeights stage_weights_implicit,
                                StateVector<Number> &new_state_vector,
                                Number t,
                                Number tau) const;

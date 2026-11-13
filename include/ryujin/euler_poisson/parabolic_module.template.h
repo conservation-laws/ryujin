@@ -292,7 +292,8 @@ namespace ryujin
     ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
         StageVectors stage_state_vectors,
-        StageWeights stage_weights,
+        StageWeights stage_weights_explicit,
+        StageWeights stage_weights_implicit,
         StateVector<Number> &new_state_vector,
         Number t,
         Number tau,
@@ -306,7 +307,8 @@ namespace ryujin
       case 0:
         backward_euler_step<0>(old_state_vector,
                                stage_state_vectors,
-                               stage_weights,
+                               stage_weights_explicit,
+                               stage_weights_implicit,
                                new_state_vector,
                                t,
                                tau);
@@ -314,7 +316,8 @@ namespace ryujin
       case 1:
         backward_euler_step<1>(old_state_vector,
                                stage_state_vectors,
-                               stage_weights,
+                               stage_weights_explicit,
+                               stage_weights_implicit,
                                new_state_vector,
                                t,
                                tau);
@@ -322,7 +325,8 @@ namespace ryujin
       case 2:
         backward_euler_step<2>(old_state_vector,
                                stage_state_vectors,
-                               stage_weights,
+                               stage_weights_explicit,
+                               stage_weights_implicit,
                                new_state_vector,
                                t,
                                tau);
@@ -330,7 +334,8 @@ namespace ryujin
       case 3:
         backward_euler_step<3>(old_state_vector,
                                stage_state_vectors,
-                               stage_weights,
+                               stage_weights_explicit,
+                               stage_weights_implicit,
                                new_state_vector,
                                t,
                                tau);
@@ -338,7 +343,8 @@ namespace ryujin
       case 4:
         backward_euler_step<4>(old_state_vector,
                                stage_state_vectors,
-                               stage_weights,
+                               stage_weights_explicit,
+                               stage_weights_implicit,
                                new_state_vector,
                                t,
                                tau);
@@ -357,7 +363,8 @@ namespace ryujin
     ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
         StageVectors /*stage_state_vectors*/,
-        StageWeights /*stage_weights*/,
+        StageWeights /*stage_weights_explicit*/,
+        StageWeights /*stage_weights_implicit*/,
         StateVector<Number> &new_state_vector,
         Number t,
         Number tau) const
