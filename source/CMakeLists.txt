@@ -44,6 +44,7 @@ set(CORE_SOURCE_FILES
   driver/equation_euler_poisson_barotropic.cc
   driver/equation_navier_stokes.cc
   driver/equation_scalar_conservation.cc
+  driver/equation_scalar_convection_diffusion.cc
   driver/equation_shallow_water.cc
   driver/logger.cc
   driver/parameter_editor.cc
@@ -102,7 +103,7 @@ target_link_libraries(object_core ${EXTERNAL_TARGETS})
 set(OBJECT_TARGETS)
 foreach(_equation
     euler euler_aeos euler_atmospheric euler_barotropic euler_poisson
-    navier_stokes scalar_conservation shallow_water
+    navier_stokes scalar_conservation scalar_diffusion shallow_water
     )
   add_subdirectory(${_equation})
   list(APPEND OBJECT_TARGETS object_${_equation})

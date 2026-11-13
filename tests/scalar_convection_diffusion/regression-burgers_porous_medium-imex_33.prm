@@ -1,0 +1,82 @@
+# Burgers flux with the porous medium diffusivity k(u) = 0.1 |u|. No exact
+# solution is known: this is a regression test and the reported error is the
+# distance to a fixed reference function. The graph viscosity and the
+# limiter are switched off so that the temporal order of the time stepping
+# scheme can be observed.
+
+subsection A - Scheduler
+  set basename          = regression
+
+  set tasks             = error evaluation
+
+  set final time        = 0.5
+  set timer granularity = 0.5
+  set align time steps  = true
+end
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = scalar convection diffusion
+
+  set flux      = function
+  subsection function
+    set expression = 0.5*u*u
+  end
+
+  set diffusion coefficient = 0.1
+  set diffusion exponent    = 1
+end
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+
+  set geometry              = rectangular domain
+
+  set mesh refinement       = 7
+
+  subsection rectangular domain
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set position bottom left      = 0
+    set position top right        = 6.28318530718
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1
+  set position      = 1
+
+  subsection function
+    set expression = 2+exp(-0.3*t)*sin(x-1.5*t)
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0
+  end
+  subsection limiter
+    set iterations        = 2
+    set relaxation factor = 1e10
+  end
+end
+
+subsection G - ParabolicModule
+  set tolerance = 1e-13
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.4
+  set cfl min               = 0.4
+  set time stepping scheme  = imex 33
+  set cfl recovery strategy = none
+end
+
+subsection K - ErrorEvaluation
+  set error normalize = true
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end

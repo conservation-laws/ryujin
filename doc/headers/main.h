@@ -29,7 +29,7 @@
   subgraph cluster_equations {
     label="Equations"; URL="\ref EquationsLayer";
     fontname="FreeSans"; style="rounded"; color="gray";
-    equations [label="{Euler | Euler AEOS | Euler barotropic | Euler-Poisson | Navier-Stokes | Scalar conservation | Shallow water}",
+    equations [label="{Euler | Euler AEOS | Euler barotropic | Euler-Poisson | Navier-Stokes | Scalar conservation | Convection-diffusion | Shallow water}",
                URL="\ref EquationsLayer"];
   }
 

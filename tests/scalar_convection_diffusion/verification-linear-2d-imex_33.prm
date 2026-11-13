@@ -1,0 +1,85 @@
+# Linear convection-diffusion of a sine wave with exact solution. The
+# graph viscosity and the limiter are switched off so that the temporal
+# order of the time stepping scheme can be observed.
+
+subsection A - Scheduler
+  set basename          = verification
+
+  set tasks             = error evaluation
+
+  set final time        = 0.2
+  set timer granularity = 0.2
+  set align time steps  = true
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = scalar convection diffusion
+
+  set flux      = function
+  subsection function
+    set expression = u;u
+  end
+
+  set diffusion coefficient = 0.1
+  set diffusion exponent    = 0
+end
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+
+  set geometry              = rectangular domain
+
+  set mesh refinement       = 0
+  set mesh type             = parallel fullydistributed
+
+  subsection rectangular domain
+    set boundary condition bottom = periodic
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set boundary condition top    = periodic
+    set position bottom left      = 0, 0
+    set position top right        = 6.28318530718, 6.28318530718
+    set subdivisions x            = 64
+    set subdivisions y            = 64
+  end
+end
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  subsection function
+    set expression = exp(-0.2*t)*sin(x+y-2*t)
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0
+  end
+  subsection limiter
+    set iterations        = 2
+    set relaxation factor = 1e10
+  end
+end
+
+subsection G - ParabolicModule
+  set tolerance = 1e-13
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.4
+  set cfl min               = 0.4
+  set time stepping scheme  = imex 33
+  set cfl recovery strategy = none
+end
+
+subsection K - ErrorEvaluation
+  set error normalize = true
+end
+
+subsection M - Logger
+  set terminal update interval = 0
+end
