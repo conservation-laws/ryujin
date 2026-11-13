@@ -114,7 +114,8 @@ namespace ryujin
     Number backward_euler_step(
         const StateVector<Number> &old_state_vector,
         StageVectors /*stage_state_vectors*/,
-        StageWeights /*stage_weights*/,
+        StageWeights /*stage_weights_explicit*/,
+        StageWeights /*stage_weights_implicit*/,
         StateVector<Number> &new_state_vector,
         Number /*t*/,
         Number tau,
