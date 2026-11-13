@@ -39,7 +39,7 @@ namespace ryujin
         "Time stepping scheme: ssprk 22, ssprk 33, erk 11, erk 22, "
         "erk 33, erk 43, erk "
         "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn, "
-        "imex 11, imex 22, imex 33, gsa imex 22");
+        "imex 11, imex 22, imex 33, gsa imex 22, gsa imex 43");
 
     cfl_min_ = Number(0.45);
     this->add_parameter(
@@ -144,6 +144,10 @@ namespace ryujin
       /* 1 / (1 - gamma) with gamma = 1 - 1 / sqrt(2): */
       this->efficiency_ = std::sqrt(Number(2.));
       break;
+    case TimeSteppingScheme::gsa_imex_43:
+      temp_.resize(5);
+      this->efficiency_ = 2.;
+      break;
     }
 
     /* Initialize temporary vectors: */
@@ -201,6 +205,8 @@ namespace ryujin
       case TimeSteppingScheme::imex_33:
         [[fallthrough]];
       case TimeSteppingScheme::gsa_imex_22:
+        [[fallthrough]];
+      case TimeSteppingScheme::gsa_imex_43:
         [[fallthrough]];
       case TimeSteppingScheme::strang_ssprk_33_cn:
         [[fallthrough]];
@@ -275,6 +281,8 @@ namespace ryujin
         return step_imex_33(state_vector, t, tau, tau_max);
       case TimeSteppingScheme::gsa_imex_22:
         return step_gsa_imex_22(state_vector, t, tau, tau_max);
+      case TimeSteppingScheme::gsa_imex_43:
+        return step_gsa_imex_43(state_vector, t, tau, tau_max);
       default:
         __builtin_unreachable();
       }
@@ -1203,6 +1211,153 @@ namespace ryujin
         tau);
 
     std::swap(state_vector, temp_[3]);
+    return this->efficiency_ * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_gsa_imex_43(
+      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
+
+    /* ARS(4, 4, 3), see @cite AscherRuuthSpiteri1997. */
+
+    constexpr Number c_2 = 1. / 2.;
+    constexpr Number c_3 = 2. / 3.;
+    constexpr Number c_4 = 1. / 2.;
+    constexpr Number c_5 = 1.;
+
+    /* explicit tableau: */
+    constexpr Number ae_21 = 1. / 2.;
+    constexpr Number ae_31 = 11. / 18.;
+    constexpr Number ae_32 = 1. / 18.;
+    constexpr Number ae_41 = 5. / 6.;
+    constexpr Number ae_42 = -5. / 6.;
+    constexpr Number ae_43 = 1. / 2.;
+    constexpr Number ae_51 = 1. / 4.;  /* aka b_1 */
+    constexpr Number ae_52 = 7. / 4.;  /* aka b_2 */
+    constexpr Number ae_53 = 3. / 4.;  /* aka b_3 */
+    constexpr Number ae_54 = -7. / 4.; /* aka b_4 */
+
+    /* implicit tableau: */
+    constexpr Number ai_21 = 0.;
+    constexpr Number ai_22 = 1. / 2.;
+    constexpr Number ai_31 = 0.;
+    constexpr Number ai_32 = 1. / 6.;
+    constexpr Number ai_33 = 1. / 2.;
+    constexpr Number ai_41 = 0.;
+    constexpr Number ai_42 = -1. / 2.;
+    constexpr Number ai_43 = 1. / 2.;
+    constexpr Number ai_44 = 1. / 2.;
+    constexpr Number ai_51 = 0.;       /* aka b_1 */
+    constexpr Number ai_52 = 3. / 2.;  /* aka b_2 */
+    constexpr Number ai_53 = -3. / 2.; /* aka b_3 */
+    constexpr Number ai_54 = 1. / 2.;  /* aka b_4 */
+    constexpr Number ai_55 = 1. / 2.;  /* aka b_5 */
+
+    /*
+     * The stages are not ordered in time. We compute every stage as an
+     * increment of an earlier stage, see @cite ErnGuermond2022, Eq. (12):
+     * stage 2 and 4 start from the old state (stage 1), stage 3 starts
+     * from stage 2, and stage 5 starts from stage 3. The first increment
+     * is the largest one and determines the time-step size tau.
+     */
+    constexpr Number dc_2 = c_2;
+    constexpr Number dc_3 = c_3 - c_2;
+    constexpr Number dc_4 = c_4;
+    constexpr Number dc_5 = c_5 - c_3;
+
+    auto &U_2 = temp_[1];
+    auto &U_3 = temp_[2];
+    auto &U_4 = temp_[3];
+    auto &U_5 = temp_[4];
+
+    /* Explicit step 2: U_old at time t -> t + tau */
+    tau = hyperbolic_module_->forward_euler_step(state_vector,
+                                                 {},
+                                                 {},
+                                                 temp_[0],
+                                                 t,
+                                                 tau / this->efficiency_,
+                                                 tau_max / this->efficiency_);
+
+    /* Implicit step 2: */
+    parabolic_module_->backward_euler_step(temp_[0],
+                                           {state_vector},
+                                           {ae_21 / dc_2},
+                                           {ai_21 / dc_2, ai_22 / dc_2},
+                                           U_2,
+                                           t,
+                                           tau);
+
+    /* Explicit step 3: U_2 at time t + c_2 / dc_2 tau -> t + c_3 / dc_2 tau */
+    hyperbolic_module_->prepare_state_vector(U_2, t + c_2 / dc_2 * tau);
+    hyperbolic_module_->forward_euler_step(U_2,
+                                           {state_vector},
+                                           {(ae_31 - ae_21) / dc_3},
+                                           temp_[0],
+                                           t + c_2 / dc_2 * tau,
+                                           dc_3 / dc_2 * tau);
+
+    /* Implicit step 3: */
+    parabolic_module_->backward_euler_step(
+        temp_[0],
+        {state_vector, U_2},
+        {(ae_31 - ae_21) / dc_3, ae_32 / dc_3},
+        {(ai_31 - ai_21) / dc_3, (ai_32 - ai_22) / dc_3, ai_33 / dc_3},
+        U_3,
+        t + c_2 / dc_2 * tau,
+        dc_3 / dc_2 * tau);
+
+    /* Explicit step 4: U_old at time t -> t + c_4 / dc_2 tau */
+    hyperbolic_module_->prepare_state_vector(U_3, t + c_3 / dc_2 * tau);
+    hyperbolic_module_->forward_euler_step(state_vector,
+                                           {U_2, U_3},
+                                           {ae_42 / dc_4, ae_43 / dc_4},
+                                           temp_[0],
+                                           t,
+                                           dc_4 / dc_2 * tau);
+
+    /* Implicit step 4: */
+    parabolic_module_->backward_euler_step(
+        temp_[0],
+        {state_vector, U_2, U_3},
+        {ae_41 / dc_4, ae_42 / dc_4, ae_43 / dc_4},
+        {ai_41 / dc_4, ai_42 / dc_4, ai_43 / dc_4, ai_44 / dc_4},
+        U_4,
+        t,
+        dc_4 / dc_2 * tau);
+
+    /* Explicit step 5: U_3 at time t + c_3 / dc_2 tau -> t + c_5 / dc_2 tau */
+    hyperbolic_module_->prepare_state_vector(U_4, t + c_4 / dc_2 * tau);
+    hyperbolic_module_->forward_euler_step(
+        U_3,
+        {state_vector, U_2, U_4},
+        {(ae_51 - ae_31) / dc_5, (ae_52 - ae_32) / dc_5, ae_54 / dc_5},
+        temp_[0],
+        t + c_3 / dc_2 * tau,
+        dc_5 / dc_2 * tau);
+
+    /* Implicit step 5: */
+    parabolic_module_->backward_euler_step(temp_[0],
+                                           {state_vector, U_2, U_3, U_4},
+                                           {(ae_51 - ae_31) / dc_5,
+                                            (ae_52 - ae_32) / dc_5,
+                                            ae_53 / dc_5,
+                                            ae_54 / dc_5},
+                                           {(ai_51 - ai_31) / dc_5,
+                                            (ai_52 - ai_32) / dc_5,
+                                            (ai_53 - ai_33) / dc_5,
+                                            ai_54 / dc_5,
+                                            ai_55 / dc_5},
+                                           U_5,
+                                           t + c_3 / dc_2 * tau,
+                                           dc_5 / dc_2 * tau);
+
+    std::swap(state_vector, U_5);
     return this->efficiency_ * tau;
   }
 } // namespace ryujin

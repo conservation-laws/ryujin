@@ -258,6 +258,43 @@ namespace ryujin
      * numerical solution is given by the last internal stage.
      */
     gsa_imex_22,
+
+    /**
+     * A globally stiffly accurate (GSA) implicit-explicit method of third
+     * order, ARS(4,4,3) of @cite AscherRuuthSpiteri1997, with the
+     * explicit Butcher tableau
+     *
+     * \f{align*}
+     * \begin{array}{c|ccccc}
+     *   0            & 0 \\
+     *   \tfrac{1}{2} & \tfrac{1}{2} & 0 \\
+     *   \tfrac{2}{3} & \tfrac{11}{18} & \tfrac{1}{18} & 0 \\
+     *   \tfrac{1}{2} & \tfrac{5}{6} & -\tfrac{5}{6} & \tfrac{1}{2} & 0 \\
+     *   1 & \tfrac{1}{4} & \tfrac{7}{4} & \tfrac{3}{4} & -\tfrac{7}{4} & 0
+     *  \end{array} \f}
+     *
+     * to solve the hyperbolic subproblem, and the diagonally implicit,
+     * zero-padded Runge-Kutta scheme with Butcher tableau
+     *
+     * \f{align*}
+     * \begin{array}{c|ccccc}
+     *   0            & 0 \\
+     *   \tfrac{1}{2} & 0 & \tfrac{1}{2} \\
+     *   \tfrac{2}{3} & 0 & \tfrac{1}{6} & \tfrac{1}{2} \\
+     *   \tfrac{1}{2} & 0 & -\tfrac{1}{2} & \tfrac{1}{2} & \tfrac{1}{2} \\
+     *   1 & 0 & \tfrac{3}{2} & -\tfrac{3}{2} & \tfrac{1}{2} & \tfrac{1}{2}
+     *  \end{array} \f}
+     *
+     * to solve the parabolic subproblem. The stages are not ordered in
+     * time: following @cite ErnGuermond2022, Eq. (12), every stage is
+     * computed as an increment of an earlier stage. The third stage (at
+     * \f$\tfrac{1}{2}\tau\f$) starts from the old state and the fourth
+     * stage (at \f$\tau\f$) starts from the second stage (at
+     * \f$\tfrac{2}{3}\tau\f$). This results in substeps of size
+     * \f$\tfrac12\tau\f$, \f$\tfrac16\tau\f$, \f$\tfrac12\tau\f$, and
+     * \f$\tfrac13\tau\f$.
+     */
+    gsa_imex_43,
   };
 } // namespace ryujin
 
@@ -283,7 +320,8 @@ DECLARE_ENUM(
          {ryujin::TimeSteppingScheme::imex_11, "imex 11"},
          {ryujin::TimeSteppingScheme::imex_22, "imex 22"},
          {ryujin::TimeSteppingScheme::imex_33, "imex 33"},
-         {ryujin::TimeSteppingScheme::gsa_imex_22, "gsa imex 22"}));
+         {ryujin::TimeSteppingScheme::gsa_imex_22, "gsa imex 22"},
+         {ryujin::TimeSteppingScheme::gsa_imex_43, "gsa imex 43"}));
 #endif
 
 namespace ryujin
@@ -556,6 +594,16 @@ namespace ryujin
      * returns the time step size tau, see step().
      */
     Number step_gsa_imex_22(StateVector<Number> &state_vector,
+                            Number t,
+                            Number tau,
+                            Number tau_max);
+
+    /**
+     * Given a reference to a previous state vector U performs a globally
+     * stiffly accurate implicit-explicit ARS(4,4,3) step. The function
+     * returns the time step size tau, see step().
+     */
+    Number step_gsa_imex_43(StateVector<Number> &state_vector,
                             Number t,
                             Number tau,
                             Number tau_max);
