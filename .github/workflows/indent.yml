@@ -23,8 +23,23 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
+    - name: setup
+      # Use the same clang-format binary that deal.II provides via its
+      # contrib/utilities/download_clang_format script.
+      env:
+        VERSION: 23
+        URL: https://github.com/dealii/dealii/releases/download/v9.8.0
+        CHECKSUM: ad08d6d0e4a28f28459da4dc26bbdc4b99610597929a800b955caa29b0d65f4a
+      run: |
+        set -euo pipefail
+        FILENAME="clang-format-${VERSION}-linux.tar.gz"
+        cd "${RUNNER_TEMP}"
+        curl -sSfLO "${URL}/${FILENAME}"
+        echo "${CHECKSUM}  ${FILENAME}" | sha256sum -c
+        tar xfz "${FILENAME}"
+        echo "${RUNNER_TEMP}/clang-${VERSION}/bin" >> "${GITHUB_PATH}"
     - name: clang-format
-      uses: DoozyX/clang-format-lint-action@v0.16.2
-      with:
-        source: 'source tests'
-        clangFormatVersion: 16.0.3
+      run: |
+        clang-format --version
+        git ls-files 'include/*.h' 'source/*.h' 'source/*.cc' 'tests/*.h' 'tests/*.cc' \
+          | xargs -P "$(nproc)" -n 20 clang-format --dry-run --Werror
