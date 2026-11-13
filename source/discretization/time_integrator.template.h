@@ -870,9 +870,9 @@ namespace ryujin
     hyperbolic_module_->forward_euler_step(
         temp_[1], {state_vector}, {Number(-1.)}, temp_[2], t + 1.0 * tau, tau);
 
-    /* Implicit step 2: T3 <- {T2, 0} and {U_old, 1} at t + tau -> t + 2 tau */
+    /* Implicit step 2: T3 <- {T2, 0} and {T1, 1} at t + tau -> t + 2 tau */
     parabolic_module_->backward_euler_step(
-        temp_[2], {state_vector}, {Number(1.)}, temp_[3], t + 1.0 * tau, tau);
+        temp_[2], {temp_[1]}, {Number(1.)}, temp_[3], t + 1.0 * tau, tau);
 
     std::swap(state_vector, temp_[3]);
     return this->efficiency_ * tau;

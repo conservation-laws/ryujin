@@ -69,9 +69,9 @@ namespace ryujin
      * \f{align*}
      * \begin{array}{c|ccc}
      *   0            & 0 \\
-     *   \tfrac{1}{2} & \tfrac{1}{2} & 0 \\
+     *   1            & 1            & 0 \\
      *   \hline
-     *   1            & 1  & 0
+     *   1            & \tfrac{1}{2} & \tfrac{1}{2}
      * \end{array}
      * \f}
      */
@@ -139,8 +139,9 @@ namespace ryujin
     erk_43,
 
     /**
-     * The explicit Runge-Kutta method RK(5,4;1) with the butcher tableau
-     * TODO
+     * The explicit Runge-Kutta method RK(5,4;1) with equidistant
+     * \f$c_l = (l-1)/5\f$. The coefficients of the Butcher tableau are
+     * given in @cite ErnGuermond2023, Eq. (4.20b).
      */
     erk_54,
 
@@ -169,7 +170,8 @@ namespace ryujin
     imex_11,
 
     /**
-     * A second order implicit-explicit method. It uses the explicit
+     * The second order implicit-explicit method IMEX(2, 2; 1), see
+     * @cite ErnGuermond2023, Eq. (4.14). It uses the explicit
      * midpoint rule with Butcher tableau
      *
      * \f{align*}
@@ -179,14 +181,14 @@ namespace ryujin
      *   1            & 0 & 1 & 0
      *  \end{array} \f}
      *
-     * to solve the hyperbolic subproblem, and a two-stage Crank-Nicolson
-     * type diagonally implicit Runge-Kutta scheme with Butcher tableau
+     * to solve the hyperbolic subproblem, and the implicit midpoint rule
+     * with Butcher tableau
      *
      * \f{align*}
      * \begin{array}{c|ccc}
      *   0            & 0 \\
      *   \tfrac{1}{2} & 0 & \tfrac{1}{2} \\
-     *   1            & \tfrac{1}{2} & \tfrac{1}{2} & 0
+     *   1            & 0 & 1 & 0
      *  \end{array} \f}
      *
      * to solve the parabolic subproblem. Each of the two stages consists
