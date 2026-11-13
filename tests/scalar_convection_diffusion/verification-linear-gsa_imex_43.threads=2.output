@@ -1,0 +1,12 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »scalar convection diffusion« with dim=1
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 129
+t     = 1
+Linf  = 1.957885274632917e-05
+L1    = 1.958168920921301e-05
+L2    = 1.958257471387232e-05
