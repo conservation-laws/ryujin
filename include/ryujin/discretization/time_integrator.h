@@ -227,6 +227,37 @@ namespace ryujin
      * size \f$\tau / 3\f$.
      */
     imex_33,
+
+    /**
+     * A globally stiffly accurate (GSA) implicit-explicit method of
+     * second order, ARS(2,2,2) of @cite AscherRuuthSpiteri1997, with the
+     * explicit Butcher tableau
+     *
+     * \f{align*}
+     * \begin{array}{c|ccc}
+     *   0      & 0 \\
+     *   \gamma & \gamma & 0 \\
+     *   1      & \delta & 1-\delta & 0
+     *  \end{array} \f}
+     *
+     * to solve the hyperbolic subproblem, and the diagonally implicit,
+     * zero-padded Runge-Kutta scheme with Butcher tableau
+     *
+     * \f{align*}
+     * \begin{array}{c|ccc}
+     *   0      & 0 \\
+     *   \gamma & 0 & \gamma \\
+     *   1      & 0 & 1 - \gamma & \gamma
+     *  \end{array} \f}
+     *
+     * with \f$\gamma = 1 - \tfrac{1}{\sqrt{2}}\f$ and \f$\delta = 1 -
+     * \tfrac{1}{2\gamma}\f$ to solve the parabolic subproblem. The two
+     * stages consist of one explicit hyperbolic step and one implicit
+     * parabolic step each, with step sizes \f$\gamma\tau\f$ and
+     * \f$(1-\gamma)\tau\f$. The GSA property ensures that the final
+     * numerical solution is given by the last internal stage.
+     */
+    gsa_imex_22,
   };
 } // namespace ryujin
 
@@ -251,7 +282,8 @@ DECLARE_ENUM(
          {ryujin::TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn"},
          {ryujin::TimeSteppingScheme::imex_11, "imex 11"},
          {ryujin::TimeSteppingScheme::imex_22, "imex 22"},
-         {ryujin::TimeSteppingScheme::imex_33, "imex 33"}));
+         {ryujin::TimeSteppingScheme::imex_33, "imex 33"},
+         {ryujin::TimeSteppingScheme::gsa_imex_22, "gsa imex 22"}));
 #endif
 
 namespace ryujin
@@ -517,6 +549,16 @@ namespace ryujin
                         Number t,
                         Number tau,
                         Number tau_max);
+
+    /**
+     * Given a reference to a previous state vector U performs a globally
+     * stiffly accurate implicit-explicit ARS(2,2,2) step. The function
+     * returns the time step size tau, see step().
+     */
+    Number step_gsa_imex_22(StateVector<Number> &state_vector,
+                            Number t,
+                            Number tau,
+                            Number tau_max);
 
     //@}
   };
