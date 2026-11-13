@@ -13,8 +13,8 @@
 
 #include <cstdint>
 #include <functional>
-#include <initializer_list>
 #include <ostream>
+#include <span>
 #include <string>
 
 namespace ryujin
@@ -120,13 +120,13 @@ namespace ryujin
       /**
        * The stage state vectors of a step function.
        */
-      using StageVectors = std::initializer_list<
-          std::reference_wrapper<const StateVector<Number>>>;
+      using StageVectors =
+          std::span<const std::reference_wrapper<const StateVector<Number>>>;
 
       /**
        * The stage weights of a step function, see StageVectors.
        */
-      using StageWeights = std::initializer_list<Number>;
+      using StageWeights = std::span<const Number>;
 
       //@}
       /**

@@ -466,58 +466,6 @@ namespace ryujin
                          Number tau_max);
 
     /**
-     * Given a reference to a previous state vector U performs an explicit
-     * first-order Euler step ERK(1,1;1) time step (and store the result
-     * in U). The function returns the time step size tau, see step().
-     */
-    Number step_erk_11(StateVector<Number> &state_vector,
-                       Number t,
-                       Number tau,
-                       Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an explicit
-     * second-order Runge-Kutta ERK(2,2;1) time step (and store the result
-     * in U). The function returns the time step size tau, see step().
-     */
-    Number step_erk_22(StateVector<Number> &state_vector,
-                       Number t,
-                       Number tau,
-                       Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an explicit
-     * third-order Runge-Kutta ERK(3,3;1) time step (and store the result
-     * in U). The function returns the time step size tau, see step().
-     */
-    Number step_erk_33(StateVector<Number> &state_vector,
-                       Number t,
-                       Number tau,
-                       Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an explicit
-     * 4 stage third-order Runge-Kutta ERK(4,3;1) time step (and store the
-     * result in U). The function returns the time step size tau, see
-     * step().
-     */
-    Number step_erk_43(StateVector<Number> &state_vector,
-                       Number t,
-                       Number tau,
-                       Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an explicit
-     * 4 stage fourth-order Runge-Kutta ERK(5,4;1) time step (and store
-     * the result in U). The function returns the time step size tau, see
-     * step().
-     */
-    Number step_erk_54(StateVector<Number> &state_vector,
-                       Number t,
-                       Number tau,
-                       Number tau_max);
-
-    /**
      * Given a reference to a previous state vector U performs a combined
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(3,3;1/3) time step and an implicit Crank-Nicolson step (and
@@ -530,83 +478,32 @@ namespace ryujin
                                    Number tau_max);
 
     /**
-     * Given a reference to a previous state vector U performs a combined
-     * explicit implicit Strang split using a third-order Runge-Kutta
-     * ERK(3,3;1) time step and an implicit Crank-Nicolson step (and store
-     * the result in U). The function returns the time step size tau, see
-     * step().
+     * Given a reference to a previous state vector @p old_state_vector
+     * performs all stages of the explicit, or implicit-explicit
+     * Runge-Kutta scheme described by the Butcher tableau of the selected
+     * time-stepping scheme and stores the result in @p new_state_vector.
+     * Every stage consists of one explicit hyperbolic step and, for an
+     * implicit-explicit scheme, one implicit parabolic step. The
+     * intermediate stages are stored in the temporary vectors. The
+     * function returns the time step size tau, see step().
      */
-    Number step_strang_erk_33_cn(StateVector<Number> &state_vector,
-                                 Number t,
-                                 Number tau,
-                                 Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs a combined
-     * explicit implicit Strang split using a third-order Runge-Kutta
-     * ERK(4,3;1) time step and an implicit Crank-Nicolson step (and store
-     * the result in U). The function returns the time step size tau, see
-     * step().
-     */
-    Number step_strang_erk_43_cn(StateVector<Number> &state_vector,
-                                 Number t,
-                                 Number tau,
-                                 Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an
-     * implicit-explicit IMEX(1,1;1) step using a forward Euler scheme for
-     * the hyperbolic subproblem and a backward Euler scheme for the
-     * parabolic subproblem. The function returns the time step size tau, see
-     * step().
-     */
-    Number step_imex_11(StateVector<Number> &state_vector,
-                        Number t,
-                        Number tau,
-                        Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an
-     * implicit-explicit IMEX(2,2;1) step using a two stage midpoint rule for
-     * the hyperbolic subproblem and a two stage midpoint rule for the parabolic
-     * subproblem. The function returns the time step size tau, see step().
-     */
-    Number step_imex_22(StateVector<Number> &state_vector,
-                        Number t,
-                        Number tau,
-                        Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs an
-     * implicit-explicit IMEX(3,3;1) step using a three stage ERK tableau for
-     * the hyperbolic subproblem and a three stage DIRK tableau for the
-     * parabolic subproblem. The function returns the time step size tau, see
-     * step().
-     */
-    Number step_imex_33(StateVector<Number> &state_vector,
-                        Number t,
-                        Number tau,
-                        Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector U performs a globally
-     * stiffly accurate implicit-explicit ARS(2,2,2) step. The function
-     * returns the time step size tau, see step().
-     */
-    Number step_gsa_imex_22(StateVector<Number> &state_vector,
+    Number step_runge_kutta(const StateVector<Number> &old_state_vector,
+                            StateVector<Number> &new_state_vector,
                             Number t,
                             Number tau,
                             Number tau_max);
 
     /**
-     * Given a reference to a previous state vector U performs a globally
-     * stiffly accurate implicit-explicit ARS(4,4,3) step. The function
-     * returns the time step size tau, see step().
+     * Given a reference to a previous state vector U performs a combined
+     * explicit implicit Strang split using the explicit Runge-Kutta scheme
+     * of the selected time-stepping scheme and an implicit Crank-Nicolson
+     * step (and store the result in U). The function returns the time step
+     * size tau, see step().
      */
-    Number step_gsa_imex_43(StateVector<Number> &state_vector,
-                            Number t,
-                            Number tau,
-                            Number tau_max);
+    Number step_strang_runge_kutta_cn(StateVector<Number> &state_vector,
+                                      Number t,
+                                      Number tau,
+                                      Number tau_max);
 
     //@}
   };

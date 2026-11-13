@@ -8,6 +8,8 @@
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/discretization/time_integrator.h>
 
+#include <discretization/butcher_tableau.h>
+
 #include <utility>
 
 namespace ryujin
@@ -88,66 +90,32 @@ namespace ryujin
 
     switch (time_stepping_scheme_) {
     case TimeSteppingScheme::ssprk_22:
-      temp_.resize(2);
-      this->efficiency_ = 1.;
-      break;
+      [[fallthrough]];
     case TimeSteppingScheme::ssprk_33:
       temp_.resize(2);
       this->efficiency_ = 1.;
-      break;
-    case TimeSteppingScheme::erk_11:
-      temp_.resize(1);
-      this->efficiency_ = 1.;
-      break;
-    case TimeSteppingScheme::erk_22:
-      temp_.resize(2);
-      this->efficiency_ = 2.;
-      break;
-    case TimeSteppingScheme::erk_33:
-      temp_.resize(3);
-      this->efficiency_ = 3.;
-      break;
-    case TimeSteppingScheme::erk_43:
-      temp_.resize(4);
-      this->efficiency_ = 4.;
-      break;
-    case TimeSteppingScheme::erk_54:
-      temp_.resize(5);
-      this->efficiency_ = 5.;
       break;
     case TimeSteppingScheme::strang_ssprk_33_cn:
       temp_.resize(3);
       this->efficiency_ = 2.;
       break;
-    case TimeSteppingScheme::strang_erk_33_cn:
-      temp_.resize(4);
-      this->efficiency_ = 6.;
-      break;
-    case TimeSteppingScheme::strang_erk_43_cn:
-      temp_.resize(4);
-      this->efficiency_ = 8.;
-      break;
-    case TimeSteppingScheme::imex_11:
-      temp_.resize(2);
-      this->efficiency_ = 1.;
-      break;
-    case TimeSteppingScheme::imex_22:
-      temp_.resize(4);
-      this->efficiency_ = 2.;
-      break;
-    case TimeSteppingScheme::imex_33:
-      temp_.resize(6);
-      this->efficiency_ = 3.;
-      break;
-    case TimeSteppingScheme::gsa_imex_22:
-      temp_.resize(4);
-      /* 1 / (1 - gamma) with gamma = 1 - 1 / sqrt(2): */
-      this->efficiency_ = std::sqrt(Number(2.));
-      break;
-    case TimeSteppingScheme::gsa_imex_43:
-      temp_.resize(5);
-      this->efficiency_ = 2.;
-      break;
+    default: {
+      /*
+       * A Runge-Kutta scheme described by a Butcher tableau with s
+       * stages: we need storage for all stages except the first one. An
+       * implicit-explicit scheme in addition needs a vector for the
+       * hyperbolic prediction, and a Strang splitting a vector for the
+       * result of the Crank-Nicolson step.
+       */
+      const auto tableau = butcher_tableau<Number>(time_stepping_scheme_);
+      const auto n_stages = tableau.c.size() - 1;
+      const bool strang =
+          time_stepping_scheme_ == TimeSteppingScheme::strang_erk_33_cn ||
+          time_stepping_scheme_ == TimeSteppingScheme::strang_erk_43_cn;
+      temp_.resize(n_stages + (tableau.is_imex() || strang ? 1 : 0));
+      this->efficiency_ =
+          Number(strang ? 2. : 1.) / tableau.maximal_increment();
+    } break;
     }
 
     /* Initialize temporary vectors: */
@@ -257,34 +225,16 @@ namespace ryujin
         return step_ssprk_22(state_vector, t, tau, tau_max);
       case TimeSteppingScheme::ssprk_33:
         return step_ssprk_33(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::erk_11:
-        return step_erk_11(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::erk_22:
-        return step_erk_22(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::erk_33:
-        return step_erk_33(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::erk_43:
-        return step_erk_43(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::erk_54:
-        return step_erk_54(state_vector, t, tau, tau_max);
       case TimeSteppingScheme::strang_ssprk_33_cn:
         return step_strang_ssprk_33_cn(state_vector, t, tau, tau_max);
       case TimeSteppingScheme::strang_erk_33_cn:
-        return step_strang_erk_33_cn(state_vector, t, tau, tau_max);
+        [[fallthrough]];
       case TimeSteppingScheme::strang_erk_43_cn:
-        return step_strang_erk_43_cn(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::imex_11:
-        return step_imex_11(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::imex_22:
-        return step_imex_22(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::imex_33:
-        return step_imex_33(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::gsa_imex_22:
-        return step_gsa_imex_22(state_vector, t, tau, tau_max);
-      case TimeSteppingScheme::gsa_imex_43:
-        return step_gsa_imex_43(state_vector, t, tau, tau_max);
+        return step_strang_runge_kutta_cn(state_vector, t, tau, tau_max);
       default:
-        __builtin_unreachable();
+        tau = step_runge_kutta(state_vector, temp_.back(), t, tau, tau_max);
+        std::swap(state_vector, temp_.back());
+        return tau;
       }
     };
 
@@ -420,260 +370,6 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_11(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
-
-    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(
-        state_vector, {}, {}, temp_[0], t, tau, tau_max);
-
-    std::swap(state_vector, temp_[0]);
-    return tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_22(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
-
-    constexpr Number c = 1. / 2.; /* equidistant c_i */
-    constexpr Number a_21 = 1. / 2.;
-    constexpr Number a_31 = 0.;                  /* aka b_1 */
-    constexpr Number a_32 [[maybe_unused]] = 1.; /* aka b_2 */
-
-    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + tau -> t + 2*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    std::swap(state_vector, temp_[1]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_33(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 3., dealii::ExcInternalError());
-
-    constexpr Number c = 1. / 3.; /* equidistant c_i */
-    constexpr Number a_21 = 1. / 3.;
-    constexpr Number a_31 = 0.;
-    constexpr Number a_32 = 2. / 3.;
-    constexpr Number a_41 = 1. / 4.;                  /* aka b_1 */
-    constexpr Number a_42 = 0.;                       /* aka b_2 */
-    constexpr Number a_43 [[maybe_unused]] = 3. / 4.; /* aka b_3 */
-
-    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    /*
-     * Step 3: T2 <- {T1, 9/4} and {T0, -2} and {U_old, 3/4}
-     * at time t + 2*tau -> t + 3*tau
-     */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[1],
-        {state_vector, temp_[0]},
-        {(a_41 - a_31) / c, (a_42 - a_32) / c},
-        temp_[2],
-        t + 2.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[2]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_43(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 4., dealii::ExcInternalError());
-
-    constexpr Number c = 1. / 4.; /* equidistant c_i */
-    constexpr Number a_21 = 1. / 4.;
-    constexpr Number a_31 = 0.;
-    constexpr Number a_32 = 1. / 2.;
-    constexpr Number a_41 = 0.;
-    constexpr Number a_42 = 1. / 4.;
-    constexpr Number a_43 = 1. / 2.;
-    constexpr Number a_51 = 0.;                       /* aka b_1 */
-    constexpr Number a_52 = 2. / 3.;                  /* aka b_2 */
-    constexpr Number a_53 = -1. / 3.;                 /* aka b_3 */
-    constexpr Number a_54 [[maybe_unused]] = 2. / 3.; /* aka b_4 */
-
-    /* U_old does not contribute to steps 3 and 4: */
-    static_assert(a_41 == a_31 && a_51 == a_41);
-
-    /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    /* Step 3: T2 <- {T1, 2} and {T0, -1} at time t + 2*tau -> t + 3*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[1],
-                                           {temp_[0]},
-                                           {(a_42 - a_32) / c},
-                                           temp_[2],
-                                           t + 2.0 * tau,
-                                           tau);
-
-    /*
-     * Step 4: T3 <- {T2, 8/3} and {T1,-10/3} and {T0, 5/3}
-     * at time t + 3*tau -> t + 4*tau
-     */
-    hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[2],
-        {temp_[0], temp_[1]},
-        {(a_52 - a_42) / c, (a_53 - a_43) / c},
-        temp_[3],
-        t + 3.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_54(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 5., dealii::ExcInternalError());
-
-    constexpr Number c = 0.2; /* equidistant c_i */
-    constexpr Number a_21 = +0.2;
-    constexpr Number a_31 = +0.26075582269554909;
-    constexpr Number a_32 = +0.13924417730445096;
-    constexpr Number a_41 = -0.25856517872570289;
-    constexpr Number a_42 = +0.91136274166280729;
-    constexpr Number a_43 = -0.05279756293710430;
-    constexpr Number a_51 = +0.21623276431503774;
-    constexpr Number a_52 = +0.51534223099602405;
-    constexpr Number a_53 = -0.81662794199265554;
-    constexpr Number a_54 = +0.88505294668159373;
-    constexpr Number a_61 = -0.10511678454691901;                  /* aka b_1 */
-    constexpr Number a_62 = +0.87880047152100838;                  /* aka b_2 */
-    constexpr Number a_63 = -0.58903404061484477;                  /* aka b_3 */
-    constexpr Number a_64 = +0.46213380485434047;                  /* aka b_4 */
-    constexpr Number a_65 [[maybe_unused]] = +0.35321654878641495; /* aka b_5 */
-
-    /* Step 1: at time t -> t + 1*tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Step 2: at time t + 1*tau -> t + 2*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    /* Step 3: at time t + 2*tau -> t + 3*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[1],
-        {state_vector, temp_[0]},
-        {(a_41 - a_31) / c, (a_42 - a_32) / c},
-        temp_[2],
-        t + 2.0 * tau,
-        tau);
-
-    /* Step 4: at time t + 3*tau -> t + 4*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[2],
-        {state_vector, temp_[0], temp_[1]},
-        {(a_51 - a_41) / c, (a_52 - a_42) / c, (a_53 - a_43) / c},
-        temp_[3],
-        t + 3.0 * tau,
-        tau);
-
-    /* Step 5: at time t + 4*tau -> t + 5*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[3], t + 4.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[3],
-        {state_vector, temp_[0], temp_[1], temp_[2]},
-        {(a_61 - a_51) / c,
-         (a_62 - a_52) / c,
-         (a_63 - a_53) / c,
-         (a_64 - a_54) / c},
-        temp_[4],
-        t + 4.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[4]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step_strang_ssprk_33_cn(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
@@ -740,624 +436,194 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_strang_erk_33_cn(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
+  Number TimeIntegrator<dim, Number>::step_runge_kutta(
+      const StateVector<Number> &old_state_vector,
+      StateVector<Number> &new_state_vector,
+      Number t,
+      Number tau,
+      Number tau_max)
   {
-    // FIXME: refactor to avoid code duplication with step_erk_33
-
     RYUJIN_DEBUG_ANNOUNCE();
 
-    Assert(this->efficiency_ == 6., dealii::ExcInternalError());
+    using Tableau = ButcherTableau<Number>;
 
-    constexpr Number c = 1. / 3.; /* equidistant c_i */
-    constexpr Number a_21 = 1. / 3.;
-    constexpr Number a_31 = 0.;
-    constexpr Number a_32 = 2. / 3.;
-    constexpr Number a_41 = 1. / 4.;                  /* aka b_1 */
-    constexpr Number a_42 = 0.;                       /* aka b_2 */
-    constexpr Number a_43 [[maybe_unused]] = 3. / 4.; /* aka b_3 */
+    const auto tableau = butcher_tableau<Number>(time_stepping_scheme_);
+    const auto &c = tableau.c;
+    const auto &a_explicit = tableau.a_explicit;
+    const auto &a_implicit = tableau.a_implicit;
 
-    /* First explicit ERK(3,3,1) step with final result in temp_[2]: */
+    const std::size_t n = c.size();
+    const bool imex = tableau.is_imex();
+    const auto start_stages = tableau.start_stages();
+    const Number dc_max = tableau.maximal_increment();
 
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
+    /*
+     * Storage: the first stage is the old state and the last stage is the
+     * new state. All other stages are stored in temp_. An
+     * implicit-explicit scheme uses temp_[0] for the hyperbolic
+     * prediction of a stage.
+     */
+    const std::size_t offset = imex ? 1 : 0;
+    const auto stage = [&](const std::size_t l) -> StateVector<Number> & {
+      return l == n - 1 ? new_state_vector : temp_[offset + l - 1];
+    };
+    const auto U = [&](const std::size_t l) -> const StateVector<Number> & {
+      return l == 0 ? old_state_vector : stage(l);
+    };
 
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 1.0 * tau,
-                                           tau);
+    std::vector<std::reference_wrapper<const StateVector<Number>>> vectors;
+    std::vector<Number> weights_explicit;
+    std::vector<Number> weights_implicit;
 
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[1],
-        {state_vector, temp_[0]},
-        {(a_41 - a_31) / c, (a_42 - a_32) / c},
-        temp_[2],
-        t + 2.0 * tau,
-        tau);
-
-    /* Implicit Crank-Nicolson step with final result in temp_[3]: */
+    /* The increment c_l - c_l' of the stage that is currently computed: */
+    Number dc = dc_max;
 
     try {
-      parabolic_module_->crank_nicolson_step(temp_[2], temp_[3], t, 6.0 * tau);
+      for (std::size_t l = 1; l < n; ++l) {
+        /*
+         * We compute the stage l as an increment of the stage l'. In terms
+         * of the Butcher tableau the weight of the stage k is given by
+         * (a_lk - a_l'k) / (c_l - c_l').
+         */
+        const std::size_t l_prime = start_stages[l];
+        dc = c[l] - c[l_prime];
+
+        const auto weight = [&](const auto &a, const std::size_t k) {
+          return (Tableau::entry(a, l, k) - Tableau::entry(a, l_prime, k)) / dc;
+        };
+
+        /*
+         * Explicit step: at time t + c_l' * tau -> t + c_l * tau
+         *
+         * The stage l' is the old state of the explicit step and does not
+         * have to be supplied. We also skip all stages that do not
+         * contribute.
+         */
+
+        vectors.clear();
+        weights_explicit.clear();
+        for (std::size_t k = 0; k < l; ++k) {
+          const Number w = weight(a_explicit, k);
+          if (k == l_prime || w == Number(0.))
+            continue;
+          vectors.push_back(U(k));
+          weights_explicit.push_back(w);
+        }
+
+        auto &prediction = imex ? temp_[0] : stage(l);
+
+        if (l == 1) {
+          /*
+           * The first explicit step determines the time-step size tau. If
+           * the first stage is not the one with the largest increment we
+           * have to reduce the CFL number accordingly so that the
+           * time-step size is admissible for all stages.
+           */
+          const Number cfl = hyperbolic_module_->cfl();
+          hyperbolic_module_->set_cfl(dc / dc_max * cfl);
+          try {
+            tau = hyperbolic_module_->forward_euler_step(old_state_vector,
+                                                         {},
+                                                         {},
+                                                         prediction,
+                                                         t,
+                                                         dc * tau,
+                                                         dc * tau_max);
+          } catch (...) {
+            hyperbolic_module_->set_cfl(cfl);
+            throw;
+          }
+          hyperbolic_module_->set_cfl(cfl);
+          tau /= dc;
+
+        } else {
+          hyperbolic_module_->forward_euler_step(U(l_prime),
+                                                 vectors,
+                                                 weights_explicit,
+                                                 prediction,
+                                                 t + c[l_prime] * tau,
+                                                 dc * tau);
+        }
+
+        /*
+         * Implicit step: at time t + c_l' * tau -> t + c_l * tau
+         *
+         * We supply all prior stages. The last implicit weight is the
+         * weight of the new stage.
+         */
+
+        if (imex) {
+          vectors.clear();
+          weights_explicit.clear();
+          weights_implicit.clear();
+          for (std::size_t k = 0; k < l; ++k) {
+            vectors.push_back(U(k));
+            weights_explicit.push_back(weight(a_explicit, k));
+            weights_implicit.push_back(weight(a_implicit, k));
+          }
+          weights_implicit.push_back(Tableau::entry(a_implicit, l, l) / dc);
+
+          parabolic_module_->backward_euler_step(prediction,
+                                                 vectors,
+                                                 weights_explicit,
+                                                 weights_implicit,
+                                                 stage(l),
+                                                 t + c[l_prime] * tau,
+                                                 dc * tau);
+        }
+
+        /* Prepare the stage for its use in subsequent stages: */
+        if (l < n - 1)
+          hyperbolic_module_->prepare_state_vector(stage(l), t + c[l] * tau);
+      }
+
     } catch (Restart &restart) {
-      /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
-       * later */
-      restart.suggested_tau_max /= this->efficiency_;
+      /*
+       * The suggested tau_max of a restart refers to the stage that
+       * signalled the restart. Adjust it to the largest increment; we
+       * multiply with this->efficiency_ later.
+       */
+      restart.suggested_tau_max *= dc_max / dc;
       throw;
     }
 
-    /* Second explicit ERK(3,3,1) 3 step with final result in temp_[2]: */
-
-    hyperbolic_module_->prepare_state_vector(temp_[3], t + 3.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        /*!*/ temp_[3], {}, {}, temp_[0], t + 3.0 * tau, tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 4.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {/*!*/ temp_[3]},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 4.0 * tau,
-                                           tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 5.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[1],
-        {/*!*/ temp_[3], temp_[0]},
-        {(a_41 - a_31) / c, (a_42 - a_32) / c},
-        temp_[2],
-        t + 5.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[2]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_strang_erk_43_cn(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    // FIXME: refactor to avoid code duplication with step_erk_43
-
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 8., dealii::ExcInternalError());
-
-    constexpr Number c = 1. / 4.; /* equidistant c_i */
-    constexpr Number a_21 = 1. / 4.;
-    constexpr Number a_31 = 0.;
-    constexpr Number a_32 = 1. / 2.;
-    constexpr Number a_41 = 0.;
-    constexpr Number a_42 = 1. / 4.;
-    constexpr Number a_43 = 1. / 2.;
-    constexpr Number a_51 = 0.;                       /* aka b_1 */
-    constexpr Number a_52 = 2. / 3.;                  /* aka b_2 */
-    constexpr Number a_53 = -1. / 3.;                 /* aka b_3 */
-    constexpr Number a_54 [[maybe_unused]] = 2. / 3.; /* aka b_4 */
-
-    /* U_old does not contribute to steps 3 and 4: */
-    static_assert(a_41 == a_31 && a_51 == a_41);
-
-    /* First explicit ERK(4,3,1) step with final result in temp_[3]: */
-
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[1],
-                                           {temp_[0]},
-                                           {(a_42 - a_32) / c},
-                                           temp_[2],
-                                           t + 2.0 * tau,
-                                           tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[2],
-        {temp_[0], temp_[1]},
-        {(a_52 - a_42) / c, (a_53 - a_43) / c},
-        temp_[3],
-        t + 3.0 * tau,
-        tau);
-
-    /* Implicit Crank-Nicolson step with final result in temp_[2]: */
-
-    try {
-      parabolic_module_->crank_nicolson_step(temp_[3], temp_[2], t, 8.0 * tau);
-    } catch (Restart &restart) {
-      /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
-       * later */
-      restart.suggested_tau_max /= this->efficiency_;
-      throw;
-    }
-
-    /* Second explicit ERK(4,3,1) step with final result in temp_[3]: */
-
-    hyperbolic_module_->prepare_state_vector(temp_[2], t + 4.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        /*!*/ temp_[2], {}, {}, temp_[0], t + 4.0 * tau, tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 5.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[0],
-                                           {/*!*/ temp_[2]},
-                                           {(a_31 - a_21) / c},
-                                           temp_[1],
-                                           t + 5.0 * tau,
-                                           tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 6.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[1],
-                                           {temp_[0]},
-                                           {(a_42 - a_32) / c},
-                                           temp_[2],
-                                           t + 6.0 * tau,
-                                           tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[2], t + 7.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[2],
-        {temp_[0], temp_[1]},
-        {(a_52 - a_42) / c, (a_53 - a_43) / c},
-        temp_[3],
-        t + 7.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_imex_11(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
-
-    constexpr Number c = 1.;
-    constexpr Number ae_21 = 1.; /* explicit tableau */
-    constexpr Number ai_21 = 0.; /* implicit tableau */
-    constexpr Number ai_22 = 1.;
-
-    /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(
-        state_vector, {}, {}, temp_[0], t, tau, tau_max);
-
-    /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {ae_21 / c},
-                                           {ai_21 / c, ai_22 / c},
-                                           temp_[1],
-                                           t,
-                                           tau);
-
-    std::swap(state_vector, temp_[1]);
     return tau;
   }
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_imex_22(
+  Number TimeIntegrator<dim, Number>::step_strang_runge_kutta_cn(
       StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
   {
     RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
-
-    constexpr Number c = 1. / 2.; /* equidistant c_i */
-
-    /* explicit tableau: */
-    constexpr Number ae_21 = 1. / 2.;
-    constexpr Number ae_31 = 0.; /* aka b_1 */
-    constexpr Number ae_32 = 1.; /* aka b_2 */
-
-    /* implicit tableau: */
-    constexpr Number ai_21 = 0.;
-    constexpr Number ai_22 = 1. / 2.;
-    constexpr Number ai_31 = 0.; /* aka b_1 */
-    constexpr Number ai_32 = 1.; /* aka b_2 */
-    constexpr Number ai_33 = 0.; /* aka b_3 */
-
-    /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {ae_21 / c},
-                                           {ai_21 / c, ai_22 / c},
-                                           temp_[1],
-                                           t,
-                                           tau);
-
-    /* Explicit step 2: T2 <- {T1, 2} and {U_old, -1} at t + tau -> t + 2 tau */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[1],
-                                           {state_vector},
-                                           {(ae_31 - ae_21) / c},
-                                           temp_[2],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    /* Implicit step 2: T3 <- {T2, 0} and {T1, 1} at t + tau -> t + 2 tau */
-    parabolic_module_->backward_euler_step(
-        temp_[2],
-        {state_vector, temp_[1]},
-        {(ae_31 - ae_21) / c, ae_32 / c},
-        {(ai_31 - ai_21) / c, (ai_32 - ai_22) / c, ai_33 / c},
-        temp_[3],
-        t + 1.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_imex_33(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 3., dealii::ExcInternalError());
-
-    /* IMEX(3, 3; 1), see @cite ErnGuermond2023, Sec. 4.3. */
-
-    const Number gamma = Number(0.5) + std::sqrt(Number(3.0)) / Number(6.0);
-
-    constexpr Number c = 1. / 3.; /* equidistant c_i */
-
-    /* explicit tableau: */
-    constexpr Number ae_21 = 1. / 3.;
-    constexpr Number ae_31 = 0.;
-    constexpr Number ae_32 = 2. / 3.;
-    constexpr Number ae_41 = 1. / 4.; /* aka b_1 */
-    constexpr Number ae_42 = 0.;      /* aka b_2 */
-    constexpr Number ae_43 = 3. / 4.; /* aka b_3 */
-
-    /* implicit tableau: */
-    const Number ai_21 = Number(1. / 3.) - gamma;
-    const Number ai_22 = gamma;
-    const Number ai_31 = gamma;
-    const Number ai_32 = Number(2. / 3.) - Number(2.) * gamma;
-    const Number ai_33 = gamma;
-    constexpr Number ai_41 = 1. / 4.; /* aka b_1 */
-    constexpr Number ai_42 = 0.;      /* aka b_2 */
-    constexpr Number ai_43 = 3. / 4.; /* aka b_3 */
-    constexpr Number ai_44 = 0.;      /* aka b_4 */
-
-    /* Explicit step 1: at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Implicit step 1: at time t -> t + tau */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {ae_21 / c},
-                                           {ai_21 / c, ai_22 / c},
-                                           temp_[1],
-                                           t,
-                                           tau);
-
-    /* Explicit step 2: at time t + tau -> t + 2 tau */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(temp_[1],
-                                           {state_vector},
-                                           {(ae_31 - ae_21) / c},
-                                           temp_[2],
-                                           t + 1.0 * tau,
-                                           tau);
-
-    /* Implicit step 2: at time t + tau -> t + 2 tau */
-    parabolic_module_->backward_euler_step(
-        temp_[2],
-        {state_vector, temp_[1]},
-        {(ae_31 - ae_21) / c, ae_32 / c},
-        {(ai_31 - ai_21) / c, (ai_32 - ai_22) / c, ai_33 / c},
-        temp_[3],
-        t + 1.0 * tau,
-        tau);
-
-    /* Explicit step 3: at time t + 2 tau -> t + 3 tau */
-    hyperbolic_module_->prepare_state_vector(temp_[3], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[3],
-        {state_vector, temp_[1]},
-        {(ae_41 - ae_31) / c, (ae_42 - ae_32) / c},
-        temp_[4],
-        t + 2.0 * tau,
-        tau);
-
-    /* Implicit step 3: at time t + 2 tau -> t + 3 tau */
-    parabolic_module_->backward_euler_step(
-        temp_[4],
-        {state_vector, temp_[1], temp_[3]},
-        {(ae_41 - ae_31) / c, (ae_42 - ae_32) / c, ae_43 / c},
-        {(ai_41 - ai_31) / c,
-         (ai_42 - ai_32) / c,
-         (ai_43 - ai_33) / c,
-         ai_44 / c},
-        temp_[5],
-        t + 2.0 * tau,
-        tau);
-
-    std::swap(state_vector, temp_[5]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_gsa_imex_22(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    /* ARS(2, 2, 2), see @cite AscherRuuthSpiteri1997. */
-
-    const Number gamma = Number(1.) - std::sqrt(Number(2.)) / Number(2.);
-    const Number delta = Number(1.) - Number(1.) / (Number(2.) * gamma);
-
-    const Number c_2 = gamma;
-    constexpr Number c_3 = 1.;
-
-    /* explicit tableau: */
-    const Number ae_21 = gamma;
-    const Number ae_31 = delta;              /* aka b_1 */
-    const Number ae_32 = Number(1.) - delta; /* aka b_2 */
-
-    /* implicit tableau: */
-    constexpr Number ai_21 = 0.;
-    const Number ai_22 = gamma;
-    constexpr Number ai_31 = 0.;             /* aka b_1 */
-    const Number ai_32 = Number(1.) - gamma; /* aka b_2 */
-    const Number ai_33 = gamma;              /* aka b_3 */
-
-    /* The increments of the two stages; the second one is the larger: */
-    const Number dc_2 = c_2;
-    const Number dc_3 = c_3 - c_2;
-    const Number ratio = dc_2 / dc_3;
 
     /*
-     * Explicit step 1: at time t -> t + ratio * tau
-     *
-     * The first stage is shorter than the second one. We thus perform
-     * the explicit step with a reduced CFL number so that the hyperbolic
-     * module returns the fraction "ratio" of the step size tau that is
-     * admissible for the second stage.
+     * Storage: the stages of the explicit Runge-Kutta scheme are stored in
+     * all but the last two vectors of temp_.
      */
-    const Number cfl = hyperbolic_module_->cfl();
-    hyperbolic_module_->set_cfl(ratio * cfl);
+    auto &U_explicit = temp_[temp_.size() - 2];
+    auto &U_implicit = temp_[temp_.size() - 1];
+
+    /* First explicit Runge-Kutta step: at time t -> t + tau */
+    tau = step_runge_kutta(
+        state_vector, U_explicit, t, tau / Number(2.), tau_max / Number(2.));
+
+    /* Implicit Crank-Nicolson step: at time t -> t + 2 * tau */
     try {
-      tau = hyperbolic_module_->forward_euler_step(
-          state_vector,
-          {},
-          {},
-          temp_[0],
-          t,
-          ratio * tau / this->efficiency_,
-          ratio * tau_max / this->efficiency_);
+      parabolic_module_->crank_nicolson_step(
+          U_explicit, U_implicit, t, Number(2.) * tau);
     } catch (Restart &restart) {
-      /* Adjust suggested_tau_max to the size of the second stage: */
-      restart.suggested_tau_max /= ratio;
-      hyperbolic_module_->set_cfl(cfl);
+      /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
+       * later */
+      restart.suggested_tau_max /= this->efficiency_;
       throw;
     }
-    hyperbolic_module_->set_cfl(cfl);
-    tau /= ratio;
 
-    /* Implicit step 1: at time t -> t + ratio * tau */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {ae_21 / dc_2},
-                                           {ai_21 / dc_2, ai_22 / dc_2},
-                                           temp_[1],
-                                           t,
-                                           ratio * tau);
+    /* Second explicit Runge-Kutta step: at time t + tau -> t + 2 * tau */
+    hyperbolic_module_->prepare_state_vector(U_implicit, t + tau);
+    step_runge_kutta(U_implicit, U_explicit, t + tau, tau, tau);
 
-    /* Explicit step 2: at time t + ratio * tau -> t + (ratio + 1) * tau */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + ratio * tau);
-    hyperbolic_module_->forward_euler_step(temp_[1],
-                                           {state_vector},
-                                           {(ae_31 - ae_21) / dc_3},
-                                           temp_[2],
-                                           t + ratio * tau,
-                                           tau);
-
-    /* Implicit step 2: at time t + ratio * tau -> t + (ratio + 1) * tau */
-    parabolic_module_->backward_euler_step(
-        temp_[2],
-        {state_vector, temp_[1]},
-        {(ae_31 - ae_21) / dc_3, ae_32 / dc_3},
-        {(ai_31 - ai_21) / dc_3, (ai_32 - ai_22) / dc_3, ai_33 / dc_3},
-        temp_[3],
-        t + ratio * tau,
-        tau);
-
-    std::swap(state_vector, temp_[3]);
-    return this->efficiency_ * tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_gsa_imex_43(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
-
-    /* ARS(4, 4, 3), see @cite AscherRuuthSpiteri1997. */
-
-    constexpr Number c_2 = 1. / 2.;
-    constexpr Number c_3 = 2. / 3.;
-    constexpr Number c_4 = 1. / 2.;
-    constexpr Number c_5 = 1.;
-
-    /* explicit tableau: */
-    constexpr Number ae_21 = 1. / 2.;
-    constexpr Number ae_31 = 11. / 18.;
-    constexpr Number ae_32 = 1. / 18.;
-    constexpr Number ae_41 = 5. / 6.;
-    constexpr Number ae_42 = -5. / 6.;
-    constexpr Number ae_43 = 1. / 2.;
-    constexpr Number ae_51 = 1. / 4.;  /* aka b_1 */
-    constexpr Number ae_52 = 7. / 4.;  /* aka b_2 */
-    constexpr Number ae_53 = 3. / 4.;  /* aka b_3 */
-    constexpr Number ae_54 = -7. / 4.; /* aka b_4 */
-
-    /* implicit tableau: */
-    constexpr Number ai_21 = 0.;
-    constexpr Number ai_22 = 1. / 2.;
-    constexpr Number ai_31 = 0.;
-    constexpr Number ai_32 = 1. / 6.;
-    constexpr Number ai_33 = 1. / 2.;
-    constexpr Number ai_41 = 0.;
-    constexpr Number ai_42 = -1. / 2.;
-    constexpr Number ai_43 = 1. / 2.;
-    constexpr Number ai_44 = 1. / 2.;
-    constexpr Number ai_51 = 0.;       /* aka b_1 */
-    constexpr Number ai_52 = 3. / 2.;  /* aka b_2 */
-    constexpr Number ai_53 = -3. / 2.; /* aka b_3 */
-    constexpr Number ai_54 = 1. / 2.;  /* aka b_4 */
-    constexpr Number ai_55 = 1. / 2.;  /* aka b_5 */
-
-    /*
-     * The stages are not ordered in time. We compute every stage as an
-     * increment of an earlier stage, see @cite ErnGuermond2022, Eq. (12):
-     * stage 2 and 4 start from the old state (stage 1), stage 3 starts
-     * from stage 2, and stage 5 starts from stage 3. The first increment
-     * is the largest one and determines the time-step size tau.
-     */
-    constexpr Number dc_2 = c_2;
-    constexpr Number dc_3 = c_3 - c_2;
-    constexpr Number dc_4 = c_4;
-    constexpr Number dc_5 = c_5 - c_3;
-
-    auto &U_2 = temp_[1];
-    auto &U_3 = temp_[2];
-    auto &U_4 = temp_[3];
-    auto &U_5 = temp_[4];
-
-    /* Explicit step 2: U_old at time t -> t + tau */
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    /* Implicit step 2: */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector},
-                                           {ae_21 / dc_2},
-                                           {ai_21 / dc_2, ai_22 / dc_2},
-                                           U_2,
-                                           t,
-                                           tau);
-
-    /* Explicit step 3: U_2 at time t + c_2 / dc_2 tau -> t + c_3 / dc_2 tau */
-    hyperbolic_module_->prepare_state_vector(U_2, t + c_2 / dc_2 * tau);
-    hyperbolic_module_->forward_euler_step(U_2,
-                                           {state_vector},
-                                           {(ae_31 - ae_21) / dc_3},
-                                           temp_[0],
-                                           t + c_2 / dc_2 * tau,
-                                           dc_3 / dc_2 * tau);
-
-    /* Implicit step 3: */
-    parabolic_module_->backward_euler_step(
-        temp_[0],
-        {state_vector, U_2},
-        {(ae_31 - ae_21) / dc_3, ae_32 / dc_3},
-        {(ai_31 - ai_21) / dc_3, (ai_32 - ai_22) / dc_3, ai_33 / dc_3},
-        U_3,
-        t + c_2 / dc_2 * tau,
-        dc_3 / dc_2 * tau);
-
-    /* Explicit step 4: U_old at time t -> t + c_4 / dc_2 tau */
-    hyperbolic_module_->prepare_state_vector(U_3, t + c_3 / dc_2 * tau);
-    hyperbolic_module_->forward_euler_step(state_vector,
-                                           {U_2, U_3},
-                                           {ae_42 / dc_4, ae_43 / dc_4},
-                                           temp_[0],
-                                           t,
-                                           dc_4 / dc_2 * tau);
-
-    /* Implicit step 4: */
-    parabolic_module_->backward_euler_step(
-        temp_[0],
-        {state_vector, U_2, U_3},
-        {ae_41 / dc_4, ae_42 / dc_4, ae_43 / dc_4},
-        {ai_41 / dc_4, ai_42 / dc_4, ai_43 / dc_4, ai_44 / dc_4},
-        U_4,
-        t,
-        dc_4 / dc_2 * tau);
-
-    /* Explicit step 5: U_3 at time t + c_3 / dc_2 tau -> t + c_5 / dc_2 tau */
-    hyperbolic_module_->prepare_state_vector(U_4, t + c_4 / dc_2 * tau);
-    hyperbolic_module_->forward_euler_step(
-        U_3,
-        {state_vector, U_2, U_4},
-        {(ae_51 - ae_31) / dc_5, (ae_52 - ae_32) / dc_5, ae_54 / dc_5},
-        temp_[0],
-        t + c_3 / dc_2 * tau,
-        dc_5 / dc_2 * tau);
-
-    /* Implicit step 5: */
-    parabolic_module_->backward_euler_step(temp_[0],
-                                           {state_vector, U_2, U_3, U_4},
-                                           {(ae_51 - ae_31) / dc_5,
-                                            (ae_52 - ae_32) / dc_5,
-                                            ae_53 / dc_5,
-                                            ae_54 / dc_5},
-                                           {(ai_51 - ai_31) / dc_5,
-                                            (ai_52 - ai_32) / dc_5,
-                                            (ai_53 - ai_33) / dc_5,
-                                            ai_54 / dc_5,
-                                            ai_55 / dc_5},
-                                           U_5,
-                                           t + c_3 / dc_2 * tau,
-                                           dc_5 / dc_2 * tau);
-
-    std::swap(state_vector, U_5);
-    return this->efficiency_ * tau;
+    std::swap(state_vector, U_explicit);
+    return Number(2.) * tau;
   }
 } // namespace ryujin
