@@ -35,9 +35,7 @@ namespace ryujin
                  const Number hd_i) {
           view.reset(precomputed, i, U, flux);
           view.accumulate(precomputed, js, U, flux, c_ij);
-          {
-            const_view.alpha(hd_i)
-          } -> std::same_as<Number>;
+          { const_view.alpha(hd_i) } -> std::same_as<Number>;
         };
 
 

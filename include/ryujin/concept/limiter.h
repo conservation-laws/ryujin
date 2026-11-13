@@ -37,16 +37,12 @@ namespace ryujin
                  const unsigned int i,
                  const unsigned int *js,
                  const Number hd_i) {
-          {
-            const_view.iterations()
-          } -> std::convertible_to<unsigned int>;
+          { const_view.iterations() } -> std::convertible_to<unsigned int>;
 
           /* Used by HyperbolicModule::forward_euler_step(): */
           view.reset(precomputed, i, U, flux);
           view.accumulate(precomputed, js, U, flux, scaled_c_ij, U);
-          {
-            const_view.bounds(hd_i)
-          } -> std::same_as<typename V::Bounds>;
+          { const_view.bounds(hd_i) } -> std::same_as<typename V::Bounds>;
           {
             const_view.limit(bounds, U, U)
           } -> std::same_as<std::tuple<Number, bool>>;

@@ -59,12 +59,8 @@ namespace ryujin
           typename V::flux_contribution_type;
           typename V::PrecomputedVectorView;
           typename V::InitialPrecomputedVectorView;
-          {
-            V::have_high_order_flux
-          } -> std::convertible_to<bool>;
-          {
-            V::have_source_terms
-          } -> std::convertible_to<bool>;
+          { V::have_high_order_flux } -> std::convertible_to<bool>;
+          { V::have_source_terms } -> std::convertible_to<bool>;
         } &&
         std::same_as<typename V::state_type,
                      dealii::Tensor<1, V::problem_dimension, Number>> &&
@@ -84,9 +80,7 @@ namespace ryujin
                      const dealii::Tensor<1, dim, Number> &),
                  const unsigned int i,
                  const unsigned int *js) {
-          {
-            view.is_admissible(U)
-          } -> std::convertible_to<bool>;
+          { view.is_admissible(U) } -> std::convertible_to<bool>;
           {
             view.apply_boundary_conditions(id, U, c_ij, get_dirichlet_data)
           } -> std::same_as<typename V::state_type>;

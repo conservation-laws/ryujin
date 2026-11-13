@@ -568,7 +568,7 @@ namespace ryujin
           else
             output << x_i << "\t" << m_i << "\n";
         } /*entry*/
-      }   /*entries*/
+      } /*entries*/
 
       output << std::flush;
     }

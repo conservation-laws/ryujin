@@ -177,6 +177,57 @@ jobs:
         cd build-no_openmp
         make VERBOSE=1 -j2
 
+  ############################################
+  # ubuntu-lts-26.04 with gcc, deal.II 9.8.0 #
+  ############################################
+
+  ubuntu-lts-2604-dealii-980:
+    name: lts-2604-deal.II-9.8.0
+    runs-on: [ubuntu-latest]
+
+    # There is no dealii/dealii:v9.8.0-* docker image (yet). Install the
+    # deal.II 9.8.0 package from the backports PPA instead.
+    container:
+      options: --user root
+      image: ubuntu:resolute
+
+    steps:
+    - name: install deal.II
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        apt-get update
+        apt-get install -y software-properties-common
+        add-apt-repository -y ppa:ginggs/deal.ii-9.8.0-backports
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          cmake g++ git libdeal.ii-dev make
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
+
   ###############################################
   # ubuntu-lts-24.04 with gcc-13, deal.II 9.7.1 #
   ###############################################

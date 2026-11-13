@@ -36,8 +36,7 @@ namespace ryujin
      * A type trait to select the correct VCL type:
      */
     template <typename T, std::size_t width>
-    struct VectorClassType {
-    };
+    struct VectorClassType {};
 
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3 && defined(__AVX512F__)
     template <>
@@ -129,8 +128,7 @@ namespace ryujin
      * Helper functions to convert to float arrays and back.
      */
     template <typename T, std::size_t width>
-    struct FC {
-    };
+    struct FC {};
 
     template <std::size_t width>
     struct FC<double, width> {

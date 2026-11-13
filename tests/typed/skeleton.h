@@ -389,8 +389,7 @@ namespace ryujin
      * objects.
      */
     template <typename System,
-              template <typename, int, typename, typename>
-              class KernelView>
+              template <typename, int, typename, typename> class KernelView>
     class Kernel
     {
     public:
