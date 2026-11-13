@@ -146,7 +146,7 @@ namespace ryujin
             face->set_boundary_id(Boundary::dynamic);
 
         } /*f*/
-      }   /*cell*/
+      } /*cell*/
     }
 #endif
   } // namespace GridGenerator

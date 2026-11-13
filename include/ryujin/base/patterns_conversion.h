@@ -15,8 +15,7 @@ DEAL_II_NAMESPACE_OPEN
 
 
 template <typename T>
-struct ConversionHelper : std::false_type {
-};
+struct ConversionHelper : std::false_type {};
 
 
 /**

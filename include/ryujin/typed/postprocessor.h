@@ -166,7 +166,7 @@ namespace ryujin
             {Section::initial_precomputed,
              &hyperbolic_system.initial_precomputed_names(dim)},
             {Section::dynamic_state, &parabolic_system_->state_names(dim)},
-        };
+    };
 
     /*
      * Look up a component name and return its section, its index, and

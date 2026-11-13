@@ -238,7 +238,7 @@ namespace ryujin
                   face->set_boundary_id(boundary_front_);
               }
             } /*for*/
-          }   /*for*/
+          } /*for*/
         };
 
         const auto add_periodicity = [this](auto &tria [[maybe_unused]]) {

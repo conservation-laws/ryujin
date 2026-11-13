@@ -82,7 +82,7 @@ constexpr Quantity quantities[]{
     {"total_energy", 1},
     {"total_energy_derivative", problem_dimension},
     {"is_admissible", 1},
-    {"f", problem_dimension *dim},
+    {"f", problem_dimension * dim},
     {"flux_divergence", problem_dimension},
     {"to_primitive_state", problem_dimension},
     {"from_primitive_state", problem_dimension},

@@ -93,7 +93,7 @@ constexpr Quantity quantities[]{
     {"mathematical_entropy", 1},
     {"mathematical_entropy_derivative", problem_dimension},
     {"is_admissible", 1},
-    {"f", problem_dimension *dim},
+    {"f", problem_dimension * dim},
     {"flux_divergence", problem_dimension},
     {"to_primitive_state", problem_dimension},
     {"from_primitive_state", problem_dimension},

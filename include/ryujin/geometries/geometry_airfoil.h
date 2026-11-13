@@ -1105,7 +1105,7 @@ namespace ryujin
               }
             }
           } /* f */
-        }   /* cell */
+        } /* cell */
 
         Manifolds::AirfoilManifold airfoil_manifold_upper{
             airfoil_center_, psi_front, psi_upper, psi_lower, true, psi_ratio_};
