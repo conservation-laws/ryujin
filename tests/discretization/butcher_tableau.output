@@ -1,0 +1,12 @@
+erk 11: stages = 1, explicit, consistent = true, order = 1
+erk 22: stages = 2, explicit, consistent = true, order = 2
+erk 33: stages = 3, explicit, consistent = true, order = 3
+erk 43: stages = 4, explicit, consistent = true, order = 3
+erk 54: stages = 5, explicit, consistent = true, order = 4
+strang erk 33 cn: stages = 3, explicit, consistent = true, order = 3
+strang erk 43 cn: stages = 4, explicit, consistent = true, order = 3
+imex 11: stages = 1, imex, consistent = true, order = 1
+imex 22: stages = 2, imex, consistent = true, order = 2
+imex 33: stages = 3, imex, consistent = true, order = 3
+gsa imex 22: stages = 2, imex, consistent = true, order = 2
+gsa imex 43: stages = 4, imex, consistent = true, order = 3
