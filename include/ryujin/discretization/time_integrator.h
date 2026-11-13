@@ -443,49 +443,40 @@ namespace ryujin
      */
     //@{
 
-    /**
-     * Given a reference to a previous state vector U performs an explicit
-     * second-order strong-stability preserving Runge-Kutta SSPRK(2,2;1/2)
-     * time step (and store the result in U). The function returns the time step
-     * size tau, see step().
+    /*
+     * All step functions given below take a reference to a previous state
+     * vector @p old_state_vector, perform a time step and store the result
+     * in @p new_state_vector. The old state vector is not modified. The
+     * functions return the time step size tau, see step().
      */
-    Number step_ssprk_22(StateVector<Number> &state_vector,
+
+    /**
+     * Performs an explicit second-order strong-stability preserving
+     * Runge-Kutta SSPRK(2,2;1/2) time step.
+     */
+    Number step_ssprk_22(const StateVector<Number> &old_state_vector,
+                         StateVector<Number> &new_state_vector,
                          Number t,
                          Number tau,
                          Number tau_max);
 
     /**
-     * Given a reference to a previous state vector U performs an explicit
-     * third-order strong-stability preserving Runge-Kutta SSPRK(3,3;1/3)
-     * time step (and store the result in U). The function returns the time step
-     * size tau, see step().
+     * Performs an explicit third-order strong-stability preserving
+     * Runge-Kutta SSPRK(3,3;1/3) time step.
      */
-    Number step_ssprk_33(StateVector<Number> &state_vector,
+    Number step_ssprk_33(const StateVector<Number> &old_state_vector,
+                         StateVector<Number> &new_state_vector,
                          Number t,
                          Number tau,
                          Number tau_max);
 
     /**
-     * Given a reference to a previous state vector U performs a combined
-     * explicit implicit Strang split using a third-order Runge-Kutta
-     * ERK(3,3;1/3) time step and an implicit Crank-Nicolson step (and
-     * store the result in U). The function returns the time step size tau, see
-     * step().
-     */
-    Number step_strang_ssprk_33_cn(StateVector<Number> &state_vector,
-                                   Number t,
-                                   Number tau,
-                                   Number tau_max);
-
-    /**
-     * Given a reference to a previous state vector @p old_state_vector
-     * performs all stages of the explicit, or implicit-explicit
+     * Performs all stages of the explicit, or implicit-explicit
      * Runge-Kutta scheme described by the Butcher tableau of the selected
-     * time-stepping scheme and stores the result in @p new_state_vector.
-     * Every stage consists of one explicit hyperbolic step and, for an
-     * implicit-explicit scheme, one implicit parabolic step. The
-     * intermediate stages are stored in the temporary vectors. The
-     * function returns the time step size tau, see step().
+     * time-stepping scheme. Every stage consists of one explicit
+     * hyperbolic step and, for an implicit-explicit scheme, one implicit
+     * parabolic step. The intermediate stages are stored in the temporary
+     * vectors.
      */
     Number step_runge_kutta(const StateVector<Number> &old_state_vector,
                             StateVector<Number> &new_state_vector,
@@ -494,16 +485,15 @@ namespace ryujin
                             Number tau_max);
 
     /**
-     * Given a reference to a previous state vector U performs a combined
-     * explicit implicit Strang split using the explicit Runge-Kutta scheme
-     * of the selected time-stepping scheme and an implicit Crank-Nicolson
-     * step (and store the result in U). The function returns the time step
-     * size tau, see step().
+     * Performs a combined explicit implicit Strang split: an explicit
+     * step with the explicit scheme of the selected time-stepping scheme,
+     * an implicit Crank-Nicolson step, and a second explicit step.
      */
-    Number step_strang_runge_kutta_cn(StateVector<Number> &state_vector,
-                                      Number t,
-                                      Number tau,
-                                      Number tau_max);
+    Number step_strang_cn(const StateVector<Number> &old_state_vector,
+                          StateVector<Number> &new_state_vector,
+                          Number t,
+                          Number tau,
+                          Number tau_max);
 
     //@}
   };

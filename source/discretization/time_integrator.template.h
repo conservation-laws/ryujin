@@ -186,22 +186,32 @@ namespace ryujin
 #endif
 
     const auto single_step = [&]() {
+      /*
+       * The result of a successful step is stored in the last temporary
+       * vector.
+       */
+      auto &result = temp_.back();
+
       switch (time_stepping_scheme_) {
       case TimeSteppingScheme::ssprk_22:
-        return step_ssprk_22(state_vector, t, tau, tau_max);
+        tau = step_ssprk_22(state_vector, result, t, tau, tau_max);
+        break;
       case TimeSteppingScheme::ssprk_33:
-        return step_ssprk_33(state_vector, t, tau, tau_max);
+        tau = step_ssprk_33(state_vector, result, t, tau, tau_max);
+        break;
       case TimeSteppingScheme::strang_ssprk_33_cn:
-        return step_strang_ssprk_33_cn(state_vector, t, tau, tau_max);
+        [[fallthrough]];
       case TimeSteppingScheme::strang_erk_33_cn:
         [[fallthrough]];
       case TimeSteppingScheme::strang_erk_43_cn:
-        return step_strang_runge_kutta_cn(state_vector, t, tau, tau_max);
+        tau = step_strang_cn(state_vector, result, t, tau, tau_max);
+        break;
       default:
-        tau = step_runge_kutta(state_vector, temp_.back(), t, tau, tau_max);
-        std::swap(state_vector, temp_.back());
-        return tau;
+        tau = step_runge_kutta(state_vector, result, t, tau, tau_max);
       }
+
+      std::swap(state_vector, result);
+      return tau;
     };
 
     if (cfl_recovery_strategy_ != CFLRecoveryStrategy::none) {
@@ -272,132 +282,72 @@ namespace ryujin
 
   template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step_ssprk_22(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
+      const StateVector<Number> &old_state_vector,
+      StateVector<Number> &new_state_vector,
+      Number t,
+      Number tau,
+      Number tau_max)
   {
     /* SSP-RK2, see @cite Shu1988, Eq. 2.15. */
 
     RYUJIN_DEBUG_ANNOUNCE();
 
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
-
     /* Step 1: T0 = U_old + tau * L(U_old) at t -> t + tau */
     tau = hyperbolic_module_->forward_euler_step(
-        state_vector, {}, {}, temp_[0], t, tau, tau_max);
+        old_state_vector, {}, {}, temp_[0], t, tau, tau_max);
 
-    /* Step 2: T1 = T0 + tau L(T0) at time t + tau -> t + 2*tau */
+    /* Step 2: U_new = T0 + tau L(T0) at time t + tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->forward_euler_step(
-        temp_[0], {}, {}, temp_[1], t + 1.0 * tau, tau);
+        temp_[0], {}, {}, new_state_vector, t + 1.0 * tau, tau);
 
-    /* Step 2: convex combination: T1 = 1/2 U_old + 1/2 T1 at time t + tau */
-    sadd<selected_memory_space_t>(
-        temp_[1], Number(1.0 / 2.0), Number(1.0 / 2.0), state_vector);
+    /* Step 2: convex combination: U_new = 1/2 U_old + 1/2 U_new at t + tau */
+    sadd<selected_memory_space_t>(new_state_vector,
+                                  Number(1.0 / 2.0),
+                                  Number(1.0 / 2.0),
+                                  old_state_vector);
 
-    std::swap(state_vector, temp_[1]);
     return tau;
   }
 
 
   template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step_ssprk_33(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
+      const StateVector<Number> &old_state_vector,
+      StateVector<Number> &new_state_vector,
+      Number t,
+      Number tau,
+      Number tau_max)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
     RYUJIN_DEBUG_ANNOUNCE();
 
-    Assert(this->efficiency_ == 1., dealii::ExcInternalError());
-
-    /* Step 1: T0 = U_old + tau * L(U_old) at time t -> t + tau */
+    /* Step 1: U_new = U_old + tau * L(U_old) at time t -> t + tau */
     tau = hyperbolic_module_->forward_euler_step(
-        state_vector, {}, {}, temp_[0], t, tau, tau_max);
+        old_state_vector, {}, {}, new_state_vector, t, tau, tau_max);
 
-    /* Step 2: T1 = T0 + tau L(T0) at time t + tau -> t + 2*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
+    /* Step 2: T0 = U_new + tau L(U_new) at time t + tau -> t + 2*tau */
+    hyperbolic_module_->prepare_state_vector(new_state_vector, t + 1.0 * tau);
     hyperbolic_module_->forward_euler_step(
-        temp_[0], {}, {}, temp_[1], t + 1.0 * tau, tau);
+        new_state_vector, {}, {}, temp_[0], t + 1.0 * tau, tau);
 
-    /* Step 2: convex combination T1 = 3/4 U_old + 1/4 T1 at time t + 0.5*tau */
+    /* Step 2: convex combination T0 = 3/4 U_old + 1/4 T0 at time t + 0.5*tau */
     sadd<selected_memory_space_t>(
-        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), state_vector);
+        temp_[0], Number(1.0 / 4.0), Number(3.0 / 4.0), old_state_vector);
 
-    /* Step 3: T0 = T1 + tau L(T1) at time t + 0.5*tau -> t + 1.5*tau */
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
+    /* Step 3: U_new = T0 + tau L(T0) at time t + 0.5*tau -> t + 1.5*tau */
+    hyperbolic_module_->prepare_state_vector(temp_[0], t + 0.5 * tau);
     hyperbolic_module_->forward_euler_step(
-        temp_[1], {}, {}, temp_[0], t + 0.5 * tau, tau);
+        temp_[0], {}, {}, new_state_vector, t + 0.5 * tau, tau);
 
-    /* Step 3: convex combination: T0 = 1/3 U_old + 2/3 T0 at time t + tau */
-    sadd<selected_memory_space_t>(
-        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), state_vector);
+    /* Step 3: convex combination: U_new = 1/3 U_old + 2/3 U_new at t + tau */
+    sadd<selected_memory_space_t>(new_state_vector,
+                                  Number(2.0 / 3.0),
+                                  Number(1.0 / 3.0),
+                                  old_state_vector);
 
-    std::swap(state_vector, temp_[0]);
     return tau;
-  }
-
-
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_strang_ssprk_33_cn(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
-  {
-    // FIXME: avoid code duplication with step_ssprk_33
-
-    RYUJIN_DEBUG_ANNOUNCE();
-
-    Assert(this->efficiency_ == 2., dealii::ExcInternalError());
-
-    /* First explicit SSPRK 3 step with final result in temp_[0]: */
-
-    tau = hyperbolic_module_->forward_euler_step(state_vector,
-                                                 {},
-                                                 {},
-                                                 temp_[0],
-                                                 t,
-                                                 tau / this->efficiency_,
-                                                 tau_max / this->efficiency_);
-
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[0], {}, {}, temp_[1], t + 1.0 * tau, tau);
-    sadd<selected_memory_space_t>(
-        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ state_vector);
-
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 0.5 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[1], {}, {}, temp_[0], t + 0.5 * tau, tau);
-    sadd<selected_memory_space_t>(
-        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ state_vector);
-
-    /* Implicit Crank-Nicolson step with final result in temp_[2]: */
-
-    try {
-      parabolic_module_->crank_nicolson_step(temp_[0], temp_[2], t, 2.0 * tau);
-    } catch (Restart &restart) {
-      /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
-       * later */
-      restart.suggested_tau_max /= this->efficiency_;
-      throw;
-    }
-
-    /* Second SSPRK 3 step with final result in temp_[0]: */
-
-    hyperbolic_module_->prepare_state_vector(/*!*/ temp_[2], t + 1.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        /*!*/ temp_[2], {}, {}, temp_[0], t + 1.0 * tau, tau);
-
-    hyperbolic_module_->prepare_state_vector(temp_[0], t + 2.0 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[0], {}, {}, temp_[1], t + 2.0 * tau, tau);
-    sadd<selected_memory_space_t>(
-        temp_[1], Number(1.0 / 4.0), Number(3.0 / 4.0), /*!*/ temp_[2]);
-
-    hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.5 * tau);
-    hyperbolic_module_->forward_euler_step(
-        temp_[1], {}, {}, temp_[0], t + 1.5 * tau, tau);
-    sadd<selected_memory_space_t>(
-        temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
-
-    std::swap(state_vector, temp_[0]);
-    return this->efficiency_ * tau;
   }
 
 
@@ -558,26 +508,44 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_strang_runge_kutta_cn(
-      StateVector<Number> &state_vector, Number t, Number tau, Number tau_max)
+  Number TimeIntegrator<dim, Number>::step_strang_cn(
+      const StateVector<Number> &old_state_vector,
+      StateVector<Number> &new_state_vector,
+      Number t,
+      Number tau,
+      Number tau_max)
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
-    /*
-     * Storage: the stages of the explicit Runge-Kutta scheme are stored in
-     * all but the last two vectors of temp_.
-     */
-    auto &U_explicit = temp_[temp_.size() - 2];
-    auto &U_implicit = temp_[temp_.size() - 1];
+    /* The explicit scheme used for the hyperbolic subproblem: */
+    const auto explicit_step = [&](const StateVector<Number> &old_U,
+                                   StateVector<Number> &new_U,
+                                   const Number time,
+                                   const Number step_size,
+                                   const Number step_size_max) {
+      if (time_stepping_scheme_ == TimeSteppingScheme::strang_ssprk_33_cn)
+        return step_ssprk_33(old_U, new_U, time, step_size, step_size_max);
+      else
+        return step_runge_kutta(old_U, new_U, time, step_size, step_size_max);
+    };
 
-    /* First explicit Runge-Kutta step: at time t -> t + tau */
-    tau = step_runge_kutta(
-        state_vector, U_explicit, t, tau / Number(2.), tau_max / Number(2.));
+    /*
+     * Storage: the explicit scheme uses all but the last two vectors of
+     * temp_. The last vector is the new state vector.
+     */
+    auto &U_implicit = temp_[temp_.size() - 2];
+
+    /* First explicit step: at time t -> t + tau */
+    tau = explicit_step(old_state_vector,
+                        new_state_vector,
+                        t,
+                        tau / Number(2.),
+                        tau_max / Number(2.));
 
     /* Implicit Crank-Nicolson step: at time t -> t + 2 * tau */
     try {
       parabolic_module_->crank_nicolson_step(
-          U_explicit, U_implicit, t, Number(2.) * tau);
+          new_state_vector, U_implicit, t, Number(2.) * tau);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
        * later */
@@ -585,11 +553,10 @@ namespace ryujin
       throw;
     }
 
-    /* Second explicit Runge-Kutta step: at time t + tau -> t + 2 * tau */
+    /* Second explicit step: at time t + tau -> t + 2 * tau */
     hyperbolic_module_->prepare_state_vector(U_implicit, t + tau);
-    step_runge_kutta(U_implicit, U_explicit, t + tau, tau, tau);
+    explicit_step(U_implicit, new_state_vector, t + tau, tau, tau);
 
-    std::swap(state_vector, U_explicit);
     return Number(2.) * tau;
   }
 } // namespace ryujin
