@@ -121,7 +121,8 @@ namespace ryujin
   void
   Checkpointing<structdim, dim, Number>::execute(TaskContext<Number> &context)
   {
-    if (!this->trigger_->fire(context))
+    const bool requested = context.request == TaskRequest::checkpoint;
+    if (!this->trigger_->fire(context) && !requested)
       return;
 
     RYUJIN_DEBUG_ANNOUNCE();
@@ -134,6 +135,9 @@ namespace ryujin
   void
   Checkpointing<structdim, dim, Number>::finalize(TaskContext<Number> &context)
   {
+    if (context.request == TaskRequest::stop)
+      return;
+
     RYUJIN_DEBUG_ANNOUNCE();
 
     write_checkpoint(context);

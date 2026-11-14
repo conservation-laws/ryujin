@@ -377,6 +377,15 @@ namespace ryujin::dashboard
   }
 
 
+  Element toggle(const std::string &label, bool on)
+  {
+    auto element = text(" " + label + " ");
+    if (on)
+      return element | bold | color(theme.ink) | bgcolor(theme.highlight);
+    return element | color(theme.caption) | bgcolor(theme.track);
+  }
+
+
   Element chip(const std::string &name, Color foreground)
   {
     return text(" " + name + " ") | color(foreground) | bgcolor(theme.track);

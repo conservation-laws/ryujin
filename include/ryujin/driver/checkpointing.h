@@ -52,12 +52,14 @@ namespace ryujin
     void start(TaskContext<Number> &context) override;
 
     /**
-     * Write a checkpoint whenever the trigger fires.
+     * Write a checkpoint whenever the trigger fires, and on
+     * TaskRequest::checkpoint.
      */
     void execute(TaskContext<Number> &context) override;
 
     /**
-     * Write a final checkpoint.
+     * Write a final checkpoint, unless the time loop has been stopped by
+     * TaskRequest::stop or TaskRequest::abort.
      */
     void finalize(TaskContext<Number> &context) override;
 

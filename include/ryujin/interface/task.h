@@ -93,12 +93,56 @@ namespace ryujin
   };
 } // namespace ryujin
 
+namespace ryujin
+{
+  /**
+   * A request from the user to the time loop, issued on the dashboard.
+   *
+   * @ingroup Driver
+   */
+  enum class TaskRequest : std::uint8_t {
+    /**
+     * No request.
+     */
+    none,
+
+    /**
+     * Write a checkpoint and continue.
+     */
+    checkpoint,
+
+    /**
+     * Stop the time loop and write a final checkpoint.
+     */
+    checkpoint_and_stop,
+
+    /**
+     * Stop the time loop without a final checkpoint.
+     */
+    stop,
+
+    /**
+     * Stop the time loop right away, and finalize only the required
+     * tasks.
+     */
+    abort,
+  };
+} // namespace ryujin
+
 #ifndef DOXYGEN
 DECLARE_ENUM(ryujin::TriggerMode,
              LIST({ryujin::TriggerMode::every_cycle, "every cycle"},
                   {ryujin::TriggerMode::timer_tick, "timer tick"},
                   {ryujin::TriggerMode::wall_clock, "wall clock"},
                   {ryujin::TriggerMode::time_points, "time points"}, ));
+
+DECLARE_ENUM(ryujin::TaskRequest,
+             LIST({ryujin::TaskRequest::none, "none"},
+                  {ryujin::TaskRequest::checkpoint, "checkpoint"},
+                  {ryujin::TaskRequest::checkpoint_and_stop,
+                   "checkpoint & stop"},
+                  {ryujin::TaskRequest::stop, "stop"},
+                  {ryujin::TaskRequest::abort, "abort"}, ));
 #endif
 
 namespace ryujin
@@ -201,6 +245,20 @@ namespace ryujin
      * Scheduler then calls Interface::Task::prepare() on all tasks.
      */
     bool prepare_required = false;
+
+    /**
+     * A request issued on a single rank in the post step phase, by the
+     * Logger for the dashboard. The Scheduler hands it on to all ranks as
+     * @p request in the next cycle.
+     */
+    TaskRequest pending_request = TaskRequest::none;
+
+    /**
+     * The request that all ranks act on: in the post step phase of the
+     * cycle in which the Scheduler has handed it on, and, if it stops the
+     * time loop, until the end.
+     */
+    TaskRequest request = TaskRequest::none;
 
     /**
      * All active tasks in the order of execution.

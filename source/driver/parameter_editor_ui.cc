@@ -3,8 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_animation.h>
-#include <driver/dashboard_music.h>
+#include <driver/dashboard_frame.h>
 #include <driver/dashboard_theme.h>
 #include <ryujin/driver/dashboard.h>
 #include <ryujin/driver/parameter_editor.h>
@@ -42,7 +41,7 @@ namespace ryujin
       /* Start at the initial position, the center: */
       Backdrop()
       {
-        position_.postpone();
+        frame_.postpone();
       }
 
       /*
@@ -51,30 +50,23 @@ namespace ryujin
        */
       void configure(const DashboardSettings &settings)
       {
-        settings_ = settings;
-        theme = make_palette(settings.color_scheme);
-        animation_ = animation::create(settings.animation);
+        frame_.configure(settings);
         stage_.reset();
-        play_dashboard_music(settings.music);
       }
 
       /* Size and place @p window on the terminal as configured: */
       Element place(Element window)
       {
         const auto [columns, rows] = Terminal::Size();
-        const int width =
-            settings_.width == 0
-                ? columns
-                : std::min(columns, std::max<int>(settings_.width, 80));
+        const int width = frame_.width(columns);
 
         window |= size(WIDTH, EQUAL, width);
-        if (settings_.height > 0)
-          window |= size(HEIGHT, EQUAL, std::min<int>(settings_.height, rows));
+        if (const int height = frame_.settings().height; height > 0)
+          window |= size(HEIGHT, EQUAL, std::min(height, rows));
         window |= size(HEIGHT, LESS_THAN, rows);
 
         const int height = Dimension::Fit(window, true).dimy;
-        const auto [left, top] = position_.offset(
-            settings_.location, columns - width, rows - height);
+        const auto [left, top] = frame_.offset(columns - width, rows - height);
         if (const Box box{left, left + width - 1, top, top + height - 1};
             box != window_) {
           window_ = box;
@@ -87,23 +79,15 @@ namespace ryujin
       /* Advance the animation, and move while there is no input: */
       void step()
       {
-        position_.move(settings_.location);
-        if (animation_ && stage_) {
-          stage_->changed.clear();
-          animation_->step(*stage_);
-          if (stage_->shift != std::pair{0, 0}) {
-            const auto [columns, rows] = stage_->free_space();
-            position_.shift(settings_.location, stage_->shift, columns, rows);
-          }
-          if (stage_->redraw || stage_->shift != std::pair{0, 0})
-            stage_.reset();
-        }
+        frame_.move();
+        if (stage_ && frame_.step(*stage_))
+          stage_.reset();
       }
 
       /* Postpone the next move of the screen saver: */
       void postpone()
       {
-        position_.postpone();
+        frame_.postpone();
       }
 
       /* Draw the animation on the whole screen: */
@@ -112,8 +96,7 @@ namespace ryujin
         if (!stage_ || stage_->screen.dimx() != screen.dimx() ||
             stage_->screen.dimy() != screen.dimy()) {
           stage_.emplace(Screen(screen.dimx(), screen.dimy()), window_);
-          if (animation_)
-            animation_->draw(*stage_);
+          frame_.draw(*stage_);
         }
 
         for (int y = 0; y < screen.dimy(); ++y)
@@ -122,22 +105,10 @@ namespace ryujin
       }
 
     private:
-      DashboardSettings settings_;
-      DashboardPosition position_;
+      dashboard::Frame frame_;
       Box window_;
-      std::unique_ptr<animation::Animation> animation_;
       std::optional<animation::Stage> stage_;
     };
-
-
-    /* A button or a choice, highlighted if @p on: */
-    Element toggle(const std::string &label, bool on)
-    {
-      auto element = text(" " + label + " ");
-      if (on)
-        return element | bold | color(theme.ink) | bgcolor(theme.highlight);
-      return element | color(theme.caption) | bgcolor(theme.track);
-    }
 
 
     /* A button @p name that calls @p on_click: */

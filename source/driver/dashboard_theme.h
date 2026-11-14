@@ -84,6 +84,10 @@ namespace ryujin::dashboard
   ftxui::Element label(const std::string &name);
 
 
+  /** A button or a choice @p label, highlighted if @p on. */
+  ftxui::Element toggle(const std::string &label, bool on);
+
+
   /** A short text on the track color. */
   ftxui::Element chip(const std::string &name, ftxui::Color foreground);
 
