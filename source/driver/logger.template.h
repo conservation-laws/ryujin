@@ -209,6 +209,18 @@ namespace ryujin
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
+#if defined(WITH_FTXUI)
+    /* Hand on a request from the dashboard to all ranks: */
+    if (const auto request =
+            dashboard_ ? dashboard_->take_request() : TaskRequest::none;
+        request != TaskRequest::none) {
+      context.pending_request = request;
+      context.info(
+          dealii::Patterns::Tools::Convert<TaskRequest>::to_string(request) +
+          " requested");
+    }
+#endif
+
     const bool write_to_logfile =
         (terminal_update_interval_ != Number(0.)) && /* suppress output */
         context.timer_tick;

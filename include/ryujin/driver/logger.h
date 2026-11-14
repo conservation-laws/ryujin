@@ -70,7 +70,8 @@ namespace ryujin
 
     /**
      * Print cycle statistics to the terminal (every "terminal update
-     * interval" seconds) and the log file (at every timer tick).
+     * interval" seconds) and the log file (at every timer tick), and hand
+     * on a request issued on the dashboard.
      */
     void execute(TaskContext<Number> &context) override;
 

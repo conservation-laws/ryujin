@@ -147,10 +147,15 @@ namespace ryujin
        * maximal number of cycles, so the final pre_step phase still
        * belongs to the last cycle:
        */
-      const bool final_time = context.t >= relax * t_final_ ||
-                              (max_cycles_ != 0 && context.cycle > max_cycles_);
+      const bool final_time =
+          context.t >= relax * t_final_ ||
+          (max_cycles_ != 0 && context.cycle > max_cycles_) ||
+          context.request >= TaskRequest::checkpoint_and_stop;
       if (final_time)
         --context.cycle;
+
+      if (context.request == TaskRequest::abort)
+        break;
 
 #ifdef DEBUG_OUTPUT
       std::cout << "\n\n###   cycle = " << context.cycle << "   ###\n\n"
@@ -200,15 +205,20 @@ namespace ryujin
                                      "a time step size."));
       context.t += context.tau;
 
-      /* Synchronize wall time: */
+      /* Synchronize wall time, and hand on a pending request: */
 
-      context.wall_time = ComputingTimer::timer("time loop").wall_time();
+      double values[2] = {
+          ComputingTimer::timer("time loop").wall_time(),
+          static_cast<double>(context.pending_request),
+      };
       {
         ComputingTimer::Scope scope(
             "time step [X] _ - synchronization barriers");
-        context.wall_time =
-            dealii::Utilities::MPI::max(context.wall_time, mpi_comm_);
+        dealii::Utilities::MPI::max(values, mpi_comm_, values);
       }
+      context.wall_time = values[0];
+      context.request = static_cast<TaskRequest>(values[1]);
+      context.pending_request = TaskRequest::none;
 
       run_phase(TaskPhase::post_step, context);
     }
@@ -216,7 +226,9 @@ namespace ryujin
     ComputingTimer::timer("time loop").stop();
 
     for (auto *task : tasks_ | std::views::reverse)
-      task->finalize(context);
+      if (context.request != TaskRequest::abort ||
+          std::ranges::find(required_, task) != required_.end())
+        task->finalize(context);
   }
 
 

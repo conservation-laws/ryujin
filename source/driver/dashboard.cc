@@ -679,9 +679,10 @@ namespace ryujin
      * The menu below the dashboard, and the panels that fold out of it:
      */
 
-    /* The buttons of the menu, of which only "options" has a function yet: */
-    constexpr std::array<std::string_view, 2> buttons = {"options", "abort"};
-    constexpr unsigned int options_button = 0;
+    /* The buttons of the menu: */
+    constexpr std::array<std::string_view, 2> buttons = {"run", "options"};
+    constexpr unsigned int run_button = 0;
+    constexpr unsigned int options_button = 1;
 
 
     /* The menu with the button @p selected highlighted: */
@@ -734,6 +735,64 @@ namespace ryujin
     std::string name_of(const T &value)
     {
       return dealii::Patterns::Tools::Convert<T>::to_string(value);
+    }
+
+
+    /*
+     * The run panel:
+     */
+
+    /* The requests of the run panel: */
+    constexpr std::array requests = {
+        TaskRequest::checkpoint,
+        TaskRequest::checkpoint_and_stop,
+        TaskRequest::stop,
+        TaskRequest::abort,
+    };
+
+
+    /* Return whether @p request can be issued for the tasks of @p data: */
+    bool available(TaskRequest request, const DashboardData &data)
+    {
+      if (request != TaskRequest::checkpoint &&
+          request != TaskRequest::checkpoint_and_stop)
+        return true;
+      return std::ranges::any_of(data.tasks, [](const auto &task) {
+        return task.name == "checkpointing";
+      });
+    }
+
+
+    /*
+     * The run panel for @p data with the row @p selected, which awaits
+     * confirmation if @p confirm:
+     */
+    Element
+    run_panel(const DashboardData &data, unsigned int selected, bool confirm)
+    {
+      Elements rows;
+      bool unavailable = false;
+      for (unsigned int i = 0; i < requests.size(); ++i) {
+        const auto name = name_of(requests[i]);
+        const bool active = i == selected;
+
+        if (!available(requests[i], data)) {
+          unavailable = true;
+          rows.push_back(muted(" " + name + " ") |
+                         bgcolor(active ? theme.track : Color::Default));
+        } else if (active && confirm)
+          rows.push_back(text(" " + name + ": press enter to confirm ") | bold |
+                         color(theme.ink) | bgcolor(theme.warn));
+        else
+          rows.push_back(toggle(name, active));
+      }
+
+      Elements notes;
+      if (unavailable)
+        notes.push_back(muted("checkpoints need the task \"checkpointing\""));
+      notes.push_back(muted("arrows: select   enter: issue   esc: close"));
+
+      return fold_out("run", std::move(rows), selected, std::move(notes));
     }
 
 
@@ -932,6 +991,7 @@ namespace ryujin
 
         if (!keys) {
           /* No more input, hide the menu: */
+          run_.reset();
           option_.reset();
           keyboard_.reset();
           write(render());
@@ -973,6 +1033,7 @@ namespace ryujin
 
     /* Close the panels and hand back the terminal at the end: */
     if (data.final_time) {
+      run_.reset();
       option_.reset();
       keyboard_.reset();
     }
@@ -989,6 +1050,12 @@ namespace ryujin
 
     /* Continue with subsequent output below the final dashboard: */
     write(render() + (data.final_time ? "\n" : ""));
+  }
+
+
+  TaskRequest Dashboard::take_request()
+  {
+    return request_.exchange(TaskRequest::none);
   }
 
 
@@ -1033,14 +1100,15 @@ namespace ryujin
           Box{left, left + width - 1, top, top + height - 1});
       auto screen = place(element | size(HEIGHT, EQUAL, height), left, top);
 
-      /* The options panel, folded out upwards from its button: */
-      if (option_) {
-        auto panel = options_panel(frame_.settings(), *option_);
+      /* The open panel, folded out upwards from its button: */
+      if (run_ || option_) {
+        auto panel = run_ ? run_panel(*data_, *run_, confirm_)
+                          : options_panel(frame_.settings(), *option_);
         const auto fit = Dimension::Fit(panel, true);
         screen = dbox({
             std::move(screen),
             place(std::move(panel),
-                  left + button_column(options_button),
+                  left + button_column(run_ ? run_button : options_button),
                   top + std::max(0, height - 1 - fit.dimy)),
         });
       }
@@ -1070,7 +1138,22 @@ namespace ryujin
       return;
 
     for (const auto key : decode(input)) {
-      if (option_) {
+      if (run_) {
+        const auto request = requests[*run_];
+        if (key == Key::up || key == Key::down) {
+          run_ = cycle(*run_, key == Key::up, requests.size());
+          confirm_ = false;
+        } else if (key == Key::select && available(request, *data_)) {
+          /* A request that ends the run needs a second return: */
+          confirm_ = !confirm_ && request != TaskRequest::checkpoint;
+          if (!confirm_) {
+            request_ = request;
+            run_.reset();
+          }
+        } else if (key == Key::close)
+          run_.reset();
+
+      } else if (option_) {
         if (key == Key::up || key == Key::down)
           option_ = cycle(*option_, key == Key::up, options().size());
         else if (key == Key::left || key == Key::right) {
@@ -1082,7 +1165,10 @@ namespace ryujin
 
       } else if (key == Key::left || key == Key::right)
         button_ = cycle(button_, key == Key::left, buttons.size());
-      else if (key == Key::select && button_ == options_button)
+      else if (key == Key::select && button_ == run_button) {
+        run_ = 0;
+        confirm_ = false;
+      } else if (key == Key::select && button_ == options_button)
         option_ = 0;
     }
   }
