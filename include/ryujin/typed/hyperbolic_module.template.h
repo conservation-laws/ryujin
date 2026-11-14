@@ -499,7 +499,7 @@ namespace ryujin
     copy_to_memory_space<MemorySpace>(
         old_state_vector, StateVectorPart::state, StateVectorPart::precomputed);
     for (int s = 0; s < stages; ++s)
-      copy_to_memory_space<MemorySpace>(stage_state_vectors.begin()[s].get(),
+      copy_to_memory_space<MemorySpace>(stage_state_vectors[s].get(),
                                         StateVectorPart::state,
                                         StateVectorPart::precomputed);
     move_to_memory_space<MemorySpace>(new_state_vector, StateVectorPart::state);
@@ -596,11 +596,11 @@ namespace ryujin
     Kokkos::Array<Number, stages> stage_weight;
     for (int s = 0; s < stages; ++s) {
       const auto &[U_s, Q_s, U_dynamic_s, Q_dynamic_s] =
-          stage_state_vectors.begin()[s].get();
+          stage_state_vectors[s].get();
       stage_U_view[s] = U_s.template view<problem_dimension, MemorySpace>();
       stage_precomputed_view[s] =
           Q_s.template view<n_precomputed_values, MemorySpace>();
-      stage_weight[s] = stage_weights.begin()[s];
+      stage_weight[s] = stage_weights[s];
     }
 
     const auto new_U_view =
