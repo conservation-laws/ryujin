@@ -22,6 +22,7 @@ subsection A - Scheduler
 
   set final time           = 1345.71
   set timer granularity    = 1345.71
+  set align time steps     = true
 end
 
 subsection B - Equation
