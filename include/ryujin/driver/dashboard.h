@@ -200,24 +200,6 @@ namespace ryujin
      */
     wyatt,
   };
-
-
-  /**
-   * The display of the wall throughput on the Dashboard.
-   *
-   * @ingroup Driver
-   */
-  enum class DashboardThroughputDisplay : std::uint8_t {
-    /**
-     * A speedometer with a needle.
-     */
-    speedometer,
-
-    /**
-     * A plain seven-segment display.
-     */
-    digital,
-  };
 } // namespace ryujin
 
 
@@ -254,11 +236,6 @@ DECLARE_ENUM(ryujin::DashboardMusic,
                   {ryujin::DashboardMusic::ryujin, "ryujin"},
                   {ryujin::DashboardMusic::matthias, "matthias"},
                   {ryujin::DashboardMusic::wyatt, "wyatt"}, ));
-
-DECLARE_ENUM(ryujin::DashboardThroughputDisplay,
-             LIST({ryujin::DashboardThroughputDisplay::speedometer,
-                   "speedometer"},
-                  {ryujin::DashboardThroughputDisplay::digital, "digital"}, ));
 #endif
 
 namespace ryujin
@@ -300,19 +277,13 @@ namespace ryujin
     /**
      * The animation in the space around the dashboard.
      */
-    DashboardAnimation animation = DashboardAnimation::ryujin;
+    DashboardAnimation animation = DashboardAnimation::none;
 
     /**
      * The music played while the dashboard is drawn. DashboardMusic::none
      * keeps the music of SplashScreen::arcade playing.
      */
     DashboardMusic music = DashboardMusic::none;
-
-    /**
-     * The display of the wall throughput.
-     */
-    DashboardThroughputDisplay throughput_display =
-        DashboardThroughputDisplay::digital;
   };
 
 

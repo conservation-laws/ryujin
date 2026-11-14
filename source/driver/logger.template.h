@@ -97,11 +97,6 @@ namespace ryujin
                   "Music played while the terminal dashboard is drawn "
                   "(requires ryujin compiled with miniaudio): none, ryujin, "
                   "matthias, wyatt");
-
-    add_parameter("dashboard throughput display",
-                  dashboard_settings_.throughput_display,
-                  "Display of the wall throughput on the terminal dashboard: "
-                  "digital, speedometer");
 #endif
 
     debug_command_ = "";

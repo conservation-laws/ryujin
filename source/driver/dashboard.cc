@@ -23,7 +23,6 @@
 #include <condition_variable>
 #include <format>
 #include <iostream>
-#include <numbers>
 #include <random>
 #include <ranges>
 
@@ -225,54 +224,6 @@ namespace ryujin
     }
 
 
-    /* A speedometer with a needle pointing at value in [0, scale]: */
-    Element speedometer(double value, double scale)
-    {
-      constexpr int cx = 29;
-      constexpr int cy = 27;
-      constexpr int radius = 25;
-
-      const double fraction = std::clamp(safe(value) / scale, 0., 1.);
-
-      Canvas c(58, 28);
-
-      const auto point = [&](double s, double r) {
-        const double phi = std::numbers::pi * (1. - s);
-        return std::pair{static_cast<int>(std::round(cx + r * std::cos(phi))),
-                         static_cast<int>(std::round(cy - r * std::sin(phi)))};
-      };
-
-      /* The dial: */
-      for (int i = 0; i <= 160; ++i) {
-        const double s = i / 160.;
-        const auto dial =
-            s <= fraction
-                ? Color::Interpolate(float(s), theme.highlight, theme.good)
-                : theme.muted;
-        for (const double r : {radius, radius - 1, radius - 2}) {
-          const auto [x, y] = point(s, r);
-          c.DrawPoint(x, y, true, dial);
-        }
-      }
-
-      /* Ticks: */
-      for (int i = 0; i <= 10; ++i) {
-        const bool major = i % 5 == 0;
-        const auto [x1, y1] = point(i / 10., radius - 5);
-        const auto [x2, y2] = point(i / 10., major ? radius - 9 : radius - 7);
-        c.DrawPointLine(x1, y1, x2, y2, major ? theme.caption : theme.muted);
-      }
-
-      /* The needle: */
-      const auto [x, y] = point(fraction, radius - 8);
-      c.DrawPointLine(cx, cy, x, y, theme.warn);
-      c.DrawPointLine(cx + 1, cy, x + 1, y, theme.warn);
-      c.DrawPointCircleFilled(cx, cy, 2, theme.bad);
-
-      return canvas(std::move(c));
-    }
-
-
     /* A seven-segment display of value with four significant digits: */
     Element digital(double value)
     {
@@ -348,7 +299,6 @@ namespace ryujin
     Element document(const DashboardData &data,
                      const std::deque<double> &wall_history,
                      const std::deque<double> &compute_history,
-                     DashboardThroughputDisplay display,
                      int width)
     {
       /*
@@ -428,23 +378,18 @@ namespace ryujin
           nice_scale(1.1 * *std::max_element(wall_history.end() - recent,
                                              wall_history.end()));
 
-      const bool dial = display == DashboardThroughputDisplay::speedometer;
-
       auto throughput = vbox({
           hbox({
               filler(),
-              dial ? speedometer(data.wall_m_dofs_per_sec, scale)
-                   : digital(data.wall_m_dofs_per_sec),
+              digital(data.wall_m_dofs_per_sec),
               filler(),
           }),
           hbox({
-              muted(dial ? " 0" : ""),
               filler(),
               text(std::format("{:.2f}", data.wall_m_dofs_per_sec)) | bold |
                   color(theme.good),
               text(" MQ/s wall"),
               filler(),
-              muted(dial ? std::format("{:g} ", scale) : ""),
           }),
           separatorLight() | color(theme.track),
           hbox({
@@ -880,11 +825,7 @@ namespace ryujin
           settings_.width == 0
               ? terminal_columns
               : std::min(terminal_columns, std::max<int>(settings_.width, 80));
-      auto element = document(*data_,
-                              wall_history_,
-                              compute_history_,
-                              settings_.throughput_display,
-                              width) |
+      auto element = document(*data_, wall_history_, compute_history_, width) |
                      size(WIDTH, EQUAL, width);
 
       /* The natural height, stretched up to the maximal height: */
