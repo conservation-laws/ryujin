@@ -189,7 +189,8 @@ namespace ryujin
 
     /** Collect a snapshot and print it to the terminal and the log file. */
     void print_cycle_statistics(const TaskContext<Number> &context,
-                                bool write_to_logfile = false,
+                                bool write_to_logfile,
+                                bool write_to_terminal,
                                 bool final_time = false);
 
     /** Collect the header and the information of the snapshot. */

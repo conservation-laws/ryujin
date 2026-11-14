@@ -231,8 +231,9 @@ namespace ryujin
 
     if (write_to_logfile || update_terminal) {
       ComputingTimer::Scope scope("time step [X] _ - synchronization barriers");
-      print_cycle_statistics(context, /*logfile*/ write_to_logfile);
-      last_terminal_output_ = context.wall_time;
+      print_cycle_statistics(context, write_to_logfile, update_terminal);
+      if (update_terminal)
+        last_terminal_output_ = context.wall_time;
     }
   }
 
@@ -260,7 +261,8 @@ namespace ryujin
     /* Write final timing statistics to screen and logfile: */
 
     if (terminal_update_interval_ != Number(0.))
-      print_cycle_statistics(context, /*logfile*/ true, /*final*/ true);
+      print_cycle_statistics(
+          context, /*logfile*/ true, /*terminal*/ true, /*final*/ true);
 
     /* Print status messages after the final statistics as usual: */
     dashboard_active_ = false;
@@ -498,6 +500,7 @@ namespace ryujin
   void Logger<structdim, dim, Number>::print_cycle_statistics(
       const TaskContext<Number> &context,
       bool write_to_logfile,
+      bool write_to_terminal,
       bool final_time)
   {
     dashboard_data_.final_time = final_time;
@@ -513,12 +516,15 @@ namespace ryujin
 
     const auto text = render_text(dashboard_data_);
 
+    /* Only redraw the terminal every "terminal update interval": */
+    if (write_to_terminal) {
 #if defined(WITH_FTXUI)
-    if (dashboard_active_)
-      dashboard_->show(dashboard_data_);
-    else
+      if (dashboard_active_)
+        dashboard_->show(dashboard_data_);
+      else
 #endif
-      std::cout << "\033[2J\033[H" << text << std::flush;
+        std::cout << "\033[2J\033[H" << text << std::flush;
+    }
 
     if (write_to_logfile)
       logfile_ << "\n" << text << std::flush;
