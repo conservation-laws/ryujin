@@ -147,7 +147,7 @@ namespace ryujin
 
         /* The state U^n at the beginning of the time step: */
         const auto &U_n =
-            stages > 0 ? stage_state_vectors.begin()->get() : old_state_vector;
+            stages > 0 ? stage_state_vectors.front().get() : old_state_vector;
         extract(U_n, solution_);
         reinit_operator(solution_);
 
