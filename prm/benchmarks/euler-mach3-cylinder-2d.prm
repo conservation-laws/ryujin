@@ -1,0 +1,66 @@
+##
+#
+# Supersonic channel flow past a cylinder in 2D at Mach 3.
+#
+##
+
+subsection A - Scheduler
+  set basename          = mach3-cylinder-2d
+
+  set tasks             =
+
+  set final time        = 1.00
+  set timer granularity = 1.00
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = cylinder
+
+  set mesh refinement     = 8
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  subsection full
+    set use mpi io     = true
+    set schlieren beta = 10
+  end
+end

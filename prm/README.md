@@ -3,8 +3,9 @@
 Parameter files
 ===============
 
-This directory contains verification configurations with test vectors
-and the parameter files for the numerical results of publications.
+This directory contains verification configurations with test vectors,
+the parameter files for the numerical results of publications, and
+benchmarks for the throughput.
 
 
 Verification
@@ -17,6 +18,19 @@ simulation result at final time to a known analytic solution and record the
 normalized L1, L2, and L\infty error norms (summed up over all components).
 
 All test configurations should be run with double floating point precision.
+
+Benchmarks
+----------
+
+The `./benchmarks` subdirectory contains parameter files to assess the
+throughput, i.e., the number of updated degrees of freedom per second
+(reported as "MQ/s" on the terminal and in the log file). The
+configurations run no tasks besides the time integration and the logger,
+and the timer granularity equals the final time, so that output does not
+distort the measurement:
+
+ - `./benchmarks/euler-mach3-cylinder-2d.prm`: Mach 3 flow past a
+   cylinder in 2D (compressible Euler equations, mesh refinement 8)
 
 Reproducibility
 ---------------
