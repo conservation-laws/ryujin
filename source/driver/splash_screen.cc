@@ -1151,8 +1151,12 @@ namespace ryujin
             std::chrono::duration<float>(clock::now() - start).count();
         if (intro.finished(t))
           break;
-        /* Show "PRESS START" for a moment, also for an early key press: */
-        if (t > Intro::press_start && (!keys.may_wait() || keys.key_pressed()))
+        /*
+         * Show "PRESS START" for a moment, also for an early key press,
+         * and do not wait if we cannot read keys:
+         */
+        if (t > Intro::press_start &&
+            (!keys.readable() || keys.read({}) != std::string()))
           intro.start(std::max(t, Intro::press_start + 0.6f));
         tty.write("\033[H" + intro.frame(t).ToString());
         std::this_thread::sleep_until(next + std::chrono::milliseconds(50));

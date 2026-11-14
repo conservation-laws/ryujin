@@ -5,9 +5,12 @@
 
 #pragma once
 
+#include <sys/types.h>
 #include <termios.h>
 
+#include <chrono>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -77,8 +80,11 @@ namespace ryujin::terminal
 
   /**
    * Single key input from stdin: switch the terminal to single key mode if
-   * stdin is the terminal and we are in its foreground, and restore the
-   * previous mode on destruction.
+   * stdin reaches it, directly or through a launcher such as mpirun that
+   * forwards stdin, if stdout reaches the same terminal, and if the
+   * process that reads the terminal is in its foreground. Restore the
+   * previous mode on destruction, or from a watchdog process if we die
+   * without cleaning up.
    *
    * @ingroup Driver
    */
@@ -93,15 +99,16 @@ namespace ryujin::terminal
     Keyboard &operator=(const Keyboard &) = delete;
 
     /**
-     * Return whether we may wait for a key press at all. We may not if
-     * stdin is the terminal but we are in the background.
+     * Return whether we have switched the terminal to single key mode, in
+     * which we read keys from stdin as they are pressed.
      */
-    bool may_wait() const;
+    bool readable() const;
 
     /**
-     * Return whether a key has been pressed, or there is no more input.
+     * Wait up to @p timeout for input and return the keys read, an empty
+     * string if there is none, or std::nullopt if there is no more input.
      */
-    bool key_pressed() const;
+    std::optional<std::string> read(std::chrono::milliseconds timeout) const;
 
     /**
      * Restore the previous mode of the terminal, and discard the keys not
@@ -110,9 +117,13 @@ namespace ryujin::terminal
     void restore() const;
 
   private:
+    /** The terminal that stdin reaches, or -1. */
+    int terminal_ = -1;
+    /** The write end of the pipe to the watchdog process, or -1. */
+    int pipe_ = -1;
+    /** The watchdog process that restores the terminal if we die. */
+    pid_t watchdog_ = -1;
     /** The previous mode, if we switched to single key mode. */
     std::optional<termios> previous_mode_;
-    /** The return value of may_wait(). */
-    bool may_wait_ = true;
   };
 } // namespace ryujin::terminal
