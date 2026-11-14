@@ -11,6 +11,7 @@ subsection A - Scheduler
   set basename          = smooth_wave-vdw
   set tasks             = error evaluation
   set final time        = 0.6
+  set align time steps  = false
   set timer granularity = 0.6
 end
 

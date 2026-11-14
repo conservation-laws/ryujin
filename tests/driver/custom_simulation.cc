@@ -101,6 +101,7 @@ int main(int argc, char *argv[])
   parameters << "subsection A - Scheduler\n"
              << "  set final time        = 1.0\n"
              << "  set timer granularity = 0.25\n"
+             << "  set align time steps  = false\n"
              << "  set tasks             = print\n"
              << "end\n";
   ParameterAcceptor::initialize(parameters);

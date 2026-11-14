@@ -13,6 +13,7 @@ subsection A - Scheduler
   set tasks             = error evaluation
 
   set final time        = 2.0
+  set align time steps  = false
   set timer granularity = 2.0
 end
 

@@ -4,6 +4,7 @@ subsection A - Scheduler
   set tasks                = error evaluation
 
   set final time           = 0.66666666666667
+  set align time steps     = false
   set timer granularity    = 0.66666666666667
 end
 

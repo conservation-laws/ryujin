@@ -45,6 +45,7 @@ void run(const std::string &time_loop_parameters,
 {
   std::stringstream parameters;
   parameters << "subsection A - Scheduler\n"
+             << "  set align time steps = false\n"
              << time_loop_parameters             //
              << "  set tasks = error evaluation" //
              << (checkpointing_parameters.empty() ? "" : ", checkpointing")

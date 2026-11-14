@@ -2,6 +2,7 @@ subsection A - Scheduler
   set basename   = verification-smooth_wave
   set tasks      = error evaluation
   set final time = 0.1
+  set align time steps = false
 end
 
 subsection B - Equation

@@ -10,6 +10,7 @@ subsection A - Scheduler
   set basename             = test
   set tasks                = error evaluation
   set final time           = 10
+  set align time steps     = false
   set timer granularity    = 10
 end
 

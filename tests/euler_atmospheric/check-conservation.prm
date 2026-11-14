@@ -13,6 +13,7 @@ subsection A - Scheduler
   set basename             = test
   set tasks                = quantities
   set final time           = 5
+  set align time steps     = false
   set timer granularity    = 5
 end
 

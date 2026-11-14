@@ -96,6 +96,7 @@ std::pair<double, double> run(const std::string &name)
   parameters << "subsection A - Scheduler\n"
              << "  set basename   = " << name << "\n"
              << "  set final time = 0.1\n"
+             << "  set align time steps = false\n"
              << "end\n"
              << "subsection B - Equation\n"
              << "  set gamma = 1.4\n"
