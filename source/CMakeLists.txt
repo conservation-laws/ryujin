@@ -63,6 +63,7 @@ if(WITH_FTXUI)
   list(APPEND CORE_SOURCE_FILES
     driver/dashboard.cc
     driver/dashboard_animation.cc
+    driver/dashboard_frame.cc
     driver/dashboard_theme.cc
     driver/parameter_editor_ui.cc
     driver/splash_screen.cc

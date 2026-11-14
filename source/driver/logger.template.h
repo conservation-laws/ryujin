@@ -6,6 +6,9 @@
 #pragma once
 
 #include <driver/dashboard_text.h>
+#if defined(WITH_FTXUI)
+#include <driver/dashboard.h>
+#endif
 #include <driver/terminal.h>
 #include <ryujin/base/computing_timer.h>
 #include <ryujin/base/convenience_macros.h>
@@ -123,6 +126,10 @@ namespace ryujin
   }
 
 
+  template <int structdim, int dim, typename Number>
+  Logger<structdim, dim, Number>::~Logger() = default;
+
+
   /*
    * ---------------------------------------------------------------------------
    * Task:
@@ -189,7 +196,8 @@ namespace ryujin
     /* Play the animation from the start of the main loop on: */
     if (!dashboard_active_ && mpi_ensemble_.world_rank() == 0 &&
         interactive_terminal()) {
-      dashboard_.start(dashboard_settings_);
+      dashboard_ = std::make_unique<Dashboard>();
+      dashboard_->start(dashboard_settings_);
       dashboard_active_ = true;
     }
 #endif
@@ -494,8 +502,8 @@ namespace ryujin
     const auto text = render_text(dashboard_data_);
 
 #if defined(WITH_FTXUI)
-    if (interactive_terminal())
-      dashboard_.show(dashboard_data_);
+    if (dashboard_active_)
+      dashboard_->show(dashboard_data_);
     else
 #endif
       std::cout << "\033[2J\033[H" << text << std::flush;

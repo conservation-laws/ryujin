@@ -15,11 +15,14 @@
 
 #include <fstream>
 #include <functional>
+#include <memory>
 #include <ostream>
 #include <string>
 
 namespace ryujin
 {
+  class Dashboard;
+
   /**
    * The task "logger" that records the run time parameters, the MPI
    * partition, and the device information in the log file
@@ -38,6 +41,11 @@ namespace ryujin
      */
     Logger(const Interface::Simulation<structdim, dim, Number> &simulation,
            const std::string &subsection = "/Logger");
+
+    /**
+     * Destructor.
+     */
+    ~Logger() override;
 
     /**
      * @name Task
@@ -148,8 +156,8 @@ namespace ryujin
     /** The snapshot of the cycle statistics shown on the terminal. */
     DashboardData dashboard_data_;
 #if defined(WITH_FTXUI)
-    /** The terminal dashboard. */
-    Dashboard dashboard_;
+    /** The terminal dashboard, on rank 0 only. */
+    std::unique_ptr<Dashboard> dashboard_;
 #endif
 
     /** The original status message printer of the TaskContext. */

@@ -3,13 +3,10 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_animation.h>
-#include <driver/dashboard_music.h>
+#include <driver/dashboard.h>
 #include <driver/dashboard_theme.h>
 #include <driver/terminal.h>
-#include <ryujin/base/random.h>
 #include <ryujin/base/version_info.h>
-#include <ryujin/driver/dashboard.h>
 
 #include <ftxui/dom/canvas.hpp>
 #include <ftxui/dom/elements.hpp>
@@ -20,11 +17,12 @@
 #include <array>
 #include <chrono>
 #include <cmath>
-#include <condition_variable>
 #include <format>
 #include <iostream>
-#include <random>
 #include <ranges>
+#include <string_view>
+#include <thread>
+#include <vector>
 
 namespace ryujin
 {
@@ -299,7 +297,8 @@ namespace ryujin
     Element document(const DashboardData &data,
                      const std::deque<double> &wall_history,
                      const std::deque<double> &compute_history,
-                     int width)
+                     int width,
+                     Element menu)
     {
       /*
        * Header: cycle, time, and progress
@@ -666,65 +665,226 @@ namespace ryujin
                 })),
           panel("tasks", gridbox(std::move(task_table))),
           hbox({
-              muted(" terminal update every "),
-              caption(std::format("{:.2f}s", data.terminal_update_interval)),
+              std::move(menu),
               filler(),
-              muted(version_string() + " "),
+              muted("terminal update every "),
+              caption(std::format("{:.2f}s", data.terminal_update_interval)),
+              muted("   " + version_string() + " "),
           }),
       });
     }
-  } // namespace
 
 
-  std::pair<int, int> DashboardPosition::offset(DashboardLocation location,
-                                                int free_columns,
-                                                int free_rows) const
-  {
-    const auto [x, y] =
-        shifted_                                  ? fractions_
-        : location == DashboardLocation::top_left ? std::pair{0., 0.}
-        : location == DashboardLocation::center   ? std::pair{.5, .5}
-                                                  : fractions_;
-    return {static_cast<int>(x * free_columns),
-            static_cast<int>(y * free_rows)};
-  }
+    /*
+     * The menu below the dashboard, and the panels that fold out of it:
+     */
+
+    /* The buttons of the menu, of which only "options" has a function yet: */
+    constexpr std::array<std::string_view, 2> buttons = {"options", "abort"};
+    constexpr unsigned int options_button = 0;
 
 
-  bool DashboardPosition::move(DashboardLocation location)
-  {
-    if (location != DashboardLocation::screen_saver ||
-        std::chrono::steady_clock::now() < next_move_)
-      return false;
-
-    static auto random = seeded_mersenne_twister();
-    std::uniform_real_distribution<double> uniform;
-    fractions_ = {uniform(random), uniform(random)};
-    postpone();
-    return true;
-  }
+    /* The menu with the button @p selected highlighted: */
+    Element menu(unsigned int selected)
+    {
+      Elements elements = {text(" ")};
+      for (unsigned int i = 0; i < buttons.size(); ++i) {
+        elements.push_back(toggle(std::string(buttons[i]), i == selected));
+        elements.push_back(text(" "));
+      }
+      return hbox(std::move(elements));
+    }
 
 
-  void DashboardPosition::postpone()
-  {
-    next_move_ = std::chrono::steady_clock::now() + std::chrono::seconds(10);
-  }
+    /* The column of the button @p index in the menu: */
+    int button_column(unsigned int index)
+    {
+      int column = 1;
+      for (unsigned int i = 0; i < index; ++i)
+        column += static_cast<int>(buttons[i].size()) + 3;
+      return column;
+    }
 
 
-  void DashboardPosition::shift(DashboardLocation location,
-                                std::pair<int, int> by,
-                                int free_columns,
-                                int free_rows)
-  {
-    /* The fraction that offset() rounds down to the cell @p x: */
-    const auto fraction = [](int x, int free) {
-      return free > 0 ? std::clamp((x + 0.5) / free, 0., 1.) : 0.5;
+    /*
+     * The panel @p title with @p rows, of which the row @p selected is
+     * marked, and @p notes below:
+     */
+    Element fold_out(const std::string &title,
+                     Elements rows,
+                     unsigned int selected,
+                     Elements notes)
+    {
+      Elements lines;
+      for (unsigned int i = 0; i < rows.size(); ++i)
+        lines.push_back(hbox({
+            text(i == selected ? "> " : "  ") | color(theme.highlight),
+            std::move(rows[i]),
+        }));
+      lines.push_back(text(""));
+      for (auto &note : notes)
+        lines.push_back(std::move(note));
+
+      return panel(title, vbox(std::move(lines))) | clear_under;
+    }
+
+
+    /* The name of the enumerator @p value: */
+    template <typename T>
+    std::string name_of(const T &value)
+    {
+      return dealii::Patterns::Tools::Convert<T>::to_string(value);
+    }
+
+
+    /*
+     * The options panel:
+     */
+
+    /* Change @p value to the next (@p direction 1) or previous (-1) one: */
+    template <typename T>
+    void step(T &value, int direction)
+    {
+      const auto table = dealii::ConversionHelper<T>().conversion_table;
+      const auto n = static_cast<int>(table.size());
+      const auto it = std::ranges::find(
+          table, value, [](const auto &entry) { return std::get<0>(entry); });
+      const auto i = static_cast<int>(it - table.begin());
+      value = std::get<0>(table[(i + direction + n) % n]);
+    }
+
+
+    /*
+     * Change @p value by @p direction times @p increment within [@p lowest,
+     * @p highest], and to zero below and above:
+     */
+    void step(unsigned int &value,
+              int direction,
+              unsigned int lowest,
+              unsigned int highest,
+              unsigned int increment)
+    {
+      if (value == 0) {
+        value = direction > 0 ? lowest : highest;
+        return;
+      }
+      const long next = long(value) + direction * long(increment);
+      value = next < lowest || next > highest ? 0 : static_cast<unsigned>(next);
+    }
+
+
+    /* A row of the options panel: */
+    struct Option {
+      /* The name, as in the parameter file without "dashboard": */
+      std::string name;
+      /* The current value of the option in @p settings: */
+      std::string (*value)(const DashboardSettings &settings);
+      /* Change the option in @p settings by @p direction 1 or -1: */
+      void (*change)(DashboardSettings &settings, int direction);
     };
 
-    const auto [left, top] = offset(location, free_columns, free_rows);
-    fractions_ = {fraction(left + by.first, free_columns),
-                  fraction(top + by.second, free_rows)};
-    shifted_ = true;
-  }
+
+    /* All rows of the options panel: */
+    const std::vector<Option> &options()
+    {
+      using S = DashboardSettings;
+      static const std::vector<Option> options = {
+          {"location",
+           [](const S &s) { return name_of(s.location); },
+           [](S &s, int direction) { step(s.location, direction); }},
+          {"max width",
+           [](const S &s) {
+             return s.width == 0 ? std::string("no limit")
+                                 : std::to_string(s.width);
+           },
+           [](S &s, int direction) { step(s.width, direction, 80, 240, 20); }},
+          {"max height",
+           [](const S &s) {
+             return s.height == 0 ? std::string("natural")
+                                  : std::to_string(s.height);
+           },
+           [](S &s, int direction) { step(s.height, direction, 30, 120, 10); }},
+          {"color scheme",
+           [](const S &s) { return name_of(s.color_scheme); },
+           [](S &s, int direction) { step(s.color_scheme, direction); }},
+          {"animation",
+           [](const S &s) { return name_of(s.animation); },
+           [](S &s, int direction) { step(s.animation, direction); }},
+#if defined(WITH_MINIAUDIO)
+          {"music",
+           [](const S &s) { return name_of(s.music); },
+           [](S &s, int direction) { step(s.music, direction); }},
+#endif
+      };
+      return options;
+    }
+
+
+    /* The options panel for @p settings with the row @p selected: */
+    Element options_panel(const DashboardSettings &settings,
+                          unsigned int selected)
+    {
+      Elements rows;
+      for (unsigned int i = 0; i < options().size(); ++i) {
+        const auto &option = options()[i];
+        const bool active = i == selected;
+        rows.push_back(hbox({
+            (active ? text(option.name) | bold : caption(option.name)) |
+                size(WIDTH, EQUAL, 20),
+            muted(active ? "< " : "  "),
+            toggle(option.value(settings), active),
+            muted(active ? " >" : "  "),
+        }));
+      }
+
+      return fold_out("options",
+                      std::move(rows),
+                      selected,
+                      {muted("arrows: select, change   esc: close")});
+    }
+
+
+    /*
+     * The keys:
+     */
+
+    enum class Key : std::uint8_t { up, down, left, right, select, close };
+
+
+    /* The keys in @p input: arrow or vi keys, return, and escape: */
+    std::vector<Key> decode(std::string_view input)
+    {
+      constexpr std::string_view arrows = "ABCD";
+      constexpr std::string_view vi = "kjlh";
+      constexpr std::array directions = {
+          Key::up, Key::down, Key::right, Key::left};
+
+      std::vector<Key> keys;
+      for (std::size_t i = 0; i < input.size(); ++i) {
+        const auto c = input[i];
+        if (c == '\033' && i + 2 < input.size() &&
+            (input[i + 1] == '[' || input[i + 1] == 'O')) {
+          if (const auto j = arrows.find(input[i + 2]); j != arrows.npos)
+            keys.push_back(directions[j]);
+          i += 2;
+        } else if (const auto j = vi.find(c); j != vi.npos)
+          keys.push_back(directions[j]);
+        else if (c == '\n' || c == '\r')
+          keys.push_back(Key::select);
+        else if (c == '\033')
+          keys.push_back(Key::close);
+      }
+      return keys;
+    }
+
+
+    /* The entry before (@p back) or after @p entry of @p n, cyclically: */
+    unsigned int cycle(unsigned int entry, bool back, std::size_t n)
+    {
+      const auto m = static_cast<unsigned int>(n);
+      return (entry + (back ? m - 1 : 1)) % m;
+    }
+  } // namespace
 
 
   Dashboard::Dashboard() = default;
@@ -742,40 +902,62 @@ namespace ryujin
     std::scoped_lock lock(mutex_);
 
     output_ = std::make_unique<terminal::Output>();
-    settings_ = settings;
-    theme = make_palette(settings.color_scheme);
-    animation_ = animation::create(settings.animation);
-    /* Keep the music of the arcade splash screen if there is none: */
-    if (settings.music != DashboardMusic::none)
-      play_dashboard_music(settings.music);
+    frame_.configure(settings);
+
+    /* Read keys for the menu if we can: */
+    auto keyboard = std::make_unique<terminal::Keyboard>();
+    if (keyboard->readable())
+      keyboard_ = std::move(keyboard);
+
     write(render());
 
     thread_ = std::jthread([this](std::stop_token token) {
-      std::condition_variable_any wakeup;
-      std::unique_lock lock(mutex_);
-      while (!wakeup.wait_for(
-          lock, token, std::chrono::milliseconds(150), [&token] {
-            return token.stop_requested();
-          })) {
+      using clock = std::chrono::steady_clock;
+      constexpr auto period = std::chrono::milliseconds(150);
+
+      for (auto next = clock::now() + period; !token.stop_requested();) {
+        /*
+         * Wait for the next frame. If we read keys, wait for keys instead,
+         * outside of the lock, and handle them right away. Only this
+         * thread changes the keyboard while it runs:
+         */
+        std::optional<std::string> keys = std::string();
+        if (keyboard_)
+          keys = keyboard_->read(std::chrono::ceil<std::chrono::milliseconds>(
+              std::max(next - clock::now(), clock::duration::zero())));
+        else
+          std::this_thread::sleep_until(next);
+
+        std::scoped_lock lock(mutex_);
+
+        if (!keys) {
+          /* No more input, hide the menu: */
+          option_.reset();
+          keyboard_.reset();
+          write(render());
+          continue;
+        }
+
+        if (!keys->empty()) {
+          handle(*keys);
+          write(render());
+          continue;
+        }
+
+        if (clock::now() < next)
+          continue;
+        next = clock::now() + period;
+
         /*
          * Redraw the last frame right away if the terminal is resized, or
          * if the dashboard moves. Otherwise advance the animation, unless
          * the last frame has scrolled:
          */
         const auto size = terminal_size();
-        if (size != terminal_size_ ||
-            (data_ && position_.move(settings_.location))) {
+        if (size != terminal_size_ || (data_ && frame_.move()))
           write(render());
-        } else if (animation_ && stage_->screen.dimy() <= size.second) {
-          stage_->changed.clear();
-          animation_->step(*stage_);
-          if (data_ && stage_->shift != std::pair{0, 0}) {
-            const auto [columns, rows] = stage_->free_space();
-            position_.shift(settings_.location, stage_->shift, columns, rows);
-            stage_->redraw = true;
-          }
-          write(stage_->redraw ? render() : changes(*stage_));
-        }
+        else if (frame_.animated() && stage_->screen.dimy() <= size.second)
+          write(frame_.step(*stage_) ? render() : changes(*stage_));
       }
     });
   }
@@ -789,6 +971,12 @@ namespace ryujin
 
     std::scoped_lock lock(mutex_);
 
+    /* Close the panels and hand back the terminal at the end: */
+    if (data.final_time) {
+      option_.reset();
+      keyboard_.reset();
+    }
+
     wall_history_.push_back(safe(data.wall_m_dofs_per_sec));
     compute_history_.push_back(safe(data.compute_m_dofs_per_sec));
     if (wall_history_.size() > 512) {
@@ -797,7 +985,7 @@ namespace ryujin
     }
 
     data_ = data;
-    position_.move(settings_.location);
+    frame_.move();
 
     /* Continue with subsequent output below the final dashboard: */
     write(render() + (data.final_time ? "\n" : ""));
@@ -821,32 +1009,48 @@ namespace ryujin
     } else {
       /* Limit the width of the dashboard on wide terminals: */
       const int terminal_columns = std::max(columns, 80);
-      const int width =
-          settings_.width == 0
-              ? terminal_columns
-              : std::min(terminal_columns, std::max<int>(settings_.width, 80));
-      auto element = document(*data_, wall_history_, compute_history_, width) |
-                     size(WIDTH, EQUAL, width);
+      const int width = frame_.width(terminal_columns);
+      auto element =
+          document(*data_,
+                   wall_history_,
+                   compute_history_,
+                   width,
+                   keyboard_ && !final_time ? menu(button_) : text("")) |
+          size(WIDTH, EQUAL, width);
 
       /* The natural height, stretched up to the maximal height: */
-      const int height = std::max(Dimension::Fit(element, true).dimy,
-                                  std::min<int>(settings_.height, lines));
+      const int height =
+          std::max(Dimension::Fit(element, true).dimy,
+                   std::min<int>(frame_.settings().height, lines));
 
       /* Cover the whole terminal, or more if the dashboard does not fit: */
       const int rows = std::max(height, lines);
-      const auto [left, top] = position_.offset(
-          settings_.location, terminal_columns - width, rows - height);
+      const auto [left, top] =
+          frame_.offset(terminal_columns - width, rows - height);
 
       stage_ = std::make_unique<animation::Stage>(
           Screen(terminal_columns, rows),
           Box{left, left + width - 1, top, top + height - 1});
-      Render(stage_->screen,
-             place(element | size(HEIGHT, EQUAL, height), left, top));
+      auto screen = place(element | size(HEIGHT, EQUAL, height), left, top);
+
+      /* The options panel, folded out upwards from its button: */
+      if (option_) {
+        auto panel = options_panel(frame_.settings(), *option_);
+        const auto fit = Dimension::Fit(panel, true);
+        screen = dbox({
+            std::move(screen),
+            place(std::move(panel),
+                  left + button_column(options_button),
+                  top + std::max(0, height - 1 - fit.dimy)),
+        });
+      }
+
+      Render(stage_->screen, screen);
     }
 
     /* Leave the screen around the final dashboard empty: */
-    if (animation_ && !final_time)
-      animation_->draw(*stage_);
+    if (!final_time)
+      frame_.draw(*stage_);
 
     std::string output = clear ? "\033[2J\033[H" : "\033[H";
     output += stage_->screen.ToString();
@@ -856,6 +1060,31 @@ namespace ryujin
       output += "\n\033[J";
 
     return output;
+  }
+
+
+  void Dashboard::handle(const std::string &input)
+  {
+    /* Ignore keys until there is a dashboard: */
+    if (!data_)
+      return;
+
+    for (const auto key : decode(input)) {
+      if (option_) {
+        if (key == Key::up || key == Key::down)
+          option_ = cycle(*option_, key == Key::up, options().size());
+        else if (key == Key::left || key == Key::right) {
+          auto settings = frame_.settings();
+          options()[*option_].change(settings, key == Key::left ? -1 : 1);
+          frame_.configure(settings);
+        } else if (key == Key::close)
+          option_.reset();
+
+      } else if (key == Key::left || key == Key::right)
+        button_ = cycle(button_, key == Key::left, buttons.size());
+      else if (key == Key::select && button_ == options_button)
+        option_ = 0;
+    }
   }
 
 

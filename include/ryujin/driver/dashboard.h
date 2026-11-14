@@ -10,27 +10,10 @@
 #include <deal.II/base/mpi.h>
 
 #include <array>
-#include <chrono>
 #include <cstdint>
 #include <deque>
-#include <memory>
-#include <mutex>
-#include <optional>
 #include <string>
-#include <thread>
-#include <utility>
 #include <vector>
-
-namespace ryujin::terminal
-{
-  class Output;
-} // namespace ryujin::terminal
-
-namespace ryujin::animation
-{
-  class Animation;
-  struct Stage;
-} // namespace ryujin::animation
 
 namespace ryujin
 {
@@ -288,56 +271,6 @@ namespace ryujin
 
 
   /**
-   * The position of the Dashboard, or of the parameter editor, in the
-   * terminal. For DashboardLocation::screen_saver the position changes
-   * to a random one every ten seconds.
-   *
-   * @ingroup Driver
-   */
-  class DashboardPosition
-  {
-  public:
-    /**
-     * Return the offset (left, top) of a window at @p location, with
-     * @p free_columns and @p free_rows of free space around it.
-     */
-    std::pair<int, int>
-    offset(DashboardLocation location, int free_columns, int free_rows) const;
-
-    /**
-     * For DashboardLocation::screen_saver, change to a new random
-     * position if the last change, or the last call to postpone(), is
-     * ten seconds ago. Return whether the position has changed.
-     */
-    bool move(DashboardLocation location);
-
-    /**
-     * Postpone the next change of the position by ten seconds.
-     */
-    void postpone();
-
-    /**
-     * Move a window at @p location by @p by = (columns, rows), within
-     * @p free_columns and @p free_rows of free space around it. The window
-     * keeps the new relative position, also for DashboardLocation::top_left
-     * and DashboardLocation::center.
-     */
-    void shift(DashboardLocation location,
-               std::pair<int, int> by,
-               int free_columns,
-               int free_rows);
-
-  private:
-    /** The fractions of the free space to the left and above. */
-    std::pair<double, double> fractions_ = {0.5, 0.5};
-    /** Whether the fractions override the location. */
-    bool shifted_ = false;
-    /** When the position changes next. */
-    std::chrono::steady_clock::time_point next_move_;
-  };
-
-
-  /**
    * A snapshot of the cycle statistics gathered by the Logger on rank 0.
    * We either render it with the Dashboard or create a plain text info
    * from it.
@@ -509,92 +442,5 @@ namespace ryujin
     double time_per_second = 0.;
 
     //@}
-  };
-
-
-  /**
-   * A terminal dashboard for the cycle statistics recorded in a
-   * DashboardData snapshot. The dashboard keeps a short history of
-   * the throughput.
-   *
-   * @ingroup Driver
-   */
-  class Dashboard
-  {
-  public:
-    Dashboard();
-
-    /**
-     * Destructor. Stops the background thread.
-     */
-    ~Dashboard();
-
-    /**
-     * Start a background thread that plays the animation, on the whole
-     * terminal until the first call to show().
-     */
-    void start(const DashboardSettings &settings);
-
-    /**
-     * Draw the snapshot @p data on the terminal and record it in the
-     * throughput history.
-     *
-     * The background thread redraws the last snapshot as soon as the
-     * terminal is resized or the dashboard moves, and advances the
-     * animation in between two calls. It stops with the final snapshot
-     * (DashboardData::final_time).
-     */
-    void show(const DashboardData &data);
-
-  private:
-    /**
-     * Render the last snapshot, or only the animation if there is none
-     * yet, into a string of ANSI escape sequences that redraws the whole
-     * terminal in place.
-     */
-    std::string render();
-
-    /**
-     * Stop the background thread.
-     */
-    void stop();
-
-    /**
-     * Return the number of columns and rows of the terminal.
-     */
-    std::pair<int, int> terminal_size() const;
-
-    /**
-     * Write @p output to the terminal.
-     */
-    void write(const std::string &output) const;
-
-    /** The settings given to start(). */
-    DashboardSettings settings_;
-    /** The last snapshot, redrawn by the background thread. */
-    std::optional<DashboardData> data_;
-
-    /** The recent wall throughput, oldest first. */
-    std::deque<double> wall_history_;
-    /** The recent compute throughput, oldest first. */
-    std::deque<double> compute_history_;
-
-    /** The position of the dashboard in the terminal. */
-    DashboardPosition position_;
-
-    /** The terminal size of the last frame. */
-    std::pair<int, int> terminal_size_;
-    /** The last frame. */
-    std::unique_ptr<animation::Stage> stage_;
-    /** The animation of the last frame. */
-    std::unique_ptr<animation::Animation> animation_;
-
-    /** The output to the terminal. */
-    std::unique_ptr<terminal::Output> output_;
-
-    /** Guards all of the above, and the output to the terminal. */
-    std::mutex mutex_;
-    /** The background thread that plays the animation. */
-    std::jthread thread_;
   };
 } // namespace ryujin
