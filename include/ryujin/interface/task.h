@@ -85,7 +85,9 @@ namespace ryujin
     /**
      * Fire once whenever the current time has reached one of the "time
      * points". Time points that lie before the time at which the trigger
-     * is evaluated for the first time are ignored.
+     * is evaluated for the first time are ignored. With "align time steps"
+     * the Scheduler shortens time steps so that every time point is
+     * reached exactly.
      */
     time_points,
   };
@@ -285,6 +287,7 @@ namespace ryujin
         return false;
 
       fired_ = true;
+      ++n_fired_;
       last_cycle_ = context.cycle;
       last_t_ = context.t;
       last_wall_time_ = context.wall_time;
@@ -393,12 +396,28 @@ namespace ryujin
     ACCESSOR_READ_ONLY(fired)
 
     /**
+     * The number of times the trigger has fired. Tasks use it to number
+     * their output files.
+     */
+    ACCESSOR_READ_ONLY(n_fired)
+
+    /**
      * The cycle, the time, and the wall time at which the trigger fired
      * last.
      */
     ACCESSOR_READ_ONLY(last_cycle)
     ACCESSOR_READ_ONLY(last_t)
     ACCESSOR_READ_ONLY(last_wall_time)
+
+    /**
+     * Serialize the number of firings for checkpointing. All other state
+     * is recomputed on the first evaluation.
+     */
+    template <class Archive>
+    void serialize(Archive &archive, const unsigned int /*version*/)
+    {
+      archive & n_fired_;
+    }
 
   private:
     /**
@@ -445,6 +464,7 @@ namespace ryujin
     std::vector<Number> time_points_;
 
     bool fired_ = false;
+    unsigned int n_fired_ = 0;
     unsigned int last_cycle_ = 0;
     Number last_t_ = Number(0.);
     Number last_wall_time_ = Number(0.);
@@ -536,15 +556,25 @@ namespace ryujin
 
       /**
        * Store the internal state of the task in a checkpoint. Called on
-       * all MPI ranks; but only the data of rank 0 is written.
+       * all MPI ranks; but only the data of rank 0 is written. The default
+       * implementation stores the Trigger.
        */
-      virtual void save(boost::archive::binary_oarchive & /*archive*/) const {}
+      virtual void save(boost::archive::binary_oarchive &archive) const
+      {
+        if (trigger_)
+          archive << *trigger_;
+      }
 
       /**
        * Restore the internal state of the task from a checkpoint. Called
-       * on all MPI ranks with the data written by save() on rank 0.
+       * on all MPI ranks with the data written by save() on rank 0. The
+       * default implementation restores the Trigger.
        */
-      virtual void load(boost::archive::binary_iarchive & /*archive*/) {}
+      virtual void load(boost::archive::binary_iarchive &archive)
+      {
+        if (trigger_)
+          archive >> *trigger_;
+      }
 
       //@}
       /**

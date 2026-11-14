@@ -76,11 +76,12 @@ namespace ryujin
                   "the given number of cycles (time steps), or when the "
                   "final time is reached, whichever comes first");
 
-    align_time_steps_ = false;
+    align_time_steps_ = true;
     add_parameter("align time steps",
                   align_time_steps_,
                   "If set to true, time steps are shortened so that every "
-                  "timer tick and the final time are reached exactly");
+                  "timer tick, every time point of a task with trigger "
+                  "\"time points\", and the final time are reached exactly");
   }
 
 
@@ -179,10 +180,18 @@ namespace ryujin
       /* Perform a time step: */
 
       context.tau = Number(0.);
-      context.t_max =
-          align_time_steps_
-              ? std::min(t_final_, context.timer_cycle * timer_granularity_)
-              : std::numeric_limits<Number>::max();
+      context.t_max = std::numeric_limits<Number>::max();
+
+      if (align_time_steps_) {
+        context.t_max =
+            std::min(t_final_, context.timer_cycle * timer_granularity_);
+
+        for (const auto *task : tasks_)
+          if (task->has_trigger() &&
+              task->trigger().mode() == TriggerMode::time_points)
+            context.t_max =
+                std::min(context.t_max, task->trigger().next(context));
+      }
 
       run_phase(TaskPhase::step, context);
 

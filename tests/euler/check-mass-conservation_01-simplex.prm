@@ -4,6 +4,7 @@ subsection A - Scheduler
   set tasks                     = quantities
 
   set final time                = 0.5
+  set align time steps          = false
   set timer granularity         = 0.5
 end
 

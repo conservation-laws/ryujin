@@ -327,7 +327,7 @@ namespace ryujin
       return;
 
     ComputingTimer::Scope scope("time step [X]   - write out quantities");
-    write_out(state_vector, context.t, context.timer_cycle);
+    write_out(state_vector, context.t, this->trigger_->n_fired() - 1);
   }
 
 

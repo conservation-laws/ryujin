@@ -26,6 +26,10 @@
 // sum_ij g(x_i) m_ij h(x_j) with two different functions g and h detect
 // misplaced entries in a matrix.
 //
+// On periodic meshes the numbering decides whether the master degree of
+// freedom sits on the bottom or on the top boundary. We therefore map the
+// top boundary y = 2 onto y = 0 before evaluating g and h.
+//
 
 using namespace ryujin;
 using namespace dealii;
@@ -60,6 +64,14 @@ namespace
     return 1. + x.square();
   }
 
+  template <int dim>
+  Point<dim> wrap(Point<dim> x, const bool periodic)
+  {
+    if (periodic && std::abs(x[1] - 2.) < 1.e-10)
+      x[1] = 0.;
+    return x;
+  }
+
   /* Print the number of distinct values of a distributed index map. */
   void print_image_size(const std::string &name, const auto &index_map)
   {
@@ -74,7 +86,9 @@ namespace
 
 
 template <int dim>
-void test(const std::string &name, const std::string &parameter_string)
+void test(const std::string &name,
+          const std::string &parameter_string,
+          const bool periodic = false)
 {
   MPIEnsemble mpi_ensemble(MPI_COMM_WORLD);
   Discretization<dim> discretization(mpi_ensemble);
@@ -101,8 +115,9 @@ void test(const std::string &name, const std::string &parameter_string)
     g_vector.reinit(offline_data.scalar_partitioner());
     h_vector.reinit(offline_data.scalar_partitioner());
     for (unsigned int i = 0; i < n_owned; ++i) {
-      g_vector.local_element(i) = g(support_points[i]);
-      h_vector.local_element(i) = h(support_points[i]);
+      const auto x = wrap(support_points[i], periodic);
+      g_vector.local_element(i) = g(x);
+      h_vector.local_element(i) = h(x);
     }
     g_vector.update_ghost_values();
     h_vector.update_ghost_values();
@@ -203,7 +218,7 @@ void test(const std::string &name, const std::string &parameter_string)
        offline_data.boundary_map()) {
     boundary_mass_sum += boundary_mass;
     normal_mass_sum += normal_mass;
-    boundary_g += boundary_mass * g(position);
+    boundary_g += boundary_mass * g(wrap(position, periodic));
     closure += normal_mass * Tensor<1, dim>(normal);
     entries_by_id.at(id) += 1.;
     (void)i;
@@ -323,11 +338,14 @@ int main(int argc, char *argv[])
   test<2>("cG Q1", domain_2d("cG Q1", 3));
   test<2>("cG Q2", domain_2d("cG Q2", 2));
   test<2>("cG Q3", domain_2d("cG Q3", 2));
-  test<2>("cG Q1 periodic", domain_2d("cG Q1", 3, "", "", "slip", "periodic"));
+  test<2>("cG Q1 periodic",
+          domain_2d("cG Q1", 3, "", "", "slip", "periodic"),
+          true);
   test<2>("cG Q1 hanging", domain_2d("cG Q1", 2, hanging));
   test<2>("cG Q2 hanging", domain_2d("cG Q2", 2, hanging));
   test<2>("cG Q1 hanging periodic",
-          domain_2d("cG Q1", 2, hanging, "", "slip", "periodic"));
+          domain_2d("cG Q1", 2, hanging, "", "slip", "periodic"),
+          true);
   test<2>("cG Q2 transformed", domain_2d("cG Q2", 3, "", transformed));
   test<2>("dG Q1", domain_2d("dG Q1", 3));
   test<2>("dG Q2", domain_2d("dG Q2", 2));

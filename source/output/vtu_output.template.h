@@ -119,7 +119,7 @@ namespace ryujin
     context.info("scheduling output");
 
     const auto t = context.t;
-    const auto cycle = context.timer_cycle;
+    const auto cycle = this->trigger_->n_fired() - 1;
     const auto name = mpi_ensemble_.base_name(context.base_name);
 
     if (output_analytic_solution_) {

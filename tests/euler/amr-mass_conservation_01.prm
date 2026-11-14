@@ -4,6 +4,7 @@ subsection A - Scheduler
   set tasks                     = quantities, mesh adaptation
 
   set final time                = 2.0
+  set align time steps          = false
   set timer granularity         = 0.5
 end
 
