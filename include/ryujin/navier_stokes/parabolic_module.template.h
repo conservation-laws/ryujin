@@ -166,17 +166,25 @@ namespace ryujin
       const auto &scalar_partitioner =
           matrix_free_.get_dof_info(0).vector_partitioner;
 
-      velocity_.reinit(dim);
-      velocity_rhs_.reinit(dim);
-      for (unsigned int i = 0; i < dim; ++i) {
-        velocity_.block(i).reinit(scalar_partitioner);
-        velocity_rhs_.block(i).reinit(scalar_partitioner);
+      for (auto *it : {&velocity_,
+                       &velocity_rhs_,
+                       &stage_velocity_,
+                       &stage_stiffness_,
+                       &stage_force_}) {
+        it->reinit(dim);
+        for (unsigned int i = 0; i < dim; ++i)
+          it->block(i).reinit(scalar_partitioner);
+        it->collect_sizes();
       }
 
-      internal_energy_.reinit(scalar_partitioner);
-      internal_energy_rhs_.reinit(scalar_partitioner);
-
-      density_.reinit(scalar_partitioner);
+      for (auto *it : {&internal_energy_,
+                       &internal_energy_rhs_,
+                       &density_,
+                       &stage_work_,
+                       &stage_internal_energy_,
+                       &stage_diffusion_,
+                       &stage_energy_rhs_})
+        it->reinit(scalar_partitioner);
 
       /* Initialize multigrid: */
 
@@ -252,124 +260,172 @@ namespace ryujin
         Number tau,
         Number /*tau_max*/) const
     {
-      AssertThrow(tau != Number(0.),
-                  dealii::ExcMessage("A parabolic module cannot choose the "
-                                     "time step size: tau must be nonzero."));
+      const auto stages = stage_state_vectors.size();
+      AssertDimension(stage_weights_explicit.size(), stages);
+      AssertDimension(stage_weights_implicit.size(), stages + 1);
+      Assert(stage_weights_implicit.back() != Number(0.),
+             dealii::ExcInternalError());
 
-      switch (stage_state_vectors.size()) {
-      case 0:
-        backward_euler_step<0>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 1:
-        backward_euler_step<1>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 2:
-        backward_euler_step<2>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 3:
-        backward_euler_step<3>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 4:
-        backward_euler_step<4>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      default:
-        AssertThrow(false, dealii::ExcMessage("Unsupported number of stages."));
-      }
+      step(old_state_vector,
+           stage_state_vectors,
+           stage_weights_implicit.first(stages),
+           stage_weights_implicit.back(),
+           new_state_vector,
+           t,
+           tau);
 
       return tau;
     }
 
 
     template <int dim, typename Number>
-    template <int stages>
-    void ParabolicModule<dim, Number>::backward_euler_step(
+    Number ParabolicModule<dim, Number>::stage_combination_step(
         const StateVector<Number> &old_state_vector,
-        StageVectors /*stage_state_vectors*/,
-        StageWeights /*stage_weights_explicit*/,
-        StageWeights /*stage_weights_implicit*/,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights_explicit,
+        StageWeights stage_weights_implicit,
         StateVector<Number> &new_state_vector,
         Number t,
         Number tau) const
     {
       RYUJIN_DEBUG_ANNOUNCE();
 
-      /* Backward Euler step to half time step, and extrapolate: */
+      const auto stages = stage_state_vectors.size();
+      AssertDimension(stage_weights_explicit.size(), stages);
+      AssertDimension(stage_weights_implicit.size(), stages);
+      Assert(stages > 0, dealii::ExcInternalError());
 
       step(old_state_vector,
+           stage_state_vectors,
+           stage_weights_implicit,
+           Number(0.),
            new_state_vector,
            t,
-           tau,
-           /*crank_nicolson_extrapolation = */ false);
-    }
+           tau);
 
+      ComputingTimer::Scope scope("time step [P] 4 - stage combination");
 
-    template <int dim, typename Number>
-    Number ParabolicModule<dim, Number>::crank_nicolson_step(
-        const StateVector<Number> &old_state_vector,
-        StateVector<Number> &new_state_vector,
-        Number t,
-        Number tau,
-        Number /*tau_max*/) const
-    {
-      RYUJIN_DEBUG_ANNOUNCE();
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      AssertThrow(tau != Number(0.),
-                  dealii::ExcMessage("A parabolic module cannot choose the "
-                                     "time step size: tau must be nonzero."));
+      using HostSpace = dealii::MemorySpace::Host;
+      const auto &last_state_vector = stage_state_vectors.back().get();
+      copy_to_memory_space<HostSpace>(last_state_vector,
+                                      StateVectorPart::state);
 
-      try {
-        step(old_state_vector,
-             new_state_vector,
-             t,
-             tau / Number(2.),
-             /*crank_nicolson_extrapolation = */ true);
+      const auto old_U_view =
+          old_state_vector.state.template view<problem_dimension>();
+      const auto last_U_view =
+          last_state_vector.state.template view<problem_dimension>();
+      const auto new_U_view =
+          new_state_vector.state.template view<problem_dimension>();
 
-      } catch (Correction) {
+      const unsigned int n_internal = offline_data_->n_locally_internal();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const auto sparsity_simd_view =
+          offline_data_->sparsity_pattern_simd().view();
 
-        /*
-         * Under very rare circumstances we might fail to perform a Crank
-         * Nicolson step because the extrapolation step produced
-         * inadmissible states. We could correct the update now by
-         * performing a limiting step (either convex limiting, or flux
-         * corrected transport)... but *meh*, just perform a backward Euler
-         * step:
-         */
-        step(old_state_vector,
-             new_state_vector,
-             t,
-             tau,
-             /*crank_nicolson_extrapolation = */ false);
+      /*
+       * The new state is a high order update with weights that are in
+       * general not convex. We require the lower bound eps * rho_i * e_min
+       * on the internal energy, where e_min is the global minimum of the
+       * specific internal energy of the old state:
+       */
+
+      const auto view = hyperbolic_system_->template view<dim, Number>();
+
+      Number e_min = std::numeric_limits<Number>::max();
+      for (unsigned int i = 0; i < n_owned; ++i) {
+        if (sparsity_simd_view.row_length(i) == 1)
+          continue;
+        const auto U_i = old_U_view.template read_tensor<Number>(i);
+        e_min = std::min(e_min, view.internal_energy(U_i) / view.density(U_i));
       }
+      e_min = Utilities::MPI::min(e_min, mpi_ensemble_.ensemble_communicator());
+
+      /*
+       * Compute the largest limiter value l in [0, 1] such that U^s + l
+       * (U^new - U^s) satisfies the bound, where U^s is the last stage.
+       * The internal energy rho e(l) = rho e^s + beta l - alpha l^2 is
+       * concave in l and admissible for l = 0. We choose a single limiter
+       * value for the whole domain in order to maintain conservation of
+       * total energy.
+       */
+
+      Number l_min = Number(1.);
+      for (unsigned int i = 0; i < n_owned; ++i) {
+        if (sparsity_simd_view.row_length(i) == 1)
+          continue;
+
+        const auto U_s = last_U_view.template read_tensor<Number>(i);
+        const auto delta = new_U_view.template read_tensor<Number>(i) - U_s;
+
+        const auto rho = view.density(U_s);
+        const auto m_s = view.momentum(U_s);
+        const auto delta_m = view.momentum(delta);
+        const auto delta_E = view.total_energy(delta);
+
+        const auto f_0 = view.internal_energy(U_s) - eps * rho * e_min;
+        const auto beta = delta_E - m_s * delta_m / rho;
+        const auto alpha = Number(0.5) * delta_m.norm_square() / rho;
+
+        if (f_0 + beta - alpha >= Number(0.))
+          continue;
+
+        Number l = Number(0.);
+        if (f_0 > Number(0.)) {
+          if (alpha > Number(0.))
+            l = (beta + std::sqrt(beta * beta + 4. * alpha * f_0)) /
+                (2. * alpha);
+          else
+            l = -f_0 / beta;
+        }
+        l_min = std::min(l_min, std::clamp(l, Number(0.), Number(1.)));
+      }
+
+      l_min = Utilities::MPI::min(l_min, mpi_ensemble_.ensemble_communicator());
+
+      /*
+       * Synchronize whether limiting is needed. Even though the bound only
+       * affects the local ensemble we need to synchronize the boolean in
+       * case we perform synchronized global time steps.
+       */
+      const bool limiting_needed = Utilities::MPI::logical_or(
+          l_min < Number(1.), mpi_ensemble_.synchronization_communicator());
+
+      if (!limiting_needed)
+        return tau;
+
+      /* If we can restart the time step, we do so: */
+      if (this->id_violation_strategy_ ==
+          IDViolationStrategy::raise_exception) {
+        this->n_restarts_++;
+        /* Half step size is a good heuristic: */
+        throw Restart{Number(0.5) * tau};
+      }
+
+      this->n_corrections_++;
+
+#ifdef DEBUG_OUTPUT
+      std::cout << "        limiting stage combination with l = " << l_min
+                << std::endl;
+#endif
+
+      const auto body_limit = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+
+        /* Skip constrained degrees of freedom: */
+        if (sparsity_simd_view.row_length(i) == 1)
+          return;
+
+        const auto U_s = last_U_view.template read_tensor<T>(i);
+        const auto U_i = new_U_view.template read_tensor<T>(i);
+        new_U_view.template write_tensor<T>(U_s + T(l_min) * (U_i - U_s), i);
+      };
+
+      cpu_simd_loop<Number>(
+          "time_step_parabolic_4", body_limit, 0, n_internal, n_owned);
+
+      new_U_view.update_ghost_values();
 
       return tau;
     }
@@ -389,15 +445,65 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::assemble_viscous_dissipation(
+        ScalarHostVector<Number> &dst, const BlockHostVector &velocity) const
+    {
+      matrix_free_.template cell_loop<ScalarHostVector<Number>,
+                                      BlockHostVector>(
+          [this](const auto &data,
+                 auto &dst,
+                 const auto &src,
+                 const auto cell_range) {
+            FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
+            FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
+
+            const auto mu = parabolic_system_->mu();
+            const auto lambda = parabolic_system_->lambda();
+
+            for (unsigned int cell = cell_range.first; cell < cell_range.second;
+                 ++cell) {
+              velocity.reinit(cell);
+              energy.reinit(cell);
+              velocity.gather_evaluate(src, EvaluationFlags::gradients);
+
+              for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+                if constexpr (dim == 1) {
+                  /* Workaround: no symmetric gradient for dim == 1: */
+                  const auto gradient = velocity.get_gradient(q);
+                  auto S = (4. / 3. * mu + lambda) * gradient;
+                  energy.submit_value(gradient * S, q);
+
+                } else {
+
+                  const auto symmetric_gradient =
+                      velocity.get_symmetric_gradient(q);
+                  const auto divergence = trace(symmetric_gradient);
+                  auto S = 2. * mu * symmetric_gradient;
+                  for (unsigned int d = 0; d < dim; ++d)
+                    S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+                  energy.submit_value(symmetric_gradient * S, q);
+                }
+              }
+              energy.integrate_scatter(EvaluationFlags::values, dst);
+            }
+          },
+          dst,
+          velocity,
+          /* zero destination */ true);
+    }
+
+
+    template <int dim, typename Number>
     void ParabolicModule<dim, Number>::step(
         const StateVector<Number> &old_state_vector,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights,
+        const Number weight,
         StateVector<Number> &new_state_vector,
         Number t,
-        Number tau,
-        const bool crank_nicolson_extrapolation) const
+        Number tau) const
     {
       RYUJIN_DEBUG_ANNOUNCE();
-      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       using HostSpace = dealii::MemorySpace::Host;
 
@@ -425,17 +531,32 @@ namespace ryujin
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
-      if (crank_nicolson_extrapolation)
-        std::cout << "        and extrapolate to t + 2 * tau" << std::endl;
 #endif
 
       /*
-       * Update MG matrices every n-th time step; this is a balance because
-       * more refreshes will render the approximation better, at some
-       * additional cost.
+       * The effective step size of the implicit operator. For a vanishing
+       * weight of the new state the update only inverts the lumped mass
+       * matrix: we use plain conjugate gradients and skip the minimum
+       * principle check, see stage_combination_step().
+       */
+      const Number tau_implicit = tau * weight;
+      const bool implicit = weight != Number(0.);
+      const bool use_gmg_velocity = use_gmg_velocity_ && implicit;
+      const bool use_gmg_internal_energy = use_gmg_internal_energy_ && implicit;
+
+      /* Whether the stage state vectors contribute to the right hand side: */
+      const bool have_stages =
+          std::any_of(stage_weights.begin(),
+                      stage_weights.end(),
+                      [](const Number w) { return w != Number(0.); });
+
+      /*
+       * Update MG matrices every n-th implicit step; this is a balance
+       * because more refreshes will render the approximation better, at
+       * some additional cost.
        */
       const bool reinitialize_gmg =
-          (cycle_++ % gmg_reinitialization_interval_ == 0);
+          implicit && (cycle_++ % gmg_reinitialization_interval_ == 0);
 
       /*
        * A boolean indicating that a restart is required.
@@ -451,17 +572,6 @@ namespace ryujin
        * number of warnings.
        */
       std::atomic<bool> restart_needed = false;
-
-      /*
-       * A boolean indicating that we have to correct the high-order Crank
-       * Nicolson update. Note that this is a truly exceptional case
-       * indicating that the high-order update produced an inadmissible
-       * state, *boo*.
-       *
-       * Our current limiting strategy is to simply fall back to perform a
-       * single backward Euler step...
-       */
-      std::atomic<bool> correction_needed = false;
 
       /*
        * Step 1:
@@ -495,6 +605,102 @@ namespace ryujin
 
         cpu_simd_loop<Number>(
             "time_step_parabolic_1", body, 0, n_owned, n_owned);
+
+        /*
+         * Add the contributions of the stages to the right hand sides. For
+         * a stage with velocity V^k, internal energy e^k, and implicit
+         * weight w_k we add the nodal force
+         *
+         *   f_k = - tau w_k sum_j B_ij V^k_j
+         *
+         * to the velocity right hand side, and the viscous dissipation and
+         * heat flux
+         *
+         *   tau w_k (m_i K_i(V^k) - sum_j beta_ij e^k_j)
+         *
+         * to the internal energy right hand side. We also record the sum
+         * of the forces F = sum_k f_k and the work S = sum_k f_k V^k that
+         * enter the energy conservation correction, see Step 2.
+         */
+        if (have_stages) {
+          stage_force_ = Number(0.);
+          stage_work_ = Number(0.);
+          stage_energy_rhs_ = Number(0.);
+
+          VelocityMatrix<dim, Number, Number> velocity_stiffness;
+          velocity_stiffness.initialize(*parabolic_system_,
+                                        *offline_data_,
+                                        matrix_free_,
+                                        density_,
+                                        Number(1.));
+
+          EnergyMatrix<dim, Number, Number> energy_stiffness;
+          energy_stiffness.initialize(*offline_data_,
+                                      matrix_free_,
+                                      density_,
+                                      parabolic_system_->cv_inverse_kappa());
+
+          for (std::size_t k = 0; k < stage_state_vectors.size(); ++k) {
+            const Number weight = stage_weights[k];
+            if (weight == Number(0.))
+              continue;
+
+            const auto &stage_state_vector = stage_state_vectors[k].get();
+            copy_to_memory_space<HostSpace>(stage_state_vector,
+                                            StateVectorPart::state);
+            const auto stage_U_view =
+                stage_state_vector.state.template view<problem_dimension>();
+
+            const auto body_extract = [&](auto sentinel, unsigned int i) {
+              using T = decltype(sentinel);
+              const auto view = hyperbolic_system_->template view<dim, T>();
+              const auto U_i = stage_U_view.template read_tensor<T>(i);
+              const auto rho_i = view.density(U_i);
+              const auto M_i = view.momentum(U_i);
+              for (unsigned int d = 0; d < dim; ++d)
+                write_entry<T>(stage_velocity_.block(d), M_i[d] / rho_i, i);
+              write_entry<T>(
+                  stage_internal_energy_, view.internal_energy(U_i) / rho_i, i);
+            };
+
+            cpu_simd_loop<Number>(
+                "time_step_parabolic_1", body_extract, 0, n_owned, n_owned);
+
+            velocity_stiffness.apply_stiffness(stage_stiffness_,
+                                               stage_velocity_);
+            assemble_viscous_dissipation(internal_energy_rhs_, stage_velocity_);
+            energy_stiffness.apply_stiffness(stage_diffusion_,
+                                             stage_internal_energy_);
+
+            const auto body_add = [&](auto sentinel, unsigned int i) {
+              using T = decltype(sentinel);
+              const T factor = tau * weight;
+
+              T work = read_entry<T>(stage_work_, i);
+              for (unsigned int d = 0; d < dim; ++d) {
+                const auto f =
+                    -factor * read_entry<T>(stage_stiffness_.block(d), i);
+                const auto v = read_entry<T>(stage_velocity_.block(d), i);
+                const auto rhs = read_entry<T>(velocity_rhs_.block(d), i);
+                const auto force = read_entry<T>(stage_force_.block(d), i);
+                write_entry<T>(velocity_rhs_.block(d), rhs + f, i);
+                write_entry<T>(stage_force_.block(d), force + f, i);
+                work += f * v;
+              }
+              write_entry<T>(stage_work_, work, i);
+
+              const auto dissipation = read_entry<T>(internal_energy_rhs_, i);
+              const auto diffusion = read_entry<T>(stage_diffusion_, i);
+              const auto energy_rhs = read_entry<T>(stage_energy_rhs_, i);
+              write_entry<T>(stage_energy_rhs_,
+                             energy_rhs + factor * (dissipation - diffusion),
+                             i);
+            };
+
+            cpu_simd_loop<Number>(
+                "time_step_parabolic_1", body_add, 0, n_owned, n_owned);
+          }
+        }
 
         /*
          * Set up "strongly enforced" boundary conditions that are not stored
@@ -575,13 +781,13 @@ namespace ryujin
         diagonal_matrix.reinit(
             lumped_mass_matrix_view, density_, affine_constraints);
 
-        if ((use_gmg_velocity_ || use_gmg_internal_energy_) && reinitialize_gmg)
+        if ((use_gmg_velocity || use_gmg_internal_energy) && reinitialize_gmg)
           mg_transfer_velocity_.interpolate_to_mg(
               offline_data_->discretization().dof_handler(),
               level_density_,
               density_);
 
-        if (use_gmg_velocity_ && reinitialize_gmg) {
+        if (use_gmg_velocity && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               VelocityMatrix<dim, float, Number>,
               LinearAlgebra::distributed::BlockVector<float>,
@@ -600,7 +806,7 @@ namespace ryujin
                 *offline_data_,
                 level_matrix_free_[level],
                 level_density_[level],
-                tau,
+                tau_implicit,
                 level);
             level_velocity_matrices_[level].compute_diagonal(
                 smoother_data[level].preconditioner);
@@ -653,8 +859,11 @@ namespace ryujin
         ComputingTimer::Scope scope("time step [P] 1 - update velocities");
 
         VelocityMatrix<dim, Number, Number> velocity_operator;
-        velocity_operator.initialize(
-            *parabolic_system_, *offline_data_, matrix_free_, density_, tau);
+        velocity_operator.initialize(*parabolic_system_,
+                                     *offline_data_,
+                                     matrix_free_,
+                                     density_,
+                                     tau_implicit);
 
         const auto tolerance_velocity =
             (tolerance_linfty_norm_ ? velocity_rhs_.linfty_norm()
@@ -667,7 +876,7 @@ namespace ryujin
          * conjugate gradient method.
          */
         try {
-          if (!use_gmg_velocity_)
+          if (!use_gmg_velocity)
             throw SolverControl::NoConvergence(0, 0.);
 
           using bvt_float = LinearAlgebra::distributed::BlockVector<float>;
@@ -709,7 +918,7 @@ namespace ryujin
           /* update exponential moving average, counting also GMG iterations */
           n_iterations_velocity_ *= 0.9;
           n_iterations_velocity_ +=
-              0.1 * (use_gmg_velocity_ ? gmg_max_iter_vel_ : 0) +
+              0.1 * (use_gmg_velocity ? gmg_max_iter_vel_ : 0) +
               0.1 * solver_control.last_step();
         }
       }
@@ -721,51 +930,7 @@ namespace ryujin
         ComputingTimer::Scope scope("time step [P] 2 - update internal energy");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
-        matrix_free_
-            .template cell_loop<ScalarHostVector<Number>, BlockHostVector>(
-                [this](const auto &data,
-                       auto &dst,
-                       const auto &src,
-                       const auto cell_range) {
-                  FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
-                      data);
-                  FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
-                      data);
-
-                  const auto mu = parabolic_system_->mu();
-                  const auto lambda = parabolic_system_->lambda();
-
-                  for (unsigned int cell = cell_range.first;
-                       cell < cell_range.second;
-                       ++cell) {
-                    velocity.reinit(cell);
-                    energy.reinit(cell);
-                    velocity.gather_evaluate(src, EvaluationFlags::gradients);
-
-                    for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
-                      if constexpr (dim == 1) {
-                        /* Workaround: no symmetric gradient for dim == 1: */
-                        const auto gradient = velocity.get_gradient(q);
-                        auto S = (4. / 3. * mu + lambda) * gradient;
-                        energy.submit_value(gradient * S, q);
-
-                      } else {
-
-                        const auto symmetric_gradient =
-                            velocity.get_symmetric_gradient(q);
-                        const auto divergence = trace(symmetric_gradient);
-                        auto S = 2. * mu * symmetric_gradient;
-                        for (unsigned int d = 0; d < dim; ++d)
-                          S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-                        energy.submit_value(symmetric_gradient * S, q);
-                      }
-                    }
-                    energy.integrate_scatter(EvaluationFlags::values, dst);
-                  }
-                },
-                internal_energy_rhs_,
-                velocity_,
-                /* zero destination */ true);
+        assemble_viscous_dissipation(internal_energy_rhs_, velocity_);
 
         const auto lumped_mass_matrix_view =
             offline_data_->lumped_mass_matrix().template view<1>();
@@ -789,16 +954,29 @@ namespace ryujin
           }
 
           /*
-           * For backward Euler we have to add this algebraic correction
-           * to ensure conservation of total energy.
+           * We have to add an algebraic correction to ensure conservation
+           * of total energy. With the nodal forces f_k of the stages, their
+           * sum F, and their work S = sum_k f_k V^k (see Step 1) the
+           * correction reads
+           *
+           *   m_i rho_i 1/2 |V_i - V_i^new|^2 + S_i - F_i V_i^new,
+           *
+           * which reduces to the classical correction for a plain backward
+           * Euler step.
            */
-          const auto correction =
-              crank_nicolson_extrapolation
-                  ? T(0.)
-                  : Number(0.5) * (V_i - V_i_new).norm_square();
+          auto result =
+              m_i * rho_i * (e_i + Number(0.5) * (V_i - V_i_new).norm_square());
 
           /* rhs_i contains already m_i K_i^{n+1/2} */
-          const auto result = m_i * rho_i * (e_i + correction) + tau * rhs_i;
+          result += tau_implicit * rhs_i;
+
+          if (have_stages) {
+            result += read_entry<T>(stage_energy_rhs_, i);
+            result += read_entry<T>(stage_work_, i);
+            for (unsigned int d = 0; d < dim; ++d)
+              result -= read_entry<T>(stage_force_.block(d), i) * V_i_new[d];
+          }
+
           write_entry<T>(internal_energy_rhs_, result, i);
         };
 
@@ -842,7 +1020,7 @@ namespace ryujin
         affine_constraints.set_zero(internal_energy_);
         affine_constraints.set_zero(internal_energy_rhs_);
 
-        if (use_gmg_internal_energy_ && reinitialize_gmg) {
+        if (use_gmg_internal_energy && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               EnergyMatrix<dim, float, Number>,
               LinearAlgebra::distributed::Vector<float>>::AdditionalData>
@@ -859,7 +1037,7 @@ namespace ryujin
                 *offline_data_,
                 level_matrix_free_[level],
                 level_density_[level],
-                tau * parabolic_system_->cv_inverse_kappa(),
+                tau_implicit * parabolic_system_->cv_inverse_kappa(),
                 level);
             level_energy_matrices_[level].compute_diagonal(
                 smoother_data[level].preconditioner);
@@ -889,7 +1067,7 @@ namespace ryujin
         EnergyMatrix<dim, Number, Number> energy_operator;
         const auto &kappa = parabolic_system_->cv_inverse_kappa();
         energy_operator.initialize(
-            *offline_data_, matrix_free_, density_, tau * kappa);
+            *offline_data_, matrix_free_, density_, tau_implicit * kappa);
 
         const auto tolerance_internal_energy =
             (tolerance_linfty_norm_ ? internal_energy_rhs_.linfty_norm()
@@ -897,7 +1075,7 @@ namespace ryujin
             tolerance_;
 
         try {
-          if (!use_gmg_internal_energy_)
+          if (!use_gmg_internal_energy)
             throw SolverControl::NoConvergence(0, 0.);
 
           using vt_float = LinearAlgebra::distributed::Vector<float>;
@@ -942,7 +1120,7 @@ namespace ryujin
           /* update exponential moving average, counting also GMG iterations */
           n_iterations_internal_energy_ *= 0.9;
           n_iterations_internal_energy_ +=
-              0.1 * (use_gmg_internal_energy_ ? gmg_max_iter_en_ : 0) +
+              0.1 * (use_gmg_internal_energy ? gmg_max_iter_en_ : 0) +
               0.1 * solver_control.last_step();
         }
       }
@@ -974,14 +1152,15 @@ namespace ryujin
             m_i_new[d] = rho_i * read_entry<T>(velocity_.block(d), i);
           }
 
-          auto rho_e_i_new = rho_i * read_entry<T>(internal_energy_, i);
+          const auto rho_e_i_new = rho_i * read_entry<T>(internal_energy_, i);
 
           /*
            * Check that the backward Euler step itself (which is our "low
            * order" update) satisfies bounds. If not, signal a restart.
            */
 
-          if (!(T(0.) == std::max(T(0.), rho_i * e_min_old - rho_e_i_new))) {
+          if (implicit &&
+              !(T(0.) == std::max(T(0.), rho_i * e_min_old - rho_e_i_new))) {
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
             const auto e_i_new = rho_e_i_new / rho_i;
@@ -993,29 +1172,6 @@ namespace ryujin
                       << std::endl;
 #endif
             restart_needed = true;
-          }
-
-          if (crank_nicolson_extrapolation) {
-            m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
-            rho_e_i_new = Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
-
-            /*
-             * If we do perform an extrapolation step for Crank Nicolson
-             * we have to check whether we maintain admissibility
-             */
-
-            if (!(T(0.) ==
-                  std::max(T(0.), eps * rho_i * e_min_old - rho_e_i_new))) {
-#ifdef DEBUG_OUTPUT
-              std::cout << std::fixed << std::setprecision(16);
-              const auto e_i_new = rho_e_i_new / rho_i;
-
-              std::cout << "Bounds violation: high-order internal energy!"
-                        << "\t\te_min_new:         " << e_i_new << "\n"
-                        << "\t\t-- correction required --" << std::endl;
-#endif
-              correction_needed = true;
-            }
           }
 
           const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
@@ -1038,34 +1194,16 @@ namespace ryujin
             "time step [X] _ - synchronization barriers");
 
         /*
-         * Synchronize whether we have to restart or correct the time step.
-         * Even though the restart/correction condition itself only affects
-         * the local ensemble we nevertheless need to synchronize the
-         * boolean in case we perform synchronized global time steps.
-         * (Otherwise different ensembles might end up with a different
-         * time step.)
+         * Synchronize whether we have to restart the time step. Even
+         * though the restart condition itself only affects the local
+         * ensemble we nevertheless need to synchronize the boolean in case
+         * we perform synchronized global time steps. (Otherwise different
+         * ensembles might end up with a different time step.)
          */
 
         restart_needed.store(Utilities::MPI::logical_or(
             restart_needed.load(),
             mpi_ensemble_.synchronization_communicator()));
-
-        correction_needed.store(Utilities::MPI::logical_or(
-            correction_needed.load(),
-            mpi_ensemble_.synchronization_communicator()));
-      }
-
-      if (correction_needed) {
-        /* If we can do a restart try that first: */
-        if (this->id_violation_strategy_ ==
-            IDViolationStrategy::raise_exception) {
-          this->n_restarts_++;
-          /* Half step size is a good heuristic: */
-          throw Restart{Number(0.5) * tau};
-        } else {
-          this->n_corrections_++;
-          throw Correction();
-        }
       }
 
       if (restart_needed) {

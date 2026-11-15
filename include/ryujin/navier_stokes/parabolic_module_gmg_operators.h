@@ -314,6 +314,33 @@ namespace ryujin
         }
       }
 
+      /**
+       * Apply the (scaled) stress operator only, i.e., compute
+       * \f$\theta\tau\sum_j B_{ij} V_j\f$ without the mass term and
+       * without fixing up boundary degrees of freedom.
+       */
+      void apply_stiffness(block_vector_type &dst,
+                           const block_vector_type &src) const
+      {
+        const auto integrator = [this](const auto &data,
+                                       auto &dst,
+                                       const auto &src,
+                                       const auto range) {
+          dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
+              data);
+
+          for (unsigned int cell = range.first; cell < range.second; ++cell) {
+            velocity.reinit(cell);
+            velocity.read_dof_values(src);
+            apply_local_operator(velocity);
+            velocity.distribute_local_to_global(dst);
+          }
+        };
+
+        matrix_free_->template cell_loop<block_vector_type, block_vector_type>(
+            integrator, dst, src, /* zero destination */ true);
+      }
+
       void compute_diagonal(
           std::shared_ptr<DiagonalMatrix<dim, Number>> &matrix) const
       {
@@ -577,6 +604,32 @@ namespace ryujin
       {
         Assert(false, dealii::ExcNotImplemented());
         return Number();
+      }
+
+      /**
+       * Apply the (scaled) diffusion operator only, i.e., compute
+       * \f$\sum_j \beta_{ij} e_j\f$ without the mass term and without
+       * fixing up boundary degrees of freedom.
+       */
+      void apply_stiffness(vector_type &dst, const vector_type &src) const
+      {
+        const auto integrator = [this](const auto &data,
+                                       auto &dst,
+                                       const auto &src,
+                                       const auto range) {
+          dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
+              data);
+
+          for (unsigned int cell = range.first; cell < range.second; ++cell) {
+            energy.reinit(cell);
+            energy.read_dof_values(src);
+            apply_local_operator(energy);
+            energy.distribute_local_to_global(dst);
+          }
+        };
+
+        matrix_free_->template cell_loop<vector_type, vector_type>(
+            integrator, dst, src, /* zero destination */ true);
       }
 
       void vmult(vector_type &dst, const vector_type &src) const
