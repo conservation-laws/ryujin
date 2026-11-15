@@ -207,9 +207,15 @@ namespace ryujin
       for (unsigned int i = 0; i < magnetic_field_.n_blocks(); ++i)
         magnetic_field_.block(i).reinit(scalar_partitioner);
 
-      velocity_rhs_.reinit(dim);
-      for (unsigned int i = 0; i < dim; ++i)
-        velocity_rhs_.block(i).reinit(scalar_partitioner);
+      for (auto *it : {&velocity_rhs_,
+                       &stage_velocity_increment_,
+                       &stage_flux_,
+                       &stage_gradient_}) {
+        it->reinit(dim);
+        for (unsigned int i = 0; i < dim; ++i)
+          it->block(i).reinit(scalar_partitioner);
+        it->collect_sizes();
+      }
 
       /*
        * Populate background fields. The vectors have just been
@@ -234,11 +240,16 @@ namespace ryujin
       RYUJIN_DEBUG_ANNOUNCE();
 
       auto &[U, Q, U_dynamic, Q_dynamic] = state_vector;
+
+      /* The potential and its time derivative, see step(): */
       U_dynamic.resize(1);
+      Q_dynamic.resize(1);
 
       const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
       U_dynamic[0].reinit_with_scalar_partitioner(partitioner, 1);
       U_dynamic[0].deal_ii_vector() = 0.;
+      Q_dynamic[0].reinit_with_scalar_partitioner(partitioner, 1);
+      Q_dynamic[0].deal_ii_vector() = 0.;
     }
 
 
@@ -292,133 +303,53 @@ namespace ryujin
     ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
         StageVectors stage_state_vectors,
-        StageWeights stage_weights_explicit,
+        [[maybe_unused]] StageWeights stage_weights_explicit,
         StageWeights stage_weights_implicit,
         StateVector<Number> &new_state_vector,
         Number t,
         Number tau,
         Number /*tau_max*/) const
     {
-      AssertThrow(tau != Number(0.),
-                  dealii::ExcMessage("A parabolic module cannot choose the "
-                                     "time step size: tau must be nonzero."));
+      const auto stages = stage_state_vectors.size();
+      AssertDimension(stage_weights_explicit.size(), stages);
+      AssertDimension(stage_weights_implicit.size(), stages + 1);
+      Assert(stage_weights_implicit.back() != Number(0.),
+             dealii::ExcInternalError());
 
-      switch (stage_state_vectors.size()) {
-      case 0:
-        backward_euler_step<0>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 1:
-        backward_euler_step<1>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 2:
-        backward_euler_step<2>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 3:
-        backward_euler_step<3>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      case 4:
-        backward_euler_step<4>(old_state_vector,
-                               stage_state_vectors,
-                               stage_weights_explicit,
-                               stage_weights_implicit,
-                               new_state_vector,
-                               t,
-                               tau);
-        break;
-      default:
-        AssertThrow(false, dealii::ExcMessage("Unsupported number of stages."));
-      }
+      step(old_state_vector,
+           stage_state_vectors,
+           stage_weights_implicit.first(stages),
+           stage_weights_implicit.back(),
+           new_state_vector,
+           t,
+           tau);
 
       return tau;
     }
 
 
     template <typename HyperbolicDescription, int dim, typename Number>
-    template <int stages>
-    void
-    ParabolicModule<HyperbolicDescription, dim, Number>::backward_euler_step(
+    Number
+    ParabolicModule<HyperbolicDescription, dim, Number>::stage_combination_step(
         const StateVector<Number> &old_state_vector,
-        StageVectors /*stage_state_vectors*/,
-        StageWeights /*stage_weights_explicit*/,
-        StageWeights /*stage_weights_implicit*/,
+        StageVectors stage_state_vectors,
+        [[maybe_unused]] StageWeights stage_weights_explicit,
+        StageWeights stage_weights_implicit,
         StateVector<Number> &new_state_vector,
         Number t,
         Number tau) const
     {
-      RYUJIN_DEBUG_ANNOUNCE();
+      [[maybe_unused]] const auto stages = stage_state_vectors.size();
+      AssertDimension(stage_weights_explicit.size(), stages);
+      AssertDimension(stage_weights_implicit.size(), stages);
 
       step(old_state_vector,
+           stage_state_vectors,
+           stage_weights_implicit,
+           Number(0.),
            new_state_vector,
            t,
-           tau,
-           /*crank_nicolson_extrapolation = */ false);
-    }
-
-
-    template <typename HyperbolicDescription, int dim, typename Number>
-    Number
-    ParabolicModule<HyperbolicDescription, dim, Number>::crank_nicolson_step(
-        const StateVector<Number> &old_state_vector,
-        StateVector<Number> &new_state_vector,
-        Number t,
-        Number tau,
-        Number /*tau_max*/) const
-    {
-      RYUJIN_DEBUG_ANNOUNCE();
-
-      AssertThrow(tau != Number(0.),
-                  dealii::ExcMessage("A parabolic module cannot choose the "
-                                     "time step size: tau must be nonzero."));
-
-      try {
-        /* Backward Euler step to half time step, and extrapolate: */
-
-        step(old_state_vector,
-             new_state_vector,
-             t,
-             tau / Number(2.),
-             /*crank_nicolson_extrapolation = */ true);
-
-      } catch (Correction) {
-
-        /*
-         * Under very rare circumstances we might fail to perform a Crank
-         * Nicolson step because the extrapolation step produced
-         * inadmissible states. We could correct the update now by
-         * performing a limiting step (either convex limiting, or flux
-         * corrected transport)... but *meh*, just perform a backward Euler
-         * step:
-         */
-        step(old_state_vector,
-             new_state_vector,
-             t,
-             tau,
-             /*crank_nicolson_extrapolation = */ false);
-      }
+           tau);
 
       return tau;
     }
@@ -848,18 +779,40 @@ namespace ryujin
     template <typename HyperbolicDescription, int dim, typename Number>
     void ParabolicModule<HyperbolicDescription, dim, Number>::step(
         const StateVector<Number> &old_state_vector,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights,
+        const Number weight,
         StateVector<Number> &new_state_vector,
         Number t,
-        Number tau [[maybe_unused]],
-        const bool crank_nicolson_extrapolation [[maybe_unused]]) const
+        Number tau) const
     {
       RYUJIN_DEBUG_ANNOUNCE();
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
-      if (crank_nicolson_extrapolation)
-        std::cout << "        and extrapolate to t + 2 * tau" << std::endl;
 #endif
+
+      /* The effective step size of the implicit operator: */
+      const Number tau_implicit = tau * weight;
+
+      /* Whether the stage state vectors contribute to the right hand side: */
+      const bool have_stages =
+          std::any_of(stage_weights.begin(),
+                      stage_weights.end(),
+                      [](const Number w) { return w != Number(0.); });
+
+      /*
+       * Whether we solve for the new potential. Without an implicit
+       * contribution of the new state the potential is formed with the
+       * time derivatives of the stages, unless the derivative of the first
+       * stage state vector is needed (it is not known), or the background
+       * density is time dependent (its change over this step enters the
+       * right hand side).
+       */
+      const bool solve_potential =
+          weight != Number(0.) ||
+          (!stage_weights.empty() && stage_weights.front() != Number(0.)) ||
+          selected_electrostatic_configuration_->is_time_dependent();
 
       const Number alpha = parabolic_system_->alpha();
 
@@ -869,7 +822,8 @@ namespace ryujin
                                       StateVectorPart::state,
                                       StateVectorPart::dynamic_state);
       move_to_memory_space<HostSpace>(new_state_vector,
-                                      StateVectorPart::dynamic_state);
+                                      StateVectorPart::dynamic_state,
+                                      StateVectorPart::dynamic_precomputed);
 
       const auto &old_U = old_state_vector.state;
       const auto old_U_view = old_U.template view<problem_dimension>();
@@ -888,6 +842,104 @@ namespace ryujin
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
 
+      /* Project the gradient of a potential into velocity space: */
+
+      const auto body_gradient =
+          [](const auto &data, auto &dst, const auto &src, const auto range) {
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+                fee_pot(data, /*CG*/ 0, /*lumped quadrature*/ 1);
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ dim, Number>
+                fee_vel(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+            for (unsigned int cell = range.first; cell < range.second; ++cell) {
+              fee_pot.reinit(cell);
+              fee_vel.reinit(cell);
+
+              fee_pot.gather_evaluate(src, dealii::EvaluationFlags::gradients);
+              for (unsigned int q = 0; q < fee_pot.n_q_points; ++q) {
+                fee_vel.submit_value(fee_pot.get_gradient(q), q);
+              }
+              fee_vel.integrate_scatter(dealii::EvaluationFlags::values, dst);
+            }
+          };
+
+      /* Query the magnetic field at the time t + tau: */
+      update_magnetic_field(t + tau);
+
+      /*
+       * Collect the contributions of the stages. For a stage with velocity
+       * v^k, potential phi^k, and implicit weight w_k we record the
+       * velocity increment
+       *
+       *   tau w_k (- B^{-1} grad phi^k + L v^k),
+       *
+       * where L denotes the Lorentz force with B_n = I - tau L, and the
+       * flux tau w_k rho v^k entering the potential update.
+       */
+
+      if (have_stages) {
+        stage_velocity_increment_ = Number(0.);
+        stage_flux_ = Number(0.);
+
+        for (std::size_t k = 0; k < stage_state_vectors.size(); ++k) {
+          const Number weight = stage_weights[k];
+          if (weight == Number(0.))
+            continue;
+
+          const auto &stage_state_vector = stage_state_vectors[k].get();
+          copy_to_memory_space<HostSpace>(stage_state_vector,
+                                          StateVectorPart::state,
+                                          StateVectorPart::dynamic_state,
+                                          StateVectorPart::dynamic_precomputed);
+          const auto stage_U_view =
+              stage_state_vector.state.template view<problem_dimension>();
+
+          matrix_free_
+              .template cell_loop<BlockHostVector, ScalarHostVector<Number>>(
+                  body_gradient,
+                  stage_gradient_,
+                  stage_state_vector.dynamic_state[0].deal_ii_vector(),
+                  /*zero destination*/ true);
+
+          const auto body_stage = [&](auto sentinel, unsigned int i) {
+            using T = decltype(sentinel);
+            const auto view = hyperbolic_system_->template view<dim, T>();
+            const T factor = tau * weight;
+
+            const auto m_i_inv =
+                lumped_mass_matrix_inverse_view.template read_entry<T>(i);
+            const auto rho_i =
+                view.density(old_U_view.template read_tensor<T>(i));
+
+            const auto U_i = stage_U_view.template read_tensor<T>(i);
+            const auto v_i = view.momentum(U_i) / view.density(U_i);
+
+            dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+            for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+              magnetic_field[d] = read_entry<T>(magnetic_field_.block(d), i);
+
+            /* tau w_k L v^k = v^k - (I - tau w_k L) v^k: */
+            const auto lorentz = v_i - apply_B_n(magnetic_field, factor, v_i);
+
+            for (unsigned int d = 0; d < dim; ++d) {
+              const auto grad_phi =
+                  m_i_inv * read_entry<T>(stage_gradient_.block(d), i);
+              const auto increment =
+                  read_entry<T>(stage_velocity_increment_.block(d), i);
+              write_entry<T>(stage_velocity_increment_.block(d),
+                             increment - factor * grad_phi + lorentz[d],
+                             i);
+              const auto flux = read_entry<T>(stage_flux_.block(d), i);
+              write_entry<T>(
+                  stage_flux_.block(d), flux + factor * rho_i * v_i[d], i);
+            }
+          };
+
+          cpu_simd_loop<Number>(
+              "time_step_parabolic_2", body_stage, 0, n_owned, n_owned);
+        }
+      }
+
       /*
        * Initialize the new potential with the old one:
        */
@@ -898,10 +950,29 @@ namespace ryujin
        * If the Gauss law restart strategy is "static full restart" or
        * "static no restart", we skip updating the potential.
        */
-      if ((gauss_law_restart_strategy_ !=
+      const bool update_potential =
+          (gauss_law_restart_strategy_ !=
            GaussLawRestartStrategy::static_no_restart) &&
           (gauss_law_restart_strategy_ !=
-           GaussLawRestartStrategy::static_full_restart)) {
+           GaussLawRestartStrategy::static_full_restart);
+
+      auto &new_derivative =
+          new_state_vector.dynamic_precomputed[0].deal_ii_vector();
+
+      if (update_potential && !solve_potential) {
+        /*
+         * Form the new potential with the time derivatives of the stages:
+         */
+        for (std::size_t k = 0; k < stage_state_vectors.size(); ++k)
+          if (stage_weights[k] != Number(0.))
+            new_potential.add(tau * stage_weights[k],
+                              stage_state_vectors[k]
+                                  .get()
+                                  .dynamic_precomputed[0]
+                                  .deal_ii_vector());
+      }
+
+      if (update_potential && solve_potential) {
 
         /*
          * ---------------------------------------------------------------------
@@ -912,18 +983,14 @@ namespace ryujin
          *   \tau \alpha \langle \rho^n B^{-1} v^n, \nabla \chi \rangle
          *
          * In case of a time-dependent background density, we add a term
-         * \theta \alpha \langle \rho_b^{n+1} - \rho_b^n, \chi \rangle to
-         * account for the time dependence. Here, t_{n+1} is the final time
-         * t_n + tau, or t_n + 2 * tau (in case of Crank Nicolson). This
-         * ensures that we are consistent with the Gauß law involution
-         * "-\Delta \varphi^{n+1} = \alpha \rho^{n+1}."
+         * \alpha \langle \rho_b(t + \tau) - \rho_b(t), \chi \rangle to
+         * account for the time dependence. This ensures that we are
+         * consistent with the Gauß law involution "-\Delta \varphi^{n+1} =
+         * \alpha \rho^{n+1}."
          * ---------------------------------------------------------------------
          */
 
         ComputingTimer::Scope scope("time step [P] 2 - update potential");
-
-        /* Query the magnetic field at the time t + tau: */
-        update_magnetic_field(t + tau);
 
         /*
          * Write out density and assemble velocity part. We need density_
@@ -942,9 +1009,17 @@ namespace ryujin
           for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
             magnetic_field[d] = read_entry<T>(magnetic_field_.block(d), i);
 
-          const auto velocity_rhs =
-              tau * alpha * rho_i *
-              apply_B_n_inverse(magnetic_field, tau, m_i / rho_i);
+          auto v_i = m_i / rho_i;
+          if (have_stages)
+            for (unsigned int d = 0; d < dim; ++d)
+              v_i[d] += read_entry<T>(stage_velocity_increment_.block(d), i);
+
+          auto velocity_rhs =
+              tau_implicit * alpha * rho_i *
+              apply_B_n_inverse(magnetic_field, tau_implicit, v_i);
+          if (have_stages)
+            for (unsigned int d = 0; d < dim; ++d)
+              velocity_rhs[d] += alpha * read_entry<T>(stage_flux_.block(d), i);
 
           write_entry<T>(density_, rho_i, i);
           for (unsigned int d = 0; d < dim; ++d)
@@ -1026,12 +1101,20 @@ namespace ryujin
         if (selected_electrostatic_configuration_->is_time_dependent()) {
 
           /*
-           * Subtract background density at time t_n:
+           * We add the change of the background density over the interval
+           * [t, t + tau] of this step. Along the start stages of a
+           * Runge-Kutta scheme these changes add up to the change over the
+           * full time step, see
+           * Interface::ParabolicModule::backward_euler_step().
+           */
+
+          /*
+           * Subtract background density at time t:
            */
 
           update_background_density(t);
 
-          Number factor = (crank_nicolson_extrapolation ? -0.5 : -1.0) * alpha;
+          Number factor = -alpha;
 
           const auto body = [&factor](const auto &data,
                                       auto &dst,
@@ -1063,11 +1146,10 @@ namespace ryujin
               /*zero destination*/ false);
 
           /*
-           * Add background density at time t_{n+1}:
+           * Add background density at time t + tau:
            */
 
-          update_background_density(
-              t + (crank_nicolson_extrapolation ? 2. : 1.) * tau);
+          update_background_density(t + tau);
 
           factor *= -1.;
 
@@ -1086,7 +1168,7 @@ namespace ryujin
          */
 
         update_operator_.set_alpha(alpha);
-        update_operator_.set_theta_tau(tau);
+        update_operator_.set_theta_tau(tau_implicit);
 
         matrix_free_.get_affine_constraints(0).distribute(new_potential);
         matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
@@ -1132,53 +1214,44 @@ namespace ryujin
       }
 
       /*
+       * Recover the time derivative of the potential of the new state:
+       */
+      if (weight != Number(0.)) {
+        new_derivative = new_potential;
+        new_derivative -= old_potential;
+        for (std::size_t k = 0; k < stage_state_vectors.size(); ++k)
+          if (stage_weights[k] != Number(0.))
+            new_derivative.add(-tau * stage_weights[k],
+                               stage_state_vectors[k]
+                                   .get()
+                                   .dynamic_precomputed[0]
+                                   .deal_ii_vector());
+        new_derivative /= tau_implicit;
+      }
+
+      /*
        * ---------------------------------------------------------------------
-       * Step 2c: update velocity vector field; Crank-Nicolson extrapolation
+       * Step 2c: update velocity vector field
        * ---------------------------------------------------------------------
        */
 
       /* Project gradient of potential into velocity space: */
 
-      const auto body_velocity =
-          [](const auto &data, auto &dst, const auto &src, const auto range) {
-            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
-                fee_pot(data, /*CG*/ 0, /*lumped quadrature*/ 1);
-            FEEvaluation<dim, order_fe, order_quad, /*components*/ dim, Number>
-                fee_vel(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
-
-            for (unsigned int cell = range.first; cell < range.second; ++cell) {
-              fee_pot.reinit(cell);
-              fee_vel.reinit(cell);
-
-              fee_pot.gather_evaluate(src, dealii::EvaluationFlags::gradients);
-              for (unsigned int q = 0; q < fee_pot.n_q_points; ++q) {
-                fee_vel.submit_value(fee_pot.get_gradient(q), q);
-              }
-              fee_vel.integrate_scatter(dealii::EvaluationFlags::values, dst);
-            }
-          };
-
       matrix_free_
           .template cell_loop<BlockHostVector, ScalarHostVector<Number>>(
-              body_velocity,
+              body_gradient,
               velocity_rhs_,
               new_potential,
               /*zero destination*/ true);
 
       /*
        * Now that we have written out the gradients, copy over the old
-       * state vector and perform the Crank-Nicolson extrapolation step on
-       * the potential:
+       * state vector:
        */
 
       new_U = old_U;
       move_to_memory_space<HostSpace>(new_U); /* invalidates default */
       const auto new_U_view = new_U.template view<problem_dimension>();
-
-      if (crank_nicolson_extrapolation) {
-        new_potential *= Number(2.);
-        new_potential -= old_potential;
-      }
 
       /*
        * Update the momentum and total energy:
@@ -1204,12 +1277,13 @@ namespace ryujin
         for (unsigned int d = 0; d < dim; ++d)
           grad_phi[d] = m_i_inv * read_entry<T>(velocity_rhs_.block(d), i);
 
-        auto new_v_i =
-            apply_B_n_inverse(magnetic_field, tau, old_v_i - tau * grad_phi);
+        auto rhs_v_i = old_v_i - tau_implicit * grad_phi;
+        if (have_stages)
+          for (unsigned int d = 0; d < dim; ++d)
+            rhs_v_i[d] += read_entry<T>(stage_velocity_increment_.block(d), i);
 
-        /* Perform an extrapolation step: */
-        if (crank_nicolson_extrapolation)
-          new_v_i = Number(2.) * new_v_i - old_v_i;
+        const auto new_v_i =
+            apply_B_n_inverse(magnetic_field, tau_implicit, rhs_v_i);
 
         auto new_U_i = old_U_i;
         for (unsigned int d = 0; d < dim; ++d)

@@ -95,21 +95,66 @@ namespace ryujin
     {
       RYUJIN_DEBUG_ANNOUNCE();
 
+      const auto stages = stage_state_vectors.size();
+      AssertDimension(stage_weights_implicit.size(), stages + 1);
+
+      assemble_right_hand_side(old_state_vector,
+                               stage_state_vectors,
+                               stage_weights_explicit,
+                               stage_weights_implicit.first(stages),
+                               tau);
+      solve(tau * stage_weights_implicit.back(), new_state_vector);
+
+      return tau;
+    }
+
+
+    template <int dim, typename Number>
+    Number ParabolicModule<dim, Number>::stage_combination_step(
+        const StateVector<Number> &old_state_vector,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights_explicit,
+        StageWeights stage_weights_implicit,
+        StateVector<Number> &new_state_vector,
+        Number /*t*/,
+        Number tau) const
+    {
+      RYUJIN_DEBUG_ANNOUNCE();
+
+      assemble_right_hand_side(old_state_vector,
+                               stage_state_vectors,
+                               stage_weights_explicit,
+                               stage_weights_implicit,
+                               tau);
+      /* With a vanishing factor solve() inverts the lumped mass matrix: */
+      solve(Number(0.), new_state_vector);
+
+      return tau;
+    }
+
+
+    template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::assemble_right_hand_side(
+        const StateVector<Number> &old_state_vector,
+        StageVectors stage_state_vectors,
+        StageWeights stage_weights_explicit,
+        StageWeights stage_weights_implicit,
+        const Number tau) const
+    {
       AssertThrow(tau != Number(0.),
                   dealii::ExcMessage("A parabolic module cannot choose the "
                                      "time step size: tau must be nonzero."));
 
       const auto stages = stage_state_vectors.size();
       AssertDimension(stage_weights_explicit.size(), stages);
-      AssertDimension(stage_weights_implicit.size(), stages + 1);
+      AssertDimension(stage_weights_implicit.size(), stages);
 
-      using HostSpace = dealii::MemorySpace::Host;
       const auto &lumped_mass_matrix =
           offline_data_->lumped_mass_matrix().deal_ii_vector();
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
       /*
-       * Step 1: Assemble the right hand side,
+       * Assemble the right hand side,
        *
        *   M W - tau sum_s { w^e_s K(k(U^s)) U^s
        *                     + (w^i_s - w^e_s) K(k(U^n)) U^s },
@@ -171,129 +216,6 @@ namespace ryujin
         cpu_simd_loop<Number>(
             "time_step_parabolic_1", body, 0, n_owned, n_owned);
       }
-
-      /*
-       * Step 2: Solve the linear system and update the state.
-       */
-      {
-        ComputingTimer::Scope scope("time step [P] 2 - solve");
-
-        /* The last implicit weight is the weight of the new state: */
-        const Number weight = *std::prev(stage_weights_implicit.end());
-
-        solve(tau * weight);
-      }
-
-      copy_to_memory_space<HostSpace>(old_state_vector, StateVectorPart::state);
-      move_to_memory_space<HostSpace>(new_state_vector, StateVectorPart::state);
-
-      const auto new_U_view =
-          new_state_vector.state.template view<problem_dimension>();
-      const auto sparsity_simd_view =
-          offline_data_->sparsity_pattern_simd().view();
-      const unsigned int n_internal = offline_data_->n_locally_internal();
-
-      const auto body = [&](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
-
-        /* Skip constrained degrees of freedom: */
-        if (sparsity_simd_view.row_length(i) == 1)
-          return;
-
-        dealii::Tensor<1, problem_dimension, T> U_i;
-        U_i[0] = read_entry<T>(solution_, i);
-        new_U_view.template write_tensor<T>(U_i, i);
-      };
-
-      cpu_simd_loop<Number>(
-          "time_step_parabolic_2", body, 0, n_internal, n_owned);
-
-      new_U_view.update_ghost_values();
-
-      return tau;
-    }
-
-
-    template <int dim, typename Number>
-    Number ParabolicModule<dim, Number>::crank_nicolson_step(
-        const StateVector<Number> &old_state_vector,
-        StateVector<Number> &new_state_vector,
-        Number /*t*/,
-        Number tau,
-        Number /*tau_max*/) const
-    {
-      RYUJIN_DEBUG_ANNOUNCE();
-
-      AssertThrow(tau != Number(0.),
-                  dealii::ExcMessage("A parabolic module cannot choose the "
-                                     "time step size: tau must be nonzero."));
-
-      using HostSpace = dealii::MemorySpace::Host;
-      const auto &lumped_mass_matrix =
-          offline_data_->lumped_mass_matrix().deal_ii_vector();
-      const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_internal = offline_data_->n_locally_internal();
-
-      /*
-       * Crank-Nicolson (the midpoint rule): perform a backward Euler step
-       * to the half time step and extrapolate.
-       */
-      {
-        ComputingTimer::Scope scope("time step [P] 1 - assemble rhs");
-
-        extract(old_state_vector, temp_);
-        reinit_operator(temp_);
-
-        const auto body = [&](auto sentinel, unsigned int i) {
-          using T = decltype(sentinel);
-          const auto m_i = read_entry<T>(lumped_mass_matrix, i);
-          const auto u_i = read_entry<T>(temp_, i);
-          write_entry<T>(right_hand_side_, m_i * u_i, i);
-          write_entry<T>(solution_, u_i, i);
-        };
-
-        cpu_simd_loop<Number>(
-            "time_step_parabolic_1", body, 0, n_owned, n_owned);
-      }
-
-      {
-        ComputingTimer::Scope scope("time step [P] 2 - solve");
-
-        solve(Number(0.5) * tau);
-
-        if (!parabolic_system_->is_linear()) {
-          /* Repeat with the diffusivity of the predicted midpoint value: */
-          reinit_operator(solution_);
-          solve(Number(0.5) * tau);
-        }
-      }
-
-      copy_to_memory_space<HostSpace>(old_state_vector, StateVectorPart::state);
-      move_to_memory_space<HostSpace>(new_state_vector, StateVectorPart::state);
-
-      const auto new_U_view =
-          new_state_vector.state.template view<problem_dimension>();
-      const auto sparsity_simd_view =
-          offline_data_->sparsity_pattern_simd().view();
-
-      const auto body = [&](auto sentinel, unsigned int i) {
-        using T = decltype(sentinel);
-
-        /* Skip constrained degrees of freedom: */
-        if (sparsity_simd_view.row_length(i) == 1)
-          return;
-
-        dealii::Tensor<1, problem_dimension, T> U_i;
-        U_i[0] = T(2.) * read_entry<T>(solution_, i) - read_entry<T>(temp_, i);
-        new_U_view.template write_tensor<T>(U_i, i);
-      };
-
-      cpu_simd_loop<Number>(
-          "time_step_parabolic_2", body, 0, n_internal, n_owned);
-
-      new_U_view.update_ghost_values();
-
-      return tau;
     }
 
 
@@ -364,29 +286,62 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::solve(const Number sigma) const
+    void ParabolicModule<dim, Number>::solve(
+        const Number sigma, StateVector<Number> &new_state_vector) const
     {
-      const auto &affine_constraints = offline_data_->affine_constraints();
-      affine_constraints.set_zero(right_hand_side_);
-      affine_constraints.set_zero(solution_);
+      {
+        ComputingTimer::Scope scope("time step [P] 2 - solve");
 
-      diffusion_operator_.set_factor(sigma);
+        const auto &affine_constraints = offline_data_->affine_constraints();
+        affine_constraints.set_zero(right_hand_side_);
+        affine_constraints.set_zero(solution_);
 
-      DiagonalMatrix<ScalarHostVector<Number>> jacobi;
-      diffusion_operator_.compute_diagonal(jacobi);
+        diffusion_operator_.set_factor(sigma);
 
-      if (sigma == Number(0.)) {
-        jacobi.vmult(solution_, right_hand_side_);
-        return;
+        DiagonalMatrix<ScalarHostVector<Number>> jacobi;
+        diffusion_operator_.compute_diagonal(jacobi);
+
+        if (sigma == Number(0.)) {
+          jacobi.vmult(solution_, right_hand_side_);
+        } else {
+          SolverControl solver_control(10000,
+                                       tolerance_ * right_hand_side_.l2_norm());
+          SolverCG<ScalarHostVector<Number>> solver(solver_control);
+          solver.solve(
+              diffusion_operator_, solution_, right_hand_side_, jacobi);
+
+          /* update exponential moving average */
+          n_iterations_ =
+              0.9 * n_iterations_ + 0.1 * solver_control.last_step();
+        }
       }
 
-      SolverControl solver_control(10000,
-                                   tolerance_ * right_hand_side_.l2_norm());
-      SolverCG<ScalarHostVector<Number>> solver(solver_control);
-      solver.solve(diffusion_operator_, solution_, right_hand_side_, jacobi);
+      using HostSpace = dealii::MemorySpace::Host;
+      move_to_memory_space<HostSpace>(new_state_vector, StateVectorPart::state);
 
-      /* update exponential moving average */
-      n_iterations_ = 0.9 * n_iterations_ + 0.1 * solver_control.last_step();
+      const auto new_U_view =
+          new_state_vector.state.template view<problem_dimension>();
+      const auto sparsity_simd_view =
+          offline_data_->sparsity_pattern_simd().view();
+      const unsigned int n_internal = offline_data_->n_locally_internal();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+
+      const auto body = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+
+        /* Skip constrained degrees of freedom: */
+        if (sparsity_simd_view.row_length(i) == 1)
+          return;
+
+        dealii::Tensor<1, problem_dimension, T> U_i;
+        U_i[0] = read_entry<T>(solution_, i);
+        new_U_view.template write_tensor<T>(U_i, i);
+      };
+
+      cpu_simd_loop<Number>(
+          "time_step_parabolic_2", body, 0, n_internal, n_owned);
+
+      new_U_view.update_ghost_values();
     }
   } // namespace ScalarDiffusion
 } // namespace ryujin

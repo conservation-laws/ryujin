@@ -100,16 +100,6 @@ namespace ryujin
      * The result is then transformed back into conserved quantities and
      * written to the output vector.
      *
-     * @note The backward Euler scheme is a fundamental building block for
-     * higher-order time stepping, including the well-known Crank-Nicolson
-     * scheme. The latter can be expressed algebraically as a backward
-     * Euler step (from time \f$t\f$ to \f$t+\tau\f$ followed by an
-     * extrapolation step \f$U^{n+2}=2U^{n+1}-U^{n}\f$ from time
-     * \f$t+\tau\f$ to \f$t+2\tau\f$). This approach differs from the
-     * Crank-Nicolson scheme discussed in @cite ryujin-2021-2 where the
-     * extrapolation step is performed on the primitive quantities
-     * (velocity and internal energy) instead of the conserved quantities.
-     *
      * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number = double>
@@ -190,8 +180,8 @@ namespace ryujin
       }
 
       /**
-       * Prepare the parabolic part of the state vector prior to a backward
-       * Euler or Crank Nicolson step.
+       * Prepare the parabolic part of the state vector prior to an
+       * implicit step.
        */
       void prepare_state_vector(StateVector<Number> &state_vector,
                                 Number t) const override;
@@ -206,8 +196,6 @@ namespace ryujin
        * stage_weights_explicit and @p stage_weights_implicit to construct
        * a modified high-order right-hand side / flux, see
        * Interface::ParabolicModule::backward_euler_step().
-       *
-       * @todo The stage state vectors and weights are currently ignored.
        */
       Number backward_euler_step(
           const StateVector<Number> &old_state_vector,
@@ -220,16 +208,26 @@ namespace ryujin
           Number tau_max = std::numeric_limits<Number>::max()) const override;
 
       /**
-       * Given a reference to a previous state vector @p old_state_vector
-       * at time @p t and a time-step size @p tau perform an implicit
-       * Crank Nicolson step (and store the result in @p new_state_vector).
+       * Perform the update of a stage without implicit solve, see
+       * Interface::ParabolicModule::stage_combination_step().
+       *
+       * The update is computed by step() with a vanishing weight of the
+       * new state.
+       *
+       * @note The weights are in general not convex: if the result
+       * violates the lower bound on the internal energy, a restart is
+       * signalled if permitted by the IDViolationStrategy. Otherwise, the
+       * result is limited toward the last stage with a single limiter
+       * value for the whole domain, which maintains conservation of total
+       * energy.
        */
-      Number crank_nicolson_step(
-          const StateVector<Number> &old_state_vector,
-          StateVector<Number> &new_state_vector,
-          Number t,
-          Number tau,
-          Number tau_max = std::numeric_limits<Number>::max()) const override;
+      Number stage_combination_step(const StateVector<Number> &old_state_vector,
+                                    StageVectors stage_state_vectors,
+                                    StageWeights stage_weights_explicit,
+                                    StageWeights stage_weights_implicit,
+                                    StateVector<Number> &new_state_vector,
+                                    Number t,
+                                    Number tau) const override;
 
       //@}
       /**
@@ -298,6 +296,14 @@ namespace ryujin
       mutable ScalarHostVector<Number> internal_energy_rhs_;
       mutable ScalarHostVector<Number> density_;
 
+      mutable BlockHostVector stage_velocity_;
+      mutable BlockHostVector stage_stiffness_;
+      mutable BlockHostVector stage_force_;
+      mutable ScalarHostVector<Number> stage_work_;
+      mutable ScalarHostVector<Number> stage_internal_energy_;
+      mutable ScalarHostVector<Number> stage_diffusion_;
+      mutable ScalarHostVector<Number> stage_energy_rhs_;
+
       mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
           level_matrix_free_;
       mutable dealii::MGConstrainedDoFs mg_constrained_dofs_;
@@ -333,34 +339,29 @@ namespace ryujin
       //@{
 
       /**
-       * The implementation of the backward_euler_step() function for a
-       * fixed number of stages @p stages. The backward_euler_step()
-       * function dispatches to it with the number of supplied stage state
-       * vectors.
-       */
-      template <int stages>
-      void backward_euler_step(const StateVector<Number> &old_state_vector,
-                               StageVectors stage_state_vectors,
-                               StageWeights stage_weights_explicit,
-                               StageWeights stage_weights_implicit,
-                               StateVector<Number> &new_state_vector,
-                               Number t,
-                               Number tau) const;
-
-      /**
        * Given a reference to a previous state vector @p old_state_vector
        * at time @p t and a time-step size @p tau perform a backward
        * Euler time step (and store the result in @p new_state_vector).
-       *
-       * If the boolean @crank_nicolson_extrapolation is set to true, then
-       * we perform a final extrapolation on the primitive state for time
-       * t + 2 * tau.
+       * The stage state vectors and their implicit weights @p
+       * stage_weights are used to construct the high-order right hand
+       * side, see Interface::ParabolicModule::backward_euler_step(). The
+       * weight @p weight of the new state may vanish.
        */
       void step(const StateVector<Number> &old_state_vector,
+                StageVectors stage_state_vectors,
+                StageWeights stage_weights,
+                const Number weight,
                 StateVector<Number> &new_state_vector,
                 Number t,
-                Number tau,
-                const bool crank_nicolson_extrapolation) const;
+                Number tau) const;
+
+      /**
+       * Compute the viscous dissipation \f$m_i K_i = \sum_K \int_K
+       * \mathbb{S}(\boldsymbol v):\nabla \boldsymbol v\,\phi_i\f$ of
+       * the velocity @p velocity and store it in @p dst.
+       */
+      void assemble_viscous_dissipation(ScalarHostVector<Number> &dst,
+                                        const BlockHostVector &velocity) const;
 
       //@}
     };

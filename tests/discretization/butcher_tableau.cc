@@ -59,15 +59,19 @@ Vector multiply(const Vector &x, const Vector &y)
   return result;
 }
 
-void test(const TimeSteppingScheme scheme, const std::string &name)
+void test(const ButcherTableau<double> &tableau, const std::string &name)
 {
-  const auto tableau = butcher_tableau<double>(scheme);
+  using Type = ButcherTableau<double>::Type;
+
   const auto &c = tableau.c;
   const std::size_t n = c.size();
+  const auto type = tableau.type();
 
   /* All tableaux that take part in the scheme: */
-  std::vector<Matrix> tableaux{expand(tableau.a_explicit, n)};
-  if (tableau.is_imex())
+  std::vector<Matrix> tableaux;
+  if (type != Type::dirk)
+    tableaux.push_back(expand(tableau.a_explicit, n));
+  if (type != Type::erk)
     tableaux.push_back(expand(tableau.a_implicit, n));
 
   const Vector one(n, 1.);
@@ -89,7 +93,7 @@ void test(const TimeSteppingScheme scheme, const std::string &name)
   bool order_1 = true;
   bool order_2 = true;
   bool order_3 = true;
-  bool order_4 = !tableau.is_imex(); /* only verified for explicit schemes */
+  bool order_4 = type != Type::imex; /* not verified for imex */
 
   const auto c2 = multiply(c, c);
   const auto c3 = multiply(c2, c);
@@ -116,26 +120,46 @@ void test(const TimeSteppingScheme scheme, const std::string &name)
                              : !order_4 ? 3
                                         : 4;
 
-  std::cout << name << ": stages = " << n - 1 << ", "
-            << (tableau.is_imex() ? "imex" : "explicit")
+  /*
+   * The diagonal of the implicit tableau may only vanish in the first
+   * row (the old state) and in the last row (the final update):
+   */
+  bool diagonal = true;
+  if (type != Type::erk)
+    for (std::size_t l = 1; l + 1 < n; ++l)
+      diagonal = diagonal && tableaux.back()[l][l] != 0.;
+
+  const std::string type_name = type == Type::erk    ? "erk"
+                                : type == Type::dirk ? "dirk"
+                                                     : "imex";
+
+  std::cout << name << ": stages = " << n - 1 << ", " << type_name
             << ", consistent = " << (consistent ? "true" : "false")
-            << ", order = " << order << std::endl;
+            << ", order = " << order
+            << ", diagonal = " << (diagonal ? "true" : "false") << std::endl;
 }
 
 int main()
 {
-  test(TimeSteppingScheme::erk_11, "erk 11");
-  test(TimeSteppingScheme::erk_22, "erk 22");
-  test(TimeSteppingScheme::erk_33, "erk 33");
-  test(TimeSteppingScheme::erk_43, "erk 43");
-  test(TimeSteppingScheme::erk_54, "erk 54");
-  test(TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn");
-  test(TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn");
-  test(TimeSteppingScheme::imex_11, "imex 11");
-  test(TimeSteppingScheme::imex_22, "imex 22");
-  test(TimeSteppingScheme::imex_33, "imex 33");
-  test(TimeSteppingScheme::gsa_imex_22, "gsa imex 22");
-  test(TimeSteppingScheme::gsa_imex_43, "gsa imex 43");
+  using enum RungeKuttaMethod;
+
+  const auto run = [](const RungeKuttaMethod method, const std::string &name) {
+    test(butcher_tableau<double>(method), name);
+  };
+
+  run(erk_11, "erk 11");
+  run(erk_22, "erk 22");
+  run(erk_33, "erk 33");
+  run(erk_43, "erk 43");
+  run(erk_54, "erk 54");
+  run(imex_11, "imex 11");
+  run(imex_22, "imex 22");
+  run(imex_33, "imex 33");
+  run(gsa_imex_22, "gsa imex 22");
+  run(gsa_imex_43, "gsa imex 43");
+  run(dirk_midpoint, "dirk midpoint");
+  run(dirk_22, "dirk 22");
+  run(dirk_23, "dirk 23");
 
   return 0;
 }

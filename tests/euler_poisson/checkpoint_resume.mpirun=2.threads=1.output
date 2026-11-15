@@ -4,10 +4,10 @@
 [INFO] entering main loop
 Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 289
-t     = 0.5347937225188055
-Linf  = 0.1179308423573346
-L1    = 0.008219937727261574
-L2    = 0.02015646109492757
+t     = 0.5347936710239283
+Linf  = 0.1179522734655936
+L1    = 0.008220627568124261
+L2    = 0.02015981301160294
 [INFO] initializing data structures
 [INFO] creating mesh and interpolating initial values
 [INFO] preparing compute kernels
@@ -18,10 +18,10 @@ L2    = 0.02015646109492757
 [INFO] scheduling checkpointing
 Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 289
-t     = 0.2673970339649534
-Linf  = 0.07521376280506778
-L1    = 0.004209991185130588
-L2    = 0.01113732552982985
+t     = 0.2673970211859009
+Linf  = 0.07521540738336199
+L1    = 0.004210857796983439
+L2    = 0.01114050856182278
 [INFO] initializing data structures
 [INFO] resume: reading mesh and loading state vector
 [INFO] preparing compute kernels
@@ -29,11 +29,11 @@ L2    = 0.01113732552982985
 [INFO] scheduling checkpointing
 Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 289
-t     = 0.5347937225188055
-Linf  = 0.1179308423573342
-L1    = 0.008219937727261557
-L2    = 0.02015646109492759
+t     = 0.5347936710239283
+Linf  = 0.1179522734655929
+L1    = 0.008220627568124236
+L2    = 0.02015981301160292
 
 final errors (time, Linf, L1, L2):
-  uninterrupted: 5.34793722518806e-01	1.17930842357335e-01	8.21993772726157e-03	2.01564610949276e-02
-  resumed:       5.34793722518806e-01	1.17930842357334e-01	8.21993772726156e-03	2.01564610949276e-02
+  uninterrupted: 5.34793671023928e-01	1.17952273465594e-01	8.22062756812426e-03	2.01598130116029e-02
+  resumed:       5.34793671023928e-01	1.17952273465593e-01	8.22062756812424e-03	2.01598130116029e-02

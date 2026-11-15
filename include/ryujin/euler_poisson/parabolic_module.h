@@ -224,7 +224,12 @@ namespace ryujin
        * a modified high-order right-hand side / flux, see
        * Interface::ParabolicModule::backward_euler_step().
        *
-       * @todo The stage state vectors and weights are currently ignored.
+       * The parabolic operator is linear for a fixed density (the
+       * density of @p old_state_vector), so only the implicit weights
+       * enter.
+       *
+       * @note The Lorentz force of the stages is evaluated with the
+       * magnetic field at time @p t + @p tau.
        */
       Number backward_euler_step(
           const StateVector<Number> &old_state_vector,
@@ -237,19 +242,23 @@ namespace ryujin
           Number tau_max = std::numeric_limits<Number>::max()) const override;
 
       /**
-       * Given a reference to a previous state vector @p old_U at time @p
-       * t and a time-step size @p tau perform an implicit Crank-Nicolson
-       * step (and store the result in @p new_U).
+       * Perform the update of a stage without implicit solve, see
+       * Interface::ParabolicModule::stage_combination_step().
        *
-       * This variant is used in the TimeIntegrator class for the Strang
-       * split variants.
+       * The velocity is updated with the operator applied to the stages.
+       * The potential is updated with the time derivatives of the
+       * potential that backward_euler_step() recovered from the implicit
+       * solve of every stage, see step(); for a time-dependent background
+       * density the potential is solved for. The internal energy is left
+       * unchanged, so the update is always admissible.
        */
-      Number crank_nicolson_step(
-          const StateVector<Number> &old_state_vector,
-          StateVector<Number> &new_state_vector,
-          Number t,
-          Number tau,
-          Number tau_max = std::numeric_limits<Number>::max()) const override;
+      Number stage_combination_step(const StateVector<Number> &old_state_vector,
+                                    StageVectors stage_state_vectors,
+                                    StageWeights stage_weights_explicit,
+                                    StageWeights stage_weights_implicit,
+                                    StateVector<Number> &new_state_vector,
+                                    Number t,
+                                    Number tau) const override;
 
       //@}
       /**
@@ -324,6 +333,9 @@ namespace ryujin
       mutable ScalarHostVector<Number> background_density_;
       mutable BlockHostVector magnetic_field_;
       mutable BlockHostVector velocity_rhs_;
+      mutable BlockHostVector stage_velocity_increment_;
+      mutable BlockHostVector stage_flux_;
+      mutable BlockHostVector stage_gradient_;
 
       mutable bool potential_initialized_;
       mutable Number t_background_density_;
@@ -333,21 +345,6 @@ namespace ryujin
        * @name Internal methods
        */
       //@{
-
-      /**
-       * The implementation of the backward_euler_step() function for a
-       * fixed number of stages @p stages. The backward_euler_step()
-       * function dispatches to it with the number of supplied stage state
-       * vectors.
-       */
-      template <int stages>
-      void backward_euler_step(const StateVector<Number> &old_state_vector,
-                               StageVectors stage_state_vectors,
-                               StageWeights stage_weights_explicit,
-                               StageWeights stage_weights_implicit,
-                               StateVector<Number> &new_state_vector,
-                               Number t,
-                               Number tau) const;
 
       /**
        * Set up affine constraints. Internally used in prepare().
@@ -388,16 +385,31 @@ namespace ryujin
        * Given a reference to a previous state vector @p old_state_vector
        * at time @p t and a time-step size @p tau perform a backward
        * Euler time step (and store the result in @p new_state_vector).
+       * The stage state vectors and their implicit weights @p
+       * stage_weights are used to construct the high-order right hand
+       * side, see Interface::ParabolicModule::backward_euler_step().
        *
-       * If the boolean @crank_nicolson_extrapolation is set to true, then
-       * we perform a final extrapolation on the primitive state for time
-       * t + 2 * tau.
+       * For a nonzero weight @p weight of the new state the time
+       * derivative of the potential, \f$(\varphi^{\text{new}} -
+       * \varphi^{\text{old}} -
+       * \tau\sum_s\omega_s\dot\varphi^s)/(\tau\omega)\f$, is recovered
+       * after the solve and stored in StateVector::dynamic_precomputed of
+       * @p new_state_vector. For a vanishing weight the new potential is
+       * formed with these derivatives without solving.
+       *
+       * @note The time derivative of the first stage state vector (the
+       * state at the beginning of the time step) is not known. If its
+       * weight is nonzero, or if the background density is time
+       * dependent, a vanishing weight of the new state falls back to
+       * solving for the potential.
        */
       void step(const StateVector<Number> &old_state_vector,
+                StageVectors stage_state_vectors,
+                StageWeights stage_weights,
+                const Number weight,
                 StateVector<Number> &new_state_vector,
                 Number t,
-                Number tau,
-                const bool crank_nicolson_extrapolation) const;
+                Number tau) const;
 
       //@}
     };

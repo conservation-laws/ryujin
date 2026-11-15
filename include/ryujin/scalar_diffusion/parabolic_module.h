@@ -144,21 +144,18 @@ namespace ryujin
           Number tau_max = std::numeric_limits<Number>::max()) const override;
 
       /**
-       * Given a reference to a previous state vector @p old_state_vector
-       * at time @p t and a time-step size @p tau perform an implicit
-       * Crank-Nicolson step (and store the result in @p new_state_vector).
-       *
-       * For a nonlinear diffusivity the step is the linearly implicit
-       * midpoint rule: a backward Euler step to the half time step with
-       * the diffusivity evaluated at @p old_state_vector serves as a
-       * predictor for the diffusivity at the midpoint.
+       * Perform the update of a stage without implicit solve, see
+       * Interface::ParabolicModule::stage_combination_step(). The
+       * operator is applied to the stages and the lumped mass matrix is
+       * inverted.
        */
-      Number crank_nicolson_step(
-          const StateVector<Number> &old_state_vector,
-          StateVector<Number> &new_state_vector,
-          Number t,
-          Number tau,
-          Number tau_max = std::numeric_limits<Number>::max()) const override;
+      Number stage_combination_step(const StateVector<Number> &old_state_vector,
+                                    StageVectors stage_state_vectors,
+                                    StageWeights stage_weights_explicit,
+                                    StageWeights stage_weights_implicit,
+                                    StateVector<Number> &new_state_vector,
+                                    Number t,
+                                    Number tau) const override;
 
       //@}
       /**
@@ -229,13 +226,28 @@ namespace ryujin
       void reinit_operator(const ScalarHostVector<Number> &u) const;
 
       /**
+       * Assemble the right hand side of backward_euler_step() and
+       * stage_combination_step() in right_hand_side_ and use the old state
+       * as initial guess in solution_. The operator is initialized with
+       * the diffusivity of the state at the beginning of the time step.
+       */
+      void assemble_right_hand_side(const StateVector<Number> &old_state_vector,
+                                    StageVectors stage_state_vectors,
+                                    StageWeights stage_weights_explicit,
+                                    StageWeights stage_weights_implicit,
+                                    const Number tau) const;
+
+      /**
        * Solve \f$(\mathbb M^L + \sigma\mathbb K)\,\textbf u = \textbf r\f$
        * for the right hand side right_hand_side_ and the currently set
-       * diffusivity. The result is stored in solution_, which also has to
-       * hold the initial guess. For \f$\sigma=0\f$ the lumped mass matrix
-       * is inverted directly.
+       * diffusivity, and store the result in @p new_state_vector.
+       *
+       * @pre The vector solution_ has to hold the initial guess.
+       *
+       * @note For \f$\sigma=0\f$ the lumped mass matrix is inverted directly.
        */
-      void solve(const Number sigma) const;
+      void solve(const Number sigma,
+                 StateVector<Number> &new_state_vector) const;
 
       //@}
     };

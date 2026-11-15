@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/discretization/time_integrator.h>
 
 #include <deal.II/base/exceptions.h>
 
@@ -18,18 +17,51 @@
 namespace ryujin
 {
   /**
-   * The Butcher tableau of an explicit, or an implicit-explicit Runge-Kutta
-   * scheme with \f$s\f$ stages.
+   * The Runge-Kutta methods described by a Butcher tableau, see
+   * butcher_tableau(). The TimeIntegrator composes the time-stepping
+   * schemes of TimeSteppingScheme from these methods: an explicit or
+   * implicit-explicit scheme uses a single method, a Strang splitting
+   * uses an explicit method for the hyperbolic subproblem and a
+   * diagonally implicit method for the parabolic subproblem.
+   *
+   * @ingroup MeshAndOfflineData
+   */
+  enum class RungeKuttaMethod {
+    /* Explicit methods, see TimeSteppingScheme for a description: */
+    erk_11,
+    erk_22,
+    erk_33,
+    erk_43,
+    erk_54,
+
+    /* Implicit-explicit methods, see TimeSteppingScheme: */
+    imex_11,
+    imex_22,
+    imex_33,
+    gsa_imex_22,
+    gsa_imex_43,
+
+    /* Diagonally implicit methods: the implicit midpoint rule
+     * (Crank-Nicolson), and DIRK22 and DIRK23, see TimeSteppingScheme: */
+    dirk_midpoint,
+    dirk_22,
+    dirk_23,
+  };
+
+
+  /**
+   * The Butcher tableau of an explicit, a diagonally implicit, or an
+   * implicit-explicit Runge-Kutta scheme with \f$s\f$ stages.
    *
    * The tableau is stored row by row. The first row belongs to the state
    * at the beginning of the time step, the rows \f$2,\ldots,s\f$ belong
    * to the intermediate stages, and the last row \f$s+1\f$ contains the
    * weights of the final update. Trailing zeros of a row can be omitted.
    *
-   * The explicit tableau @p a_explicit is strictly lower triangular. For
-   * an implicit-explicit scheme the implicit tableau @p a_implicit is
-   * lower triangular and shares the coefficients @p c with the explicit
-   * tableau; for an explicit scheme @p a_implicit is empty.
+   * The explicit tableau @p a_explicit is strictly lower triangular, the
+   * implicit tableau @p a_implicit is lower triangular. Both share the
+   * coefficients @p c. An explicit scheme has no implicit tableau, a
+   * diagonally implicit scheme has no explicit tableau, see type().
    *
    * @ingroup MeshAndOfflineData
    */
@@ -42,11 +74,27 @@ namespace ryujin
     Matrix a_implicit;
 
     /**
-     * Returns true if the tableau describes an implicit-explicit scheme.
+     * The type of a Runge-Kutta scheme.
      */
-    bool is_imex() const
+    enum class Type {
+      /** An explicit scheme: @p a_implicit is empty. */
+      erk,
+      /** A diagonally implicit scheme: @p a_explicit is empty. */
+      dirk,
+      /** An implicit-explicit scheme. */
+      imex,
+    };
+
+    /**
+     * Return the type of the scheme described by the tableau.
+     */
+    Type type() const
     {
-      return !a_implicit.empty();
+      if (a_implicit.empty())
+        return Type::erk;
+      if (a_explicit.empty())
+        return Type::dirk;
+      return Type::imex;
     }
 
     /**
@@ -93,19 +141,12 @@ namespace ryujin
 
 
   /**
-   * Return the Butcher tableau of the Runge-Kutta scheme @p scheme. For a
-   * Strang splitting scheme the tableau of the explicit Runge-Kutta
-   * scheme used for the hyperbolic subproblem is returned.
-   *
-   * The strong stability preserving schemes TimeSteppingScheme::ssprk_22,
-   * TimeSteppingScheme::ssprk_33, and
-   * TimeSteppingScheme::strang_ssprk_33_cn are implemented as convex
-   * combinations of forward Euler steps and do not have a tableau.
+   * Return the Butcher tableau of the Runge-Kutta method @p method.
    *
    * @ingroup MeshAndOfflineData
    */
   template <typename Number = double>
-  ButcherTableau<Number> butcher_tableau(const TimeSteppingScheme scheme)
+  ButcherTableau<Number> butcher_tableau(const RungeKuttaMethod method)
   {
     using T = ButcherTableau<Number>;
 
@@ -116,8 +157,8 @@ namespace ryujin
      */
 
     // clang-format off
-    switch (scheme) {
-    case TimeSteppingScheme::erk_11:
+    switch (method) {
+    case RungeKuttaMethod::erk_11:
       return T{
           /* c: */
           {0., 1.},
@@ -127,7 +168,7 @@ namespace ryujin
           /* implicit: */
           {}};
 
-    case TimeSteppingScheme::erk_22:
+    case RungeKuttaMethod::erk_22:
       return T{
           /* c: */
           {0., 1. / 2., 1.},
@@ -138,9 +179,7 @@ namespace ryujin
           /* implicit: */
           {}};
 
-    case TimeSteppingScheme::erk_33:
-      [[fallthrough]];
-    case TimeSteppingScheme::strang_erk_33_cn:
+    case RungeKuttaMethod::erk_33:
       return T{
           /* c: */
           {0., 1. / 3., 2. / 3., 1.},
@@ -152,9 +191,7 @@ namespace ryujin
           /* implicit: */
           {}};
 
-    case TimeSteppingScheme::erk_43:
-      [[fallthrough]];
-    case TimeSteppingScheme::strang_erk_43_cn:
+    case RungeKuttaMethod::erk_43:
       return T{
           /* c: */
           {0., 1. / 4., 1. / 2., 3. / 4., 1.},
@@ -167,7 +204,7 @@ namespace ryujin
           /* implicit: */
           {}};
 
-    case TimeSteppingScheme::erk_54:
+    case RungeKuttaMethod::erk_54:
       return T{
           /* c: */
           {0., 0.2, 0.4, 0.6, 0.8, 1.},
@@ -181,7 +218,7 @@ namespace ryujin
           /* implicit: */
           {}};
 
-    case TimeSteppingScheme::imex_11:
+    case RungeKuttaMethod::imex_11:
       return T{
           /* c: */
           {0., 1.},
@@ -192,7 +229,7 @@ namespace ryujin
           {{},
            {0., 1.}}};
 
-    case TimeSteppingScheme::imex_22:
+    case RungeKuttaMethod::imex_22:
       return T{
           /* c: */
           {0., 1. / 2., 1.},
@@ -205,7 +242,7 @@ namespace ryujin
            {0., 1. / 2.},
            {0.,      1., 0.}}};
 
-    case TimeSteppingScheme::imex_33: {
+    case RungeKuttaMethod::imex_33: {
       /* gamma: */
       const Number g = Number(0.5) + std::sqrt(Number(3.0)) / Number(6.0);
 
@@ -224,7 +261,7 @@ namespace ryujin
            {            1. / 4.,                      0., 3. / 4., 0.}}};
     }
 
-    case TimeSteppingScheme::gsa_imex_22: {
+    case RungeKuttaMethod::gsa_imex_22: {
       /* gamma and delta: */
       const Number g = Number(1.) - std::sqrt(Number(2.)) / Number(2.);
       const Number d = Number(1.) - Number(1.) / (Number(2.) * g);
@@ -242,7 +279,7 @@ namespace ryujin
            {0., 1 - g, g}}};
     }
 
-    case TimeSteppingScheme::gsa_imex_43:
+    case RungeKuttaMethod::gsa_imex_43:
       return T{
           /* c: */
           {0., 1. / 2., 2. / 3., 1. / 2., 1.},
@@ -259,18 +296,52 @@ namespace ryujin
            {0., -1. / 2.,  1. / 2., 1. / 2.},
            {0.,  3. / 2., -3. / 2., 1. / 2., 1. / 2.}}};
 
-    case TimeSteppingScheme::ssprk_22:
-      [[fallthrough]];
-    case TimeSteppingScheme::ssprk_33:
-      [[fallthrough]];
-    case TimeSteppingScheme::strang_ssprk_33_cn:
-      break;
+    case RungeKuttaMethod::dirk_midpoint:
+      return T{
+          /* c: */
+          {0., 1. / 2., 1.},
+          /* explicit: */
+          {},
+          /* implicit: */
+          {{},
+           {0., 1. / 2.},
+           {0.,      1., 0.}}};
+
+    case RungeKuttaMethod::dirk_22: {
+      /* Butcher-Burrage DIRK22, see @cite SalgadoTomas2022, Eq. (3.8): */
+      const auto g = Number(1. - std::sqrt(2.) / 2.);
+
+      return T{
+          /* c: */
+          {0., g, 1 - g, 1.},
+          /* explicit: */
+          {},
+          /* implicit: */
+          {{},
+           {0.,        g},
+           {0., 1 - 2 * g,       g},
+           {0.,   1. / 2., 1. / 2., 0.}}};
+    }
+
+    case RungeKuttaMethod::dirk_23: {
+      /* Crouzeix DIRK23, see @cite SalgadoTomas2022, Eq. (3.10): */
+      const auto g = Number(1. / 2. + std::sqrt(3.) / 6.);
+
+      return T{
+          /* c: */
+          {0., g, 1 - g, 1.},
+          /* explicit: */
+          {},
+          /* implicit: */
+          {{},
+           {0.,        g},
+           {0., 1 - 2 * g,       g},
+           {0.,   1. / 2., 1. / 2., 0.}}};
+    }
     }
     // clang-format on
 
-    AssertThrow(false,
-                dealii::ExcMessage("The selected time stepping scheme is "
-                                   "not described by a Butcher tableau."));
+    AssertThrow(false, dealii::ExcInternalError());
     __builtin_trap();
   }
 } // namespace ryujin

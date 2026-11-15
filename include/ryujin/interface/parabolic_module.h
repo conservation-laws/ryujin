@@ -54,12 +54,11 @@ namespace ryujin
        * flux, see @cite ErnGuermond2023, Eq. (3.7). Let \f$\boldsymbol
        * G(\boldsymbol U)\f$ denote the parabolic operator and let
        * \f$\boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U)\f$
-       * denote its quasi-linearization around the state \f$\boldsymbol
-       * U^n\f$ at the beginning of the time step. With the old state
-       * \f$\boldsymbol W\f$, the \f$k\f$ stage states \f$\boldsymbol
-       * U^{s}\f$, the \f$k\f$ explicit weights \f$\omega^{\text e}_s\f$,
-       * and the \f$k+1\f$ implicit weights \f$\omega^{\text i}_s\f$ the
-       * function solves
+       * denote a linearization around the state \f$\boldsymbol U^n\f$ at
+       * the beginning of the time step. With the old state \f$\boldsymbol
+       * W\f$, the \f$k\f$ stage states \f$\boldsymbol U^{s}\f$, the \f$k\f$
+       * explicit weights \f$\omega^{\text e}_s\f$, and the \f$k+1\f$
+       * implicit weights \f$\omega^{\text i}_s\f$ the function solves
        * \f{align}
        *   \boldsymbol U^{\text{new}}
        *   - \tau\,\omega^{\text i}_{k+1}\,
@@ -72,35 +71,53 @@ namespace ryujin
        *   \boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U^{s})
        *   \Big\}.
        * \f}
-       * For a linear parabolic operator the explicit weights drop out and
-       * only the implicit weights \f$\omega^{\text i}_s\f$ enter.
+       * The linearization is chosen by the parabolic module. It has to be
+       * the same in every term of a time step; \f$\boldsymbol
+       * G^{\text{lin}} = \boldsymbol G\f$, i.e., solving the nonlinear
+       * problem, is admissible. For a linear parabolic operator the
+       * explicit weights drop out and only the implicit weights
+       * \f$\omega^{\text i}_s\f$ enter.
        *
        * The number of stage state vectors and the number of explicit
        * weights have to agree. The list of implicit weights contains one
        * additional entry: its last element \f$\omega^{\text i}_{k+1}\f$
-       * is the weight of the new state. Stages for which both weights
-       * vanish can be omitted. A plain backward Euler step is performed
-       * with no stage state vectors, no explicit weights, and the single
-       * implicit weight 1.
+       * is the weight of the new state and is nonzero; the case of a
+       * vanishing weight is handled by stage_combination_step(). Stages
+       * for which both weights vanish can be omitted. A plain backward
+       * Euler step is performed with no stage state vectors, no explicit
+       * weights, and the single implicit weight 1.
        *
-       * In terms of the Butcher tableaux of the explicit and implicit
-       * schemes the weights for the stage \f$l\f$ are \f$\omega^{\text e}_s
-       * = (a^{\text e}_{l,s}-a^{\text e}_{l-1,s}) / (c_l - c_{l-1})\f$ and
-       * \f$\omega^{\text i}_s = (a^{\text i}_{l,s} -a^{\text i}_{l-1,s}) /
-       * (c_l - c_{l-1})\f$; the last implicit weight is the scaled
-       * diagonal entry \f$a^{\text i}_{l,l} / (c_l - c_{l-1})\f$. If the
-       * hyperbolic module splits off an implicit flux
-       * (Interface::HyperbolicModule::have_implicit_flux()) the explicit
-       * weights are instead one for the start stage of the increment and
-       * zero otherwise.
+       * The TimeIntegrator computes the stage \f$l\f$ as an increment of
+       * its start stage \f$l'\f$ (the old state \f$\boldsymbol W\f$ of
+       * the step) with step size \f$(c_l - c_{l'})\tau\f$. In terms of the
+       * Butcher tableaux the weights are \f$\omega^{\text e}_s =
+       * (a^{\text e}_{l,s}-a^{\text e}_{l',s}) / (c_l - c_{l'})\f$ and
+       * \f$\omega^{\text i}_s = (a^{\text i}_{l,s} -a^{\text i}_{l',s}) /
+       * (c_l - c_{l'})\f$; the last implicit weight is the scaled diagonal
+       * entry \f$a^{\text i}_{l,l} / (c_l - c_{l'})\f$. For a diagonally
+       * implicit scheme the explicit tableau is the strictly lower part of
+       * the implicit tableau: the known stages enter with the operator
+       * \f$\boldsymbol G\f$ and only the new stage is linearized. If the
+       * hyperbolic module of an implicit-explicit scheme splits off an
+       * implicit flux (Interface::HyperbolicModule::have_implicit_flux())
+       * the explicit weights are instead one for the start stage and zero
+       * otherwise.
        *
-       * @note A parabolic module that makes use of the quasi-linearization
-       * expects the state \f$\boldsymbol U^n\f$ as first stage state
-       * vector.
+       * @note A parabolic module that makes use of the linearization uses
+       * the first stage state vector as linearization point
+       * \f$\boldsymbol U^n\f$.
        *
-       * The function returns the time step size @p tau. A parabolic module
-       * cannot choose the time step size: @p tau must be nonzero and @p
-       * tau_max is ignored.
+       * The time @p t and the time-step size @p tau refer to the step
+       * from the start stage to the new stage. A parabolic module that
+       * maintains a constraint with time-dependent data (such as the
+       * Gauss law with a time-dependent background density) uses the
+       * change of the data from @p t to @p t + @p tau. Along the start
+       * stages of a scheme these changes add up to the change over the
+       * full time step, so the new state satisfies the constraint at the
+       * end of the time step.
+       *
+       * @note The function must return the time step size @p tau
+       * unchanged. @p tau_max is ignored.
        *
        * @todo This function should always operate on the selected memory space.
        */
@@ -115,25 +132,42 @@ namespace ryujin
           Number tau_max = std::numeric_limits<Number>::max()) const = 0;
 
       /**
-       * Given a reference to a previous state vector @p old_state_vector
-       * at time @p t and a time-step size @p tau perform an implicit
-       * Crank-Nicolson step (and store the result in @p new_state_vector).
+       * Perform the update of a stage whose implicit weight of the new
+       * state vanishes: with the same arguments as backward_euler_step()
+       * (without the weight of the new state) compute
+       * \f{align}
+       *   \boldsymbol U^{\text{new}}
+       *   \;=\;
+       *   \boldsymbol W + \tau\sum_{s=1}^{k}\Big\{
+       *   \omega^{\text e}_s\,\boldsymbol G(\boldsymbol U^{s})
+       *   + \big(\omega^{\text i}_s-\omega^{\text e}_s\big)\,
+       *   \boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U^{s})
+       *   \Big\}
+       * \f}
+       * and store the result in @p new_state_vector. This is the final
+       * update of a scheme whose last row is not implicit, for example
+       * the Crank-Nicolson scheme (the implicit midpoint rule) or
+       * TimeSteppingScheme::imex_22. The new state is always the state at
+       * the end of the time step.
        *
-       * This variant is used in the TimeIntegrator class for the Strang
-       * split variants.
+       * @note How the operator is evaluated for the stages is up to the
+       * parabolic module.
        *
-       * The function returns the time step size @p tau. A parabolic module
-       * cannot choose the time step size: @p tau must be nonzero and @p
-       * tau_max is ignored.
+       * @note If the new state is not admissible the module must signal a
+       * restart (if permitted by the IDViolationStrategy), or should apply
+       * an appropriate limiter.
        *
-       * @todo This function should always operate on the selected memory space.
+       * @note The function must return the time step size @p tau
+       * unchanged.
        */
-      virtual Number crank_nicolson_step(
-          const StateVector<Number> &old_state_vector,
-          StateVector<Number> &new_state_vector,
-          Number t,
-          Number tau,
-          Number tau_max = std::numeric_limits<Number>::max()) const = 0;
+      virtual Number
+      stage_combination_step(const StateVector<Number> &old_state_vector,
+                             StageVectors stage_state_vectors,
+                             StageWeights stage_weights_explicit,
+                             StageWeights stage_weights_implicit,
+                             StateVector<Number> &new_state_vector,
+                             Number t,
+                             Number tau) const = 0;
 
       //@}
 

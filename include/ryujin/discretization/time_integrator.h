@@ -26,6 +26,11 @@
 
 namespace ryujin
 {
+  template <typename Number>
+  struct ButcherTableau;
+
+  enum class RungeKuttaMethod;
+
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
    *
@@ -162,6 +167,41 @@ namespace ryujin
      * Crank-Nicolson for the parabolic subproblem
      */
     strang_erk_43_cn,
+
+    /**
+     * A Strang split using erk 33 for the hyperbolic subproblem and the
+     * second order Butcher-Burrage DIRK22 scheme with Butcher tableau
+     * \f{align*}
+     * \begin{array}{c|cc}
+     *   \gamma   & \gamma \\
+     *   1-\gamma & 1-2\gamma    & \gamma \\
+     *   \hline
+     *            & \tfrac{1}{2} & \tfrac{1}{2}
+     * \end{array}
+     * \f}
+     * with \f$\gamma = 1 - \tfrac{\sqrt{2}}{2}\f$ for the parabolic
+     * subproblem, see @cite SalgadoTomas2022.
+     */
+    strang_erk_33_dirk_22,
+
+    /**
+     * A Strang split using erk 33 for the hyperbolic subproblem and the
+     * third order Crouzeix DIRK23 scheme with Butcher tableau
+     * \f{align*}
+     * \begin{array}{c|cc}
+     *   \gamma   & \gamma \\
+     *   1-\gamma & 1-2\gamma    & \gamma \\
+     *   \hline
+     *            & \tfrac{1}{2} & \tfrac{1}{2}
+     * \end{array}
+     * \f}
+     * with \f$\gamma = \tfrac{1}{2} + \tfrac{\sqrt{3}}{6}\f$ for the
+     * parabolic subproblem, see @cite SalgadoTomas2022. The scheme is
+     * third order for a linear parabolic operator; a linearized nonlinear
+     * operator reduces it to second order. The Strang split limits the
+     * overall order to two.
+     */
+    strang_erk_33_dirk_23,
 
     /**
      * A Euler IMEX splitting. This is the low order IMEX method: it performs a
@@ -317,6 +357,10 @@ DECLARE_ENUM(
          {ryujin::TimeSteppingScheme::strang_ssprk_33_cn, "strang ssprk 33 cn"},
          {ryujin::TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn"},
          {ryujin::TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn"},
+         {ryujin::TimeSteppingScheme::strang_erk_33_dirk_22,
+          "strang erk 33 dirk 22"},
+         {ryujin::TimeSteppingScheme::strang_erk_33_dirk_23,
+          "strang erk 33 dirk 23"},
          {ryujin::TimeSteppingScheme::imex_11, "imex 11"},
          {ryujin::TimeSteppingScheme::imex_22, "imex 22"},
          {ryujin::TimeSteppingScheme::imex_33, "imex 33"},
@@ -435,6 +479,19 @@ namespace ryujin
     dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>
         parabolic_module_;
 
+    /**
+     * The Runge-Kutta method of the selected time-stepping scheme. For a
+     * Strang splitting this is the explicit method of the hyperbolic
+     * subproblem. Not used by the strong stability preserving schemes.
+     */
+    RungeKuttaMethod method_;
+
+    /**
+     * The diagonally implicit Runge-Kutta method of the parabolic
+     * subproblem of a Strang splitting.
+     */
+    RungeKuttaMethod parabolic_method_;
+
     std::vector<StateVector<Number>> temp_;
 
     //@}
@@ -471,14 +528,16 @@ namespace ryujin
                          Number tau_max);
 
     /**
-     * Performs all stages of the explicit, or implicit-explicit
-     * Runge-Kutta scheme described by the Butcher tableau of the selected
-     * time-stepping scheme. Every stage consists of one explicit
-     * hyperbolic step and, for an implicit-explicit scheme, one implicit
-     * parabolic step. The intermediate stages are stored in the temporary
-     * vectors.
+     * Performs all stages of the explicit, diagonally implicit, or
+     * implicit-explicit Runge-Kutta scheme described by the Butcher
+     * tableau @p tableau. Every stage consists of one explicit hyperbolic
+     * step (unless the scheme is diagonally implicit) and one implicit
+     * parabolic step (unless the scheme is explicit). The intermediate
+     * stages are stored in the temporary vectors. A diagonally implicit
+     * scheme does not choose the time-step size: @p tau must be nonzero.
      */
-    Number step_runge_kutta(const StateVector<Number> &old_state_vector,
+    Number step_runge_kutta(const ButcherTableau<Number> &tableau,
+                            const StateVector<Number> &old_state_vector,
                             StateVector<Number> &new_state_vector,
                             Number t,
                             Number tau,
@@ -487,13 +546,14 @@ namespace ryujin
     /**
      * Performs a combined explicit implicit Strang split: an explicit
      * step with the explicit scheme of the selected time-stepping scheme,
-     * an implicit Crank-Nicolson step, and a second explicit step.
+     * a step with the diagonally implicit method of the selected
+     * time-stepping scheme, and a second explicit step.
      */
-    Number step_strang_cn(const StateVector<Number> &old_state_vector,
-                          StateVector<Number> &new_state_vector,
-                          Number t,
-                          Number tau,
-                          Number tau_max);
+    Number step_strang(const StateVector<Number> &old_state_vector,
+                       StateVector<Number> &new_state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     //@}
   };
