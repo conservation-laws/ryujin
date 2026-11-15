@@ -253,8 +253,8 @@ namespace ryujin::terminal
     void set_mode(int terminal, const termios &mode, int when)
     {
       sigset_t stop, previous;
-      ::sigemptyset(&stop);
-      ::sigaddset(&stop, SIGTTOU);
+      sigemptyset(&stop);
+      sigaddset(&stop, SIGTTOU);
       ::pthread_sigmask(SIG_BLOCK, &stop, &previous);
       ::tcsetattr(terminal, when, &mode);
       ::pthread_sigmask(SIG_SETMASK, &previous, nullptr);
