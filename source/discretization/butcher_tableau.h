@@ -157,6 +157,10 @@ namespace ryujin
     case TimeSteppingScheme::erk_33:
       [[fallthrough]];
     case TimeSteppingScheme::strang_erk_33_cn:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_erk_33_dirk_22:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_erk_33_dirk_23:
       return T{
           /* c: */
           {0., 1. / 3., 2. / 3., 1.},
@@ -287,6 +291,83 @@ namespace ryujin
     AssertThrow(false,
                 dealii::ExcMessage("The selected time stepping scheme is "
                                    "not described by a Butcher tableau."));
+    __builtin_trap();
+  }
+
+
+  /**
+   * Return the Butcher tableau of the diagonally implicit Runge-Kutta
+   * scheme used for the parabolic subproblem of the Strang splitting
+   * scheme @p scheme. The tableau is of type ButcherTableau::Type::dirk
+   * and uses the same convention as butcher_tableau(): the first row
+   * belongs to the old state, the last row contains the weights of the
+   * final update.
+   *
+   * @ingroup MeshAndOfflineData
+   */
+  template <typename Number = double>
+  ButcherTableau<Number> parabolic_tableau(const TimeSteppingScheme scheme)
+  {
+    using T = ButcherTableau<Number>;
+
+    // clang-format off
+    switch (scheme) {
+    case TimeSteppingScheme::strang_ssprk_33_cn:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_erk_33_cn:
+      [[fallthrough]];
+    case TimeSteppingScheme::strang_erk_43_cn:
+      /* Crank-Nicolson, i.e., the implicit midpoint rule: */
+      return T{
+          /* c: */
+          {0., 1. / 2., 1.},
+          /* explicit: */
+          {},
+          /* implicit: */
+          {{},
+           {0., 1. / 2.},
+           {0.,      1., 0.}}};
+
+    case TimeSteppingScheme::strang_erk_33_dirk_22: {
+      /* Butcher-Burrage DIRK22, see @cite SalgadoTomas2022, Eq. (3.8): */
+      const auto g = Number(1. - std::sqrt(2.) / 2.);
+
+      return T{
+          /* c: */
+          {0., g, 1 - g, 1.},
+          /* explicit: */
+          {},
+          /* implicit: */
+          {{},
+           {0.,        g},
+           {0., 1 - 2 * g,       g},
+           {0.,   1. / 2., 1. / 2., 0.}}};
+    }
+
+    case TimeSteppingScheme::strang_erk_33_dirk_23: {
+      /* Crouzeix DIRK23, see @cite SalgadoTomas2022, Eq. (3.10): */
+      const auto g = Number(1. / 2. + std::sqrt(3.) / 6.);
+
+      return T{
+          /* c: */
+          {0., g, 1 - g, 1.},
+          /* explicit: */
+          {},
+          /* implicit: */
+          {{},
+           {0.,        g},
+           {0., 1 - 2 * g,       g},
+           {0.,   1. / 2., 1. / 2., 0.}}};
+    }
+
+    default:
+      break;
+    }
+    // clang-format on
+
+    AssertThrow(false,
+                dealii::ExcMessage("The selected time stepping scheme is "
+                                   "not a Strang splitting scheme."));
     __builtin_trap();
   }
 } // namespace ryujin

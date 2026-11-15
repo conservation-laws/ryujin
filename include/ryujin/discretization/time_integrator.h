@@ -164,6 +164,41 @@ namespace ryujin
     strang_erk_43_cn,
 
     /**
+     * A Strang split using erk 33 for the hyperbolic subproblem and the
+     * second order Butcher-Burrage DIRK22 scheme with Butcher tableau
+     * \f{align*}
+     * \begin{array}{c|cc}
+     *   \gamma   & \gamma \\
+     *   1-\gamma & 1-2\gamma    & \gamma \\
+     *   \hline
+     *            & \tfrac{1}{2} & \tfrac{1}{2}
+     * \end{array}
+     * \f}
+     * with \f$\gamma = 1 - \tfrac{\sqrt{2}}{2}\f$ for the parabolic
+     * subproblem, see @cite SalgadoTomas2022.
+     */
+    strang_erk_33_dirk_22,
+
+    /**
+     * A Strang split using erk 33 for the hyperbolic subproblem and the
+     * third order Crouzeix DIRK23 scheme with Butcher tableau
+     * \f{align*}
+     * \begin{array}{c|cc}
+     *   \gamma   & \gamma \\
+     *   1-\gamma & 1-2\gamma    & \gamma \\
+     *   \hline
+     *            & \tfrac{1}{2} & \tfrac{1}{2}
+     * \end{array}
+     * \f}
+     * with \f$\gamma = \tfrac{1}{2} + \tfrac{\sqrt{3}}{6}\f$ for the
+     * parabolic subproblem, see @cite SalgadoTomas2022. The scheme is
+     * third order for a linear parabolic operator; a linearized nonlinear
+     * operator reduces it to second order. The Strang split limits the
+     * overall order to two.
+     */
+    strang_erk_33_dirk_23,
+
+    /**
      * A Euler IMEX splitting. This is the low order IMEX method: it performs a
      * forward Euler time step for the hyperbolic subproblem and then a backward
      * Euler time step for the parabolic subproblem. */
@@ -317,6 +352,10 @@ DECLARE_ENUM(
          {ryujin::TimeSteppingScheme::strang_ssprk_33_cn, "strang ssprk 33 cn"},
          {ryujin::TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn"},
          {ryujin::TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn"},
+         {ryujin::TimeSteppingScheme::strang_erk_33_dirk_22,
+          "strang erk 33 dirk 22"},
+         {ryujin::TimeSteppingScheme::strang_erk_33_dirk_23,
+          "strang erk 33 dirk 23"},
          {ryujin::TimeSteppingScheme::imex_11, "imex 11"},
          {ryujin::TimeSteppingScheme::imex_22, "imex 22"},
          {ryujin::TimeSteppingScheme::imex_33, "imex 33"},
