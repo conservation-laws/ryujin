@@ -130,19 +130,16 @@ namespace ryujin
     }
 
     /**
-     * Given a reference to a previous state vector @p old_U at time @p
-     * t and a time-step size @p tau perform an implicit Crank-Nicolson
-     * step (and store the result in @p new_U).
-     *
-     * This variant is used in the TimeIntegrator class for the Strang
-     * split variants.
+     * Perform the update of a stage without implicit solve, see
+     * Interface::ParabolicModule::stage_combination_step().
      */
-    Number crank_nicolson_step(
-        const StateVector<Number> &old_state_vector,
-        StateVector<Number> &new_state_vector,
-        Number /*t*/,
-        Number tau,
-        Number /*tau_max*/ = std::numeric_limits<Number>::max()) const override
+    Number stage_combination_step(const StateVector<Number> &old_state_vector,
+                                  StageVectors /*stage_state_vectors*/,
+                                  StageWeights /*stage_weights_explicit*/,
+                                  StageWeights /*stage_weights_implicit*/,
+                                  StateVector<Number> &new_state_vector,
+                                  Number /*t*/,
+                                  Number tau) const override
     {
       Assert(false,
              dealii::ExcMessage("The parabolic system is the identity. This "
