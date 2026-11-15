@@ -9,14 +9,17 @@
 #include <ryujin/euler/initial_state_astro_jet.h>
 #include <ryujin/euler/initial_state_becker_solution.h>
 #include <ryujin/euler/initial_state_contrast.h>
+#include <ryujin/euler/initial_state_degond_riemann.h>
 #include <ryujin/euler/initial_state_exact_riemann_solution.h>
 #include <ryujin/euler/initial_state_four_state_contrast.h>
 #include <ryujin/euler/initial_state_function.h>
+#include <ryujin/euler/initial_state_gresho_vortex.h>
 #include <ryujin/euler/initial_state_icf_like.h>
 #include <ryujin/euler/initial_state_isentropic_vortex.h>
 #include <ryujin/euler/initial_state_leblanc.h>
 #include <ryujin/euler/initial_state_noh.h>
 #include <ryujin/euler/initial_state_radial_contrast.h>
+#include <ryujin/euler/initial_state_radial_explosion.h>
 #include <ryujin/euler/initial_state_ramp_up.h>
 #include <ryujin/euler/initial_state_rarefaction.h>
 #include <ryujin/euler/initial_state_shock_front.h>
@@ -43,14 +46,17 @@ namespace ryujin
           L::template creator<AstroJet<HS, dim, Number>>(),
           L::template creator<BeckerSolution<HS, dim, Number>>(),
           L::template creator<Contrast<HS, dim, Number>>(),
+          L::template creator<DegondRiemann<HS, dim, Number>>(),
           L::template creator<ExactRiemannSolution<HS, dim, Number>>(),
           L::template creator<FourStateContrast<HS, dim, Number>>(),
           L::template creator<Function<HS, dim, Number>>(),
+          L::template creator<GreshoVortex<HS, dim, Number>>(),
           L::template creator<ICFLike<HS, dim, Number>>(),
           L::template creator<IsentropicVortex<HS, dim, Number>>(),
           L::template creator<LeBlanc<HS, dim, Number>>(),
           L::template creator<Noh<HS, dim, Number>>(),
           L::template creator<RadialContrast<HS, dim, Number>>(),
+          L::template creator<RadialExplosion<HS, dim, Number>>(),
           L::template creator<RampUp<HS, dim, Number>>(),
           L::template creator<Rarefaction<HS, dim, Number>>(),
           L::template creator<ShockFront<HS, dim, Number>>(),

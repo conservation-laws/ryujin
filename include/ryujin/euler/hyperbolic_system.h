@@ -333,6 +333,7 @@ namespace ryujin
       static constexpr bool have_gamma = true;
       static constexpr bool have_covolume_constant = false;
       static constexpr bool have_energy_equation = true;
+      static constexpr bool have_mach_number = false;
 
       //@}
       /**
