@@ -113,6 +113,10 @@ namespace ryujin
           StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
+    protected:
+      const BarotropicEquationOfState *selected_barotropic_equation_of_state_ =
+          nullptr;
+
     private:
       /**
        * @name Internal fields, methods, and friends
@@ -131,9 +135,6 @@ namespace ryujin
 
       std::vector<std::unique_ptr<BarotropicEquationOfState>>
           barotropic_equation_of_state_list_;
-
-      const BarotropicEquationOfState *selected_barotropic_equation_of_state_ =
-          nullptr;
 
       template <int, typename, typename>
       friend class HyperbolicSystemView;
