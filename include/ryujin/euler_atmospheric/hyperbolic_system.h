@@ -650,6 +650,9 @@ namespace ryujin
       /** The high-order flux differs from the low-order flux: */
       static constexpr bool have_high_order_flux = true;
 
+      /** The full flux is integrated explicitly: */
+      static constexpr bool have_implicit_flux = false;
+
       /**
        * Given flux contributions @p flux_i and @p flux_j compute the
        * well-balanced high-order flux.

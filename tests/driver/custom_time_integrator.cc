@@ -118,8 +118,8 @@ std::pair<double, double> run(const std::string &name)
              << "  set direction     =  1,  1\n"
              << "  set position      = -1, -1\n"
              << "  subsection isentropic vortex\n"
-             << "    set mach number = 1\n"
-             << "    set beta        = 5\n"
+             << "    set advection velocity = 1\n"
+             << "    set beta               = 5\n"
              << "  end\n"
              << "end\n";
 

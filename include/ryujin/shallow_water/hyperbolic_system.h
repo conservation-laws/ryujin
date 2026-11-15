@@ -499,6 +499,9 @@ namespace ryujin
        */
       static constexpr bool have_high_order_flux = true;
 
+      /** The full flux is integrated explicitly: */
+      static constexpr bool have_implicit_flux = false;
+
       /**
        * Given precomputed flux contributions @p prec_i and @p prec_j
        * compute the high-order flux \f$(f(U_i^{\ast,j}) +

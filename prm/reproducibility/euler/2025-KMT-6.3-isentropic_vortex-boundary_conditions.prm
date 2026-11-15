@@ -13,8 +13,8 @@
 # This file corresponds to strategy (b) of Table 4, sub/supersonic boundary
 # conditions ("dynamic") with the exact solution as boundary data, for M =
 # 1. For strategy (a) set all boundary conditions to "dirichlet". For M =
-# 1.5, 2.0, 2.5 set the "mach number" to sqrt(2) M and the final time to 6
-# / M. The rows of Table 4 are obtained by increasing "mesh refinement"
+# 1.5, 2.0, 2.5 set the "advection velocity" to sqrt(2) M and the final
+# time to 6 / M. The rows of Table 4 are obtained by increasing "mesh refinement"
 # from 0 to 5 (dG Q1, 24 elements per edge, 2304 degrees of freedom per
 # component on level 0). As in 2025-KMT-6.2-isentropic_vortex.prm we use
 # erk 54 instead of "SSPRK-54" and "relaxation factor = 4"; this is a
@@ -76,8 +76,8 @@ subsection E - InitialValues
   set position      = -1, -1
 
   subsection isentropic vortex
-    set mach number = 1.41421356237310
-    set beta        = 5
+    set advection velocity = 1.41421356237310
+    set beta               = 5
   end
 end
 

@@ -47,8 +47,10 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system,
       const InitialValues &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
-      : Interface::HyperbolicModule<dim, Number>(
-            problem_dimension, n_precomputed_values, subsection)
+      : Interface::HyperbolicModule<dim, Number>(problem_dimension,
+                                                 n_precomputed_values,
+                                                 View::have_implicit_flux,
+                                                 subsection)
       , indicator_(hyperbolic_system, subsection + "/indicator")
       , limiter_(hyperbolic_system, subsection + "/limiter")
       , wave_speed_estimator_(hyperbolic_system,
@@ -986,12 +988,16 @@ namespace ryujin
             old_precomputed_view, initial_precomputed_view, i, U_i);
 
         Kokkos::Array<flux_contribution_type, stages> flux_iHs;
+        [[maybe_unused]] Kokkos::Array<state_type, stages> U_iH;
         [[maybe_unused]] state_type S_iH;
 
         for (int s = 0; s < stages; ++s) {
           const auto U_iHs = stage_U_view[s].template read_tensor<T>(i);
           flux_iHs[s] = view.flux_contribution(
               stage_precomputed_view[s], initial_precomputed_view, i, U_iHs);
+
+          if constexpr (View::have_implicit_flux)
+            U_iH[s] = U_iHs;
 
           if constexpr (View::have_source_terms) {
             const auto &pv_s = stage_precomputed_view[s];
@@ -1094,7 +1100,16 @@ namespace ryujin
 
           const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
           U_i_new += tau * m_i_inv * flux_ij;
-          auto P_ij = -flux_ij;
+
+          /*
+           * The flux of the high-order update. An implicit flux only
+           * enters the low-order update:
+           */
+          auto flux_ijH = flux_ij;
+          if constexpr (View::have_implicit_flux)
+            flux_ijH = view.explicit_flux_divergence(U_i, U_j, c_ij);
+
+          auto P_ij = -flux_ijH;
 
           if constexpr (equilibrated_states) {
             const auto &[U_star_ij, U_star_ji] =
@@ -1127,8 +1142,8 @@ namespace ryujin
             F_iH += weight * high_order_flux_ij;
             P_ij += weight * high_order_flux_ij;
           } else {
-            F_iH += weight * flux_ij;
-            P_ij += weight * flux_ij;
+            F_iH += weight * flux_ijH;
+            P_ij += weight * flux_ijH;
           }
 
           if constexpr (View::have_source_terms) {
@@ -1148,6 +1163,11 @@ namespace ryujin
                   view.high_order_flux_divergence(flux_iHs[s], flux_jHs, c_ij);
               F_iH += stage_weight[s] * high_order_flux_ij;
               P_ij += stage_weight[s] * high_order_flux_ij;
+            } else if constexpr (View::have_implicit_flux) {
+              const auto flux_ijH =
+                  view.explicit_flux_divergence(U_iH[s], U_jHs, c_ij);
+              F_iH += stage_weight[s] * flux_ijH;
+              P_ij += stage_weight[s] * flux_ijH;
             } else {
               const auto flux_ij =
                   view.flux_divergence(flux_iHs[s], flux_jHs, c_ij);

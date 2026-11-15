@@ -113,6 +113,10 @@ namespace ryujin
           StateVector<ScalarNumber> &state_vector,
           const bool skip_constrained_dofs = true) const;
 
+    protected:
+      const BarotropicEquationOfState *selected_barotropic_equation_of_state_ =
+          nullptr;
+
     private:
       /**
        * @name Internal fields, methods, and friends
@@ -131,9 +135,6 @@ namespace ryujin
 
       std::vector<std::unique_ptr<BarotropicEquationOfState>>
           barotropic_equation_of_state_list_;
-
-      const BarotropicEquationOfState *selected_barotropic_equation_of_state_ =
-          nullptr;
 
       template <int, typename, typename>
       friend class HyperbolicSystemView;
@@ -371,6 +372,7 @@ namespace ryujin
       static constexpr bool have_gamma = false;
       static constexpr bool have_covolume_constant = false;
       static constexpr bool have_energy_equation = false;
+      static constexpr bool have_mach_number = false;
 
       //@}
       /**
@@ -543,6 +545,9 @@ namespace ryujin
        * The low-order and high-order fluxes are the same:
        */
       static constexpr bool have_high_order_flux = false;
+
+      /** The full flux is integrated explicitly: */
+      static constexpr bool have_implicit_flux = false;
 
       DEAL_II_HOST_DEVICE
       state_type high_order_flux_divergence(
