@@ -6,7 +6,7 @@
 [INFO] entering main loop
 Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 16384
-t     = 2.001481663694795
-Linf  = 0.06533605252058426
-L1    = 0.003832538776907276
-L2    = 0.009154353391071958
+t     = 2.001481897276975
+Linf  = 0.06533469736820829
+L1    = 0.003832463256974416
+L2    = 0.009154328384476487
