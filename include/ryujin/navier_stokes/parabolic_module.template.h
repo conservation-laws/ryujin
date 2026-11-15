@@ -253,7 +253,7 @@ namespace ryujin
     Number ParabolicModule<dim, Number>::backward_euler_step(
         const StateVector<Number> &old_state_vector,
         StageVectors stage_state_vectors,
-        StageWeights stage_weights_explicit,
+        [[maybe_unused]] StageWeights stage_weights_explicit,
         StageWeights stage_weights_implicit,
         StateVector<Number> &new_state_vector,
         Number t,
@@ -282,7 +282,7 @@ namespace ryujin
     Number ParabolicModule<dim, Number>::stage_combination_step(
         const StateVector<Number> &old_state_vector,
         StageVectors stage_state_vectors,
-        StageWeights stage_weights_explicit,
+        [[maybe_unused]] StageWeights stage_weights_explicit,
         StageWeights stage_weights_implicit,
         StateVector<Number> &new_state_vector,
         Number t,
@@ -290,7 +290,7 @@ namespace ryujin
     {
       RYUJIN_DEBUG_ANNOUNCE();
 
-      const auto stages = stage_state_vectors.size();
+      [[maybe_unused]] const auto stages = stage_state_vectors.size();
       AssertDimension(stage_weights_explicit.size(), stages);
       AssertDimension(stage_weights_implicit.size(), stages);
       Assert(stages > 0, dealii::ExcInternalError());
