@@ -41,9 +41,10 @@ namespace ryujin
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
-        mach_number_ = 2.0;
-        this->add_parameter(
-            "mach number", mach_number_, "Mach number of isentropic vortex");
+        advection_velocity_ = 2.0;
+        this->add_parameter("advection velocity",
+                            advection_velocity_,
+                            "Advection velocity in x direction");
 
         beta_ = 5.0;
         this->add_parameter("beta", beta_, "vortex strength beta");
@@ -59,7 +60,7 @@ namespace ryujin
 
         /* In 3D we simply project onto the 2d plane: */
         dealii::Point<2> point_bar;
-        point_bar[0] = point[0] - mach_number_ * t;
+        point_bar[0] = point[0] - advection_velocity_ * t;
         point_bar[1] = point[1];
 
         const Number r_square = Number(point_bar.norm_square());
@@ -71,7 +72,7 @@ namespace ryujin
                                           (Number(2.) * gamma_) * factor *
                                           factor;
 
-        const Number u = mach_number_ - factor * Number(point_bar[1]);
+        const Number u = advection_velocity_ - factor * Number(point_bar[1]);
         const Number v = factor * Number(point_bar[0]);
 
         const Number rho = ryujin::pow(T, Number(1.) / (Number(gamma_ - 1.)));
@@ -96,7 +97,7 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system_;
 
       Number gamma_;
-      Number mach_number_;
+      Number advection_velocity_;
       Number beta_;
     };
   } // namespace EulerInitialStates

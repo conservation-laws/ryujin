@@ -44,8 +44,8 @@ subsection E - InitialValues
   set position      =  0,  0
 
   subsection isentropic vortex
-    set mach number = 0
-    set beta        = 5
+    set advection velocity = 0
+    set beta               = 5
   end
 end
 
