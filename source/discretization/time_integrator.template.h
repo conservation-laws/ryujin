@@ -41,7 +41,8 @@ namespace ryujin
         "Time stepping scheme: ssprk 22, ssprk 33, erk 11, erk 22, "
         "erk 33, erk 43, erk "
         "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn, "
-        "imex 11, imex 22, imex 33, gsa imex 22, gsa imex 43");
+        "strang erk 33 dirk 22, strang erk 33 dirk 23, imex 11, imex 22, "
+        "imex 33, gsa imex 22, gsa imex 43");
 
     cfl_min_ = Number(0.45);
     this->add_parameter(
@@ -91,39 +92,114 @@ namespace ryujin
      * the scheme performs implicit steps with the parabolic module:
      */
 
-    bool implicit = false;
+    /*
+     * The Runge-Kutta methods of the selected scheme: a single method, or
+     * for a Strang splitting an explicit method for the hyperbolic and a
+     * diagonally implicit method for the parabolic subproblem. The strong
+     * stability preserving schemes are convex combinations of forward
+     * Euler steps and have no method.
+     */
+
+    using enum TimeSteppingScheme;
+    using M = RungeKuttaMethod;
+
+    bool ssprk = false;
+    bool strang = false;
 
     switch (time_stepping_scheme_) {
-    case TimeSteppingScheme::ssprk_22:
+    case ssprk_22:
       [[fallthrough]];
-    case TimeSteppingScheme::ssprk_33:
-      temp_.resize(2);
-      this->efficiency_ = 1.;
+    case ssprk_33:
+      ssprk = true;
       break;
-    case TimeSteppingScheme::strang_ssprk_33_cn:
-      temp_.resize(3);
-      this->efficiency_ = 2.;
-      implicit = true;
+    case erk_11:
+      method_ = M::erk_11;
       break;
-    default: {
-      /*
-       * A Runge-Kutta scheme described by a Butcher tableau with s
-       * stages: we need storage for all stages except the first one. An
-       * implicit-explicit scheme in addition needs a vector for the
-       * hyperbolic prediction, and a Strang splitting a vector for the
-       * result of the Crank-Nicolson step.
-       */
-      const auto tableau = butcher_tableau<Number>(time_stepping_scheme_);
-      const auto n_stages = tableau.c.size() - 1;
-      const bool strang =
-          time_stepping_scheme_ == TimeSteppingScheme::strang_erk_33_cn ||
-          time_stepping_scheme_ == TimeSteppingScheme::strang_erk_43_cn;
-      implicit = tableau.type() == ButcherTableau<Number>::Type::imex || strang;
-      temp_.resize(n_stages + (implicit ? 1 : 0));
-      this->efficiency_ =
-          Number(strang ? 2. : 1.) / tableau.maximal_increment();
-    } break;
+    case erk_22:
+      method_ = M::erk_22;
+      break;
+    case erk_33:
+      method_ = M::erk_33;
+      break;
+    case erk_43:
+      method_ = M::erk_43;
+      break;
+    case erk_54:
+      method_ = M::erk_54;
+      break;
+    case strang_ssprk_33_cn:
+      ssprk = true;
+      strang = true;
+      parabolic_method_ = M::dirk_midpoint;
+      break;
+    case strang_erk_33_cn:
+      strang = true;
+      method_ = M::erk_33;
+      parabolic_method_ = M::dirk_midpoint;
+      break;
+    case strang_erk_43_cn:
+      strang = true;
+      method_ = M::erk_43;
+      parabolic_method_ = M::dirk_midpoint;
+      break;
+    case strang_erk_33_dirk_22:
+      strang = true;
+      method_ = M::erk_33;
+      parabolic_method_ = M::dirk_22;
+      break;
+    case strang_erk_33_dirk_23:
+      strang = true;
+      method_ = M::erk_33;
+      parabolic_method_ = M::dirk_23;
+      break;
+    case imex_11:
+      method_ = M::imex_11;
+      break;
+    case imex_22:
+      method_ = M::imex_22;
+      break;
+    case imex_33:
+      method_ = M::imex_33;
+      break;
+    case gsa_imex_22:
+      method_ = M::gsa_imex_22;
+      break;
+    case gsa_imex_43:
+      method_ = M::gsa_imex_43;
+      break;
     }
+
+    /*
+     * Resize temporary storage: a Runge-Kutta method with s stages needs
+     * storage for all stages except the first and the last one, an
+     * implicit-explicit method in addition a vector for the hyperbolic
+     * prediction. A strong stability preserving scheme needs a single
+     * vector. The result is stored in the last vector. A Strang splitting
+     * runs the stages of its two methods one after the other, and needs
+     * two vectors for its intermediate states instead of one.
+     */
+
+    std::size_t n_stages = 1;
+    bool imex = false;
+    this->efficiency_ = Number(1.);
+
+    if (!ssprk) {
+      const auto tableau = butcher_tableau<Number>(method_);
+      imex = tableau.type() == ButcherTableau<Number>::Type::imex;
+      n_stages = tableau.c.size() - 2 + (imex ? 1 : 0);
+      this->efficiency_ = Number(1.) / tableau.maximal_increment();
+    }
+
+    if (strang) {
+      const auto tableau = butcher_tableau<Number>(parabolic_method_);
+      n_stages = std::max(n_stages, tableau.c.size() - 2);
+      this->efficiency_ *= Number(2.);
+    }
+
+    temp_.resize(n_stages + (strang ? 2 : 1));
+
+    /* Whether the scheme performs implicit steps with the parabolic module: */
+    const bool implicit = imex || strang;
 
     /* Make sure the user selects an appropriate time-stepping scheme: */
 
@@ -204,10 +280,19 @@ namespace ryujin
       case TimeSteppingScheme::strang_erk_33_cn:
         [[fallthrough]];
       case TimeSteppingScheme::strang_erk_43_cn:
-        tau = step_strang_cn(state_vector, result, t, tau, tau_max);
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_erk_33_dirk_22:
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_erk_33_dirk_23:
+        tau = step_strang(state_vector, result, t, tau, tau_max);
         break;
       default:
-        tau = step_runge_kutta(state_vector, result, t, tau, tau_max);
+        tau = step_runge_kutta(butcher_tableau<Number>(method_),
+                               state_vector,
+                               result,
+                               t,
+                               tau,
+                               tau_max);
       }
 
       std::swap(state_vector, result);
@@ -353,6 +438,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step_runge_kutta(
+      const ButcherTableau<Number> &tableau,
       const StateVector<Number> &old_state_vector,
       StateVector<Number> &new_state_vector,
       Number t,
@@ -363,15 +449,21 @@ namespace ryujin
 
     using Tableau = ButcherTableau<Number>;
 
-    const auto tableau = butcher_tableau<Number>(time_stepping_scheme_);
     const auto &c = tableau.c;
     const auto &a_explicit = tableau.a_explicit;
     const auto &a_implicit = tableau.a_implicit;
 
     const std::size_t n = c.size();
-    const bool imex = tableau.type() == Tableau::Type::imex;
+    const auto type = tableau.type();
+    const bool hyperbolic = type != Tableau::Type::dirk;
+    const bool parabolic = type != Tableau::Type::erk;
+    const bool imex = hyperbolic && parabolic;
     const auto start_stages = tableau.start_stages();
     const Number dc_max = tableau.maximal_increment();
+
+    Assert(hyperbolic || tau != Number(0.),
+           dealii::ExcMessage("A diagonally implicit scheme cannot choose the "
+                              "time step size: tau must be nonzero."));
 
     /*
      * Storage: the first stage is the old state and the last stage is the
@@ -409,102 +501,138 @@ namespace ryujin
         };
 
         /*
+         * For a diagonally implicit scheme the explicit weights are those
+         * of the strictly lower part of the implicit tableau: the known
+         * stages enter with the parabolic operator, only the new stage is
+         * linearized, see Interface::ParabolicModule::backward_euler_step().
+         */
+        const auto weight_strictly_lower = [&](const std::size_t k) {
+          const Number a_l_prime_k =
+              k < l_prime ? Tableau::entry(a_implicit, l_prime, k) : Number(0.);
+          return (Tableau::entry(a_implicit, l, k) - a_l_prime_k) / dc;
+        };
+
+        /*
          * Explicit step: at time t + c_l' * tau -> t + c_l * tau
          *
          * The stage l' is the old state of the explicit step and does not
          * have to be supplied. We also skip all stages that do not
-         * contribute.
+         * contribute. A diagonally implicit scheme uses the stage l' as
+         * prediction.
          */
 
-        vectors.clear();
-        weights_explicit.clear();
-        for (std::size_t k = 0; k < l; ++k) {
-          const Number w = weight(a_explicit, k);
-          if (k == l_prime || w == Number(0.))
-            continue;
-          vectors.push_back(U(k));
-          weights_explicit.push_back(w);
-        }
+        const StateVector<Number> *prediction = &U(l_prime);
 
-        auto &prediction = imex ? temp_[0] : stage(l);
-
-        if (l == 1) {
-          /*
-           * The first explicit step determines the time-step size tau. If
-           * the first stage is not the one with the largest increment we
-           * have to reduce the CFL number accordingly so that the
-           * time-step size is admissible for all stages.
-           */
-          const Number cfl = hyperbolic_module_->cfl();
-          hyperbolic_module_->set_cfl(dc / dc_max * cfl);
-          try {
-            tau = hyperbolic_module_->forward_euler_step(old_state_vector,
-                                                         {},
-                                                         {},
-                                                         prediction,
-                                                         t,
-                                                         dc * tau,
-                                                         dc * tau_max);
-          } catch (...) {
-            hyperbolic_module_->set_cfl(cfl);
-            throw;
+        if (hyperbolic) {
+          vectors.clear();
+          weights_explicit.clear();
+          for (std::size_t k = 0; k < l; ++k) {
+            const Number w = weight(a_explicit, k);
+            if (k == l_prime || w == Number(0.))
+              continue;
+            vectors.push_back(U(k));
+            weights_explicit.push_back(w);
           }
-          hyperbolic_module_->set_cfl(cfl);
-          tau /= dc;
 
-        } else {
-          hyperbolic_module_->forward_euler_step(U(l_prime),
-                                                 vectors,
-                                                 weights_explicit,
-                                                 prediction,
-                                                 t + c[l_prime] * tau,
-                                                 dc * tau);
+          auto &explicit_result = imex ? temp_[0] : stage(l);
+          prediction = &explicit_result;
+
+          if (l == 1) {
+            /*
+             * The first explicit step determines the time-step size tau.
+             * If the first stage is not the one with the largest increment
+             * we have to reduce the CFL number accordingly so that the
+             * time-step size is admissible for all stages.
+             */
+            const Number cfl = hyperbolic_module_->cfl();
+            hyperbolic_module_->set_cfl(dc / dc_max * cfl);
+            try {
+              tau = hyperbolic_module_->forward_euler_step(old_state_vector,
+                                                           {},
+                                                           {},
+                                                           explicit_result,
+                                                           t,
+                                                           dc * tau,
+                                                           dc * tau_max);
+            } catch (...) {
+              hyperbolic_module_->set_cfl(cfl);
+              throw;
+            }
+            hyperbolic_module_->set_cfl(cfl);
+            tau /= dc;
+
+          } else {
+            hyperbolic_module_->forward_euler_step(U(l_prime),
+                                                   vectors,
+                                                   weights_explicit,
+                                                   explicit_result,
+                                                   t + c[l_prime] * tau,
+                                                   dc * tau);
+          }
         }
 
         /*
          * Implicit step: at time t + c_l' * tau -> t + c_l * tau
          *
-         * We supply all prior stages. The last implicit weight is the
-         * weight of the new stage. If the hyperbolic module splits off an
-         * implicit flux, the prediction contains the implicit flux of the
-         * start stage l' only, and we supply the explicit weights of
-         * that forward Euler step.
+         * We supply all prior stages. If the hyperbolic module splits off
+         * an implicit flux, the prediction contains the implicit flux of
+         * the start stage l' only, and we supply the explicit weights of
+         * that forward Euler step. If the weight of the new stage vanishes
+         * the stage is computed without implicit solve.
          */
 
-        if (imex) {
-          const bool implicit_flux = hyperbolic_module_->have_implicit_flux();
+        if (parabolic) {
+          const bool implicit_flux =
+              imex && hyperbolic_module_->have_implicit_flux();
           vectors.clear();
           weights_explicit.clear();
           weights_implicit.clear();
           for (std::size_t k = 0; k < l; ++k) {
             vectors.push_back(U(k));
-            weights_explicit.push_back(implicit_flux ? Number(k == l_prime)
-                                                     : weight(a_explicit, k));
+            weights_explicit.push_back(!imex ? weight_strictly_lower(k)
+                                       : implicit_flux ? Number(k == l_prime)
+                                                       : weight(a_explicit, k));
             weights_implicit.push_back(weight(a_implicit, k));
           }
-          weights_implicit.push_back(Tableau::entry(a_implicit, l, l) / dc);
 
-          parabolic_module_->backward_euler_step(prediction,
-                                                 vectors,
-                                                 weights_explicit,
-                                                 weights_implicit,
-                                                 stage(l),
-                                                 t + c[l_prime] * tau,
-                                                 dc * tau);
+          const Number weight_new = Tableau::entry(a_implicit, l, l) / dc;
+
+          if (weight_new == Number(0.)) {
+            Assert(l == n - 1, dealii::ExcInternalError());
+            parabolic_module_->stage_combination_step(*prediction,
+                                                      vectors,
+                                                      weights_explicit,
+                                                      weights_implicit,
+                                                      stage(l),
+                                                      t + c[l_prime] * tau,
+                                                      dc * tau);
+          } else {
+            weights_implicit.push_back(weight_new);
+            parabolic_module_->backward_euler_step(*prediction,
+                                                   vectors,
+                                                   weights_explicit,
+                                                   weights_implicit,
+                                                   stage(l),
+                                                   t + c[l_prime] * tau,
+                                                   dc * tau);
+          }
         }
 
         /* Prepare the stage for its use in subsequent stages: */
-        if (l < n - 1)
+        if (hyperbolic && l < n - 1)
           hyperbolic_module_->prepare_state_vector(stage(l), t + c[l] * tau);
       }
 
     } catch (Restart &restart) {
       /*
        * The suggested tau_max of a restart refers to the stage that
-       * signalled the restart. Adjust it to the largest increment; we
-       * multiply with this->efficiency_ later.
+       * signalled the restart. If the hyperbolic module chooses the
+       * time-step size we adjust it to the largest increment; we multiply
+       * with this->efficiency_ later. A diagonally implicit scheme passes
+       * the suggestion through.
        */
-      restart.suggested_tau_max *= dc_max / dc;
+      if (hyperbolic)
+        restart.suggested_tau_max *= dc_max / dc;
       throw;
     }
 
@@ -513,7 +641,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_strang_cn(
+  Number TimeIntegrator<dim, Number>::step_strang(
       const StateVector<Number> &old_state_vector,
       StateVector<Number> &new_state_vector,
       Number t,
@@ -531,12 +659,18 @@ namespace ryujin
       if (time_stepping_scheme_ == TimeSteppingScheme::strang_ssprk_33_cn)
         return step_ssprk_33(old_U, new_U, time, step_size, step_size_max);
       else
-        return step_runge_kutta(old_U, new_U, time, step_size, step_size_max);
+        return step_runge_kutta(butcher_tableau<Number>(method_),
+                                old_U,
+                                new_U,
+                                time,
+                                step_size,
+                                step_size_max);
     };
 
     /*
-     * Storage: the explicit scheme uses all but the last two vectors of
-     * temp_. The last vector is the new state vector.
+     * Storage: the explicit and the diagonally implicit scheme use all
+     * but the last two vectors of temp_. The last vector is the new state
+     * vector.
      */
     auto &U_implicit = temp_[temp_.size() - 2];
 
@@ -547,10 +681,14 @@ namespace ryujin
                         tau / Number(2.),
                         tau_max / Number(2.));
 
-    /* Implicit Crank-Nicolson step: at time t -> t + 2 * tau */
+    /* Diagonally implicit step: at time t -> t + 2 * tau */
     try {
-      parabolic_module_->crank_nicolson_step(
-          new_state_vector, U_implicit, t, Number(2.) * tau);
+      step_runge_kutta(butcher_tableau<Number>(parabolic_method_),
+                       new_state_vector,
+                       U_implicit,
+                       t,
+                       Number(2.) * tau,
+                       tau_max);
     } catch (Restart &restart) {
       /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
        * later */

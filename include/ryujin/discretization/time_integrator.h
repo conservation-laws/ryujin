@@ -26,6 +26,11 @@
 
 namespace ryujin
 {
+  template <typename Number>
+  struct ButcherTableau;
+
+  enum class RungeKuttaMethod;
+
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
    *
@@ -474,6 +479,19 @@ namespace ryujin
     dealii::ObserverPointer<const Interface::ParabolicModule<dim, Number>>
         parabolic_module_;
 
+    /**
+     * The Runge-Kutta method of the selected time-stepping scheme. For a
+     * Strang splitting this is the explicit method of the hyperbolic
+     * subproblem. Not used by the strong stability preserving schemes.
+     */
+    RungeKuttaMethod method_;
+
+    /**
+     * The diagonally implicit Runge-Kutta method of the parabolic
+     * subproblem of a Strang splitting.
+     */
+    RungeKuttaMethod parabolic_method_;
+
     std::vector<StateVector<Number>> temp_;
 
     //@}
@@ -510,14 +528,16 @@ namespace ryujin
                          Number tau_max);
 
     /**
-     * Performs all stages of the explicit, or implicit-explicit
-     * Runge-Kutta scheme described by the Butcher tableau of the selected
-     * time-stepping scheme. Every stage consists of one explicit
-     * hyperbolic step and, for an implicit-explicit scheme, one implicit
-     * parabolic step. The intermediate stages are stored in the temporary
-     * vectors.
+     * Performs all stages of the explicit, diagonally implicit, or
+     * implicit-explicit Runge-Kutta scheme described by the Butcher
+     * tableau @p tableau. Every stage consists of one explicit hyperbolic
+     * step (unless the scheme is diagonally implicit) and one implicit
+     * parabolic step (unless the scheme is explicit). The intermediate
+     * stages are stored in the temporary vectors. A diagonally implicit
+     * scheme does not choose the time-step size: @p tau must be nonzero.
      */
-    Number step_runge_kutta(const StateVector<Number> &old_state_vector,
+    Number step_runge_kutta(const ButcherTableau<Number> &tableau,
+                            const StateVector<Number> &old_state_vector,
                             StateVector<Number> &new_state_vector,
                             Number t,
                             Number tau,
@@ -526,13 +546,14 @@ namespace ryujin
     /**
      * Performs a combined explicit implicit Strang split: an explicit
      * step with the explicit scheme of the selected time-stepping scheme,
-     * an implicit Crank-Nicolson step, and a second explicit step.
+     * a step with the diagonally implicit method of the selected
+     * time-stepping scheme, and a second explicit step.
      */
-    Number step_strang_cn(const StateVector<Number> &old_state_vector,
-                          StateVector<Number> &new_state_vector,
-                          Number t,
-                          Number tau,
-                          Number tau_max);
+    Number step_strang(const StateVector<Number> &old_state_vector,
+                       StateVector<Number> &new_state_vector,
+                       Number t,
+                       Number tau,
+                       Number tau_max);
 
     //@}
   };

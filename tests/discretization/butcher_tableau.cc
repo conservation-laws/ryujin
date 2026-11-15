@@ -141,11 +141,10 @@ void test(const ButcherTableau<double> &tableau, const std::string &name)
 
 int main()
 {
-  using enum TimeSteppingScheme;
+  using enum RungeKuttaMethod;
 
-  const auto run = [](const TimeSteppingScheme scheme,
-                      const std::string &name) {
-    test(butcher_tableau<double>(scheme), name);
+  const auto run = [](const RungeKuttaMethod method, const std::string &name) {
+    test(butcher_tableau<double>(method), name);
   };
 
   run(erk_11, "erk 11");
@@ -153,26 +152,14 @@ int main()
   run(erk_33, "erk 33");
   run(erk_43, "erk 43");
   run(erk_54, "erk 54");
-  run(strang_erk_33_cn, "strang erk 33 cn");
-  run(strang_erk_43_cn, "strang erk 43 cn");
-  run(strang_erk_33_dirk_22, "strang erk 33 dirk 22");
-  run(strang_erk_33_dirk_23, "strang erk 33 dirk 23");
   run(imex_11, "imex 11");
   run(imex_22, "imex 22");
   run(imex_33, "imex 33");
   run(gsa_imex_22, "gsa imex 22");
   run(gsa_imex_43, "gsa imex 43");
-
-  const auto run_parabolic = [](const TimeSteppingScheme scheme,
-                                const std::string &name) {
-    test(parabolic_tableau<double>(scheme), name + " (parabolic)");
-  };
-
-  run_parabolic(strang_ssprk_33_cn, "strang ssprk 33 cn");
-  run_parabolic(strang_erk_33_cn, "strang erk 33 cn");
-  run_parabolic(strang_erk_43_cn, "strang erk 43 cn");
-  run_parabolic(strang_erk_33_dirk_22, "strang erk 33 dirk 22");
-  run_parabolic(strang_erk_33_dirk_23, "strang erk 33 dirk 23");
+  run(dirk_midpoint, "dirk midpoint");
+  run(dirk_22, "dirk 22");
+  run(dirk_23, "dirk 23");
 
   return 0;
 }
