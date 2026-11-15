@@ -44,6 +44,7 @@ namespace ryujin
       struct Parameters {
         unsigned int iterations;
         double relaxation_factor;
+        bool limit_velocity;
       };
 
       //@}
@@ -53,10 +54,12 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor.
+       * Constructor. The argument @p limit_velocity sets the default of
+       * the "limit velocity" parameter.
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
-              const std::string &subsection = "/Limiter")
+              const std::string &subsection = "/Limiter",
+              const bool limit_velocity = false)
           : ParameterAcceptor(subsection)
           , parameters_("euler_barotropic_limiter_parameters",
                         TransferPolicy::implicit_transfers_host_resident)
@@ -75,6 +78,12 @@ namespace ryujin
                       parameters.relaxation_factor,
                       "Factor for scaling the relaxation window with r_i = "
                       "factor * (m_i/|Omega|)^(1.5/d).");
+
+        parameters.limit_velocity = limit_velocity;
+        add_parameter("limit velocity",
+                      parameters.limit_velocity,
+                      "Also limit the square of the velocity |v|^2 from "
+                      "above.");
 
         /* invalidates view on default memory space */
         ParameterAcceptor::parse_parameters_call_back.connect(
@@ -162,7 +171,7 @@ namespace ryujin
       /**
        * The number of stored entries in the bounds array.
        */
-      static constexpr unsigned int n_bounds = 2;
+      static constexpr unsigned int n_bounds = 3;
 
       /**
        * Array type used to store accumulated bounds.
@@ -193,6 +202,14 @@ namespace ryujin
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber relaxation_factor() const
       {
         return ScalarNumber(parameters_->relaxation_factor);
+      }
+
+      /**
+       * Return whether the square of the velocity is limited.
+       */
+      DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool limit_velocity() const
+      {
+        return parameters_->limit_velocity;
       }
 
       /**
@@ -314,6 +331,7 @@ namespace ryujin
 
       Number rho_relaxation_numerator_;
       Number rho_relaxation_denominator_;
+      Number v2_relaxation_numerator_;
 
       //@}
     };
@@ -334,7 +352,8 @@ namespace ryujin
         const state_type &U_i) const -> Bounds
     {
       const auto rho_i = view_.density(U_i);
-      return {/*rho_min*/ rho_i, /*rho_max*/ rho_i};
+      const auto v2_i = view_.momentum(U_i).norm_square() / (rho_i * rho_i);
+      return {/*rho_min*/ rho_i, /*rho_max*/ rho_i, /*v2_max*/ v2_i};
     }
 
 
@@ -343,10 +362,12 @@ namespace ryujin
     LimiterView<dim, Number, MemorySpace>::combine_bounds(
         const Bounds &bounds_left, const Bounds &bounds_right) const -> Bounds
     {
-      const auto &[rho_min_l, rho_max_l] = bounds_left;
-      const auto &[rho_min_r, rho_max_r] = bounds_right;
+      const auto &[rho_min_l, rho_max_l, v2_max_l] = bounds_left;
+      const auto &[rho_min_r, rho_max_r, v2_max_r] = bounds_right;
 
-      return {std::min(rho_min_l, rho_min_r), std::max(rho_max_l, rho_max_r)};
+      return {std::min(rho_min_l, rho_min_r),
+              std::max(rho_max_l, rho_max_r),
+              std::max(v2_max_l, v2_max_r)};
     }
 
 
@@ -356,7 +377,7 @@ namespace ryujin
         const Bounds &bounds, const Number &hd) const -> Bounds
     {
       auto relaxed_bounds = bounds;
-      auto &[rho_min_relaxed, rho_max_relaxed] = relaxed_bounds;
+      auto &[rho_min_relaxed, rho_max_relaxed, v2_max_relaxed] = relaxed_bounds;
 
       /* Use r = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -370,6 +391,7 @@ namespace ryujin
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       rho_min_relaxed *= std::max(Number(1.) - r, Number(eps));
       rho_max_relaxed *= (Number(1.) + r);
+      v2_max_relaxed *= (Number(1.) + r);
 
       return relaxed_bounds;
     }
@@ -388,15 +410,17 @@ namespace ryujin
 
       /* Bounds: */
 
-      auto &[rho_min, rho_max] = bounds_;
+      auto &[rho_min, rho_max, v2_max] = bounds_;
 
       rho_min = Number(std::numeric_limits<ScalarNumber>::max());
       rho_max = Number(0.);
+      v2_max = Number(0.);
 
       /* Relaxation: */
 
       rho_relaxation_numerator_ = Number(0.);
       rho_relaxation_denominator_ = Number(0.);
+      v2_relaxation_numerator_ = Number(0.);
     }
 
 
@@ -418,7 +442,7 @@ namespace ryujin
              dealii::ExcNotImplemented());
 
       /* Bounds: */
-      auto &[rho_min, rho_max] = bounds_;
+      auto &[rho_min, rho_max, v2_max] = bounds_;
 
       const auto rho_i = view_.density(U_i_);
       const auto rho_j = view_.density(U_j);
@@ -442,6 +466,19 @@ namespace ryujin
       const auto beta_ij = Number(1.);
       rho_relaxation_numerator_ += beta_ij * (rho_i + rho_j);
       rho_relaxation_denominator_ += std::abs(beta_ij);
+
+      if (!limit_velocity())
+        return;
+
+      /* Velocity bound and relaxation: */
+
+      const auto v2_ij_bar =
+          view_.momentum(U_ij_bar).norm_square() / (rho_ij_bar * rho_ij_bar);
+      v2_max = std::max(v2_max, v2_ij_bar);
+
+      const auto v2_i = view_.momentum(U_i_).norm_square() / (rho_i * rho_i);
+      const auto v2_j = view_.momentum(U_j).norm_square() / (rho_j * rho_j);
+      v2_relaxation_numerator_ += beta_ij * (v2_j - v2_i);
     }
 
 
@@ -450,10 +487,10 @@ namespace ryujin
     LimiterView<dim, Number, MemorySpace>::bounds(const Number hd_i) const
         -> Bounds
     {
-      const auto &[rho_min, rho_max] = bounds_;
+      const auto &[rho_min, rho_max, v2_max] = bounds_;
 
       auto relaxed_bounds = fully_relax_bounds(bounds_, hd_i);
-      auto &[rho_min_relaxed, rho_max_relaxed] = relaxed_bounds;
+      auto &[rho_min_relaxed, rho_max_relaxed, v2_max_relaxed] = relaxed_bounds;
 
       /* Apply a stricter window: */
 
@@ -466,6 +503,13 @@ namespace ryujin
 
       rho_min_relaxed = std::max(rho_min_relaxed, rho_min - rho_relaxation);
       rho_max_relaxed = std::min(rho_max_relaxed, rho_max + rho_relaxation);
+
+      const auto v2_relaxation =
+          ScalarNumber(2. * relaxation_factor()) *
+          std::abs(v2_relaxation_numerator_) /
+          (std::abs(rho_relaxation_denominator_) + Number(eps));
+
+      v2_max_relaxed = std::min(v2_max_relaxed, v2_max + v2_relaxation);
 
       return relaxed_bounds;
     }
@@ -484,7 +528,9 @@ namespace ryujin
       Number t_r = t_max;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      const auto small = view_.vacuum_state_relaxation_small();
       const auto large = view_.vacuum_state_relaxation_large();
+      const ScalarNumber relax_small = ScalarNumber(1. + small * eps);
       const ScalarNumber relax = ScalarNumber(1. + large * eps);
 
       /*
@@ -586,7 +632,92 @@ namespace ryujin
 #endif
       }
 
-      return {t_r, success};
+      if (!limit_velocity())
+        return {t_r, success};
+
+      /*
+       * Limit the square of the velocity: Given t_l with psi(t_l) >= 0
+       * find t in [t_l, t_r] with psi(t) >= 0, where
+       *
+       *   psi(t) = rho(t)^2 v2_max - |m(t)|^2,
+       *
+       * with rho(t) = rho_U + t rho_P and m(t) = m_U + t m_P, is a
+       * quadratic polynomial. A single quadratic Newton step thus finds
+       * the root (up to round-off).
+       */
+
+      {
+        const auto &rho_U = view_.density(U);
+        const auto &rho_P = view_.density(P);
+        const auto &m_U = view_.momentum(U);
+        const auto &m_P = view_.momentum(P);
+
+        const auto &v2_max = std::get<2>(bounds);
+
+        const auto psi = [&](const Number t) {
+          const auto rho = rho_U + t * rho_P;
+          return relax_small * rho * rho * v2_max -
+                 (m_U + t * m_P).norm_square();
+        };
+
+        const auto dpsi = [&](const Number t) {
+          return ScalarNumber(2.) *
+                 ((rho_U + t * rho_P) * rho_P * v2_max - (m_U + t * m_P) * m_P);
+        };
+
+        Number t_l = t_min;
+
+        /* If psi(t_r) > 0 the state is in bounds and we return t_r: */
+        const auto psi_r = psi(t_r);
+        t_l = ryujin::compare_and_apply_mask<
+            dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
+
+        if (t_l == t_r)
+          return {t_r, success};
+
+        /*
+         * Verify that the low-order state is within bounds. This property
+         * might be violated for relative CFL numbers larger than 1.
+         */
+        const auto psi_l = psi(t_l);
+        const auto rho_l = rho_U + t_l * rho_P;
+        const auto lower_bound =
+            (ScalarNumber(1.) - relax) * rho_l * rho_l * v2_max -
+            ScalarNumber(100.) * eps;
+        if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
+#ifdef DEBUG_OUTPUT
+          std::cout << std::fixed << std::setprecision(16);
+          std::cout << "Bounds violation: low-order square velocity "
+                       "(critical)!\n\t\tPsi left: 0 <= "
+                    << psi_l << "\n"
+                    << std::endl;
+#endif
+          success = false;
+        }
+
+        quadratic_newton_step(
+            t_l, t_r, psi_l, psi_r, dpsi(t_l), dpsi(t_r), Number(-1.));
+
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
+        /*
+         * Verify that the new state is within bounds:
+         */
+        const auto rho_new = rho_U + t_l * rho_P;
+        const auto lower_bound_new =
+            (ScalarNumber(1.) - relax) * rho_new * rho_new * v2_max -
+            ScalarNumber(100.) * eps;
+        if (!(std::min(Number(0.), psi(t_l) - lower_bound_new) == Number(0.))) {
+#ifdef DEBUG_OUTPUT
+          std::cout << std::fixed << std::setprecision(16);
+          std::cout << "Bounds violation: high-order square velocity!\n"
+                    << "\t\tPsi: 0 <= " << psi(t_l) << "\n"
+                    << std::endl;
+#endif
+          success = false;
+        }
+#endif
+        return {t_l, success};
+      }
     }
   } // namespace EulerBarotropic
 } // namespace ryujin
