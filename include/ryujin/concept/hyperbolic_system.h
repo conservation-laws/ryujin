@@ -60,6 +60,7 @@ namespace ryujin
           typename V::PrecomputedVectorView;
           typename V::InitialPrecomputedVectorView;
           { V::have_high_order_flux } -> std::convertible_to<bool>;
+          { V::have_implicit_flux } -> std::convertible_to<bool>;
           { V::have_source_terms } -> std::convertible_to<bool>;
         } &&
         std::same_as<typename V::state_type,
@@ -111,6 +112,15 @@ namespace ryujin
              view.high_order_flux_divergence(flux, flux, c_ij)
            } -> std::same_as<typename V::state_type>;
          }) &&
+        (!V::have_implicit_flux ||
+         (!V::have_high_order_flux &&
+          requires(const V &view,
+                   const typename V::state_type &U,
+                   const dealii::Tensor<1, dim, Number> &c_ij) {
+            {
+              view.explicit_flux_divergence(U, U, c_ij)
+            } -> std::same_as<typename V::state_type>;
+          })) &&
         (!V::have_source_terms ||
          requires(const V &view,
                   const typename V::state_type &U,

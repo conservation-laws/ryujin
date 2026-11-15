@@ -166,6 +166,7 @@ namespace ryujin
           VectorView<n_initial_precomputed_values>;
 
       static constexpr bool have_high_order_flux = false;
+      static constexpr bool have_implicit_flux = false;
 
       static constexpr bool have_source_terms = false;
 

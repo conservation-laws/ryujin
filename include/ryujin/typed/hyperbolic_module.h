@@ -204,6 +204,14 @@ namespace ryujin
      * old state. Source terms, if present, are combined with the same
      * weights.
      *
+     * If the hyperbolic system splits the flux \f$\mathbb f = \mathbb
+     * f^e+\mathbb f^i\f$ into an explicit and an implicit part
+     * (<code>View::have_implicit_flux</code>), the implicit flux
+     * \f$\mathbb f^i(\boldsymbol U^n)\f$ only enters the low-order update.
+     * The high-order flux and the limiter then only see the explicit flux
+     * \f$\mathbb f^e\f$. Adjusting the implicit part of the update (for
+     * high order) is left to the parabolic module.
+     *
      * @note The routine only performs an explicit update step on the
      * locally owned dof index range. It neither updates the precomputed
      * block of the state vector, sets boundary conditions (prior) to the

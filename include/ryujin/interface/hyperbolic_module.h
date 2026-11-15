@@ -143,6 +143,15 @@ namespace ryujin
        */
       ACCESSOR_READ_ONLY(n_precomputed_values)
 
+      /**
+       * Whether the hyperbolic system splits off an implicit flux that only
+       * enters the low-order update, a run time copy of the compile time
+       * constant of the hyperbolic system. The time integrator then hands
+       * the explicit weights of the start stage to the parabolic module,
+       * see TimeIntegrator::step_runge_kutta().
+       */
+      ACCESSOR_READ_ONLY(have_implicit_flux)
+
       //@}
 
     protected:
@@ -151,12 +160,14 @@ namespace ryujin
        */
       HyperbolicModule(const unsigned int problem_dimension,
                        const unsigned int n_precomputed_values,
+                       const bool have_implicit_flux,
                        const std::string &subsection)
           : Module<dim, Number>(subsection)
           , cfl_(Number(0.2))
           , acceptable_tau_max_ratio_(Number(1.e6))
           , problem_dimension_(problem_dimension)
           , n_precomputed_values_(n_precomputed_values)
+          , have_implicit_flux_(have_implicit_flux)
       {
       }
 
@@ -166,6 +177,7 @@ namespace ryujin
     private:
       const unsigned int problem_dimension_;
       const unsigned int n_precomputed_values_;
+      const bool have_implicit_flux_;
     };
   } // namespace Interface
 } // namespace ryujin

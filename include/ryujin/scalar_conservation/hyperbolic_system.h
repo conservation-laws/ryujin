@@ -426,6 +426,9 @@ namespace ryujin
       /** The low-order and high-order fluxes are the same */
       static constexpr bool have_high_order_flux = false;
 
+      /** The full flux is integrated explicitly: */
+      static constexpr bool have_implicit_flux = false;
+
       state_type high_order_flux_divergence(
           const flux_contribution_type &,
           const flux_contribution_type &,

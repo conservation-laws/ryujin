@@ -119,6 +119,7 @@ public:
       : Interface::HyperbolicModule<dim, Number>(
             FirstModule::problem_dimension,
             FirstModule::n_precomputed_values,
+            /*have_implicit_flux*/ false,
             subsection)
       , first_(mpi_ensemble,
                offline_data,
