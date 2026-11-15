@@ -118,7 +118,7 @@ namespace ryujin
       const bool strang =
           time_stepping_scheme_ == TimeSteppingScheme::strang_erk_33_cn ||
           time_stepping_scheme_ == TimeSteppingScheme::strang_erk_43_cn;
-      implicit = tableau.is_imex() || strang;
+      implicit = tableau.type() == ButcherTableau<Number>::Type::imex || strang;
       temp_.resize(n_stages + (implicit ? 1 : 0));
       this->efficiency_ =
           Number(strang ? 2. : 1.) / tableau.maximal_increment();
@@ -369,7 +369,7 @@ namespace ryujin
     const auto &a_implicit = tableau.a_implicit;
 
     const std::size_t n = c.size();
-    const bool imex = tableau.is_imex();
+    const bool imex = tableau.type() == Tableau::Type::imex;
     const auto start_stages = tableau.start_stages();
     const Number dc_max = tableau.maximal_increment();
 

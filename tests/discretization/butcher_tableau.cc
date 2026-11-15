@@ -67,7 +67,8 @@ void test(const TimeSteppingScheme scheme, const std::string &name)
 
   /* All tableaux that take part in the scheme: */
   std::vector<Matrix> tableaux{expand(tableau.a_explicit, n)};
-  if (tableau.is_imex())
+  const bool imex = tableau.type() == ButcherTableau<double>::Type::imex;
+  if (imex)
     tableaux.push_back(expand(tableau.a_implicit, n));
 
   const Vector one(n, 1.);
@@ -89,7 +90,7 @@ void test(const TimeSteppingScheme scheme, const std::string &name)
   bool order_1 = true;
   bool order_2 = true;
   bool order_3 = true;
-  bool order_4 = !tableau.is_imex(); /* only verified for explicit schemes */
+  bool order_4 = !imex; /* only verified for explicit schemes */
 
   const auto c2 = multiply(c, c);
   const auto c3 = multiply(c2, c);
@@ -117,7 +118,7 @@ void test(const TimeSteppingScheme scheme, const std::string &name)
                                         : 4;
 
   std::cout << name << ": stages = " << n - 1 << ", "
-            << (tableau.is_imex() ? "imex" : "explicit")
+            << (imex ? "imex" : "explicit")
             << ", consistent = " << (consistent ? "true" : "false")
             << ", order = " << order << std::endl;
 }

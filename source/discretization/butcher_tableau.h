@@ -18,18 +18,18 @@
 namespace ryujin
 {
   /**
-   * The Butcher tableau of an explicit, or an implicit-explicit Runge-Kutta
-   * scheme with \f$s\f$ stages.
+   * The Butcher tableau of an explicit, a diagonally implicit, or an
+   * implicit-explicit Runge-Kutta scheme with \f$s\f$ stages.
    *
    * The tableau is stored row by row. The first row belongs to the state
    * at the beginning of the time step, the rows \f$2,\ldots,s\f$ belong
    * to the intermediate stages, and the last row \f$s+1\f$ contains the
    * weights of the final update. Trailing zeros of a row can be omitted.
    *
-   * The explicit tableau @p a_explicit is strictly lower triangular. For
-   * an implicit-explicit scheme the implicit tableau @p a_implicit is
-   * lower triangular and shares the coefficients @p c with the explicit
-   * tableau; for an explicit scheme @p a_implicit is empty.
+   * The explicit tableau @p a_explicit is strictly lower triangular, the
+   * implicit tableau @p a_implicit is lower triangular. Both share the
+   * coefficients @p c. An explicit scheme has no implicit tableau, a
+   * diagonally implicit scheme has no explicit tableau, see type().
    *
    * @ingroup MeshAndOfflineData
    */
@@ -42,11 +42,27 @@ namespace ryujin
     Matrix a_implicit;
 
     /**
-     * Returns true if the tableau describes an implicit-explicit scheme.
+     * The type of a Runge-Kutta scheme.
      */
-    bool is_imex() const
+    enum class Type {
+      /** An explicit scheme: @p a_implicit is empty. */
+      erk,
+      /** A diagonally implicit scheme: @p a_explicit is empty. */
+      dirk,
+      /** An implicit-explicit scheme. */
+      imex,
+    };
+
+    /**
+     * Return the type of the scheme described by the tableau.
+     */
+    Type type() const
     {
-      return !a_implicit.empty();
+      if (a_implicit.empty())
+        return Type::erk;
+      if (a_explicit.empty())
+        return Type::dirk;
+      return Type::imex;
     }
 
     /**
