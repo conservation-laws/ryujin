@@ -18,6 +18,13 @@ namespace ryujin
      *
      * An analytic solution for the compressible Euler equations.
      *
+     * The parameter \f$\varepsilon\f$ (<code>mach number</code>) scales the
+     * vortex strength \f$\beta\f$ and the advection velocity: the
+     * velocity is then of order \f$\varepsilon\f$, and the density and
+     * pressure fluctuations are of order \f$\varepsilon^2\f$. For
+     * \f$\varepsilon\to0\f$ this is a well-prepared solution in the low
+     * Mach number regime.
+     *
      * @note This class returns the analytic solution as a function of time
      * @p t and position @p x.
      *
@@ -48,6 +55,14 @@ namespace ryujin
 
         beta_ = 5.0;
         this->add_parameter("beta", beta_, "vortex strength beta");
+
+        mach_number_ = 1.0;
+        if constexpr (!View::have_mach_number) {
+          this->add_parameter("mach number",
+                              mach_number_,
+                              "low Mach number scaling of vortex strength and "
+                              "advection velocity");
+        }
       }
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
@@ -58,21 +73,26 @@ namespace ryujin
           gamma_ = view.gamma();
         }
 
+        if constexpr (View::have_mach_number) {
+          mach_number_ = view.mach_number();
+        }
+
         /* In 3D we simply project onto the 2d plane: */
         dealii::Point<2> point_bar;
-        point_bar[0] = point[0] - advection_velocity_ * t;
+        point_bar[0] = point[0] - mach_number_ * advection_velocity_ * t;
         point_bar[1] = point[1];
 
         const Number r_square = Number(point_bar.norm_square());
 
-        const Number factor = beta_ / Number(2. * M_PI) *
+        const Number factor = mach_number_ * beta_ / Number(2. * M_PI) *
                               exp(Number(0.5) - Number(0.5) * r_square);
 
         const Number T = Number(1.) - (gamma_ - Number(1.)) /
                                           (Number(2.) * gamma_) * factor *
                                           factor;
 
-        const Number u = advection_velocity_ - factor * Number(point_bar[1]);
+        const Number u =
+            mach_number_ * advection_velocity_ - factor * Number(point_bar[1]);
         const Number v = factor * Number(point_bar[0]);
 
         const Number rho = ryujin::pow(T, Number(1.) / (Number(gamma_ - 1.)));
@@ -99,6 +119,7 @@ namespace ryujin
       Number gamma_;
       Number advection_velocity_;
       Number beta_;
+      Number mach_number_;
     };
   } // namespace EulerInitialStates
 } // namespace ryujin
