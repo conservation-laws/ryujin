@@ -465,16 +465,21 @@ namespace ryujin
          * Implicit step: at time t + c_l' * tau -> t + c_l * tau
          *
          * We supply all prior stages. The last implicit weight is the
-         * weight of the new stage.
+         * weight of the new stage. If the hyperbolic module splits off an
+         * implicit flux, the prediction contains the implicit flux of the
+         * start stage l' only, and we supply the explicit weights of
+         * that forward Euler step.
          */
 
         if (imex) {
+          const bool implicit_flux = hyperbolic_module_->have_implicit_flux();
           vectors.clear();
           weights_explicit.clear();
           weights_implicit.clear();
           for (std::size_t k = 0; k < l; ++k) {
             vectors.push_back(U(k));
-            weights_explicit.push_back(weight(a_explicit, k));
+            weights_explicit.push_back(implicit_flux ? Number(k == l_prime)
+                                                     : weight(a_explicit, k));
             weights_implicit.push_back(weight(a_implicit, k));
           }
           weights_implicit.push_back(Tableau::entry(a_implicit, l, l) / dc);

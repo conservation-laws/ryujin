@@ -88,7 +88,11 @@ namespace ryujin
        * = (a^{\text e}_{l,s}-a^{\text e}_{l-1,s}) / (c_l - c_{l-1})\f$ and
        * \f$\omega^{\text i}_s = (a^{\text i}_{l,s} -a^{\text i}_{l-1,s}) /
        * (c_l - c_{l-1})\f$; the last implicit weight is the scaled
-       * diagonal entry \f$a^{\text i}_{l,l} / (c_l - c_{l-1})\f$.
+       * diagonal entry \f$a^{\text i}_{l,l} / (c_l - c_{l-1})\f$. If the
+       * hyperbolic module splits off an implicit flux
+       * (Interface::HyperbolicModule::have_implicit_flux()) the explicit
+       * weights are instead one for the start stage of the increment and
+       * zero otherwise.
        *
        * @note A parabolic module that makes use of the quasi-linearization
        * expects the state \f$\boldsymbol U^n\f$ as first stage state
