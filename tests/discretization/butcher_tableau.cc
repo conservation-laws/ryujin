@@ -11,10 +11,12 @@
 
 //
 // Verify the Butcher tableaux of all Runge-Kutta schemes: the row sums of
-// the explicit and implicit tableaux have to coincide with the
-// coefficients c, and the order conditions have to be satisfied up to the
-// reported order. For implicit-explicit schemes this includes all
-// coupling conditions (up to order three).
+// the explicit tableau have to coincide with the coefficients c, the row
+// sums of the implicit tableau have to coincide with c for every stage
+// with an implicit solve, and the order conditions have to be satisfied
+// up to the reported order. For implicit-explicit schemes this includes
+// all coupling conditions (up to order three), formulated with the row
+// sums of the two tableaux. We also report the number of implicit solves.
 //
 
 using namespace ryujin;
@@ -76,12 +78,23 @@ void test(const ButcherTableau<double> &tableau, const std::string &name)
 
   const Vector one(n, 1.);
 
+  /* The abscissae of a tableau are its row sums: */
+  std::vector<Vector> abscissae;
+  for (const auto &a : tableaux)
+    abscissae.push_back(apply(a, one));
+
+  unsigned int solves = 0;
+  if (type != Type::erk)
+    for (std::size_t l = 0; l < n; ++l)
+      solves += tableaux.back()[l][l] != 0. ? 1 : 0;
+
   bool consistent = std::abs(c.front()) < tolerance && //
                     std::abs(c.back() - 1.) < tolerance;
-  for (const auto &a : tableaux) {
-    const auto row_sum = apply(a, one);
+  for (std::size_t s = 0; s < tableaux.size(); ++s) {
+    const bool is_explicit = type != Type::dirk && s == 0;
     for (std::size_t l = 0; l < n; ++l)
-      consistent = consistent && std::abs(row_sum[l] - c[l]) < tolerance;
+      if (is_explicit || l + 1 == n || tableaux[s][l][l] != 0.)
+        consistent = consistent && std::abs(abscissae[s][l] - c[l]) < tolerance;
   }
 
   /* The weights are the last row of the tableau: */
@@ -95,19 +108,27 @@ void test(const ButcherTableau<double> &tableau, const std::string &name)
   bool order_3 = true;
   bool order_4 = type != Type::imex; /* not verified for imex */
 
-  const auto c2 = multiply(c, c);
-  const auto c3 = multiply(c2, c);
-
   for (const auto &a_b : tableaux) {
     const auto &b = a_b.back();
     order_1 = order_1 && check(dot(b, one) - 1.);
-    order_2 = order_2 && check(dot(b, c) - 1. / 2.);
-    order_3 = order_3 && check(dot(b, c2) - 1. / 3.);
-    order_4 = order_4 && check(dot(b, c3) - 1. / 4.);
 
-    for (const auto &a : tableaux) {
+    for (std::size_t s = 0; s < tableaux.size(); ++s) {
+      const auto &c_s = abscissae[s];
+      order_2 = order_2 && check(dot(b, c_s) - 1. / 2.);
+
+      for (const auto &c_t : abscissae)
+        order_3 = order_3 && check(dot(b, multiply(c_s, c_t)) - 1. / 3.);
+
+      for (const auto &a : tableaux)
+        order_3 = order_3 && check(dot(b, apply(a, c_s)) - 1. / 6.);
+    }
+
+    /* Fourth order conditions of a single tableau: */
+    if (type != Type::imex) {
+      const auto &a = a_b;
+      const auto c2 = multiply(c, c);
       const auto ac = apply(a, c);
-      order_3 = order_3 && check(dot(b, ac) - 1. / 6.);
+      order_4 = order_4 && check(dot(b, multiply(c2, c)) - 1. / 4.);
       order_4 = order_4 && check(dot(b, multiply(c, ac)) - 1. / 8.);
       order_4 = order_4 && check(dot(b, apply(a, c2)) - 1. / 12.);
       order_4 = order_4 && check(dot(b, apply(a, ac)) - 1. / 24.);
@@ -120,23 +141,13 @@ void test(const ButcherTableau<double> &tableau, const std::string &name)
                              : !order_4 ? 3
                                         : 4;
 
-  /*
-   * The diagonal of the implicit tableau may only vanish in the first
-   * row (the old state) and in the last row (the final update):
-   */
-  bool diagonal = true;
-  if (type != Type::erk)
-    for (std::size_t l = 1; l + 1 < n; ++l)
-      diagonal = diagonal && tableaux.back()[l][l] != 0.;
-
   const std::string type_name = type == Type::erk    ? "erk"
                                 : type == Type::dirk ? "dirk"
                                                      : "imex";
 
   std::cout << name << ": stages = " << n - 1 << ", " << type_name
             << ", consistent = " << (consistent ? "true" : "false")
-            << ", order = " << order
-            << ", diagonal = " << (diagonal ? "true" : "false") << std::endl;
+            << ", order = " << order << ", solves = " << solves << std::endl;
 }
 
 int main()
