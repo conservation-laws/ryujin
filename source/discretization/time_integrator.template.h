@@ -353,18 +353,11 @@ namespace ryujin
             << "        restart with cruise control: using suggested_tau_max"
             << std::endl;
 #endif
-        //
-        // Multiply the suggested tau_max value with the efficiency.
-        //
-        // We have to account for the fact that the e Restart exception is
-        // thrown within a substep of the hyperbolic or parabolic module.
-        // This implies that the suggested_tau_max is computed for that
-        // particular substep and not for the full combined method (where
-        // tau_max can be larger). We thus multiply tau_max with the
-        // efficiency factor.
-        //
-        tau_max = std::min(
-            tau_max, this->efficiency_ * Number(restart.suggested_tau_max));
+        /*
+         * The step functions report the suggested tau_max in terms of the
+         * step size of the full time step:
+         */
+        tau_max = std::min(tau_max, Number(restart.suggested_tau_max));
       }
 
       return single_step();
@@ -653,12 +646,11 @@ namespace ryujin
       /*
        * The suggested tau_max of a restart refers to the stage that
        * signalled the restart. If the hyperbolic module chooses the
-       * time-step size we adjust it to the largest increment; we multiply
-       * with this->efficiency_ later. A diagonally implicit scheme passes
-       * the suggestion through.
+       * time-step size we convert it into the step size of the full time
+       * step. A diagonally implicit scheme passes the suggestion through.
        */
       if (hyperbolic)
-        restart.suggested_tau_max *= dc_max / dc;
+        restart.suggested_tau_max /= dc;
       throw;
     }
 
@@ -676,21 +668,30 @@ namespace ryujin
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
-    /* The explicit scheme used for the hyperbolic subproblem: */
+    /*
+     * The explicit scheme used for the hyperbolic subproblem. The explicit
+     * steps are performed with half the step size: we double the suggested
+     * tau_max of a restart.
+     */
     const auto explicit_step = [&](const StateVector<Number> &old_U,
                                    StateVector<Number> &new_U,
                                    const Number time,
                                    const Number step_size,
                                    const Number step_size_max) {
-      if (time_stepping_scheme_ == TimeSteppingScheme::strang_ssprk_33_cn)
-        return step_ssprk_33(old_U, new_U, time, step_size, step_size_max);
-      else
-        return step_runge_kutta(butcher_tableau<Number>(method_),
-                                old_U,
-                                new_U,
-                                time,
-                                step_size,
-                                step_size_max);
+      try {
+        if (time_stepping_scheme_ == TimeSteppingScheme::strang_ssprk_33_cn)
+          return step_ssprk_33(old_U, new_U, time, step_size, step_size_max);
+        else
+          return step_runge_kutta(butcher_tableau<Number>(method_),
+                                  old_U,
+                                  new_U,
+                                  time,
+                                  step_size,
+                                  step_size_max);
+      } catch (Restart &restart) {
+        restart.suggested_tau_max *= 2.;
+        throw;
+      }
     };
 
     /*
@@ -707,20 +708,16 @@ namespace ryujin
                         tau / Number(2.),
                         tau_max / Number(2.));
 
-    /* Diagonally implicit step: at time t -> t + 2 * tau */
-    try {
-      step_runge_kutta(butcher_tableau<Number>(parabolic_method_),
-                       new_state_vector,
-                       U_implicit,
-                       t,
-                       Number(2.) * tau,
-                       tau_max);
-    } catch (Restart &restart) {
-      /* Adjust suggested_tau_max. We multiply with this->efficiency_ again
-       * later */
-      restart.suggested_tau_max /= this->efficiency_;
-      throw;
-    }
+    /*
+     * Diagonally implicit step: at time t -> t + 2 * tau. The step is
+     * performed with the full step size; a restart passes through.
+     */
+    step_runge_kutta(butcher_tableau<Number>(parabolic_method_),
+                     new_state_vector,
+                     U_implicit,
+                     t,
+                     Number(2.) * tau,
+                     tau_max);
 
     /* Second explicit step: at time t + tau -> t + 2 * tau */
     hyperbolic_module_->prepare_state_vector(U_implicit, t + tau);
