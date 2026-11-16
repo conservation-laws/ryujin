@@ -41,8 +41,11 @@ namespace ryujin
     gsa_imex_22,
     gsa_imex_43,
 
-    /* Diagonally implicit methods: the implicit midpoint rule
-     * (Crank-Nicolson), and DIRK22 and DIRK23, see TimeSteppingScheme: */
+    /*
+     * Diagonally implicit methods: the implicit midpoint rule
+     * (Crank-Nicolson), DIRK22 (Butcher-Burrage) and DIRK23 (Croizeix),
+     * see TimeSteppingScheme:
+     */
     dirk_midpoint,
     dirk_22,
     dirk_23,

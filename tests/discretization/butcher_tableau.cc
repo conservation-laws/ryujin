@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <discretization/butcher_tableau.h>
+#include <ryujin/discretization/butcher_tableau.h>
 
 #include <cmath>
 #include <iostream>

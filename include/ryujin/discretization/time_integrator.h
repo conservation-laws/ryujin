@@ -10,6 +10,7 @@
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
 #include <ryujin/base/patterns_conversion.h>
+#include <ryujin/discretization/butcher_tableau.h>
 #include <ryujin/interface/hyperbolic_module.h>
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/parabolic_module.h>
@@ -26,11 +27,6 @@
 
 namespace ryujin
 {
-  template <typename Number>
-  struct ButcherTableau;
-
-  enum class RungeKuttaMethod;
-
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
    *
@@ -480,80 +476,19 @@ namespace ryujin
         parabolic_module_;
 
     /**
-     * The Runge-Kutta method of the selected time-stepping scheme. For a
+     * The Butcher tableau of the selected time-stepping scheme. For a
      * Strang splitting this is the explicit method of the hyperbolic
      * subproblem. Not used by the strong stability preserving schemes.
      */
-    RungeKuttaMethod method_;
+    ButcherTableau<Number> tableau_;
 
     /**
-     * The diagonally implicit Runge-Kutta method of the parabolic
-     * subproblem of a Strang splitting.
+     * The Butcher tableau of the diagonally implicit Runge-Kutta method
+     * of the parabolic subproblem of a Strang splitting.
      */
-    RungeKuttaMethod parabolic_method_;
+    ButcherTableau<Number> parabolic_tableau_;
 
     std::vector<StateVector<Number>> temp_;
-
-    //@}
-    /**
-     * @name Internal methods
-     */
-    //@{
-
-    /*
-     * All step functions given below take a reference to a previous state
-     * vector @p old_state_vector, perform a time step and store the result
-     * in @p new_state_vector. The old state vector is not modified. The
-     * functions return the time step size tau, see step().
-     */
-
-    /**
-     * Performs an explicit second-order strong-stability preserving
-     * Runge-Kutta SSPRK(2,2;1/2) time step.
-     */
-    Number step_ssprk_22(const StateVector<Number> &old_state_vector,
-                         StateVector<Number> &new_state_vector,
-                         Number t,
-                         Number tau,
-                         Number tau_max);
-
-    /**
-     * Performs an explicit third-order strong-stability preserving
-     * Runge-Kutta SSPRK(3,3;1/3) time step.
-     */
-    Number step_ssprk_33(const StateVector<Number> &old_state_vector,
-                         StateVector<Number> &new_state_vector,
-                         Number t,
-                         Number tau,
-                         Number tau_max);
-
-    /**
-     * Performs all stages of the explicit, diagonally implicit, or
-     * implicit-explicit Runge-Kutta scheme described by the Butcher
-     * tableau @p tableau. Every stage consists of one explicit hyperbolic
-     * step (unless the scheme is diagonally implicit) and one implicit
-     * parabolic step (unless the scheme is explicit). The intermediate
-     * stages are stored in the temporary vectors. A diagonally implicit
-     * scheme does not choose the time-step size: @p tau must be nonzero.
-     */
-    Number step_runge_kutta(const ButcherTableau<Number> &tableau,
-                            const StateVector<Number> &old_state_vector,
-                            StateVector<Number> &new_state_vector,
-                            Number t,
-                            Number tau,
-                            Number tau_max);
-
-    /**
-     * Performs a combined explicit implicit Strang split: an explicit
-     * step with the explicit scheme of the selected time-stepping scheme,
-     * a step with the diagonally implicit method of the selected
-     * time-stepping scheme, and a second explicit step.
-     */
-    Number step_strang(const StateVector<Number> &old_state_vector,
-                       StateVector<Number> &new_state_vector,
-                       Number t,
-                       Number tau,
-                       Number tau_max);
 
     //@}
   };
