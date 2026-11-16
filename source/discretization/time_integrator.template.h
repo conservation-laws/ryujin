@@ -172,21 +172,29 @@ namespace ryujin
     /*
      * Resize temporary storage: a Runge-Kutta method with s stages needs
      * storage for all stages except the first and the last one, an
-     * implicit-explicit method in addition a vector for the hyperbolic
-     * prediction. A strong stability preserving scheme needs a single
-     * vector. The result is stored in the last vector. A Strang splitting
-     * runs the stages of its two methods one after the other, and needs
-     * two vectors for its intermediate states instead of one.
+     * implicit-explicit method (or an explicit method for a hyperbolic
+     * module that splits off an implicit flux) in addition a vector for
+     * the hyperbolic prediction. A strong stability preserving scheme needs a
+     * single vector. The result is stored in the last vector. A Strang
+     * splitting runs the stages of its two methods one after the other, and
+     * needs two vectors for its intermediate states instead of one.
      */
 
     std::size_t n_stages = 1;
     bool imex = false;
     this->efficiency_ = Number(1.);
 
+    const bool implicit_flux = hyperbolic_module_->have_implicit_flux();
+
+    Assert(!implicit_flux || !parabolic_system_->is_identity(),
+           dealii::ExcMessage("An equation that splits off an implicit flux "
+                              "requires a parabolic module that integrates "
+                              "it."));
+
     if (!ssprk) {
       const auto tableau = butcher_tableau<Number>(method_);
       imex = tableau.type() == ButcherTableau<Number>::Type::imex;
-      n_stages = tableau.c.size() - 2 + (imex ? 1 : 0);
+      n_stages = tableau.c.size() - 2 + (imex || implicit_flux ? 1 : 0);
       this->efficiency_ = Number(1.) / tableau.maximal_increment();
     }
 
@@ -215,6 +223,12 @@ namespace ryujin
         dealii::ExcMessage(
             "The selected equation has a trivial parabolic subsystem and "
             "should not be run with an IMEX timestepping scheme."));
+
+    AssertThrow(
+        !ssprk || !implicit_flux,
+        dealii::ExcMessage(
+            "The selected equation splits off an implicit flux and cannot "
+            "be used with an SSPRK scheme."));
 
     /* Initialize temporary vectors: */
 
@@ -458,6 +472,15 @@ namespace ryujin
     const bool hyperbolic = type != Tableau::Type::dirk;
     const bool parabolic = type != Tableau::Type::erk;
     const bool imex = hyperbolic && parabolic;
+
+    /*
+     * If the hyperbolic module splits off an implicit flux, every
+     * hyperbolic prediction (also of the explicit substep of a Strang
+     * splitting) contains the implicit flux of the start stage, which the
+     * parabolic module has to remove again:
+     */
+    const bool implicit_flux = hyperbolic_module_->have_implicit_flux();
+    const bool hyperbolic_prediction = imex || (hyperbolic && implicit_flux);
     const auto start_stages = tableau.start_stages();
     const Number dc_max = tableau.maximal_increment();
 
@@ -467,11 +490,11 @@ namespace ryujin
 
     /*
      * Storage: the first stage is the old state and the last stage is the
-     * new state. All other stages are stored in temp_. An
-     * implicit-explicit scheme uses temp_[0] for the hyperbolic
-     * prediction of a stage.
+     * new state. All other stages are stored in temp_. A scheme with
+     * hyperbolic prediction uses temp_[0] for the hyperbolic prediction of
+     * a stage.
      */
-    const std::size_t offset = imex ? 1 : 0;
+    const std::size_t offset = hyperbolic_prediction ? 1 : 0;
     const auto stage = [&](const std::size_t l) -> StateVector<Number> & {
       return l == n - 1 ? new_state_vector : temp_[offset + l - 1];
     };
@@ -534,7 +557,7 @@ namespace ryujin
             weights_explicit.push_back(w);
           }
 
-          auto &explicit_result = imex ? temp_[0] : stage(l);
+          auto &explicit_result = hyperbolic_prediction ? temp_[0] : stage(l);
           prediction = &explicit_result;
 
           if (l == 1) {
@@ -575,30 +598,33 @@ namespace ryujin
          * Implicit step: at time t + c_l' * tau -> t + c_l * tau
          *
          * We supply all prior stages. If the hyperbolic module splits off
-         * an implicit flux, the prediction contains the implicit flux of
-         * the start stage l' only, and we supply the explicit weights of
-         * that forward Euler step. If the weight of the new stage vanishes
-         * the stage is computed without implicit solve.
+         * an implicit flux, the hyperbolic prediction contains the implicit
+         * flux of the start stage l' only, and we supply the explicit
+         * weights of that forward Euler step. The prediction of a
+         * diagonally implicit scheme, the start stage l', contains no
+         * implicit flux and all explicit weights vanish. If the weight of
+         * the new stage vanishes the stage is computed without implicit
+         * solve.
          */
 
-        if (parabolic) {
-          const bool implicit_flux =
-              imex && hyperbolic_module_->have_implicit_flux();
+        if (parabolic || hyperbolic_prediction) {
           vectors.clear();
           weights_explicit.clear();
           weights_implicit.clear();
           for (std::size_t k = 0; k < l; ++k) {
             vectors.push_back(U(k));
-            weights_explicit.push_back(!imex ? weight_strictly_lower(k)
-                                       : implicit_flux ? Number(k == l_prime)
-                                                       : weight(a_explicit, k));
+            if (implicit_flux)
+              weights_explicit.push_back(Number(hyperbolic && k == l_prime));
+            else if (imex)
+              weights_explicit.push_back(weight(a_explicit, k));
+            else
+              weights_explicit.push_back(weight_strictly_lower(k));
             weights_implicit.push_back(weight(a_implicit, k));
           }
 
           const Number weight_new = Tableau::entry(a_implicit, l, l) / dc;
 
           if (weight_new == Number(0.)) {
-            Assert(l == n - 1, dealii::ExcInternalError());
             parabolic_module_->stage_combination_step(*prediction,
                                                       vectors,
                                                       weights_explicit,

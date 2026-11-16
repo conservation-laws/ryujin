@@ -98,10 +98,13 @@ namespace ryujin
        * implicit scheme the explicit tableau is the strictly lower part of
        * the implicit tableau: the known stages enter with the operator
        * \f$\boldsymbol G\f$ and only the new stage is linearized. If the
-       * hyperbolic module of an implicit-explicit scheme splits off an
-       * implicit flux (Interface::HyperbolicModule::have_implicit_flux())
-       * the explicit weights are instead one for the start stage and zero
-       * otherwise.
+       * hyperbolic module splits off an implicit flux
+       * (Interface::HyperbolicModule::have_implicit_flux()) the explicit
+       * weights instead describe the implicit flux in the prediction: one
+       * for the start stage and zero otherwise after a hyperbolic step
+       * (also of an explicit scheme, whose stages then pass through
+       * stage_combination_step()), and zero for a diagonally implicit
+       * scheme.
        *
        * @note A parabolic module that makes use of the linearization uses
        * the first stage state vector as linearization point
@@ -144,18 +147,19 @@ namespace ryujin
        *   \boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U^{s})
        *   \Big\}
        * \f}
-       * and store the result in @p new_state_vector. This is the final
-       * update of a scheme whose last row is not implicit, for example
-       * the Crank-Nicolson scheme (the implicit midpoint rule) or
-       * TimeSteppingScheme::imex_22. The new state is always the state at
-       * the end of the time step.
+       * and store the result in @p new_state_vector. This is the update
+       * of every stage of a scheme whose row of the implicit tableau has
+       * a vanishing diagonal entry. The function makes no assumption on
+       * the position of the stage in the time step, or on the order of the
+       * stage state vectors beyond the first one being the state at the
+       * beginning of the time step.
        *
        * @note How the operator is evaluated for the stages is up to the
        * parabolic module.
        *
        * @note If the new state is not admissible the module must signal a
-       * restart (if permitted by the IDViolationStrategy), or should apply
-       * an appropriate limiter.
+       * restart (if permitted by the IDViolationStrategy), or should limit
+       * the update toward the (admissible) old state \f$\boldsymbol W\f$.
        *
        * @note The function must return the time step size @p tau
        * unchanged.

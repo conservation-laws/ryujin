@@ -217,7 +217,7 @@ namespace ryujin
        * @note The weights are in general not convex: if the result
        * violates the lower bound on the internal energy, a restart is
        * signalled if permitted by the IDViolationStrategy. Otherwise, the
-       * result is limited toward the last stage with a single limiter
+       * result is limited toward the old state with a single limiter
        * value for the whole domain, which maintains conservation of total
        * energy.
        */
