@@ -144,18 +144,19 @@ namespace ryujin
        *   \boldsymbol G^{\text{lin}}(\boldsymbol U^n;\boldsymbol U^{s})
        *   \Big\}
        * \f}
-       * and store the result in @p new_state_vector. This is the final
-       * update of a scheme whose last row is not implicit, for example
-       * the Crank-Nicolson scheme (the implicit midpoint rule) or
-       * TimeSteppingScheme::imex_22. The new state is always the state at
-       * the end of the time step.
+       * and store the result in @p new_state_vector. This is the update
+       * of every stage of a scheme whose row of the implicit tableau has
+       * a vanishing diagonal entry. The function makes no assumption on
+       * the position of the stage in the time step, or on the order of the
+       * stage state vectors beyond the first one being the state at the
+       * beginning of the time step.
        *
        * @note How the operator is evaluated for the stages is up to the
        * parabolic module.
        *
        * @note If the new state is not admissible the module must signal a
-       * restart (if permitted by the IDViolationStrategy), or should apply
-       * an appropriate limiter.
+       * restart (if permitted by the IDViolationStrategy), or should limit
+       * the update toward the (admissible) old state \f$\boldsymbol W\f$.
        *
        * @note The function must return the time step size @p tau
        * unchanged.

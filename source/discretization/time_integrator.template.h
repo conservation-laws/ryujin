@@ -598,7 +598,6 @@ namespace ryujin
           const Number weight_new = Tableau::entry(a_implicit, l, l) / dc;
 
           if (weight_new == Number(0.)) {
-            Assert(l == n - 1, dealii::ExcInternalError());
             parabolic_module_->stage_combination_step(*prediction,
                                                       vectors,
                                                       weights_explicit,
