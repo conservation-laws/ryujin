@@ -98,10 +98,13 @@ namespace ryujin
        * implicit scheme the explicit tableau is the strictly lower part of
        * the implicit tableau: the known stages enter with the operator
        * \f$\boldsymbol G\f$ and only the new stage is linearized. If the
-       * hyperbolic module of an implicit-explicit scheme splits off an
-       * implicit flux (Interface::HyperbolicModule::have_implicit_flux())
-       * the explicit weights are instead one for the start stage and zero
-       * otherwise.
+       * hyperbolic module splits off an implicit flux
+       * (Interface::HyperbolicModule::have_implicit_flux()) the explicit
+       * weights instead describe the implicit flux in the prediction: one
+       * for the start stage and zero otherwise after a hyperbolic step
+       * (also of an explicit scheme, whose stages then pass through
+       * stage_combination_step()), and zero for a diagonally implicit
+       * scheme.
        *
        * @note A parabolic module that makes use of the linearization uses
        * the first stage state vector as linearization point
