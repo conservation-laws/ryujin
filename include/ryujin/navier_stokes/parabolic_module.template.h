@@ -293,7 +293,6 @@ namespace ryujin
       [[maybe_unused]] const auto stages = stage_state_vectors.size();
       AssertDimension(stage_weights_explicit.size(), stages);
       AssertDimension(stage_weights_implicit.size(), stages);
-      Assert(stages > 0, dealii::ExcInternalError());
 
       step(old_state_vector,
            stage_state_vectors,
@@ -307,15 +306,8 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      using HostSpace = dealii::MemorySpace::Host;
-      const auto &last_state_vector = stage_state_vectors.back().get();
-      copy_to_memory_space<HostSpace>(last_state_vector,
-                                      StateVectorPart::state);
-
       const auto old_U_view =
           old_state_vector.state.template view<problem_dimension>();
-      const auto last_U_view =
-          last_state_vector.state.template view<problem_dimension>();
       const auto new_U_view =
           new_state_vector.state.template view<problem_dimension>();
 
@@ -343,9 +335,9 @@ namespace ryujin
       e_min = Utilities::MPI::min(e_min, mpi_ensemble_.ensemble_communicator());
 
       /*
-       * Compute the largest limiter value l in [0, 1] such that U^s + l
-       * (U^new - U^s) satisfies the bound, where U^s is the last stage.
-       * The internal energy rho e(l) = rho e^s + beta l - alpha l^2 is
+       * Compute the largest limiter value l in [0, 1] such that W + l
+       * (U^new - W) satisfies the bound, where W is the old state. The
+       * internal energy rho e(l) = rho e^W + beta l - alpha l^2 is
        * concave in l and admissible for l = 0. We choose a single limiter
        * value for the whole domain in order to maintain conservation of
        * total energy.
@@ -356,7 +348,7 @@ namespace ryujin
         if (sparsity_simd_view.row_length(i) == 1)
           continue;
 
-        const auto U_s = last_U_view.template read_tensor<Number>(i);
+        const auto U_s = old_U_view.template read_tensor<Number>(i);
         const auto delta = new_U_view.template read_tensor<Number>(i) - U_s;
 
         const auto rho = view.density(U_s);
@@ -417,7 +409,7 @@ namespace ryujin
         if (sparsity_simd_view.row_length(i) == 1)
           return;
 
-        const auto U_s = last_U_view.template read_tensor<T>(i);
+        const auto U_s = old_U_view.template read_tensor<T>(i);
         const auto U_i = new_U_view.template read_tensor<T>(i);
         new_U_view.template write_tensor<T>(U_s + T(l_min) * (U_i - U_s), i);
       };
@@ -535,9 +527,10 @@ namespace ryujin
 
       /*
        * The effective step size of the implicit operator. For a vanishing
-       * weight of the new state the update only inverts the lumped mass
-       * matrix: we use plain conjugate gradients and skip the minimum
-       * principle check, see stage_combination_step().
+       * weight of the new state the operators reduce to the (diagonal)
+       * lumped mass matrix weighted with the density: we invert it
+       * directly and skip the minimum principle check, see
+       * stage_combination_step().
        */
       const Number tau_implicit = tau * weight;
       const bool implicit = weight != Number(0.);
@@ -871,55 +864,77 @@ namespace ryujin
             tolerance_;
 
         /*
-         * Multigrid might lack robustness for some cases, so in case it takes
-         * too many iterations we better switch to the more robust plain
-         * conjugate gradient method.
+         * Without implicit contribution the operator is diagonal. The
+         * rows of degrees of freedom with prescribed velocity are the
+         * identity.
          */
-        try {
-          if (!use_gmg_velocity)
-            throw SolverControl::NoConvergence(0, 0.);
+        if (!implicit) {
+          diagonal_matrix.vmult(velocity_, velocity_rhs_);
 
-          using bvt_float = LinearAlgebra::distributed::BlockVector<float>;
+          for (auto entry : offline_data_->boundary_map()) {
+            const auto i = std::get<0>(entry);
+            const auto id = std::get<4>(entry);
+            if (i >= n_owned)
+              continue;
+            if (id == Boundary::no_slip || id == Boundary::dirichlet)
+              for (unsigned int d = 0; d < dim; ++d)
+                velocity_.block(d).local_element(i) =
+                    velocity_rhs_.block(d).local_element(i);
+          }
 
-          MGCoarseGridApplySmoother<bvt_float> mg_coarse;
-          mg_coarse.initialize(mg_smoother_velocity_);
+        } else {
+          /*
+           * Multigrid might lack robustness for some cases, so in case it takes
+           * too many iterations we better switch to the more robust plain
+           * conjugate gradient method.
+           */
+          try {
+            if (!use_gmg_velocity)
+              throw SolverControl::NoConvergence(0, 0.);
 
-          mg::Matrix<bvt_float> mg_matrix(level_velocity_matrices_);
+            using bvt_float = LinearAlgebra::distributed::BlockVector<float>;
 
-          Multigrid<bvt_float> mg(mg_matrix,
-                                  mg_coarse,
-                                  mg_transfer_velocity_,
-                                  mg_smoother_velocity_,
-                                  mg_smoother_velocity_,
-                                  level_velocity_matrices_.min_level(),
-                                  level_velocity_matrices_.max_level());
+            MGCoarseGridApplySmoother<bvt_float> mg_coarse;
+            mg_coarse.initialize(mg_smoother_velocity_);
 
-          const auto &dof_handler =
-              offline_data_->discretization().dof_handler();
-          PreconditionMG<dim, bvt_float, MGTransferVelocity<dim, float>>
-              preconditioner(dof_handler, mg, mg_transfer_velocity_);
+            mg::Matrix<bvt_float> mg_matrix(level_velocity_matrices_);
 
-          SolverControl solver_control(gmg_max_iter_vel_, tolerance_velocity);
-          SolverCG<BlockHostVector> solver(solver_control);
-          solver.solve(
-              velocity_operator, velocity_, velocity_rhs_, preconditioner);
+            Multigrid<bvt_float> mg(mg_matrix,
+                                    mg_coarse,
+                                    mg_transfer_velocity_,
+                                    mg_smoother_velocity_,
+                                    mg_smoother_velocity_,
+                                    level_velocity_matrices_.min_level(),
+                                    level_velocity_matrices_.max_level());
 
-          /* update exponential moving average */
-          n_iterations_velocity_ =
-              0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
+            const auto &dof_handler =
+                offline_data_->discretization().dof_handler();
+            PreconditionMG<dim, bvt_float, MGTransferVelocity<dim, float>>
+                preconditioner(dof_handler, mg, mg_transfer_velocity_);
 
-        } catch (SolverControl::NoConvergence &) {
+            SolverControl solver_control(gmg_max_iter_vel_, tolerance_velocity);
+            SolverCG<BlockHostVector> solver(solver_control);
+            solver.solve(
+                velocity_operator, velocity_, velocity_rhs_, preconditioner);
 
-          SolverControl solver_control(1000, tolerance_velocity);
-          SolverCG<BlockHostVector> solver(solver_control);
-          solver.solve(
-              velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
+            /* update exponential moving average */
+            n_iterations_velocity_ =
+                0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
 
-          /* update exponential moving average, counting also GMG iterations */
-          n_iterations_velocity_ *= 0.9;
-          n_iterations_velocity_ +=
-              0.1 * (use_gmg_velocity ? gmg_max_iter_vel_ : 0) +
-              0.1 * solver_control.last_step();
+          } catch (SolverControl::NoConvergence &) {
+
+            SolverControl solver_control(1000, tolerance_velocity);
+            SolverCG<BlockHostVector> solver(solver_control);
+            solver.solve(
+                velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
+
+            /* update exponential moving average, counting also GMG iterations
+             */
+            n_iterations_velocity_ *= 0.9;
+            n_iterations_velocity_ +=
+                0.1 * (use_gmg_velocity ? gmg_max_iter_vel_ : 0) +
+                0.1 * solver_control.last_step();
+          }
         }
       }
 
@@ -930,7 +945,8 @@ namespace ryujin
         ComputingTimer::Scope scope("time step [P] 2 - update internal energy");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
-        assemble_viscous_dissipation(internal_energy_rhs_, velocity_);
+        if (implicit)
+          assemble_viscous_dissipation(internal_energy_rhs_, velocity_);
 
         const auto lumped_mass_matrix_view =
             offline_data_->lumped_mass_matrix().template view<1>();
@@ -968,7 +984,8 @@ namespace ryujin
               m_i * rho_i * (e_i + Number(0.5) * (V_i - V_i_new).norm_square());
 
           /* rhs_i contains already m_i K_i^{n+1/2} */
-          result += tau_implicit * rhs_i;
+          if (implicit)
+            result += tau_implicit * rhs_i;
 
           if (have_stages) {
             result += read_entry<T>(stage_energy_rhs_, i);
@@ -1074,54 +1091,74 @@ namespace ryujin
                                     : internal_energy_rhs_.l2_norm()) *
             tolerance_;
 
-        try {
-          if (!use_gmg_internal_energy)
-            throw SolverControl::NoConvergence(0, 0.);
+        /*
+         * Without implicit contribution the operator is diagonal. The
+         * rows of degrees of freedom with prescribed internal energy are
+         * the identity.
+         */
+        if (!implicit) {
+          diagonal_matrix.vmult(internal_energy_, internal_energy_rhs_);
 
-          using vt_float = LinearAlgebra::distributed::Vector<float>;
-          MGCoarseGridApplySmoother<vt_float> mg_coarse;
-          mg_coarse.initialize(mg_smoother_energy_);
-          mg::Matrix<vt_float> mg_matrix(level_energy_matrices_);
+          for (auto entry : offline_data_->boundary_map()) {
+            const auto i = std::get<0>(entry);
+            const auto id = std::get<4>(entry);
+            if (i < n_owned && id == Boundary::dirichlet)
+              internal_energy_.local_element(i) =
+                  internal_energy_rhs_.local_element(i);
+          }
 
-          Multigrid<vt_float> mg(mg_matrix,
-                                 mg_coarse,
-                                 mg_transfer_energy_,
-                                 mg_smoother_energy_,
-                                 mg_smoother_energy_,
-                                 level_energy_matrices_.min_level(),
-                                 level_energy_matrices_.max_level());
+        } else {
+          try {
+            if (!use_gmg_internal_energy)
+              throw SolverControl::NoConvergence(0, 0.);
 
-          const auto &dof_handler =
-              offline_data_->discretization().dof_handler();
-          PreconditionMG<dim, vt_float, MGTransferEnergy<dim, float>>
-              preconditioner(dof_handler, mg, mg_transfer_energy_);
+            using vt_float = LinearAlgebra::distributed::Vector<float>;
+            MGCoarseGridApplySmoother<vt_float> mg_coarse;
+            mg_coarse.initialize(mg_smoother_energy_);
+            mg::Matrix<vt_float> mg_matrix(level_energy_matrices_);
 
-          SolverControl solver_control(gmg_max_iter_en_,
-                                       tolerance_internal_energy);
-          SolverCG<ScalarHostVector<Number>> solver(solver_control);
-          solver.solve(energy_operator,
-                       internal_energy_,
-                       internal_energy_rhs_,
-                       preconditioner);
+            Multigrid<vt_float> mg(mg_matrix,
+                                   mg_coarse,
+                                   mg_transfer_energy_,
+                                   mg_smoother_energy_,
+                                   mg_smoother_energy_,
+                                   level_energy_matrices_.min_level(),
+                                   level_energy_matrices_.max_level());
 
-          /* update exponential moving average */
-          n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
-                                          0.1 * solver_control.last_step();
+            const auto &dof_handler =
+                offline_data_->discretization().dof_handler();
+            PreconditionMG<dim, vt_float, MGTransferEnergy<dim, float>>
+                preconditioner(dof_handler, mg, mg_transfer_energy_);
 
-        } catch (SolverControl::NoConvergence &) {
+            SolverControl solver_control(gmg_max_iter_en_,
+                                         tolerance_internal_energy);
+            SolverCG<ScalarHostVector<Number>> solver(solver_control);
+            solver.solve(energy_operator,
+                         internal_energy_,
+                         internal_energy_rhs_,
+                         preconditioner);
 
-          SolverControl solver_control(1000, tolerance_internal_energy);
-          SolverCG<ScalarHostVector<Number>> solver(solver_control);
-          solver.solve(energy_operator,
-                       internal_energy_,
-                       internal_energy_rhs_,
-                       diagonal_matrix);
+            /* update exponential moving average */
+            n_iterations_internal_energy_ =
+                0.9 * n_iterations_internal_energy_ +
+                0.1 * solver_control.last_step();
 
-          /* update exponential moving average, counting also GMG iterations */
-          n_iterations_internal_energy_ *= 0.9;
-          n_iterations_internal_energy_ +=
-              0.1 * (use_gmg_internal_energy ? gmg_max_iter_en_ : 0) +
-              0.1 * solver_control.last_step();
+          } catch (SolverControl::NoConvergence &) {
+
+            SolverControl solver_control(1000, tolerance_internal_energy);
+            SolverCG<ScalarHostVector<Number>> solver(solver_control);
+            solver.solve(energy_operator,
+                         internal_energy_,
+                         internal_energy_rhs_,
+                         diagonal_matrix);
+
+            /* update exponential moving average, counting also GMG iterations
+             */
+            n_iterations_internal_energy_ *= 0.9;
+            n_iterations_internal_energy_ +=
+                0.1 * (use_gmg_internal_energy ? gmg_max_iter_en_ : 0) +
+                0.1 * solver_control.last_step();
+          }
         }
       }
 
