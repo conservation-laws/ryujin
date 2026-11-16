@@ -31,6 +31,7 @@ set(CORE_SOURCE_FILES
   discretization/mesh_adaptor.cc
   discretization/offline_data.cc
   discretization/time_integrator.cc
+  discretization/time_stepping.cc
   driver/checkpointing.cc
   driver/dashboard_text.cc
   driver/environment.cc

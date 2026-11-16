@@ -148,7 +148,7 @@ namespace ryujin
        * enters the low-order update, a run time copy of the compile time
        * constant of the hyperbolic system. The time integrator then hands
        * the explicit weights of the start stage to the parabolic module,
-       * see TimeIntegrator::step_runge_kutta().
+       * see step_runge_kutta().
        */
       ACCESSOR_READ_ONLY(have_implicit_flux)
 
