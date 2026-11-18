@@ -845,8 +845,6 @@ namespace ryujin
                      parabolic_module.n_restarts()};
     data.warnings = {hyperbolic_module.n_warnings(),
                      parabolic_module.n_warnings()};
-    data.corrections = {hyperbolic_module.n_corrections(),
-                        parabolic_module.n_corrections()};
 
     data.solver_statistics.clear();
     if (!simulation_.parabolic_system().is_identity()) {

@@ -241,8 +241,7 @@ namespace ryujin
       output << "        [ " << data.time_stepping_scheme
              << " with CFL = " << std::setprecision(2) << std::fixed << data.cfl
              << " (" << data.restarts[0] << "/" << data.restarts[1] << " rsts)"
-             << " (" << data.warnings[0] << "/" << data.warnings[1] << " warn)"
-             << " (" << data.corrections[0] << "/" << data.corrections[1] << " corr) ]"
+             << " (" << data.warnings[0] << "/" << data.warnings[1] << " warn) ]"
              << std::endl;
 
       for (const auto &line : data.solver_statistics)

@@ -387,7 +387,10 @@ namespace ryujin
       if (!limiting_needed)
         return tau;
 
-      /* If we can restart the time step, we do so: */
+      /*
+       * If we can restart the time step, we do so. Otherwise, we limit
+       * the stage combination and record a warning:
+       */
       if (this->id_violation_strategy_ ==
           IDViolationStrategy::raise_exception) {
         this->n_restarts_++;
@@ -395,7 +398,7 @@ namespace ryujin
         throw Restart{Number(0.5) * tau};
       }
 
-      this->n_corrections_++;
+      this->n_warnings_++;
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        limiting stage combination with l = " << l_min

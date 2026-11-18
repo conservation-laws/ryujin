@@ -79,21 +79,6 @@ namespace ryujin
   };
 
 
-  /**
-   * A class signalling that a correction step is required for the update.
-   * This is meant to be a truly exceptional situation, for example where
-   * the high-order update violates an admissibility condition. With our
-   * limiting approach this must never happen, ... but we might have taken
-   * some short cuts in the parabolic update that under rare circumstances
-   * require limiting.
-   *
-   * @ingroup Interfaces
-   */
-  class Correction final
-  {
-  };
-
-
   namespace Interface
   {
     /**
@@ -194,11 +179,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(n_restarts)
 
       /**
-       * The number of corrections performed by the step functions.
-       */
-      ACCESSOR_READ_ONLY(n_corrections)
-
-      /**
        * The number of ID violation warnings encountered in the step
        * functions. We issue a warning whenever we encounter an ID
        * violation (and throwing a restart is disabled).
@@ -215,7 +195,6 @@ namespace ryujin
           : ParameterAcceptor(subsection)
           , id_violation_strategy_(IDViolationStrategy::warn)
           , n_restarts_(0)
-          , n_corrections_(0)
           , n_warnings_(0)
       {
       }
@@ -223,7 +202,6 @@ namespace ryujin
       mutable IDViolationStrategy id_violation_strategy_;
 
       mutable unsigned int n_restarts_;
-      mutable unsigned int n_corrections_;
       mutable unsigned int n_warnings_;
     };
   } // namespace Interface
