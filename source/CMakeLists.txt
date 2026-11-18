@@ -96,7 +96,7 @@ if(WITH_MINIAUDIO)
     )
 endif()
 
-target_link_libraries(object_core ${EXTERNAL_TARGETS})
+target_link_libraries(object_core ${EXTERNAL_TARGETS} ${PRIVATE_EXTERNAL_TARGETS})
 
 #
 # Equation-specific source files and compilation targets:
@@ -124,6 +124,9 @@ add_library(libryujin SHARED ${_objects})
 
 deal_ii_setup_target(libryujin)
 target_link_libraries(libryujin ${EXTERNAL_TARGETS})
+set_property(TARGET libryujin APPEND PROPERTY
+  LINK_LIBRARIES ${PRIVATE_EXTERNAL_TARGETS}
+  )
 
 target_compile_features(libryujin PUBLIC cxx_std_20)
 target_include_directories(libryujin PUBLIC
