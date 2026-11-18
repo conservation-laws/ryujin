@@ -228,6 +228,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/macros/macro_ryujin_check_submodule.cm
 ryujin_check_submodule(simd-math)
 
 set(EXTERNAL_TARGETS)
+set(PRIVATE_EXTERNAL_TARGETS)
 
 if(WITH_EOSPAC)
   find_package(EOSPAC REQUIRED)
@@ -243,9 +244,7 @@ if(WITH_FTXUI)
   set_target_properties(screen dom component PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     )
-  list(APPEND EXTERNAL_TARGETS
-    "$<BUILD_INTERFACE:ftxui::dom>" "$<BUILD_INTERFACE:ftxui::component>"
-    )
+  list(APPEND PRIVATE_EXTERNAL_TARGETS "ftxui::dom" "ftxui::component")
 endif()
 
 if(WITH_MINIAUDIO)
@@ -259,9 +258,7 @@ if(WITH_MINIAUDIO)
   message(STATUS "Using miniaudio from ${MINIAUDIO_INCLUDE_DIR}")
   # miniaudio loads the audio backends at run time with dlopen():
   find_package(Threads REQUIRED)
-  list(APPEND EXTERNAL_TARGETS
-    "$<BUILD_INTERFACE:Threads::Threads>" "$<BUILD_INTERFACE:${CMAKE_DL_LIBS}>"
-    )
+  list(APPEND PRIVATE_EXTERNAL_TARGETS "Threads::Threads" ${CMAKE_DL_LIBS})
 endif()
 
 if(WITH_GDAL)
