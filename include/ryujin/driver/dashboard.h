@@ -432,8 +432,6 @@ namespace ryujin
     std::array<unsigned int, 2> restarts = {};
     /** The warnings of the hyperbolic and the parabolic module. */
     std::array<unsigned int, 2> warnings = {};
-    /** The corrections of the hyperbolic and the parabolic module. */
-    std::array<unsigned int, 2> corrections = {};
     /** The statistics of the linear solvers of the parabolic module. */
     std::vector<std::string> solver_statistics;
     /** The average time step size since the last snapshot. */

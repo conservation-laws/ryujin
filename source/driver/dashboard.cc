@@ -279,7 +279,7 @@ namespace ryujin
     }
 
 
-    /* The restarts, warnings, or corrections of the two modules: */
+    /* The restarts or warnings of the two modules: */
     Element counter(const std::string &name, std::array<unsigned int, 2> n)
     {
       const auto c = [](unsigned int k) {
@@ -474,7 +474,6 @@ namespace ryujin
               label("events"),
               counter("restarts", data.restarts),
               counter("warnings", data.warnings),
-              counter("corrections", data.corrections),
           }),
       };
 
