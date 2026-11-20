@@ -116,33 +116,33 @@ namespace ryujin
 
     /* clang-format off */
     constexpr std::array<Bar, 16> matthias_bars{{
-        {"A4 C5 E5 G5",   "A5 . E5 . A5 C6 B5 A5 G#5 - A5 - E5 - . ."},     /* Am7 */
-        {"A4 C5 E5 G5",   "C6 . B5 . C6 E6 D6 C6 B5 - C6 - A5 - - -"},      /* Am7 */
-        {"F4 A4 C5 E5",   "F5 - A5 - C6 - E6 - D6 C6 A5 - F5 - A5 -"},      /* Fmaj7 */
-        {"G4 B4 D5 F5",   "G5 - B5 - D6 - F6 - E6 D6 B5 - G5 - B5 -"},      /* G7 */
-        {"A4 C5 E5 G5",   "E6 . E6 D#6 E6 . C6 . A5 . C6 . E6 - - ."},      /* Am7 */
-        {"A4 C5 E5 G5",   "G6 . G6 F#6 G6 . E6 . C6 . E6 . G6 - A6 -"},     /* Am7 */
-        {"D4 F4 A4 C5",   "F6 - - E6 D6 - - C6 A5 - C6 - D6 - F6 -"},       /* Dm7 */
-        {"E4 G#4 B4 D5",  "E6 - - - D6 - B5 - G#5 - B5 - D6 - E6 -"},       /* E7 */
-        {"F4 A4 C5 E5",   "A6 - - G6 F6 - E6 - F6 - - - C6 - - ."},         /* Fmaj7 */
-        {"G4 B4 D5 F5",   "B6 - - A6 G6 - F6 - D6 - - - B5 - - ."},         /* G7 */
-        {"E4 G4 B4 D5",   "E6 . B5 . E6 . G6 . F#6 . E6 . D6 . B5 ."},      /* Em7 */
-        {"A4 C5 E5 G5",   "C6 - - - A5 - - - . . E5 F5 F#5 G5 G#5 -"},      /* Am7 */
-        {"D4 F4 A4 C5",   "A5 - D6 - F6 - A6 - G6 F6 E6 D6 C6 - A5 -"},     /* Dm7 */
-        {"E4 G#4 B4 D5",  "B5 - E6 - G#6 - B6 - A6 G#6 F6 E6 D6 - B5 -"},   /* E7 */
-        {"A4 C5 E5 G5",   "A6 . E6 . C6 . A5 . E6 . C6 . A5 . E5 ."},       /* Am7 */
-        {"E4 G#4 B4 D5",  "G#5 - - - B5 - - - D6 - E6 - G#6 - - -"},        /* E7 */
+        {"E4 G4 B4 E5",  "E6 . B5 . G5 . B5 . E6 . F#6 . G6 - F#6 -"},   /* Em */
+        {"C4 E4 G4 C5",  "E6 . C6 . G5 . C6 . E6 . F#6 . G6 - A6 -"},    /* C */
+        {"A4 C5 E5 A5",  "A6 - - - G6 - F#6 - E6 - - - C6 - - -"},       /* Am */
+        {"B4 D#5 F#5 A5","D#6 - - - F#6 - - - B6 - - - A6 - F#6 -"},     /* B7 */
+        {"E4 G4 B4 E5",  "G6 - - E6 - - B5 - E6 - - G6 - - B6 -"},       /* Em */
+        {"C4 E4 G4 C5",  "C7 - - - B6 - - - G6 - - - E6 - - -"},         /* C */
+        {"A4 C5 E5 A5",  "A6 G6 F#6 E6 D#6 E6 F#6 E6 C6 - - - A5 - - -"},/* Am */
+        {"B4 D#5 F#5 A5","B5 - - - - - D#6 - F#6 - - - A6 - - -"},       /* B7 */
+        {"C4 E4 G4 C5",  "G6 - - - E6 - - - C6 - - - E6 - G6 -"},        /* C */
+        {"D4 F#4 A4 D5", "F#6 - - - D6 - - - A5 - - - D6 - F#6 -"},      /* D */
+        {"G4 B4 D5 G5",  "D6 - - - B5 - - - G5 - - - B5 - D6 -"},        /* G */
+        {"E4 G4 B4 E5",  "E6 - - - - - - - . . B5 - E6 - G6 -"},         /* Em */
+        {"A4 C5 E5 A5",  "A6 . E6 . C6 . E6 . A6 . B6 . C7 - A6 -"},     /* Am */
+        {"B4 D#5 F#5 A5","B6 . F#6 . D#6 . F#6 . B6 . A6 . F#6 - D#6 -"},/* B7 */
+        {"E4 G4 B4 E5",  "E6 D#6 E6 F#6 G6 F#6 G6 A6 B6 - - - G6 - - -"},/* Em */
+        {"B4 D#5 F#5 A5","F#6 - - - D#6 - - - B5 - - - . . . ."},        /* B7 */
     }};
     /* clang-format on */
 
     constexpr Tune matthias_tune{
         .tempo = 150.f,
         .bars = matthias_bars,
-        .bass = "0.4.0.4.0.4.2.4.",
-        .arpeggio = "0246135702461357",
+        .bass = "0.0.4.0.0.4.0.4.",
+        .arpeggio = "0123456765432101",
         .kick = "x...x...x...x...",
-        .snare = "....x.......x.x.",
-        .hihat = "..x...x...x...x.",
+        .snare = "....x.......x..x",
+        .hihat = "x.x.x.x.x.x.x.xx",
         .lead_ratio = 2.f,
     };
 
