@@ -74,7 +74,6 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set use mpi io     = true
     set schlieren beta = 10
   end
 end

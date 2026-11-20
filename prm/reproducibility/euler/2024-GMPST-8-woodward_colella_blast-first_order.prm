@@ -96,7 +96,6 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set use mpi io            = true
     set vtu output quantities = rho, m, E
   end
 end

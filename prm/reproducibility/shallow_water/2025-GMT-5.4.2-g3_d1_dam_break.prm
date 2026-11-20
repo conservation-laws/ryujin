@@ -117,7 +117,6 @@ subsection I - VTUOutput
     set trigger time points        = 3, 4, 5, 6
     set schlieren beta             = 10
     set schlieren recompute bounds = true
-    set use mpi io                 = true
     set vtu output quantities      = h, m_1, m_2, bathymetry, schlieren_h
   end
 end
