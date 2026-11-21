@@ -8,6 +8,7 @@
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/mpi_ensemble.h>
 #include <ryujin/base/observer_pointer.h>
+#include <ryujin/base/patterns_conversion.h>
 #include <ryujin/interface/hyperbolic_system.h>
 #include <ryujin/interface/offline_data.h>
 #include <ryujin/interface/postprocessor.h>
@@ -17,6 +18,39 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
+
+namespace ryujin
+{
+  /**
+   * An enum class controlling how VTUOutput writes out a vtu record in
+   * parallel.
+   *
+   * @ingroup Output
+   */
+  enum class VTUOutputMode {
+    /**
+     * Write a single vtu file with MPI IO.
+     */
+    mpi_io,
+    /**
+     * Write a single vtu file: all ranks send their data in sequence to
+     * rank 0, which writes the file. Works on every file system but
+     * requires deal.II 9.9 or newer.
+     */
+    send_to_rank_0,
+    /**
+     * Write one vtu file per rank and a pvtu record.
+     */
+    pvtu_record
+  };
+} // namespace ryujin
+
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::VTUOutputMode,
+             LIST({ryujin::VTUOutputMode::mpi_io, "mpi io"},
+                  {ryujin::VTUOutputMode::send_to_rank_0, "send to rank 0"},
+                  {ryujin::VTUOutputMode::pvtu_record, "pvtu record"}));
+#endif
 
 namespace ryujin
 {
@@ -85,7 +119,7 @@ namespace ryujin
      */
     //@{
 
-    bool use_mpi_io_;
+    VTUOutputMode output_mode_;
     bool output_analytic_solution_;
 
     Number beta_;

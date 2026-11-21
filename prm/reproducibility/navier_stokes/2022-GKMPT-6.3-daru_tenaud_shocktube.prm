@@ -123,7 +123,6 @@ subsection I - VTUOutput
   subsection full
     set trigger multiplier = 100
     set schlieren beta     = 10
-    set use mpi io         = true
   end
 end
 

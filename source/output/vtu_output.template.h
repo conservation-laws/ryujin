@@ -83,12 +83,18 @@ namespace ryujin
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
 
-    use_mpi_io_ = true;
-    add_parameter("use mpi io",
-                  use_mpi_io_,
-                  "If enabled write out one vtu file via MPI IO using "
-                  "write_vtu_in_parallel() instead of independent output files "
-                  "via write_vtu_with_pvtu_record()");
+#if DEAL_II_VERSION_GTE(9, 9, 0)
+    output_mode_ = VTUOutputMode::send_to_rank_0;
+#else
+    output_mode_ = VTUOutputMode::mpi_io;
+#endif
+    add_parameter("output mode",
+                  output_mode_,
+                  "How to write out the vtu record in parallel. \"mpi io\": "
+                  "a single vtu file written with MPI IO; \"send to rank 0\": "
+                  "a single vtu file written by rank 0, works on all file "
+                  "systems (requires deal.II 9.9 or newer); \"pvtu record\": "
+                  "one vtu file per rank and a pvtu record");
   }
 
 
@@ -97,6 +103,12 @@ namespace ryujin
   VTUOutput<structdim, dim, Number>::prepare(TaskContext<Number> & /*context*/)
   {
     RYUJIN_DEBUG_ANNOUNCE();
+
+#if !DEAL_II_VERSION_GTE(9, 9, 0)
+    AssertThrow(output_mode_ != VTUOutputMode::send_to_rank_0,
+                dealii::ExcMessage("The output mode \"send to rank 0\" "
+                                   "requires deal.II 9.9 or newer"));
+#endif
 
     selection_ = postprocessor_.prepare(vtu_output_quantities_);
     bounds_.clear();
@@ -266,19 +278,35 @@ namespace ryujin
 
     /* Perform output: */
 
+    const auto write_out = [&](const std::string &prefix) {
+      const auto comm = mpi_ensemble_.ensemble_communicator();
+      const auto filename =
+          prefix + "_" + Utilities::to_string(cycle, 6) + ".vtu";
+
+      switch (output_mode_) {
+      case VTUOutputMode::mpi_io:
+        data_out->write_vtu_in_parallel(filename, comm);
+        break;
+      case VTUOutputMode::send_to_rank_0:
+#if DEAL_II_VERSION_GTE(9, 9, 0)
+        data_out->write_vtu_in_parallel(
+            filename, comm, DataOutBase::ParallelWriteMode::send_to_rank_0);
+#else
+        AssertThrow(false,
+                    dealii::ExcMessage("The output mode \"send to rank 0\" "
+                                       "requires deal.II 9.9 or newer"));
+#endif
+        break;
+      case VTUOutputMode::pvtu_record:
+        data_out->write_vtu_with_pvtu_record("", prefix, cycle, comm, 6);
+        break;
+      }
+    };
+
     if (!levelsets_) {
       data_out->build_patches(
           mapping, patch_order, DataOut<structdim, dim>::curved_inner_cells);
-
-      if (use_mpi_io_) {
-        /* MPI-based synchronous IO */
-        data_out->write_vtu_in_parallel(
-            name + "_" + Utilities::to_string(cycle, 6) + ".vtu",
-            mpi_ensemble_.ensemble_communicator());
-      } else {
-        data_out->write_vtu_with_pvtu_record(
-            "", name, cycle, mpi_ensemble_.ensemble_communicator(), 6);
-      }
+      write_out(name);
     }
 
     if (levelsets_ && manifolds_.size() != 0) {
@@ -317,20 +345,7 @@ namespace ryujin
 
       data_out->build_patches(
           mapping, patch_order, DataOut<structdim, dim>::curved_inner_cells);
-
-      if (use_mpi_io_) {
-        /* MPI-based synchronous IO */
-        data_out->write_vtu_in_parallel(
-            name + "-levelsets_" + Utilities::to_string(cycle, 6) + ".vtu",
-            mpi_ensemble_.ensemble_communicator());
-      } else {
-        data_out->write_vtu_with_pvtu_record(
-            "",
-            name + "-levelsets",
-            cycle,
-            mpi_ensemble_.ensemble_communicator(),
-            6);
-      }
+      write_out(name + "-levelsets");
     }
 
     /* Explicitly delete pointer to free up memory early: */

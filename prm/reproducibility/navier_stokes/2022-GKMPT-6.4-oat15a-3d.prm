@@ -121,7 +121,6 @@ subsection I - VTUOutput
   subsection levelsets
     set manifolds          = x-0.075, x-0.15, y, y-0.01, y+0.01, z-0.023
     set trigger multiplier = 50
-    set use mpi io         = true
     set schlieren beta     = 10
   end
 end
