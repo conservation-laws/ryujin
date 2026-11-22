@@ -72,8 +72,8 @@ namespace ryujin
     add_parameter("dashboard color scheme",
                   dashboard_settings_.color_scheme,
                   "Color scheme of the terminal dashboard: ryujin, ansi16, "
-                  "gruvbox, light, monochrome, okabe-ito, rainbow, "
-                  "solarized, tamu");
+                  "everforest, gruvbox, light, monochrome, nord, okabe-ito, "
+                  "rainbow, solarized, tamu");
 
     add_parameter(
         "dashboard location",

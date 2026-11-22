@@ -83,6 +83,12 @@ namespace ryujin
     ansi16,
 
     /**
+     * The soft greens of the dark Everforest palette by Sainnhe Park,
+     * https://github.com/sainnhe/everforest
+     */
+    everforest,
+
+    /**
      * The warm colors of the dark Gruvbox palette by Pavel Pertsev,
      * https://github.com/morhetz/gruvbox
      */
@@ -99,6 +105,12 @@ namespace ryujin
      * Shades of gray.
      */
     monochrome,
+
+    /**
+     * The Frost and Aurora colors of the Nord palette by Arctic Ice
+     * Studio, https://www.nordtheme.com
+     */
+    nord,
 
     /**
      * The palette of M. Okabe and K. Ito, "Color Universal Design
@@ -205,9 +217,11 @@ DECLARE_ENUM(ryujin::DashboardLocation,
 DECLARE_ENUM(ryujin::DashboardColorScheme,
              LIST({ryujin::DashboardColorScheme::ryujin, "ryujin"},
                   {ryujin::DashboardColorScheme::ansi16, "ansi16"},
+                  {ryujin::DashboardColorScheme::everforest, "everforest"},
                   {ryujin::DashboardColorScheme::gruvbox, "gruvbox"},
                   {ryujin::DashboardColorScheme::light, "light"},
                   {ryujin::DashboardColorScheme::monochrome, "monochrome"},
+                  {ryujin::DashboardColorScheme::nord, "nord"},
                   {ryujin::DashboardColorScheme::okabe_ito, "okabe-ito"},
                   {ryujin::DashboardColorScheme::rainbow, "rainbow"},
                   {ryujin::DashboardColorScheme::solarized, "solarized"},
