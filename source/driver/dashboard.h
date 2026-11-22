@@ -100,37 +100,46 @@ namespace ryujin
 
     /** The settings, the position, and the animation. */
     dashboard::Frame frame_;
+
     /** The last snapshot, redrawn by the background thread. */
     std::optional<DashboardData> data_;
 
     /** The recent wall throughput, oldest first. */
     std::deque<double> wall_history_;
+
     /** The recent compute throughput, oldest first. */
     std::deque<double> compute_history_;
 
     /** The terminal size of the last frame. */
     std::pair<int, int> terminal_size_;
+
     /** The last frame. */
     std::unique_ptr<animation::Stage> stage_;
 
     /** The output to the terminal. */
     std::unique_ptr<terminal::Output> output_;
+
     /** The keyboard input, null if keys cannot be read from stdin. */
     std::unique_ptr<terminal::Keyboard> keyboard_;
 
     /** The button selected in the menu below the dashboard. */
     unsigned int button_ = 0;
+
     /** The row selected in the run panel, if it is open. */
     std::optional<unsigned int> run_;
+
     /** Whether the request selected in the run panel awaits confirmation. */
     bool confirm_ = false;
+
     /** The row selected in the options panel, if it is open. */
     std::optional<unsigned int> option_;
 
     /** Guards all of the above, and the output to the terminal. */
     std::mutex mutex_;
+
     /** The request issued in the run panel, taken by take_request(). */
     std::atomic<TaskRequest> request_ = TaskRequest::none;
+
     /** The background thread that plays the animation. */
     std::jthread thread_;
   };

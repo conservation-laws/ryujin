@@ -101,13 +101,16 @@ namespace ryujin::dashboard
 
     /** The settings. */
     DashboardSettings settings_;
+
     /** The animation around the window, null for none. */
     std::unique_ptr<animation::Animation> animation_;
 
     /** The fractions of the free space to the left and above. */
     std::pair<double, double> fractions_ = {0.5, 0.5};
+
     /** Whether an animation has moved the window. */
     bool shifted_ = false;
+
     /** When the screen saver moves next. */
     std::chrono::steady_clock::time_point next_move_;
   };

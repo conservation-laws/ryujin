@@ -12,11 +12,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <deque>
-#include <initializer_list>
+#include <format>
 #include <map>
 #include <numbers>
 #include <optional>
@@ -78,6 +76,8 @@ namespace ryujin::animation
       return colors[std::clamp(static_cast<int>(t * n), 0, n - 1)];
     }
 
+    const auto brown = ftxui::Color::RGB(150, 95, 55);
+
     int free_area(const Stage &stage)
     {
       int area = 0;
@@ -87,37 +87,13 @@ namespace ryujin::animation
       return area;
     }
 
-    using Sprite = std::vector<std::vector<std::string>>;
-
-    Sprite make_sprite(std::initializer_list<std::string_view> rows)
+    /* Return @p text repeated @p n times: */
+    std::string repeat(std::string_view text, int n)
     {
-      Sprite sprite;
-      for (const auto row : rows) {
-        auto &glyphs = sprite.emplace_back();
-        for (const char c : row)
-          if ((c & 0xc0) == 0x80)
-            glyphs.back() += c;
-          else
-            glyphs.emplace_back(1, c);
-      }
-      return sprite;
-    }
-
-    Sprite mirror(Sprite sprite)
-    {
-      static const std::map<std::string, std::string> swap = {{"(", ")"},
-                                                              {")", "("},
-                                                              {"/", "\\"},
-                                                              {"\\", "/"},
-                                                              {"<", ">"},
-                                                              {">", "<"}};
-      for (auto &row : sprite) {
-        std::ranges::reverse(row);
-        for (auto &glyph : row)
-          if (const auto it = swap.find(glyph); it != swap.end())
-            glyph = it->second;
-      }
-      return sprite;
+      std::string result;
+      for (int i = 0; i < n; ++i)
+        result += text;
+      return result;
     }
 
     /** The content of a cell of a frame, empty if the cell is blank. */
@@ -130,32 +106,28 @@ namespace ryujin::animation
       bool operator==(const Glyph &) const = default;
     };
 
+    /** The glyphs of the whole stage, row by row. */
+    using Frame = std::vector<Glyph>;
+
     /*
-     * Paint the cells of the @p frame of a region of the stage, row by
-     * row, that differ from the @p last frame, and make @p frame the last
-     * frame:
+     * Paint the cells of @p frame that differ from the @p last frame, and
+     * make @p frame the last frame:
      */
-    void repaint(Stage &stage,
-                 const ftxui::Box &region,
-                 std::vector<Glyph> &last,
-                 std::vector<Glyph> frame)
+    void repaint(Stage &stage, Frame &last, Frame frame)
     {
-      const int width = region.x_max - region.x_min + 1;
+      const int width = stage.screen.dimx();
       if (last.size() != frame.size())
         last.assign(frame.size(), Glyph());
 
       for (std::size_t i = 0; i < frame.size(); ++i) {
-        const auto &glyph = frame[i];
-        if (glyph == last[i])
+        const auto &g = frame[i];
+        if (g == last[i])
           continue;
-        auto &pixel = stage.pixel(region.x_min + int(i) % width,
-                                  region.y_min + int(i) / width);
-        if (!glyph.character.empty()) {
-          pixel.character = glyph.character;
-          pixel.foreground_color = glyph.color;
-          pixel.bold = glyph.bold;
-          pixel.dim = glyph.dim;
-        }
+        const Cell c{int(i) % width, int(i) / width};
+        if (g.character.empty())
+          stage.pixel(c.first, c.second);
+        else
+          paint(stage, c, g.character, g.color, g.bold, g.dim);
       }
 
       last = std::move(frame);
@@ -258,10 +230,7 @@ namespace ryujin::animation
         });
 
         /* Populate the free area sparsely: */
-        int area = 0;
-        for (int y = 0; y < height_; ++y)
-          for (int x = 0; x < width_; ++x)
-            area += stage.free(x, y);
+        const int area = free_area(stage);
         max_snakes_ = area < 200 ? 0 : std::clamp(area / 300, 2, 32);
         max_food_ = std::min(area / 150, 64);
       }
@@ -607,8 +576,7 @@ namespace ryujin::animation
       explicit Canvas(const Stage &stage)
           : stage(stage)
           , width(stage.screen.dimx())
-          , height(stage.screen.dimy())
-          , cells(width * height)
+          , cells(width * stage.screen.dimy())
       {
       }
 
@@ -627,7 +595,7 @@ namespace ryujin::animation
         const int row = int(std::lround(y));
         int column = int(std::floor(x));
         for (const auto glyph : characters(text)) {
-          if (glyph != " " && open(column, row) &&
+          if (glyph != " " && open(stage, column, row) &&
               (!clip || clip->Contain(column, row)))
             cells[row * width + column] = {
                 std::string(glyph), color, bold, dim};
@@ -635,47 +603,50 @@ namespace ryujin::animation
         }
       }
 
-      /*
-       * Draw @p rows ending on row @p bottom. An opaque sprite also blanks
-       * the gaps inside each row, so that it hides whatever is behind it:
-       */
+      /* Draw @p rows ending on row @p bottom: */
       void sprite(double x,
                   int bottom,
                   const Rows &rows,
                   ftxui::Color color,
-                  bool bold = false,
                   bool dim = false,
-                  const ftxui::Box *clip = nullptr,
-                  bool opaque = false)
+                  const ftxui::Box *clip = nullptr)
       {
         for (std::size_t i = 0; i < rows.size(); ++i) {
           const int row = bottom - int(rows.size() - 1 - i);
-          if (opaque) {
-            const auto glyphs = characters(rows[i]);
-            const auto blank = [](std::string_view g) { return g == " "; };
-            const auto first = std::ranges::find_if_not(glyphs, blank);
-            const auto last =
-                std::ranges::find_if_not(glyphs.rbegin(), glyphs.rend(), blank)
-                    .base();
-            for (auto it = first; it < last; ++it) {
-              const int column = int(std::floor(x)) + int(it - glyphs.begin());
-              if (open(column, row))
-                cells[row * width + column] = Glyph();
-            }
-          }
-          put(x, row, rows[i], color, bold, dim, clip);
+          put(x, row, rows[i], color, false, dim, clip);
         }
       }
 
-      bool open(int x, int y) const
+      /*
+       * Draw an opaque sprite that also blanks the gaps inside each row,
+       * so that it hides whatever is behind it:
+       */
+      void figure(double x,
+                  int bottom,
+                  const Rows &rows,
+                  ftxui::Color color,
+                  bool dim = false)
       {
-        return x >= 0 && y >= 0 && x < width && y < height && stage.free(x, y);
+        const auto blank = [](std::string_view g) { return g == " "; };
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+          const int row = bottom - int(rows.size() - 1 - i);
+          const auto glyphs = characters(rows[i]);
+          const auto first = std::ranges::find_if_not(glyphs, blank);
+          const auto last =
+              std::ranges::find_if_not(glyphs.rbegin(), glyphs.rend(), blank)
+                  .base();
+          for (auto it = first; it < last; ++it) {
+            const int column = int(std::floor(x)) + int(it - glyphs.begin());
+            if (open(stage, column, row))
+              cells[row * width + column] = Glyph();
+          }
+        }
+        sprite(x, bottom, rows, color, dim);
       }
 
       const Stage &stage;
       const int width;
-      const int height;
-      std::vector<Glyph> cells;
+      Frame cells;
     };
 
 
@@ -890,11 +861,6 @@ namespace ryujin::animation
         std::vector<std::array<bool, 2>> seats = {};
         std::vector<Guest> guests = {};
       };
-
-      static ftxui::Color cat_color()
-      {
-        return ftxui::Color::RGB(255, 175, 95);
-      }
 
       void spawn(Traffic::Kind kind, double speed, int width)
       {
@@ -1217,76 +1183,59 @@ namespace ryujin::animation
       const auto &theme = dashboard::theme;
       const auto muted = theme.muted;
       const auto plain = ftxui::Color::Default;
-      const auto coffee = ftxui::Color::RGB(150, 95, 55);
-      const auto water = theme.animation[0];
+      const auto ginger = ftxui::Color::RGB(255, 175, 95);
       const int t = t_;
-      const auto line = [](std::string_view left,
-                           std::string_view fill,
-                           int length,
-                           std::string_view right) {
-        std::string result(left);
-        for (int i = 0; i < length; ++i)
-          result += fill;
-        return result += right;
+
+      /* The room, faded because it is far, and the street behind the glass: */
+      const auto far = [&](double x, double y, std::string_view text) {
+        canvas.put(x, y, text, muted, false, true);
+      };
+      const auto street =
+          [&](double x, double y, std::string_view text, ftxui::Color color) {
+            canvas.put(x, y, text, color, false, true, &inside_);
+          };
+      /* Outline @p b with the corners and edges @p glyphs, like "┌─┐│└┘": */
+      const auto outline = [&](const ftxui::Box &b, std::string_view glyphs) {
+        const auto g = characters(glyphs);
+        const auto edge = repeat(g[1], b.x_max - b.x_min - 1);
+        far(b.x_min, b.y_min, std::string(g[0]) + edge + std::string(g[2]));
+        for (int y = b.y_min + 1; y < b.y_max; ++y) {
+          far(b.x_min, y, g[3]);
+          far(b.x_max, y, g[3]);
+        }
+        far(b.x_min, b.y_max, std::string(g[4]) + edge + std::string(g[5]));
       };
 
-      /* The room in one-point perspective, faded because it is far: */
-      const int x0 = inset_;
-      const int x1 = right_;
-      canvas.put(
-          x0, ceiling_, line("┌", "─", x1 - x0 - 1, "┐"), muted, false, true);
-      for (int y = ceiling_ + 1; y < horizon_; ++y) {
-        canvas.put(x0, y, "│", muted, false, true);
-        canvas.put(x1, y, "│", muted, false, true);
-      }
-      canvas.put(
-          x0, horizon_, line("└", "─", x1 - x0 - 1, "┘"), muted, false, true);
+      /* The room in one-point perspective: */
+      outline({inset_, right_, ceiling_, horizon_}, "┌─┐│└┘");
       for (int k = 1; k <= ceiling_ - top_; ++k) {
-        canvas.put(x0 - k, ceiling_ - k, "╲", muted, false, true);
-        canvas.put(x1 + k, ceiling_ - k, "╱", muted, false, true);
+        far(inset_ - k, ceiling_ - k, "╲");
+        far(right_ + k, ceiling_ - k, "╱");
       }
       for (int k = 1; k <= floor_ - horizon_; ++k) {
-        canvas.put(x0 - k, horizon_ + k, "╱", muted, false, true);
-        canvas.put(x1 + k, horizon_ + k, "╲", muted, false, true);
+        far(inset_ - k, horizon_ + k, "╱");
+        far(right_ + k, horizon_ + k, "╲");
       }
 
       /* The window in the back wall, with its sill: */
-      const auto &w = window_;
-      canvas.put(w.x_min,
-                 w.y_min,
-                 line("╔", "═", w.x_max - w.x_min - 1, "╗"),
-                 muted,
-                 false,
-                 true);
-      for (int y = w.y_min + 1; y < w.y_max; ++y) {
-        canvas.put(w.x_min, y, "║", muted, false, true);
-        canvas.put(w.x_max, y, "║", muted, false, true);
-      }
-      canvas.put(w.x_min,
-                 w.y_max,
-                 line("╚", "═", w.x_max - w.x_min - 1, "╝"),
-                 muted,
-                 false,
-                 true);
-      canvas.put(w.x_min - 1,
-                 w.y_max + 1,
-                 line("", "▀", w.x_max - w.x_min + 3, ""),
-                 coffee,
+      outline(window_, "╔═╗║╚╝");
+      canvas.put(window_.x_min - 1,
+                 window_.y_max + 1,
+                 repeat("▀", window_.x_max - window_.x_min + 3),
+                 brown,
                  false,
                  true);
 
       for (const auto &[x, y] : drops_)
         switch (weather_) {
         case Weather::rain:
-          canvas.put(x, y, "╱", water, false, true, &inside_);
+          street(x, y, "╱", theme.animation[0]);
           break;
         case Weather::snow:
-          canvas.put(
-              x, y, int(x * 7) % 3 ? "*" : "·", plain, false, true, &inside_);
+          street(x, y, int(x * 7) % 3 ? "*" : "·", plain);
           break;
         case Weather::clear:
-          canvas.put(
-              x, y, (t / 3) % 2 ? "v" : "^", muted, false, true, &inside_);
+          street(x, y, (t / 3) % 2 ? "v" : "^", muted);
           break;
         }
 
@@ -1307,7 +1256,7 @@ namespace ryujin::animation
         }
         if (a.direction < 0)
           rows = mirror(rows);
-        canvas.sprite(a.x, inside_.y_max, rows, a.color, false, true, &inside_);
+        canvas.sprite(a.x, inside_.y_max, rows, a.color, true, &inside_);
       }
 
       if (pigeon_) {
@@ -1315,16 +1264,23 @@ namespace ryujin::animation
         const auto glyph = pigeon.flying          ? (t % 2 ? "\\v/" : "‾v‾")
                            : pigeon.direction > 0 ? "(o>"
                                                   : "<o)";
-        canvas.put(pigeon.x, pigeon.y, glyph, muted, false, true, &inside_);
+        street(pigeon.x, pigeon.y, glyph, muted);
       }
 
       for (const int x : mullions_)
         for (int y = inside_.y_min; y <= inside_.y_max; ++y)
-          canvas.put(x, y, "│", muted, false, true);
+          far(x, y, "│");
 
-      /* Seated, facing right, with a hand on the table and the knees under it:
-       */
+      const Rows table = {"═╤═", " │"};
+      /* Seated, facing right, a hand on the table, the knees under it: */
       const Rows seated = {" o", "/|\\_", " └┐"};
+      /* Seated at a table with a steaming cup of coffee: */
+      const auto drinker = [&](double x, int y, ftxui::Color color, int phase) {
+        canvas.figure(x, y, seated, color);
+        canvas.put(x + 4, y - 2, "c[]", color);
+        canvas.put(
+            x + 5, y - 3, (t / 4 + phase) % 2 ? "~" : "≀", color, false, true);
+      };
 
       /*
        * The rows of tables, back to front. People walking pass behind the
@@ -1337,53 +1293,33 @@ namespace ryujin::animation
             continue;
           const bool step = int(guest.x * (row.near ? 1.3 : 2.)) % 2;
           if (row.near)
-            canvas.sprite(guest.x,
-                          y,
-                          {" o", "/|\\", step ? "/ \\" : " | "},
-                          guest.color,
-                          false,
-                          false,
-                          nullptr,
-                          true);
+            canvas.figure(
+                guest.x, y, {" o", "/|\\", step ? "/ \\" : " | "}, guest.color);
           else
-            canvas.sprite(guest.x,
-                          y,
-                          {" o ", step ? " Λ " : " λ "},
-                          guest.color,
-                          false,
-                          true,
-                          nullptr,
-                          true);
+            canvas.figure(
+                guest.x, y, {" o ", step ? " Λ " : " λ "}, guest.color, true);
         }
-        for (std::size_t i = 0; i < row.tables.size(); ++i) {
-          const int x = row.tables[i];
+        for (const int x : row.tables)
           if (row.near)
-            canvas.sprite(
-                x, y, {"═╤═", " │"}, muted, false, false, nullptr, true);
+            canvas.figure(x, y, table, muted);
           else
-            canvas.put(x, y, "─┬─", muted, false, true);
-        }
+            far(x, y, "─┬─");
         for (const auto &guest : row.guests) {
           if (guest.state != Guest::State::sit)
             continue;
           const int x = row.tables[guest.table];
-          const auto steam = (t / 4 + guest.table) % 2 ? "~" : "≀";
-          if (row.near && guest.laptop) {
-            canvas.sprite(
-                guest.x, y, seated, guest.color, false, false, nullptr, true);
-            canvas.put(x, y - 2, (t + guest.table) % 4 < 2 ? "▁" : "▂", muted);
-            canvas.put(x + 1, y - 2, "╱", theme.caption, true);
-          } else if (row.near) {
-            canvas.sprite(
-                guest.x, y, seated, guest.color, false, false, nullptr, true);
-            canvas.put(guest.x + 4, y - 2, "c[]", guest.color);
-            canvas.put(x + 1, y - 3, steam, guest.color, false, true);
-          } else {
-            canvas.sprite(guest.x, y, {" o ", " Λ "}, guest.color, false, true);
+          if (!row.near) {
+            canvas.sprite(guest.x, y, {" o ", " Λ "}, guest.color, true);
             const int cup = guest.side == 0 ? x : x + 2;
             canvas.put(cup, y - 1, "u", guest.color, false, true);
             if ((t / 5 + guest.table + guest.side) % 3 == 0)
               canvas.put(cup, y - 2, "~", guest.color, false, true);
+          } else if (guest.laptop) {
+            canvas.figure(guest.x, y, seated, guest.color);
+            canvas.put(x, y - 2, (t + guest.table) % 4 < 2 ? "▁" : "▂", muted);
+            canvas.put(x + 1, y - 2, "╱", theme.caption, true);
+          } else {
+            drinker(guest.x, y, guest.color, guest.table);
           }
         }
       }
@@ -1395,7 +1331,7 @@ namespace ryujin::animation
         for (int y = top_; y < shade; ++y)
           canvas.put(x + 1, y, "│", muted);
         /* A bell-shaped shade, with the bulb peeking out right below: */
-        canvas.put(x, shade, "▄█▄", coffee);
+        canvas.put(x, shade, "▄█▄", brown);
         const bool flicker = (t + 37 * int(i)) % 97 < 2;
         canvas.put(x + 1,
                    shade + 1,
@@ -1449,14 +1385,13 @@ namespace ryujin::animation
         canvas.sprite(cat_.x,
                       floor_,
                       {" /\\_/\\", closed ? "( -.- )" : "( o.o )"},
-                      cat_color());
+                      ginger);
         canvas.put(cat_.x + (cat_.direction > 0 ? 7 : -1),
                    floor_,
                    (t / 3) % 2 ? "~" : "-",
-                   cat_color());
+                   ginger);
         for (const auto &z : zs_)
-          canvas.put(
-              z.x, z.y, z.age < 13 ? "z" : "Z", cat_color(), false, true);
+          canvas.put(z.x, z.y, z.age < 13 ? "z" : "Z", ginger, false, true);
       }
 
       /*
@@ -1468,31 +1403,15 @@ namespace ryujin::animation
         const auto legs =
             int(c.x * 1.3) % 2 || (c.state == State::queue && c.timer) ? "/ \\"
                                                                        : " | ";
-        if (c.cup) {
-          canvas.sprite(c.x,
-                        floor_,
-                        {" o", "/|\\c[]", legs},
-                        c.color,
-                        false,
-                        false,
-                        nullptr,
-                        true);
+        canvas.figure(
+            c.x, floor_, {" o", c.cup ? "/|\\c[]" : "/|\\", legs}, c.color);
+        if (c.cup)
           canvas.put(c.x + 4,
                      floor_ - 2,
                      (t / 4) % 2 ? "~" : "≀",
                      c.color,
                      false,
                      true);
-        } else {
-          canvas.sprite(c.x,
-                        floor_,
-                        {" o", "/|\\", legs},
-                        c.color,
-                        false,
-                        false,
-                        nullptr,
-                        true);
-        }
       };
       const auto queued = [this](const Customer &c) {
         return c.state == State::queue && c.x <= pickup_ + 14;
@@ -1502,17 +1421,10 @@ namespace ryujin::animation
           person(c);
 
       for (const int x : tables_)
-        canvas.sprite(
-            x + 4, floor_, {"═╤═", " │"}, muted, false, false, nullptr, true);
+        canvas.figure(x + 4, floor_, table, muted);
       for (const auto &c : customers_)
-        if (c.state == State::seated) {
-          const int x = tables_[c.seat];
-          canvas.sprite(
-              x, floor_, seated, c.color, false, false, nullptr, true);
-          canvas.put(x + 4, floor_ - 2, "c[]", c.color);
-          canvas.put(
-              x + 5, floor_ - 3, (t / 4) % 2 ? "~" : "≀", c.color, false, true);
-        }
+        if (c.state == State::seated)
+          drinker(tables_[c.seat], floor_, c.color, 0);
 
       for (auto it = customers_.rbegin(); it != customers_.rend(); ++it)
         if (queued(*it))
@@ -1552,10 +1464,6 @@ namespace ryujin::animation
         phase_ = Phase::done;
         barista_ = station();
         brew_ = 1.;
-        level_ = 1.;
-        water_ = bloom_water;
-        for (const auto &pour : pours)
-          water_ += pour.water;
         frame_.clear();
         show(stage);
       }
@@ -1621,11 +1529,6 @@ namespace ryujin::animation
         return chance(0.6) ? "Jitterz" : others[pick(others.size())];
       }
 
-      static ftxui::Color coffee()
-      {
-        return ftxui::Color::RGB(150, 95, 55);
-      }
-
       /*
        * Place the bottom left corner of the bar in a free band below,
        * above, left, or right of the dashboard:
@@ -1636,10 +1539,7 @@ namespace ryujin::animation
         const int width = stage.screen.dimx();
         const int height = stage.screen.dimy();
 
-        struct Band {
-          int x_min, x_max, y_min, y_max;
-        };
-        const std::array<Band, 4> bands = {{
+        const std::array<ftxui::Box, 4> bands = {{
             {0, width - 1, box.y_max + 1, height - 1},
             {0, width - 1, 0, box.y_min - 1},
             {0, box.x_min - 1, 0, height - 1},
@@ -1654,19 +1554,11 @@ namespace ryujin::animation
             origin_ = Cell{band.x_min + (columns - bar_width) / 2, band.y_max};
 
             /* Lay out the cafe again only if the stage has changed: */
-            const Layout layout{
-                width,
-                height,
-                box,
-                {band.x_min, band.x_max, band.y_min, band.y_max}};
+            const Layout layout{width, height, box, band};
             if (!cafe_ || layout != layout_) {
               layout_ = layout;
-              cafe_.emplace(stage,
-                            layout.band,
-                            *origin_,
-                            bar_width,
-                            bar_height,
-                            weather_);
+              cafe_.emplace(
+                  stage, band, *origin_, bar_width, bar_height, weather_);
             }
             return;
           }
@@ -1762,9 +1654,6 @@ namespace ryujin::animation
             enter(Phase::bloom);
           break;
         case Phase::bloom:
-          level_ = 0.05 * phase_step_ / bloom_steps;
-          water_ = bloom_water * std::min(phase_step_, bloom_pour_steps) /
-                   bloom_pour_steps;
           if (phase_step_ == bloom_steps)
             enter(Phase::pour);
           break;
@@ -1781,18 +1670,35 @@ namespace ryujin::animation
             brew_ = 1.;
             enter(Phase::done);
           }
-          level_ = 0.05 + 0.95 * brew_;
-          water_ = bloom_water;
-          for (const auto &pour : pours)
-            water_ += pour.water *
-                      std::clamp((brew_ - pour.begin) / (pour.end - pour.begin),
-                                 0.,
-                                 1.);
           break;
         }
         case Phase::done:
           break;
         }
+      }
+
+      /* The fill level of the pot from 0 to 1: */
+      double level() const
+      {
+        if (phase_ < Phase::bloom)
+          return 0.;
+        if (phase_ == Phase::bloom)
+          return 0.05 * phase_step_ / bloom_steps;
+        return 0.05 + 0.95 * brew_;
+      }
+
+      /* The water poured so far in grams, from the bloom on: */
+      double water() const
+      {
+        if (phase_ == Phase::bloom)
+          return bloom_water * std::min(phase_step_, bloom_pour_steps) /
+                 bloom_pour_steps;
+        double water = bloom_water;
+        for (const auto &pour : pours)
+          water += pour.water *
+                   std::clamp(
+                       (brew_ - pour.begin) / (pour.end - pour.begin), 0., 1.);
+        return water;
       }
 
       /* Whether water streams from the kettle: */
@@ -1814,9 +1720,6 @@ namespace ryujin::animation
         if (!origin_)
           return;
 
-        const int width = stage.screen.dimx();
-        const int height = stage.screen.dimy();
-        const ftxui::Box screen = {0, width - 1, 0, height - 1};
         const ftxui::Box bar = {origin_->first,
                                 origin_->first + bar_width - 1,
                                 origin_->second - bar_height + 1,
@@ -1855,7 +1758,7 @@ namespace ryujin::animation
          * simulation takes:
          */
         const bool weighing = phase_ == Phase::weigh && barista_ == station();
-        char display[32];
+        std::string display;
         if (phase_ >= Phase::bloom) {
           const int seconds =
               phase_ == Phase::bloom
@@ -1863,19 +1766,13 @@ namespace ryujin::animation
                   : bloom_seconds +
                         int(std::lround((brew_seconds - bloom_seconds) *
                                         brew_));
-          std::snprintf(display,
-                        sizeof(display),
-                        "%d:%02d %3.0fg",
-                        seconds / 60,
-                        seconds % 60,
-                        water_);
+          display = std::format(
+              "{}:{:02} {:3.0f}g", seconds / 60, seconds % 60, water());
         } else {
-          std::snprintf(display,
-                        sizeof(display),
-                        "%4.1fg",
-                        weighing ? 18. * phase_step_ / weigh_steps : 0.);
+          display = std::format(
+              "{:4.1f}g", weighing ? 18. * phase_step_ / weigh_steps : 0.);
         }
-        const int length = int(std::strlen(display));
+        const int length = int(display.size());
         const int display_x = dripper_x + 3 - length / 2;
 
         /* The counter, with a gap around the display: */
@@ -1893,7 +1790,7 @@ namespace ryujin::animation
         text(bag_x + 1 + (8 - int(roaster_.size()) + 1) / 2,
              3,
              roaster_,
-             coffee(),
+             brown,
              true);
         text(bag_x + 9, 3, "│", theme.muted);
 
@@ -1907,7 +1804,7 @@ namespace ryujin::animation
           text(grinder_x + 2 + shake,
                5,
                grinding && step_ % 2 ? "░" : "▒",
-               coffee());
+               brown);
         text(grinder_x + 1 + shake, 4, "|▓|", theme.muted);
         text(grinder_x, 3, "[___]", theme.muted);
         if (grinding)
@@ -1923,46 +1820,26 @@ namespace ryujin::animation
           text(dripper_x + 1,
                6,
                wet && step_ % 4 < 2 ? "~~~~~" : "▒▒▒▒▒",
-               wet ? theme.animation[0] : coffee());
+               wet ? theme.animation[0] : brown);
         } else if (weighing) {
           const int grounds = int(std::ceil(5. * phase_step_ / weigh_steps));
-          std::string row;
-          for (int i = 0; i < grounds; ++i)
-            row += "▒";
-          text(dripper_x + 1, 6, row, coffee());
+          text(dripper_x + 1, 6, repeat("▒", grounds), brown);
           if (phase_step_ < weigh_steps - 4)
-            text(dripper_x + 3, 7, "∘", coffee(), true);
+            text(dripper_x + 3, 7, "∘", brown, true);
         }
 
         /* The coffee in the pot, in eighths of a cell: */
-        static const std::array<std::string, 9> blocks = {
+        static constexpr std::array<std::string_view, 9> blocks = {
             " ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"};
-        const int eighths = int(std::lround(16. * level_));
+        const int eighths = int(std::lround(16. * level()));
         if (eighths > 0)
           text(
-              dripper_x + 1,
-              3,
-              [&] {
-                std::string row;
-                for (int i = 0; i < 5; ++i)
-                  row += blocks[std::min(eighths, 8)];
-                return row;
-              }(),
-              coffee());
+              dripper_x + 1, 3, repeat(blocks[std::min(eighths, 8)], 5), brown);
         if (eighths > 8)
-          text(
-              dripper_x + 1,
-              4,
-              [&] {
-                std::string row;
-                for (int i = 0; i < 5; ++i)
-                  row += blocks[eighths - 8];
-                return row;
-              }(),
-              coffee());
+          text(dripper_x + 1, 4, repeat(blocks[eighths - 8], 5), brown);
         if (phase_ >= Phase::bloom && phase_ != Phase::done && eighths < 16 &&
             step_ % 3 == 0)
-          text(dripper_x + 3, 4, "·", coffee(), true);
+          text(dripper_x + 3, 4, "·", brown, true);
 
         /* The kettle, pouring right into the dripper: */
         if (pouring()) {
@@ -1999,7 +1876,7 @@ namespace ryujin::animation
           text(x, 0, "/   \\", plain);
         }
 
-        repaint(stage, screen, frame_, std::move(canvas.cells));
+        repaint(stage, frame_, std::move(canvas.cells));
       }
 
       std::optional<Cell> origin_;
@@ -2011,11 +1888,7 @@ namespace ryujin::animation
         ftxui::Box dashboard;
         ftxui::Box band;
 
-        bool operator==(const Layout &other) const
-        {
-          return width == other.width && height == other.height &&
-                 dashboard == other.dashboard && band == other.band;
-        }
+        bool operator==(const Layout &) const = default;
       };
       Layout layout_ = {};
       std::optional<Cafe> cafe_;
@@ -2038,13 +1911,7 @@ namespace ryujin::animation
       /* The progress of the brew after the bloom, from 0 to 1: */
       double brew_ = 0.;
 
-      /* The fill level of the pot from 0 to 1: */
-      double level_ = 0.;
-
-      /* The water poured so far in grams: */
-      double water_ = 0.;
-
-      std::vector<Glyph> frame_;
+      Frame frame_;
     };
 
 
@@ -2071,9 +1938,7 @@ namespace ryujin::animation
                  shade(0.2 + 0.5 * pick(100) / 100.)});
         }
 
-        std::erase_if(fish_, [&](const Fish &f) {
-          return !fits(stage, look(f), f.x, f.y);
-        });
+        std::erase_if(fish_, [&](const Fish &f) { return !fits(stage, f); });
         const auto count = [&](auto... kinds) {
           return std::ranges::count_if(
               fish_, [&](const Fish &f) { return ((f.kind == kinds) || ...); });
@@ -2087,7 +1952,7 @@ namespace ryujin::animation
             spawn(stage, kind);
 
         bubbles_.clear();
-        scene_.clear();
+        frame_.clear();
         compose(stage);
       }
 
@@ -2137,26 +2002,18 @@ namespace ryujin::animation
         int age;
       };
 
-      struct Glyph {
-        std::string text;
-        ftxui::Color color;
-        bool bold = false;
-        bool dim = false;
-        bool operator==(const Glyph &) const = default;
-      };
-
-      const std::vector<Sprite> right_ = {
-          make_sprite({"><>"}),
-          make_sprite({"><(((°>"}),
-          make_sprite({">(°)"}),
-          make_sprite({"  \\ | /  ", ">-(  ° )-", "  / | \\  "}),
-          make_sprite({"V(°.°)V"}),
-          make_sprite({"Y(°.°)Y"}),
-          make_sprite({" .--. ", "(    )", " )()( ", " (  ) ", " )  ( "}),
-          make_sprite({" .--. ", "(    )", " ()() ", " )  ( ", " (  ) "}),
-          make_sprite({" .-. ", "(   )", " ||| ", " | | ", " | | "})};
-      const std::vector<Sprite> left_ = [this] {
-        std::vector<Sprite> sprites;
+      const std::vector<Rows> right_ = {
+          Rows{"><>"},
+          Rows{"><(((°>"},
+          Rows{">(°)"},
+          Rows{"  \\ | /  ", ">-(  ° )-", "  / | \\  "},
+          Rows{"V(°.°)V"},
+          Rows{"Y(°.°)Y"},
+          Rows{" .--. ", "(    )", " )()( ", " (  ) ", " )  ( "},
+          Rows{" .--. ", "(    )", " ()() ", " )  ( ", " (  ) "},
+          Rows{" .-. ", "(   )", " ||| ", " | | ", " | | "}};
+      const std::vector<Rows> left_ = [this] {
+        std::vector<Rows> sprites;
         for (const auto &sprite : right_)
           sprites.push_back(mirror(sprite));
         return sprites;
@@ -2167,7 +2024,7 @@ namespace ryujin::animation
         return static_cast<int>(std::lround(v));
       }
 
-      const Sprite &look(const Fish &f) const
+      const Rows &look(const Fish &f) const
       {
         const auto frame = [&] {
           switch (f.kind) {
@@ -2187,20 +2044,23 @@ namespace ryujin::animation
         return (f.dir > 0 ? right_ : left_)[frame];
       }
 
-      bool fits(const Stage &stage, const Sprite &sprite, double x, int y) const
+      bool fits(const Stage &stage, const Fish &f, double x) const
       {
-        if (y + static_cast<int>(sprite.size()) > height_ - 1)
+        const auto &sprite = look(f);
+        if (f.y + int(sprite.size()) > height_ - 1)
           return false;
-        for (int r = 0; r < static_cast<int>(sprite.size()); ++r)
-          for (int k = 0; k < static_cast<int>(sprite[r].size()); ++k)
-            if (sprite[r][k] != " " && !open(stage, round(x) + k, y + r))
+        for (int r = 0; r < int(sprite.size()); ++r) {
+          const auto glyphs = characters(sprite[r]);
+          for (int k = 0; k < int(glyphs.size()); ++k)
+            if (glyphs[k] != " " && !open(stage, round(x) + k, f.y + r))
               return false;
+        }
         return true;
       }
 
       bool fits(const Stage &stage, const Fish &f) const
       {
-        return fits(stage, look(f), f.x, f.y);
+        return fits(stage, f, f.x);
       }
 
       void spawn(const Stage &stage, Kind kind)
@@ -2228,7 +2088,7 @@ namespace ryujin::animation
       void advance(const Stage &stage, Fish &f, double speed)
       {
         if (const double x = f.x + f.dir * speed;
-            fits(stage, look(f), x, f.y) && !chance(0.003))
+            fits(stage, f, x) && !chance(0.003))
           f.x = x;
         else
           f.dir = -f.dir;
@@ -2254,7 +2114,8 @@ namespace ryujin::animation
             change(stage, f, false, dy);
           advance(stage, f, f.kind == Kind::big ? 0.25 : 0.45);
           if (chance(0.01))
-            bubble(f.x + (f.dir > 0 ? look(f)[0].size() : -1.), f.y);
+            bubble(f.x + (f.dir > 0 ? characters(look(f)[0]).size() : -1.),
+                   f.y);
           return;
 
         case Kind::puffer:
@@ -2301,60 +2162,47 @@ namespace ryujin::animation
       {
         static constexpr std::array<const char *, 7> sand = {
             "_", ".", "_", "_", ",", "_", "."};
-        std::map<int, Glyph> next;
-        const auto put = [&](int x, int y, Glyph g) {
-          if (open(stage, x, y))
-            next[y * width_ + x] = std::move(g);
-        };
+        Canvas canvas(stage);
 
         const auto floor = dashboard::theme.animation.front();
         for (int x = 0; x < width_; ++x)
-          put(x, height_ - 1, {sand[x * 5 % sand.size()], floor, false, true});
+          canvas.put(
+              x, height_ - 1, sand[x * 5 % sand.size()], floor, false, true);
 
         for (const auto &w : weeds_)
           for (int r = 0; r < w.height && open(stage, w.x, height_ - 2 - r);
                ++r)
-            put(w.x,
-                height_ - 2 - r,
-                {(time_ / 8 + r + w.phase) % 2 ? "(" : ")", w.color});
+            canvas.put(w.x,
+                       height_ - 2 - r,
+                       (time_ / 8 + r + w.phase) % 2 ? "(" : ")",
+                       w.color);
 
         const auto bright = dashboard::theme.animation.back();
         for (const auto &b : bubbles_)
-          put(round(b.x),
-              round(b.y),
-              {b.age < 6    ? "."
-               : b.age < 16 ? "o"
-                            : "O",
-               bright,
-               false,
-               b.age < 6});
+          canvas.put(round(b.x),
+                     round(b.y),
+                     b.age < 6    ? "."
+                     : b.age < 16 ? "o"
+                                  : "O",
+                     bright,
+                     false,
+                     b.age < 6);
 
         for (const bool front : {false, true})
           for (const auto &f : fish_) {
             if ((f.kind == Kind::jelly || f.kind == Kind::crab) == front)
               continue;
             const auto &sprite = look(f);
-            for (int r = 0; r < static_cast<int>(sprite.size()); ++r)
-              for (int k = 0; k < static_cast<int>(sprite[r].size()); ++k)
-                if (sprite[r][k] != " ")
-                  put(round(f.x) + k,
-                      f.y + r,
-                      {sprite[r][k], f.color, true, f.kind == Kind::jelly});
+            for (int r = 0; r < int(sprite.size()); ++r)
+              canvas.put(round(f.x),
+                         f.y + r,
+                         sprite[r],
+                         f.color,
+                         true,
+                         f.kind == Kind::jelly);
           }
 
-        for (const auto &[i, g] : scene_)
-          if (!next.contains(i))
-            stage.pixel(i % width_, i / width_);
-        for (const auto &[i, g] : next)
-          if (const auto it = scene_.find(i);
-              it == scene_.end() || !(it->second == g))
-            paint(stage,
-                  {i % width_, i / width_},
-                  g.text,
-                  g.color,
-                  g.bold,
-                  g.dim);
-        scene_ = std::move(next);
+        repaint(stage, frame_, std::move(canvas.cells));
       }
 
       int width_ = 0;
@@ -2363,7 +2211,7 @@ namespace ryujin::animation
       std::vector<Fish> fish_;
       std::vector<Weed> weeds_;
       std::vector<Bubble> bubbles_;
-      std::map<int, Glyph> scene_;
+      Frame frame_;
     };
   } // namespace
 
