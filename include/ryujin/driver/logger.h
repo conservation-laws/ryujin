@@ -6,7 +6,6 @@
 #pragma once
 
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/driver/dashboard.h>
 #include <ryujin/interface/simulation.h>
 #include <ryujin/interface/task.h>
 
@@ -22,6 +21,8 @@
 namespace ryujin
 {
   class Dashboard;
+  struct CycleStatistics;
+  struct DashboardSettings;
 
   /**
    * The task "logger" that records the run time parameters, the MPI
@@ -93,7 +94,7 @@ namespace ryujin
     /** Halve the cpu time if there are two threads per rank. */
     bool terminal_correct_for_hyperthreading_;
     /** The settings of the terminal dashboard. */
-    DashboardSettings dashboard_settings_;
+    std::unique_ptr<DashboardSettings> dashboard_settings_;
 
     /** A shell command run at the end, if nonempty. */
     std::string debug_command_;
@@ -155,7 +156,7 @@ namespace ryujin
     double time_per_second_exp_;
 
     /** The snapshot of the cycle statistics shown on the terminal. */
-    DashboardData dashboard_data_;
+    std::unique_ptr<CycleStatistics> cycle_statistics_;
 #if defined(WITH_FTXUI)
     /** The terminal dashboard, on rank 0 only. */
     std::unique_ptr<Dashboard> dashboard_;

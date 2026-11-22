@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <ryujin/driver/dashboard.h>
+#include <dashboard/settings.h>
 
 #include <ftxui/screen/box.hpp>
 #include <ftxui/screen/screen.hpp>

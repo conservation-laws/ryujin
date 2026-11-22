@@ -3,8 +3,8 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard.h>
-#include <driver/dashboard_theme.h>
+#include <dashboard/dashboard.h>
+#include <dashboard/theme.h>
 #include <driver/terminal.h>
 #include <ryujin/base/version_info.h>
 
@@ -200,7 +200,7 @@ namespace ryujin
 
     /* A range bar marking [min, max] and the average relative to scale: */
     Element
-    range_bar(const DashboardData::MinMaxAvg &v, double scale, int width)
+    range_bar(const CycleStatistics::MinMaxAvg &v, double scale, int width)
     {
       const auto position = [&](double value) {
         const auto column = static_cast<int>(value / scale * (width - 1));
@@ -294,7 +294,7 @@ namespace ryujin
 
 
     /* The dashboard for the snapshot @p data, @p width columns wide: */
-    Element document(const DashboardData &data,
+    Element document(const CycleStatistics &data,
                      const std::deque<double> &wall_history,
                      const std::deque<double> &compute_history,
                      int width,
@@ -751,7 +751,7 @@ namespace ryujin
 
 
     /* Return whether @p request can be issued for the tasks of @p data: */
-    bool available(TaskRequest request, const DashboardData &data)
+    bool available(TaskRequest request, const CycleStatistics &data)
     {
       if (request != TaskRequest::checkpoint &&
           request != TaskRequest::checkpoint_and_stop)
@@ -767,7 +767,7 @@ namespace ryujin
      * confirmation if @p confirm:
      */
     Element
-    run_panel(const DashboardData &data, unsigned int selected, bool confirm)
+    run_panel(const CycleStatistics &data, unsigned int selected, bool confirm)
     {
       Elements rows;
       bool unavailable = false;
@@ -1025,7 +1025,7 @@ namespace ryujin
   }
 
 
-  void Dashboard::show(const DashboardData &data)
+  void Dashboard::show(const CycleStatistics &data)
   {
     /* No more updates after the final snapshot: */
     if (data.final_time)

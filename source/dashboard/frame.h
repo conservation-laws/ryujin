@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <driver/dashboard_animation.h>
-#include <ryujin/driver/dashboard.h>
+#include <dashboard/animation.h>
+#include <dashboard/settings.h>
 
 #include <chrono>
 #include <memory>

@@ -5,7 +5,7 @@
 ##
 
 help_description = """
-This script generates source/driver/splash_screen_logo.h, the logo of the
+This script generates source/dashboard/splash_screen_logo.h, the logo of the
 splash screen, from doc/logo.png: the dragon is cut out of the background
 of the image and framed by a thin outline of the darker background,
 cropped, scaled to a height of 64 pixels, and stored with a palette of at
@@ -57,7 +57,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--input", default="doc/logo.png")
-    parser.add_argument("--output", default="source/driver/splash_screen_logo.h")
+    parser.add_argument("--output", default="source/dashboard/splash_screen_logo.h")
     args = parser.parse_args()
 
     image = Image.open(args.input).convert("RGB")

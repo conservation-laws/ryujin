@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include <dashboard/settings.h>
 #include <ryujin/base/compile_time_options.h>
-#include <ryujin/driver/dashboard.h>
 
 namespace ryujin
 {

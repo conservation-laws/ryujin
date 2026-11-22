@@ -3,12 +3,12 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_music.h>
-#include <driver/splash_screen_logo.h>
+#include <dashboard/music.h>
+#include <dashboard/splash_screen_logo.h>
 #include <driver/terminal.h>
 
+#include <dashboard/splash_screen.h>
 #include <ryujin/base/version_info.h>
-#include <ryujin/driver/splash_screen.h>
 
 #include <ftxui/screen/color.hpp>
 #include <ftxui/screen/screen.hpp>

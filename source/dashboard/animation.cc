@@ -3,8 +3,8 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_animation.h>
-#include <driver/dashboard_theme.h>
+#include <dashboard/animation.h>
+#include <dashboard/theme.h>
 #include <ryujin/base/random.h>
 
 #include <algorithm>

@@ -3,10 +3,10 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_frame.h>
-#include <driver/dashboard_theme.h>
-#include <ryujin/driver/dashboard.h>
-#include <ryujin/driver/parameter_editor.h>
+#include <dashboard/frame.h>
+#include <dashboard/parameter_editor.h>
+#include <dashboard/settings.h>
+#include <dashboard/theme.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 

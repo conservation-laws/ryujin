@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_music.h>
+#include <dashboard/music.h>
 
 #include <deal.II/base/exceptions.h>
 

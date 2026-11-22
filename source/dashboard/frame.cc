@@ -3,9 +3,9 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_frame.h>
-#include <driver/dashboard_music.h>
-#include <driver/dashboard_theme.h>
+#include <dashboard/frame.h>
+#include <dashboard/music.h>
+#include <dashboard/theme.h>
 #include <ryujin/base/random.h>
 
 #include <algorithm>

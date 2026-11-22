@@ -3,11 +3,11 @@
 // Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
+#include <dashboard/parameter_editor.h>
+#include <dashboard/splash_screen.h>
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/driver/environment.h>
 #include <ryujin/driver/equation.h>
-#include <ryujin/driver/parameter_editor.h>
-#include <ryujin/driver/splash_screen.h>
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_acceptor.h>

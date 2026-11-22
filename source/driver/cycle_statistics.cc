@@ -3,7 +3,7 @@
 // Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_text.h>
+#include <driver/cycle_statistics.h>
 
 #include <deal.II/base/utilities.h>
 
@@ -20,7 +20,7 @@ namespace ryujin
 {
   namespace
   {
-    void print_head(const DashboardData &data, std::ostream &stream)
+    void print_head(const CycleStatistics &data, std::ostream &stream)
     {
       std::ostringstream primary;
       if (data.final_time) {
@@ -53,7 +53,7 @@ namespace ryujin
     }
 
 
-    void print_information(const DashboardData &data, std::ostream &stream)
+    void print_information(const CycleStatistics &data, std::ostream &stream)
     {
       stream << "Information: (HYP) " << data.hyperbolic_name;
       if (!data.parabolic_name.empty())
@@ -73,7 +73,7 @@ namespace ryujin
     }
 
 
-    void print_memory_statistics(const DashboardData &data,
+    void print_memory_statistics(const CycleStatistics &data,
                                  std::ostream &stream)
     {
       const auto &memory = data.memory;
@@ -91,7 +91,7 @@ namespace ryujin
     }
 
 
-    void print_timers(const DashboardData &data, std::ostream &stream)
+    void print_timers(const CycleStatistics &data, std::ostream &stream)
     {
       std::vector<std::ostringstream> output(data.timers.size());
 
@@ -148,7 +148,7 @@ namespace ryujin
     }
 
 
-    void print_tasks(const DashboardData &data, std::ostream &stream)
+    void print_tasks(const CycleStatistics &data, std::ostream &stream)
     {
       std::size_t name_width = 0;
       std::size_t trigger_width = 0;
@@ -176,7 +176,7 @@ namespace ryujin
     }
 
 
-    void print_throughput(const DashboardData &data, std::ostream &stream)
+    void print_throughput(const CycleStatistics &data, std::ostream &stream)
     {
       /* Print Jean-Luc and Martin metrics: */
 
@@ -284,7 +284,7 @@ namespace ryujin
   } // namespace
 
 
-  std::string render_text(const DashboardData &data)
+  std::string render_text(const CycleStatistics &data)
   {
     std::ostringstream output;
     print_head(data, output);

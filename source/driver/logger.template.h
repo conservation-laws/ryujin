@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <driver/dashboard_text.h>
+#include <driver/cycle_statistics.h>
 #if defined(WITH_FTXUI)
-#include <driver/dashboard.h>
+#include <dashboard/dashboard.h>
 #endif
 #include <driver/terminal.h>
 #include <ryujin/base/computing_timer.h>
@@ -43,12 +43,14 @@ namespace ryujin
       const std::string &subsection /*= "/Logger"*/)
       : ParameterAcceptor(subsection)
       , Interface::Task<Number>("logger", TaskPhase::post_step)
+      , dashboard_settings_(std::make_unique<DashboardSettings>())
       , simulation_(simulation)
       , mpi_ensemble_(simulation.mpi_ensemble())
       , n_global_dofs_(0)
       , n_devices_(0)
       , last_terminal_output_(0.)
       , time_per_second_exp_(0.)
+      , cycle_statistics_(std::make_unique<CycleStatistics>())
   {
     terminal_update_interval_ = 5;
     add_parameter("terminal update interval",
@@ -59,50 +61,50 @@ namespace ryujin
 
 #if defined(WITH_FTXUI)
     add_parameter("dashboard",
-                  dashboard_settings_.mode,
+                  dashboard_settings_->mode,
                   "Draw the terminal dashboard that redraws the terminal in "
                   "place: auto (if stdout reaches the terminal, also through "
                   "mpirun), on, off (print plain text instead).");
 
     add_parameter("dashboard animation",
-                  dashboard_settings_.animation,
+                  dashboard_settings_->animation,
                   "Animation in the space around the terminal dashboard: "
                   "ryujin, matthias, eric, jordan, wyatt, none");
 
     add_parameter("dashboard color scheme",
-                  dashboard_settings_.color_scheme,
+                  dashboard_settings_->color_scheme,
                   "Color scheme of the terminal dashboard: ryujin, ansi16, "
                   "everforest, gruvbox, light, monochrome, nord, okabe-ito, "
                   "rainbow, solarized, tamu");
 
     add_parameter(
         "dashboard location",
-        dashboard_settings_.location,
+        dashboard_settings_->location,
         "Location of the terminal dashboard: top left, center, "
         "screen saver (move to a random position every ten seconds, in "
         "the parameter editor only while there is no input).");
 
     add_parameter("dashboard max height",
-                  dashboard_settings_.height,
+                  dashboard_settings_->height,
                   "Maximal height of the terminal dashboard in lines. If "
                   "nonzero, the dashboard stretches to fill the terminal up to "
                   "this height. Setting the height to zero keeps the natural "
                   "height of the dashboard.");
 
     add_parameter("dashboard max width",
-                  dashboard_settings_.width,
+                  dashboard_settings_->width,
                   "Maximal width of the terminal dashboard in columns. The "
                   "dashboard fills the terminal up to this width. Setting the "
                   "width to zero removes the limit.");
 
     add_parameter("dashboard music",
-                  dashboard_settings_.music,
+                  dashboard_settings_->music,
                   "Music played while the terminal dashboard is drawn "
                   "(requires ryujin compiled with miniaudio): none, ryujin, "
                   "matthias, jordan, wyatt");
 
     add_parameter("dashboard glass",
-                  dashboard_settings_.glass,
+                  dashboard_settings_->glass,
                   "Let the animation show faintly through the empty cells of "
                   "the terminal dashboard.");
 #endif
@@ -164,7 +166,7 @@ namespace ryujin
     print_info_ = context.info;
     context.info = [this, &context](const std::string &message) {
       constexpr std::size_t n_messages = 100;
-      auto &messages = dashboard_data_.messages;
+      auto &messages = cycle_statistics_->messages;
       messages.push_back({message, context.cycle, context.t});
       if (messages.size() > n_messages)
         messages.pop_front();
@@ -202,7 +204,7 @@ namespace ryujin
     if (!dashboard_active_ && mpi_ensemble_.world_rank() == 0 &&
         interactive_terminal()) {
       dashboard_ = std::make_unique<Dashboard>();
-      dashboard_->start(dashboard_settings_);
+      dashboard_->start(*dashboard_settings_);
       dashboard_active_ = true;
     }
 #endif
@@ -250,7 +252,7 @@ namespace ryujin
     return false;
 #else
     /* Return whether we are running on an interactive terminal: */
-    const auto mode = dashboard_settings_.mode;
+    const auto mode = dashboard_settings_->mode;
     if (mode == DashboardMode::automatic)
       return terminal::stdout_reaches_terminal();
     return mode == DashboardMode::on;
@@ -508,7 +510,7 @@ namespace ryujin
       bool write_to_terminal,
       bool final_time)
   {
-    dashboard_data_.final_time = final_time;
+    cycle_statistics_->final_time = final_time;
     collect_information(context);
     collect_memory_statistics();
     collect_timers();
@@ -519,13 +521,13 @@ namespace ryujin
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
-    const auto text = render_text(dashboard_data_);
+    const auto text = render_text(*cycle_statistics_);
 
     /* Only redraw the terminal every "terminal update interval": */
     if (write_to_terminal) {
 #if defined(WITH_FTXUI)
       if (dashboard_active_)
-        dashboard_->show(dashboard_data_);
+        dashboard_->show(*cycle_statistics_);
       else
 #endif
         std::cout << "\033[2J\033[H" << text << std::flush;
@@ -570,7 +572,7 @@ namespace ryujin
     threads = std::to_string(MultithreadInfo::n_threads()) + " threads";
 #endif
 
-    auto &data = dashboard_data_;
+    auto &data = *cycle_statistics_;
     data.cycle = context.cycle;
     data.t = context.t;
     data.t_final = context.t_final;
@@ -593,7 +595,7 @@ namespace ryujin
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
 
-    dashboard_data_.memory = Utilities::MPI::min_max_avg(
+    cycle_statistics_->memory = Utilities::MPI::min_max_avg(
         stats.VmRSS / 1024., mpi_ensemble_.world_communicator());
   }
 
@@ -611,7 +613,7 @@ namespace ryujin
     /* Percentages are only meaningful for the timers of the time loop: */
     bool percentage = false;
 
-    auto &timers = dashboard_data_.timers;
+    auto &timers = cycle_statistics_->timers;
     timers.clear();
     for (const auto &[name, timer] : ComputingTimer::timers()) {
       const double cpu_time =
@@ -668,7 +670,7 @@ namespace ryujin
       __builtin_unreachable();
     };
 
-    auto &tasks = dashboard_data_.tasks;
+    auto &tasks = cycle_statistics_->tasks;
     tasks.clear();
 
     for (const auto *task : context.tasks) {
@@ -764,9 +766,9 @@ namespace ryujin
         current_.device_time_avg = device_time_statistics.avg;
         current_.device_time_min = device_time_statistics.min;
         current_.device_time_max = device_time_statistics.max;
-        dashboard_data_.device_time_min_index =
+        cycle_statistics_->device_time_min_index =
             device_time_statistics.min_index;
-        dashboard_data_.device_time_max_index =
+        cycle_statistics_->device_time_max_index =
             device_time_statistics.max_index;
       }
     }
@@ -782,7 +784,7 @@ namespace ryujin
                                 static_cast<double>(n_global_dofs_) *
                                 simulation_.time_integrator().efficiency();
 
-    auto &data = dashboard_data_;
+    auto &data = *cycle_statistics_;
     data.device = have_separate_memory_spaces;
     data.n_devices = n_devices_;
     data.wall_m_dofs_per_sec = delta_q_dofs / 1.e6 / delta_wall_time;

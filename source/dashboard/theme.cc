@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_theme.h>
+#include <dashboard/theme.h>
 #include <ryujin/base/version_info.h>
 
 #include <string>
