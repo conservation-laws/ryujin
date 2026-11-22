@@ -169,6 +169,12 @@ namespace ryujin
      * An aquarium around the dashboard.
      */
     wyatt,
+
+    /**
+     * A forest at night around the dashboard, with animals that roam the
+     * forest floor.
+     */
+    jordan,
   };
 
 
@@ -199,6 +205,12 @@ namespace ryujin
      * A not very aquatic waltz.
      */
     wyatt,
+
+    /**
+     * An original folk song in the style of the arcade games of the
+     * eighties, for the forest at night of DashboardAnimation::jordan.
+     */
+    jordan,
   };
 } // namespace ryujin
 
@@ -232,12 +244,14 @@ DECLARE_ENUM(ryujin::DashboardAnimation,
                   {ryujin::DashboardAnimation::ryujin, "ryujin"},
                   {ryujin::DashboardAnimation::matthias, "matthias"},
                   {ryujin::DashboardAnimation::eric, "eric"},
+                  {ryujin::DashboardAnimation::jordan, "jordan"},
                   {ryujin::DashboardAnimation::wyatt, "wyatt"}, ));
 
 DECLARE_ENUM(ryujin::DashboardMusic,
              LIST({ryujin::DashboardMusic::none, "none"},
                   {ryujin::DashboardMusic::ryujin, "ryujin"},
                   {ryujin::DashboardMusic::matthias, "matthias"},
+                  {ryujin::DashboardMusic::jordan, "jordan"},
                   {ryujin::DashboardMusic::wyatt, "wyatt"}, ));
 #endif
 

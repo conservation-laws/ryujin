@@ -67,7 +67,7 @@ namespace ryujin
     add_parameter("dashboard animation",
                   dashboard_settings_.animation,
                   "Animation in the space around the terminal dashboard: "
-                  "ryujin, matthias, eric, wyatt, none");
+                  "ryujin, matthias, eric, jordan, wyatt, none");
 
     add_parameter("dashboard color scheme",
                   dashboard_settings_.color_scheme,
@@ -99,7 +99,7 @@ namespace ryujin
                   dashboard_settings_.music,
                   "Music played while the terminal dashboard is drawn "
                   "(requires ryujin compiled with miniaudio): none, ryujin, "
-                  "matthias, wyatt");
+                  "matthias, jordan, wyatt");
 
     add_parameter("dashboard glass",
                   dashboard_settings_.glass,
