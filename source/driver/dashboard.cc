@@ -873,6 +873,9 @@ namespace ryujin
            [](const S &s) { return name_of(s.music); },
            [](S &s, int direction) { step(s.music, direction); }},
 #endif
+          {"glass",
+           [](const S &s) { return std::string(s.glass ? "true" : "false"); },
+           [](S &s, int) { s.glass = !s.glass; }},
       };
       return options;
     }
