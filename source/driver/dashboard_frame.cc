@@ -10,9 +10,54 @@
 
 #include <algorithm>
 #include <random>
+#include <set>
 
 namespace ryujin::dashboard
 {
+  namespace
+  {
+    /* Return whether the cell (x, y) is a blank on the default background: */
+    bool blank(const animation::Stage &stage, int x, int y)
+    {
+      const auto &p = stage.screen.PixelAt(x, y);
+      return (p.character == " " || p.character.empty()) &&
+             p.background_color == ftxui::Color::Default;
+    }
+
+
+    /*
+     * The empty cells of the dashboard, with a cell of margin around text
+     * that keeps the words apart from the glass:
+     */
+    std::set<std::pair<int, int>> glass(const animation::Stage &stage)
+    {
+      std::set<std::pair<int, int>> cells;
+      const auto &d = stage.dashboard;
+      for (int y = d.y_min; y <= d.y_max; ++y)
+        for (int x = d.x_min + 1; x < d.x_max; ++x)
+          if (blank(stage, x - 1, y) && blank(stage, x, y) &&
+              blank(stage, x + 1, y))
+            cells.emplace(x, y);
+      return cells;
+    }
+
+
+    /* Fade what the animation painted into the cell (x, y) of the glass: */
+    void fade(animation::Stage &stage, int x, int y)
+    {
+      constexpr float strength = 0.8f;
+      auto &p = stage.screen.PixelAt(x, y);
+      if (p.foreground_color != ftxui::Color::Default)
+        p.foreground_color = ftxui::Color::Interpolate(
+            strength, p.foreground_color, theme.track);
+      if (p.background_color != ftxui::Color::Default)
+        p.background_color = ftxui::Color::Interpolate(
+            strength, p.background_color, theme.track);
+      p.bold = false;
+    }
+  } // namespace
+
+
   void Frame::configure(const DashboardSettings &settings)
   {
     const auto previous = std::exchange(settings_, settings);
@@ -70,8 +115,15 @@ namespace ryujin::dashboard
 
   void Frame::draw(animation::Stage &stage)
   {
-    if (animation_)
-      animation_->draw(stage);
+    if (!animation_)
+      return;
+
+    /* Before the animation paints into the empty cells: */
+    if (settings_.glass)
+      stage.glass = glass(stage);
+    animation_->draw(stage);
+    for (const auto &[x, y] : stage.glass)
+      fade(stage, x, y);
   }
 
 
@@ -82,6 +134,9 @@ namespace ryujin::dashboard
 
     stage.changed.clear();
     animation_->step(stage);
+    for (const auto &[x, y] : stage.changed)
+      if (stage.glass.contains({x, y}))
+        fade(stage, x, y);
     if (stage.shift == std::pair{0, 0})
       return stage.redraw;
 

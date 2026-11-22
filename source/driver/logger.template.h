@@ -100,6 +100,11 @@ namespace ryujin
                   "Music played while the terminal dashboard is drawn "
                   "(requires ryujin compiled with miniaudio): none, ryujin, "
                   "matthias, wyatt");
+
+    add_parameter("dashboard glass",
+                  dashboard_settings_.glass,
+                  "Let the animation show faintly through the empty cells of "
+                  "the terminal dashboard.");
 #endif
 
     debug_command_ = "";

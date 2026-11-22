@@ -266,6 +266,12 @@ namespace ryujin
      * keeps the music of SplashScreen::arcade playing.
      */
     DashboardMusic music = DashboardMusic::none;
+
+    /**
+     * Let the animation show faintly through the empty cells of the
+     * dashboard, as through smoked glass.
+     */
+    bool glass = false;
   };
 
 

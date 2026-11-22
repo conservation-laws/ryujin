@@ -11,6 +11,7 @@
 #include <ftxui/screen/screen.hpp>
 
 #include <memory>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -39,11 +40,16 @@ namespace ryujin::animation
      * followed by a fresh rendering of the whole stage.
      */
     std::pair<int, int> shift = {0, 0};
+    /**
+     * The empty cells of the dashboard that the animation shows faintly
+     * through, with the setting "dashboard glass".
+     */
+    std::set<std::pair<int, int>> glass = {};
 
-    /** Return whether the cell (x, y) is outside of the dashboard. */
+    /** Return whether the cell (x, y) is free for the animation. */
     bool free(int x, int y) const
     {
-      return !dashboard.Contain(x, y);
+      return !dashboard.Contain(x, y) || glass.contains({x, y});
     }
 
     /** Return the free (columns, rows) around the dashboard. */
