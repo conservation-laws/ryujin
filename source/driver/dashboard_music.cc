@@ -35,17 +35,17 @@ namespace ryujin
   namespace
   {
     /*
-     * A tune: bars of sixteen steps (sixteenth notes). Every bar has a
-     * chord of four notes, the lowest one being the root, and a lead line
-     * of sixteen steps, where a note is written as in "F#5", "-" holds the
-     * previous note, and "." rests.
+     * A tune: bars of steps_per_bar steps (sixteen by default). Every bar
+     * has a chord of four notes, the lowest one being the root, and a lead
+     * line, where a note is written as in "F#5", "-" holds the previous
+     * note, and "." rests.
      *
      * The bass line, the arpeggio, and the drums repeat the same pattern
-     * of sixteen steps in every bar. In the patterns of the bass line and
-     * the arpeggio, the digits '0' to '3' play the notes of the chord, and
-     * '4' to '7' the same notes an octave higher; the bass line sounds two
-     * octaves below, the arpeggio one octave below the chord. In the drum
-     * patterns, 'x' strikes. In all patterns, '.' rests.
+     * in every bar. In the patterns of the bass line and the arpeggio, the
+     * digits '0' to '3' play the notes of the chord, and '4' to '7' the
+     * same notes an octave higher; the bass line sounds two octaves below,
+     * the arpeggio one octave below the chord. In the drum patterns, 'x'
+     * strikes. In all patterns, '.' rests.
      */
 
     struct Bar {
@@ -68,6 +68,10 @@ namespace ryujin
        * bell.
        */
       float lead_ratio;
+      unsigned int steps_per_bar = 16;
+      float vibrato = 0.004f;
+      float echo = 0.5f;
+      float bass_level = 0.45f;
     };
 
 
@@ -148,40 +152,91 @@ namespace ryujin
 
 
     /*
-     * DashboardMusic::wyatt: a slow drift through the aquarium at 104
-     * beats per minute in C major, with a touch of Lydian from the D7
+     * DashboardMusic::wyatt: Waltz of the Flowers by Tchaikovsky.
      */
 
     /* clang-format off */
-    constexpr std::array<Bar, 16> wyatt_bars{{
-        {"C4 E4 G4 B4",   "E5 - - - G5 - B5 - - - - - A5 - G5 -"},     /* Cmaj7 */
-        {"D4 F#4 A4 C5",  "F#5 - - - - - E5 - D5 - E5 - F#5 - A5 -"},  /* D7 */
-        {"B3 D4 F#4 A4",  "B5 - - - - - - - A5 - F#5 - D5 - - -"},     /* Bm7 */
-        {"E4 G4 B4 D5",   "E5 - - - - - - - . . B4 - D5 - E5 -"},      /* Em7 */
-        {"A3 C4 E4 G4",   "C6 - - - B5 - A5 - - - G5 - E5 - - -"},     /* Am7 */
-        {"D4 F#4 A4 C5",  "F#5 - A5 - C6 - - - D6 - C6 - A5 - - -"},   /* D7 */
-        {"G3 B3 D4 F#4",  "B5 - - - - - - - A5 - B5 - D6 - - -"},      /* Gmaj7 */
-        {"C4 E4 G4 B4",   "E6 . D6 . B5 . G5 . E5 - - - - - - -"},     /* Cmaj7 */
-        {"F4 A4 C5 E5",   "A5 - - - C6 - E6 - - - - - D6 - C6 -"},     /* Fmaj7 */
-        {"E4 G4 B4 D5",   "B5 - - - - - G5 - - - E5 - G5 - B5 -"},     /* Em7 */
-        {"D4 F4 A4 C5",   "A5 - - - - - F5 - - - D5 - F5 - A5 -"},     /* Dm7 */
-        {"G3 B3 D4 F4",   "B5 - - - D6 - - - F6 - - - D6 - B5 -"},     /* G7 */
-        {"C4 E4 G4 B4",   "C6 - - - - - B5 - G5 - - - E5 - G5 -"},     /* Cmaj7 */
-        {"A3 C4 E4 G4",   "A5 - - - - - G5 - E5 - - - C5 - E5 -"},     /* Am7 */
-        {"D4 F#4 A4 C5",  "F#5 - - - - - - - A5 - - - C6 - - -"},      /* D7 */
-        {"G3 B3 D4 F4",   "B5 - - - - - - - . . . . D5 E5 F5 D5"},     /* G7 */
+    constexpr std::array<Bar, 64> wyatt_bars{{
+        {"A3 C#4 E4 A4",    "E4 - - - A4 - - - C#5 - - -"},
+        {"A3 B3 D4 F4",     "D5 - - - - - - - - - - C#5"},
+        {"A3 C#4 E4 A4",    "- - - - - - - - - - - -"},
+        {"A3 C#4 E4 A4",    "- - - - - - - - - - . ."},
+        {"A3 C#4 E4 A4",    "E4 - - - A4 - - - C#5 - - -"},
+        {"A3 C#4 F4 A4",    "D5 - - - C#5 - - - - - - B4"},
+        {"A3 C#4 E4 A4",    "E5 - - - - - - - A4 - - -"},
+        {"A3 C#4 E4 A4",    ". . . . E4 - F#4 - G#4 - A4 -"},
+        {"G#3 B3 D4 E4",    "A#4 - C#5 - A#4 - C#5 - B4 - . ."},
+        {"G3 A#3 C#4 E4",   ". . . . G4 - A4 - A#4 - B4 -"},
+        {"F#4 B4 D5 F#5",   "C#5 - E5 - C#5 - E5 - D5 - . ."},
+        {"D4 F#4 B4 D5",    ". . . . B4 - C#5 - D5 - E5 -"},
+        {"B3 C#4 F4 G#4",   "F5 - G#5 - F#5 - F5 - F#5 - G#5 -"},
+        {"E4 G#4 B4 D5",    "B5 - A5 - G#5 - A5 - F#5 - D5 -"},
+        {"F4 A4 B4 D#5",    "C#5 - - - - - - - B4 - - -"},
+        {"E4 G#4 B4 D5",    "- - A#4 - A4 - G#4 - F4 - - -"},
+        {"A3 C#4 E4 A4",    "E4 - - - A4 - - - C#5 - - -"},
+        {"A3 B3 D4 F4",     "D5 - - - - - - - - - - C#5"},
+        {"A3 C#4 E4 A4",    "- - - - - - - - - - - -"},
+        {"A3 C#4 E4 A4",    "- - - - - - - - - - . ."},
+        {"A3 C#4 E4 A4",    "E4 - - - A4 - - - C#5 - - -"},
+        {"A3 C#4 F4 A4",    "D5 - - - C#5 - - - - - - B4"},
+        {"A3 C#4 E4 A4",    "E5 - - - - - - - A4 - - -"},
+        {"A3 B3 D#4 F#4",   ". . . . A4 - B4 - C#5 - D#5 -"},
+        {"C#4 E4 G#4 B4",   "E5 - F#5 - D#5 - F#5 - E5 - . ."},
+        {"F#4 A#4 C#5 E5",  ". . . . D5 - D#5 - E5 - F#5 -"},
+        {"E4 G#4 B4 E5",    "G#5 - A5 - G5 - A5 - G#5 - . ."},
+        {"D#4 G4 A#4 C#5",  ". . . . G5 - G#5 - A#5 - C6 -"},
+        {"C#4 E4 G#4 C#5",  "C#6 - D#6 - E6 - C6 - D#6 - C#6 -"},
+        {"A3 C#4 E4 A4",    "E6 - C6 - D#6 - C#6 - E6 - C#6 -"},
+        {"G#3 C#4 E4 G#4",  "E6 - C#6 - E6 - C#6 - E6 - C6 -"},
+        {"C#4 E4 G#4 C#5",  "C#6 - E5 - F#5 - G#5 - A5 - B5 -"},
+        {"A3 C#4 E4 A4",    "C#6 - - - - - - - G#5 - - -"},
+        {"E4 G#4 B4 E5",    "B5 - - - - - - - F#5 - - -"},
+        {"B3 D4 F#4 A4",    "A5 - - - - - - - D5 - - -"},
+        {"E4 G#4 B4 D5",    "G#5 B5 A5 - G5 - . . G#5 - . ."},
+        {"F#4 A4 D5 F#5",   "D6 - - - - - - - A5 - - -"},
+        {"E4 G#4 C#5 E5",   "C#6 - - - - - - - G#5 - - -"},
+        {"A3 C#4 E4 A4",    "B5 - - - - - - - E5 - - -"},
+        {"E4 G#4 B4 D5",    "B5 C#6 B5 - A5 - . . B5 - . ."},
+        {"A3 C#4 E4 A4",    "C#6 - - - - - - - G#5 - - -"},
+        {"E4 G#4 B4 E5",    "B5 - - - - - - - F#5 - - -"},
+        {"B3 D4 F#4 A4",    "A5 - - - - - - - D5 - - -"},
+        {"E4 G#4 B4 D5",    "G#5 B5 A5 - G5 - . . G#5 - . ."},
+        {"F4 G#4 B4 D5",    "D6 - - - - - - - A5 - - -"},
+        {"F#4 A#4 D5 F#5",  "D6 - - - - - - - A#5 - - -"},
+        {"G3 B3 D4 G4",     "D6 - - - - - - - B5 - - -"},
+        {"G#3 B3 D4 E4",    "E6 - E5 - F#5 - G#5 - A5 - B5 -"},
+        {"A3 C#4 E4 A4",    "C#6 - - - - - - - G#5 - - -"},
+        {"E4 G#4 B4 E5",    "B5 - - - - - - - F#5 - - -"},
+        {"B3 D4 F#4 A4",    "A5 - - - - - - - D5 - - -"},
+        {"E4 G#4 B4 D5",    "G#5 B5 A5 - G5 - . . G#5 - . ."},
+        {"F#4 A4 D5 F#5",   "D6 - - - - - - - A5 - - -"},
+        {"E4 G#4 C#5 E5",   "C#6 - - - - - - - G#5 - - -"},
+        {"A3 C#4 E4 A4",    "B5 - - - - - - - E5 - - -"},
+        {"E4 G#4 B4 D5",    "B5 C#6 B5 - A5 - . . B5 - . ."},
+        {"A3 C#4 E4 A4",    "C#6 - - - - - - - G#5 - - -"},
+        {"E4 G#4 B4 E5",    "B5 - - - - - - - F#5 - - -"},
+        {"B3 D4 F#4 A4",    "A5 - - - - - - - D5 - - -"},
+        {"E4 G#4 B4 D5",    "G#5 B5 A5 - G5 - . . G#5 - . ."},
+        {"B3 D#4 G4 B4",    "G5 - - - - - - - F#5 - - -"},
+        {"C4 D#4 F#4 A4",   "F#5 - - - - - - - E5 - - -"},
+        {"E4 G#4 B4 E5",    "E5 - . . . . C#5 - D5 - D#5 -"},
+        {"E4 G#4 B4 D5",    "E5 - B4 - G#4 - F#4 - F4 - . ."},
     }};
     /* clang-format on */
 
     constexpr Tune wyatt_tune{
-        .tempo = 104.f,
+        .tempo = 168.f,
         .bars = wyatt_bars,
-        .bass = "0.....4.2.....4.",
-        .arpeggio = "0246753102467531",
-        .kick = "x.......x.....x.",
-        .snare = "........x.......",
-        .hihat = "....x.......x...",
-        .lead_ratio = 3.f,
+        .bass = "0...........",
+        .arpeggio = "....12..12..",
+        .kick = "............",
+        .snare = "............",
+        .hihat = "............",
+        .lead_ratio = 2.f,
+        .steps_per_bar = 12,
+        .vibrato = 0.f,
+        .echo = 0.f,
+        .bass_level = 0.6f,
     };
 
 
@@ -327,10 +382,10 @@ namespace ryujin
              std::sin(phase + index * std::sin(phase));
     }
 
-    float lead(const Voice &v, float ratio)
+    float lead(const Voice &v, float ratio, float depth)
     {
       const float t = v.time;
-      const float vibrato = std::clamp((t - 0.3f) / 0.3f, 0.f, 1.f) * 0.004f *
+      const float vibrato = std::clamp((t - 0.3f) / 0.3f, 0.f, 1.f) * depth *
                             v.frequency / 5.5f * std::sin(two_pi * 5.5f * t);
       const float phase = two_pi * v.frequency * t + vibrato;
       const float index = 1.f + 1.5f * std::exp(-6.f * t);
@@ -387,7 +442,8 @@ namespace ryujin
         for (const auto pattern :
              {tune.bass, tune.arpeggio, tune.kick, tune.snare, tune.hihat}) {
           (void)pattern;
-          Assert(pattern.size() == 16, dealii::ExcInternalError());
+          Assert(pattern.size() == tune.steps_per_bar,
+                 dealii::ExcInternalError());
         }
 
         std::vector<int> notes;
@@ -395,7 +451,7 @@ namespace ryujin
           const auto chord = parse_notes(bar.chord);
           const auto lead = parse_notes(bar.lead);
           Assert(chord.size() == 4, dealii::ExcInternalError());
-          Assert(lead.size() == 16, dealii::ExcInternalError());
+          Assert(lead.size() == tune.steps_per_bar, dealii::ExcInternalError());
           chords_.push_back({chord[0], chord[1], chord[2], chord[3]});
           notes.insert(notes.end(), lead.begin(), lead.end());
         }
@@ -426,17 +482,19 @@ namespace ryujin
           const float hiss = 0.5f * (noise_ - previous);
 
           /* The lead with a dotted eighth echo: */
-          const float lead_line = lead_.sound(lead, tune_.lead_ratio);
+          const float lead_line =
+              lead_.sound(lead, tune_.lead_ratio, tune_.vibrato);
           float &echo_sample = echo_[echo_position_];
           echo_position_ = (echo_position_ + 1) % echo_.size();
           const float delayed = echo_sample;
           echo_sample = lead_line + 0.4f * delayed;
 
-          const float mix =
-              0.45f * bass_.sound(bass) + 0.28f * (lead_line + 0.5f * delayed) +
-              0.10f * arpeggio_.sound(arpeggio) + 0.60f * kick_.sound(kick) +
-              0.30f * snare_.sound(snare, noise_) +
-              0.12f * hihat_.sound(hihat, hiss);
+          const float mix = tune_.bass_level * bass_.sound(bass) +
+                            0.28f * (lead_line + tune_.echo * delayed) +
+                            0.10f * arpeggio_.sound(arpeggio) +
+                            0.60f * kick_.sound(kick) +
+                            0.30f * snare_.sound(snare, noise_) +
+                            0.12f * hihat_.sound(hihat, hiss);
           output[k] = 0.3f * std::tanh(mix);
 
           for (auto *voices :
@@ -448,8 +506,9 @@ namespace ryujin
     private:
       void next_step()
       {
-        const auto i = position_ % 16;
-        const auto &chord = chords_[position_ / 16 % chords_.size()];
+        const auto i = position_ % tune_.steps_per_bar;
+        const auto &chord =
+            chords_[position_ / tune_.steps_per_bar % chords_.size()];
 
         if (tune_.kick[i] == 'x')
           kick_.trigger();

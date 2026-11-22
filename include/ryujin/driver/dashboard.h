@@ -178,8 +178,7 @@ namespace ryujin
     matthias,
 
     /**
-     * An original underwater tune in the style of the arcade games of the
-     * eighties, for the aquarium of DashboardAnimation::wyatt.
+     * A not very aquatic waltz.
      */
     wyatt,
   };
