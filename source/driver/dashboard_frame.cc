@@ -113,10 +113,10 @@ namespace ryujin::dashboard
   }
 
 
-  void Frame::draw(animation::Stage &stage)
+  bool Frame::draw(animation::Stage &stage)
   {
     if (!animation_)
-      return;
+      return false;
 
     /* Before the animation paints into the empty cells: */
     if (settings_.glass)
@@ -124,6 +124,22 @@ namespace ryujin::dashboard
     animation_->draw(stage);
     for (const auto &[x, y] : stage.glass)
       fade(stage, x, y);
+    return shift(stage);
+  }
+
+
+  bool Frame::finish(animation::Stage &stage)
+  {
+    if (!animation_)
+      return false;
+
+    /* Before the animation paints into the empty cells: */
+    if (settings_.glass)
+      stage.glass = glass(stage);
+    animation_->finish(stage);
+    for (const auto &[x, y] : stage.glass)
+      fade(stage, x, y);
+    return shift(stage);
   }
 
 
@@ -137,8 +153,14 @@ namespace ryujin::dashboard
     for (const auto &[x, y] : stage.changed)
       if (stage.glass.contains({x, y}))
         fade(stage, x, y);
+    return shift(stage) || stage.redraw;
+  }
+
+
+  bool Frame::shift(const animation::Stage &stage)
+  {
     if (stage.shift == std::pair{0, 0})
-      return stage.redraw;
+      return false;
 
     /* Keep the new relative position, rounded down to the shifted cell: */
     const auto [free_columns, free_rows] = stage.free_space();

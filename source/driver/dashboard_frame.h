@@ -64,9 +64,18 @@ namespace ryujin::dashboard
     void postpone();
 
     /**
-     * Fill the free cells of the freshly rendered @p stage.
+     * Fill the free cells of the freshly rendered @p stage, and move the
+     * window as the animation asks for. Return whether the whole stage
+     * has to be rendered again.
      */
-    void draw(animation::Stage &stage);
+    bool draw(animation::Stage &stage);
+
+    /**
+     * Fill the free cells of the freshly rendered final @p stage, after
+     * the simulation finished, and move the window as the animation asks
+     * for. Return whether the whole stage has to be rendered again.
+     */
+    bool finish(animation::Stage &stage);
 
     /**
      * Advance the animation on @p stage, and move the window as the
@@ -84,15 +93,24 @@ namespace ryujin::dashboard
     }
 
   private:
+    /**
+     * Move the window by the shift that the animation asked for on
+     * @p stage. Return whether the window has moved.
+     */
+    bool shift(const animation::Stage &stage);
+
     /** The settings. */
     DashboardSettings settings_;
+
     /** The animation around the window, null for none. */
     std::unique_ptr<animation::Animation> animation_;
 
     /** The fractions of the free space to the left and above. */
     std::pair<double, double> fractions_ = {0.5, 0.5};
+
     /** Whether an animation has moved the window. */
     bool shifted_ = false;
+
     /** When the screen saver moves next. */
     std::chrono::steady_clock::time_point next_move_;
   };

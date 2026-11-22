@@ -1116,11 +1116,21 @@ namespace ryujin
       }
 
       Render(stage_->screen, screen);
+      if (data_->t_final > 0.)
+        stage_->progress = std::clamp(data_->t / data_->t_final, 0., 1.);
+      if (data_->eta > 0.)
+        stage_->eta = data_->eta;
     }
 
-    /* Leave the screen around the final dashboard empty: */
-    if (!final_time)
-      frame_.draw(*stage_);
+    /*
+     * Let the animation decide what stays around the final dashboard.
+     * Move the dashboard right away if the animation asks for it, and
+     * render the whole screen again:
+     */
+    if ((final_time ? frame_.finish(*stage_) : frame_.draw(*stage_)) && data_) {
+      terminal_size_ = {};
+      return render();
+    }
 
     std::string output = clear ? "\033[2J\033[H" : "\033[H";
     output += stage_->screen.ToString();

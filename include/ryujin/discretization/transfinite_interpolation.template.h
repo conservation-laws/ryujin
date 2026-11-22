@@ -13,6 +13,8 @@
 
 #include <deal.II/base/table.h>
 
+#include <iomanip>
+
 namespace ryujin
 {
 

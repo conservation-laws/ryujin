@@ -24,42 +24,70 @@ namespace ryujin::animation
    * @ingroup Driver
    */
   struct Stage {
-    /** The cells of the whole terminal. */
+    /**
+     * The cells of the whole terminal.
+     */
     ftxui::Screen screen;
-    /** The cells covered by the dashboard. */
+
+    /**
+     * The cells covered by the dashboard.
+     */
     ftxui::Box dashboard;
-    /** The cells changed by the animation since the last step. */
+
+    /**
+     * The progress of the simulation from 0 to 1, negative if unknown.
+     */
+    double progress = -1.;
+
+    /**
+     * The estimated remaining wall time of the simulation in seconds,
+     * negative if unknown.
+     */
+    double eta = -1.;
+
+    /**
+     * The cells changed by the animation since the last step.
+     */
     std::vector<std::pair<int, int>> changed = {};
+
     /**
      * Set by the animation to request a fresh rendering of the whole
      * stage, including the dashboard, followed by Animation::draw().
      */
     bool redraw = false;
+
     /**
      * Set by the animation to move the dashboard by (columns, rows),
      * followed by a fresh rendering of the whole stage.
      */
     std::pair<int, int> shift = {0, 0};
+
     /**
      * The empty cells of the dashboard that the animation shows faintly
      * through, with the setting "dashboard glass".
      */
     std::set<std::pair<int, int>> glass = {};
 
-    /** Return whether the cell (x, y) is free for the animation. */
+    /**
+     * Return whether the cell (x, y) is free for the animation.
+     */
     bool free(int x, int y) const
     {
       return !dashboard.Contain(x, y) || glass.contains({x, y});
     }
 
-    /** Return the free (columns, rows) around the dashboard. */
+    /**
+     * Return the free (columns, rows) around the dashboard.
+     */
     std::pair<int, int> free_space() const
     {
       return {screen.dimx() - (dashboard.x_max - dashboard.x_min + 1),
               screen.dimy() - (dashboard.y_max - dashboard.y_min + 1)};
     }
 
-    /** Clear the pixel at (x, y), mark it as changed, and return it. */
+    /**
+     * Clear the pixel at (x, y), mark it as changed, and return it.
+     */
     ftxui::Pixel &pixel(int x, int y)
     {
       changed.emplace_back(x, y);
@@ -79,7 +107,9 @@ namespace ryujin::animation
   public:
     virtual ~Animation() = default;
 
-    /** Fill the free cells of a freshly rendered stage. */
+    /**
+     * Fill the free cells of a freshly rendered stage.
+     */
     virtual void draw(Stage &stage) = 0;
 
     /**
@@ -87,9 +117,17 @@ namespace ryujin::animation
      * Stage::pixel().
      */
     virtual void step(Stage &stage) = 0;
+
+    /**
+     * Fill the free cells of the freshly rendered final stage, after the
+     * simulation finished. By default, the final stage stays empty.
+     */
+    virtual void finish(Stage & /*stage*/) {}
   };
 
 
-  /** Return the animation @p kind, null for DashboardAnimation::none. */
+  /**
+   * Return the animation @p kind, null for DashboardAnimation::none.
+   */
   std::unique_ptr<Animation> create(DashboardAnimation kind);
 } // namespace ryujin::animation
