@@ -522,9 +522,1008 @@ namespace ryujin::animation
     };
 
 
+    /* Return a random number in [a, b]: */
+    int integer(int a, int b)
+    {
+      return std::uniform_int_distribution<int>(a, b)(random);
+    }
+
+    double uniform(double a, double b)
+    {
+      return std::uniform_real_distribution<double>(a, b)(random);
+    }
+
+    /* Move @p x towards @p target by at most @p speed: */
+    double toward(double x, double target, double speed)
+    {
+      if (std::abs(target - x) <= speed)
+        return target;
+      return x + std::copysign(speed, target - x);
+    }
+
+    /* Split @p text into its UTF-8 characters: */
+    std::vector<std::string_view> characters(std::string_view text)
+    {
+      std::vector<std::string_view> result;
+      for (std::size_t i = 0; i < text.size();) {
+        const auto lead = static_cast<unsigned char>(text[i]);
+        const std::size_t n = lead < 0x80   ? 1
+                              : lead < 0xe0 ? 2
+                              : lead < 0xf0 ? 3
+                                            : 4;
+        result.push_back(text.substr(i, n));
+        i += n;
+      }
+      return result;
+    }
+
+    using Rows = std::vector<std::string>;
+
+    /* Mirror @p rows, padded to the same width, left to right: */
+    Rows mirror(const Rows &rows)
+    {
+      static const std::map<std::string_view, std::string_view> swap = {
+          {"(", ")"},
+          {")", "("},
+          {"/", "\\"},
+          {"\\", "/"},
+          {"<", ">"},
+          {">", "<"},
+          {"[", "]"},
+          {"]", "["},
+          {"{", "}"},
+          {"}", "{"},
+          {"╱", "╲"},
+          {"╲", "╱"},
+          {"`", "'"},
+          {"'", "`"},
+          {"╭", "╮"},
+          {"╮", "╭"},
+          {"╰", "╯"},
+          {"╯", "╰"}};
+      std::size_t width = 0;
+      for (const auto &row : rows)
+        width = std::max(width, characters(row).size());
+      Rows result;
+      for (const auto &row : rows) {
+        auto glyphs = characters(row);
+        glyphs.resize(width, " ");
+        std::string mirrored;
+        for (auto it = glyphs.rbegin(); it != glyphs.rend(); ++it) {
+          const auto swapped = swap.find(*it);
+          mirrored += swapped != swap.end() ? swapped->second : *it;
+        }
+        result.push_back(std::move(mirrored));
+      }
+      return result;
+    }
+
+
+    /*
+     * A frame of the whole stage, composed back to front before it is
+     * painted with repaint(). Only the free cells take a glyph.
+     */
+    struct Canvas {
+      explicit Canvas(const Stage &stage)
+          : stage(stage)
+          , width(stage.screen.dimx())
+          , height(stage.screen.dimy())
+          , cells(width * height)
+      {
+      }
+
+      /*
+       * Write @p text at the real-valued (@p x, @p y) into the free cells
+       * within @p clip, skipping blanks:
+       */
+      void put(double x,
+               double y,
+               std::string_view text,
+               ftxui::Color color,
+               bool bold = false,
+               bool dim = false,
+               const ftxui::Box *clip = nullptr)
+      {
+        const int row = int(std::lround(y));
+        int column = int(std::floor(x));
+        for (const auto glyph : characters(text)) {
+          if (glyph != " " && open(column, row) &&
+              (!clip || clip->Contain(column, row)))
+            cells[row * width + column] = {
+                std::string(glyph), color, bold, dim};
+          ++column;
+        }
+      }
+
+      /*
+       * Draw @p rows ending on row @p bottom. An opaque sprite also blanks
+       * the gaps inside each row, so that it hides whatever is behind it:
+       */
+      void sprite(double x,
+                  int bottom,
+                  const Rows &rows,
+                  ftxui::Color color,
+                  bool bold = false,
+                  bool dim = false,
+                  const ftxui::Box *clip = nullptr,
+                  bool opaque = false)
+      {
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+          const int row = bottom - int(rows.size() - 1 - i);
+          if (opaque) {
+            const auto glyphs = characters(rows[i]);
+            const auto blank = [](std::string_view g) { return g == " "; };
+            const auto first = std::ranges::find_if_not(glyphs, blank);
+            const auto last =
+                std::ranges::find_if_not(glyphs.rbegin(), glyphs.rend(), blank)
+                    .base();
+            for (auto it = first; it < last; ++it) {
+              const int column = int(std::floor(x)) + int(it - glyphs.begin());
+              if (open(column, row))
+                cells[row * width + column] = Glyph();
+            }
+          }
+          put(x, row, rows[i], color, bold, dim, clip);
+        }
+      }
+
+      bool open(int x, int y) const
+      {
+        return x >= 0 && y >= 0 && x < width && y < height && stage.free(x, y);
+      }
+
+      const Stage &stage;
+      const int width;
+      const int height;
+      std::vector<Glyph> cells;
+    };
+
+
     /**
-     * A pour-over coffee bar below the dashboard: a barista walks up,
-     * weighs and grinds the beans, and brews a pot of coffee that is
+     * The cafe around the bar of Coffee: the room in one-point perspective
+     * with a street behind the window in the back wall (walkers, cyclists,
+     * cars, a pigeon, and the weather), rows of tables down the depth of
+     * the floor, and next to the bar a record player, a regular with a
+     * laptop, a cat, and customers who queue, get a cup, and sit or leave.
+     */
+    class Cafe
+    {
+    public:
+      enum class Weather : std::uint8_t { rain, snow, clear };
+
+      /*
+       * Lay out the room on the @p stage around the dashboard, with the
+       * bottom left corner of the bar of @p bar_width x @p bar_height at
+       * @p bar in the free @p band, and start with the room in full swing,
+       * about four minutes in:
+       */
+      Cafe(const Stage &stage,
+           const ftxui::Box &band,
+           Cell bar,
+           int bar_width,
+           int bar_height,
+           Weather weather)
+          : weather_(weather)
+      {
+        const int width = stage.screen.dimx();
+        const auto &box = stage.dashboard;
+        const bool dashboard = box.x_min <= box.x_max;
+
+        floor_ = bar.second;
+        const int bar_top = floor_ - bar_height;
+
+        /*
+         * The back wall goes at the top of the screen, unless the
+         * dashboard covers it; then right below the dashboard, if that is
+         * above the bar:
+         */
+        top_ = dashboard && box.y_min < 7 && box.y_max < bar_top ? box.y_max + 1
+                                                                 : 0;
+        int bottom = bar_top;
+        if (dashboard && top_ < box.y_min && box.y_max < bar_top)
+          bottom = std::min(bottom, box.y_min);
+        const int glass = std::clamp(bottom - top_ - 6, 2, 5);
+
+        /*
+         * One-point perspective: the back wall spans the rows from the
+         * ceiling to the horizon, inset by inset_ on both sides, and the
+         * side walls run from its corners towards the corners of the
+         * screen at one column per row:
+         */
+        ceiling_ = top_ + 1;
+        horizon_ = ceiling_ + 2 + glass + 2;
+        inset_ = std::max(4, std::min(floor_ - horizon_, (width - 60) / 2));
+        right_ = width - 1 - inset_;
+        window_ = {inset_ + 3,
+                   width - 1 - inset_ - 3,
+                   ceiling_ + 1,
+                   ceiling_ + 2 + glass};
+        inside_ = {window_.x_min + 1,
+                   window_.x_max - 1,
+                   window_.y_min + 1,
+                   window_.y_max - 1};
+        mullions_ = {inside_.x_min + (inside_.x_max - inside_.x_min) / 3,
+                     inside_.x_min + 2 * (inside_.x_max - inside_.x_min) / 3};
+
+        door_ = band.x_max + 1;
+        pickup_ = bar.first + bar_width + 1;
+        /*
+         * The queue holds three people, five columns apart, and the tables
+         * (seven columns wide, with the seated customer) start right
+         * after:
+         */
+        for (int x = pickup_ + 18; x < door_ - 7; x += 12)
+          tables_.push_back(x);
+        taken_.assign(tables_.size(), false);
+        left_ = band.x_min;
+        left_limit_ = bar.first - 2;
+        /* The record player, the regular, and the cat only where they fit: */
+        player_ = left_ + 9 < left_limit_;
+        if (left_ + 24 < left_limit_)
+          laptop_ = left_ + 12;
+
+        /*
+         * Lamps and fans hang in front of the side walls, the lamps lower,
+         * so that they look closer, and only where the side walls leave
+         * room for them:
+         */
+        const int lamp = std::max(1, int(std::lround(0.3 * inset_)) - 1);
+        const int fan = std::max(1, int(std::lround(0.7 * inset_)) - 3);
+        if (inset_ >= 5)
+          lamps_ = {lamp, width - 1 - lamp - 2};
+        if (fan + 7 < lamp || (lamp + 4 < fan && fan + 7 < inset_))
+          fans_ = {fan, width - 1 - fan - 6};
+
+        /*
+         * Rows of tables down the depth of the floor, every eight rows
+         * from just in front of the back wall to just behind the bar. Rows
+         * in the back half are smaller and faded. People enter and leave
+         * where the right side wall meets their row, or at the edge of the
+         * screen:
+         */
+        const double middle = (horizon_ + floor_) / 2.;
+        for (int y = horizon_ + 3;
+             y + 3 < floor_ - bar_height && rows_.size() < 6;
+             y += 8) {
+          const int depth = y - horizon_;
+          const int wall_left = std::max(0, inset_ - depth);
+          const int wall_right =
+              std::min(width - 1, width - 1 - inset_ + depth);
+          Row row{.y = y, .near = y >= middle, .door = double(wall_right)};
+          for (int x = wall_left + 4 + integer(0, 8);
+               x + 9 < wall_right && row.tables.size() < 8;
+               x += integer(16, 26))
+            row.tables.push_back(x);
+          row.seats.assign(row.tables.size(), {false, false});
+          rows_.push_back(std::move(row));
+        }
+
+        cat_.x = std::max(left_ + 10, (left_ + left_limit_) / 2 - 4);
+
+        for (int i = 0; i < 200; ++i)
+          step_street();
+        for (int i = 0; i < 1600; ++i) {
+          step_room();
+          step_rows();
+        }
+      }
+
+      void step()
+      {
+        ++t_;
+        step_street();
+        step_room();
+        step_rows();
+      }
+
+      void draw(Canvas &canvas) const;
+
+    private:
+      /* A walker, a cyclist, or a car on the street: */
+      struct Traffic {
+        enum class Kind : std::uint8_t { walker, bike, car } kind;
+        int direction;
+        double speed;
+        double x;
+        int width;
+        ftxui::Color color;
+        bool umbrella;
+      };
+
+      struct Pigeon {
+        double x;
+        double y;
+        int direction;
+        bool flying;
+        int timer;
+      };
+
+      /* A note from the record player, or a "z" of the sleeping cat: */
+      struct Float {
+        double x;
+        double y;
+        int age;
+        double phase;
+        std::string_view glyph;
+        ftxui::Color color;
+      };
+
+      struct Cat {
+        enum class State : std::uint8_t { walk, sit, sleep };
+        double x = 0.;
+        double target = 0.;
+        State state = State::sit;
+        int timer = 60;
+        int direction = 1;
+      };
+
+      /* A customer of the bar, with the index of a table, or -1: */
+      struct Customer {
+        enum class State : std::uint8_t { queue, served, seated, leaving };
+        double x;
+        State state;
+        int timer;
+        int order;
+        int seat;
+        ftxui::Color color;
+        bool cup;
+      };
+
+      /* A customer at a table of a row, on side 0 or 1 of the table: */
+      struct Guest {
+        enum class State : std::uint8_t { walk, sit, leave };
+        double x;
+        int table;
+        int side;
+        State state;
+        double target;
+        int timer;
+        bool laptop;
+        ftxui::Color color;
+      };
+
+      struct Row {
+        int y;
+        bool near;
+        double door;
+        std::vector<int> tables = {};
+        std::vector<std::array<bool, 2>> seats = {};
+        std::vector<Guest> guests = {};
+      };
+
+      static ftxui::Color cat_color()
+      {
+        return ftxui::Color::RGB(255, 175, 95);
+      }
+
+      void spawn(Traffic::Kind kind, double speed, int width)
+      {
+        const int direction = pick(2) ? 1 : -1;
+        traffic_.push_back(
+            {kind,
+             direction,
+             speed,
+             double(direction > 0 ? inside_.x_min - width : inside_.x_max + 1),
+             width,
+             random_color(),
+             weather_ == Weather::rain && chance(0.7)});
+      }
+
+      void step_street()
+      {
+        const int x0 = inside_.x_min;
+        const int x1 = inside_.x_max;
+        const auto count = [this](Traffic::Kind kind) {
+          return std::ranges::count_if(
+              traffic_, [kind](const Traffic &a) { return a.kind == kind; });
+        };
+        if (count(Traffic::Kind::walker) < std::max(2, (x1 - x0) / 18) &&
+            chance(0.08))
+          spawn(Traffic::Kind::walker, uniform(0.15, 0.3), 3);
+        if (count(Traffic::Kind::bike) == 0 && chance(0.008))
+          spawn(Traffic::Kind::bike, uniform(0.6, 0.9), 3);
+        if (count(Traffic::Kind::car) == 0 && chance(0.004))
+          spawn(Traffic::Kind::car, uniform(1.0, 1.4), 5);
+        for (auto &a : traffic_)
+          a.x += a.direction * a.speed;
+        std::erase_if(traffic_, [x0, x1](const Traffic &a) {
+          return a.x < x0 - a.width - 1 || a.x > x1 + 1;
+        });
+
+        /* The weather on the glass: */
+        switch (weather_) {
+        case Weather::rain:
+          for (auto &[x, y] : drops_) {
+            x -= 1.;
+            y += 1.;
+          }
+          std::erase_if(drops_, [&](const auto &p) {
+            return p.first < x0 || p.second > inside_.y_max;
+          });
+          while (int(drops_.size()) < (x1 - x0) * 5 / 6)
+            drops_.emplace_back(uniform(x0, x1 + 5),
+                                inside_.y_min + uniform(-0.5, 0.5));
+          break;
+        case Weather::snow:
+          for (auto &[x, y] : drops_) {
+            x += 0.3 * (pick(3) - 1);
+            y += 0.2;
+          }
+          std::erase_if(drops_, [&](const auto &p) {
+            return p.first < x0 || p.first > x1 ||
+                   p.second > inside_.y_max + 0.4;
+          });
+          while (int(drops_.size()) < (x1 - x0) / 5)
+            drops_.emplace_back(uniform(x0, x1), double(inside_.y_min));
+          break;
+        case Weather::clear:
+          /* Now and then a few birds fly across the clear sky: */
+          for (auto &p : drops_)
+            p.first += 0.5;
+          std::erase_if(drops_, [x1](const auto &p) { return p.first > x1; });
+          if (drops_.empty() && chance(0.01))
+            for (int i = 0, n = integer(2, 4); i < n; ++i)
+              drops_.emplace_back(x0 - 2. - 3 * i, inside_.y_min + i % 2);
+          break;
+        }
+
+        /* The pigeon hops about, and flies off when someone comes near: */
+        if (!pigeon_) {
+          if (--pigeon_wait_ <= 0 && x1 - 4 > x0 + 3)
+            pigeon_ = Pigeon{double(integer(x0 + 3, x1 - 5)),
+                             double(inside_.y_max),
+                             pick(2) ? 1 : -1,
+                             false,
+                             20};
+          return;
+        }
+        auto &pigeon = *pigeon_;
+        if (pigeon.flying) {
+          pigeon.x += pigeon.direction;
+          pigeon.y -= 0.4;
+          if (pigeon.y < inside_.y_min || pigeon.x < x0 || pigeon.x > x1) {
+            pigeon_.reset();
+            pigeon_wait_ = integer(100, 300);
+          }
+          return;
+        }
+        if (std::ranges::any_of(traffic_, [&](const Traffic &a) {
+              return std::abs(a.x + a.width / 2. - pigeon.x) < a.width / 2. + 3;
+            })) {
+          pigeon.flying = true;
+          return;
+        }
+        if (--pigeon.timer <= 0) {
+          pigeon.timer = integer(8, 40);
+          if (chance(0.3))
+            pigeon.direction *= -1;
+          pigeon.x = std::clamp(pigeon.x + pigeon.direction, x0 + 1., x1 - 3.);
+        }
+      }
+
+      void step_room()
+      {
+        static constexpr std::array<std::string_view, 2> notes = {"♪", "♫"};
+        if (player_ && t_ % 7 == 0 && chance(0.8))
+          notes_.push_back({left_ + 4.,
+                            floor_ - 4.,
+                            0,
+                            uniform(0., 6.3),
+                            notes[pick(2)],
+                            random_color()});
+        for (auto &note : notes_) {
+          ++note.age;
+          note.y -= 0.18;
+          note.x += 0.18 + 0.25 * std::sin(0.3 * note.age + note.phase);
+        }
+        std::erase_if(notes_, [this](const Float &note) {
+          return note.age >= 45 || note.y <= horizon_ - 3;
+        });
+
+        /* The cat walks to a spot, sits and blinks, or curls up for a nap: */
+        const int lo = left_ + 10;
+        const int hi = left_limit_ - 9; /* clear of the record player */
+        if (hi > lo) {
+          if (cat_.state == Cat::State::walk) {
+            cat_.x = toward(cat_.x, cat_.target, 0.3);
+            if (cat_.x == cat_.target) {
+              cat_.state = chance(0.35) ? Cat::State::sleep : Cat::State::sit;
+              cat_.timer = cat_.state == Cat::State::sleep ? integer(400, 900)
+                                                           : integer(40, 160);
+            }
+          } else {
+            --cat_.timer;
+            if (cat_.state == Cat::State::sleep && t_ % 14 == 0)
+              zs_.push_back({cat_.x + 7, floor_ - 1., 0, 0., "z", {}});
+            if (cat_.timer <= 0) {
+              cat_.state = Cat::State::walk;
+              cat_.target = integer(lo, hi);
+              cat_.direction = cat_.target > cat_.x ? 1 : -1;
+            }
+          }
+        }
+        for (auto &z : zs_) {
+          ++z.age;
+          z.y -= 0.15;
+          z.x += 0.1;
+        }
+        std::erase_if(zs_, [](const Float &z) { return z.age >= 26; });
+
+        /* Customers come in from the right, queue, get a cup, sit or leave: */
+        using State = Customer::State;
+        const auto queued = [](const Customer &c) {
+          return c.state == State::queue;
+        };
+        const bool door_clear =
+            std::ranges::all_of(customers_, [&](const Customer &c) {
+              return !queued(c) || c.x < door_ - 6;
+            });
+        if (std::ranges::count_if(customers_, queued) < 3 &&
+            customers_.size() < 6 && pickup_ + 14 < door_ && door_clear &&
+            chance(0.02))
+          customers_.push_back({double(door_),
+                                State::queue,
+                                0,
+                                integer(25, 60),
+                                -1,
+                                random_color(),
+                                false});
+
+        int k = 0;
+        for (auto &c : customers_) {
+          if (!queued(c))
+            continue;
+          const double target = pickup_ + 5 * k;
+          c.x = toward(c.x, target, 0.4);
+          if (k++ == 0 && c.x == target && ++c.timer >= c.order) {
+            c.state = State::served;
+            c.cup = true;
+            std::vector<int> free;
+            for (std::size_t i = 0; i < taken_.size(); ++i)
+              if (!taken_[i])
+                free.push_back(int(i));
+            if (!free.empty() && chance(0.6)) {
+              c.seat = free[pick(free.size())];
+              taken_[c.seat] = true;
+            }
+          }
+        }
+
+        for (auto &c : customers_) {
+          switch (c.state) {
+          case State::served: {
+            const double target =
+                c.seat >= 0 ? double(tables_[c.seat]) : door_ + 1.;
+            c.x = toward(c.x, target, 0.4);
+            if (c.seat >= 0 && c.x == target) {
+              c.state = State::seated;
+              c.timer = integer(250, 700);
+            }
+            break;
+          }
+          case State::seated:
+            if (--c.timer <= 0) {
+              taken_[c.seat] = false;
+              c.state = State::leaving;
+              c.cup = false;
+              c.seat = -1;
+            }
+            break;
+          case State::leaving:
+            c.x = toward(c.x, door_ + 1., 0.4);
+            break;
+          case State::queue:
+            break;
+          }
+        }
+        std::erase_if(customers_,
+                      [this](const Customer &c) { return c.x >= door_ + 1; });
+      }
+
+      /*
+       * Customers in the rows of tables come in from the right, sit at a
+       * table, on either side in the back rows, and leave the same way:
+       */
+      void step_rows()
+      {
+        using State = Guest::State;
+        for (auto &row : rows_) {
+          std::vector<std::pair<int, int>> free;
+          for (std::size_t i = 0; i < row.seats.size(); ++i)
+            for (int side = 0; side < (row.near ? 1 : 2); ++side)
+              if (!row.seats[i][side])
+                free.emplace_back(int(i), side);
+          if (!free.empty() && chance(0.006)) {
+            const auto [i, side] = free[pick(free.size())];
+            const int x = row.tables[i];
+            const int target = row.near ? x - 4 : side == 0 ? x - 2 : x + 2;
+            /* Shorter stays at the front, so that its rows never fill up: */
+            row.guests.push_back(
+                {row.door,
+                 i,
+                 side,
+                 State::walk,
+                 double(target),
+                 row.near ? integer(150, 450) : integer(300, 900),
+                 row.near && chance(0.35),
+                 random_color()});
+            row.seats[i][side] = true;
+          }
+          const double speed = row.near ? 0.4 : 0.35;
+          for (auto &guest : row.guests) {
+            switch (guest.state) {
+            case State::walk:
+              guest.x = toward(guest.x, guest.target, speed);
+              if (guest.x == guest.target)
+                guest.state = State::sit;
+              break;
+            case State::sit:
+              if (--guest.timer <= 0) {
+                row.seats[guest.table][guest.side] = false;
+                guest.state = State::leave;
+              }
+              break;
+            case State::leave:
+              guest.x = toward(guest.x, row.door + 2., speed);
+              break;
+            }
+          }
+          std::erase_if(row.guests, [&row](const Guest &guest) {
+            return guest.x >= row.door + 2.;
+          });
+        }
+      }
+
+      Weather weather_;
+      int t_ = 0;
+
+      /* The layout of the room: */
+      int floor_ = 0;
+      int top_ = 0;
+      int ceiling_ = 0;
+      int horizon_ = 0;
+      int inset_ = 0;
+      int right_ = 0;
+      ftxui::Box window_ = {};
+      ftxui::Box inside_ = {};
+      std::array<int, 2> mullions_ = {};
+      std::vector<int> lamps_;
+      std::vector<int> fans_;
+
+      /* The layout of the floor next to the bar: */
+      int door_ = 0;
+      int pickup_ = 0;
+      int left_ = 0;
+      int left_limit_ = 0;
+      bool player_ = false;
+      std::optional<int> laptop_;
+      std::vector<int> tables_;
+      std::vector<bool> taken_;
+      std::vector<Row> rows_;
+
+      std::vector<Traffic> traffic_;
+      std::vector<std::pair<double, double>> drops_;
+      std::optional<Pigeon> pigeon_;
+      int pigeon_wait_ = 0;
+      std::vector<Float> notes_;
+      std::vector<Float> zs_;
+      Cat cat_;
+      std::vector<Customer> customers_;
+    };
+
+
+    void Cafe::draw(Canvas &canvas) const
+    {
+      const auto &theme = dashboard::theme;
+      const auto muted = theme.muted;
+      const auto plain = ftxui::Color::Default;
+      const auto coffee = ftxui::Color::RGB(150, 95, 55);
+      const auto water = theme.animation[0];
+      const int t = t_;
+      const auto line = [](std::string_view left,
+                           std::string_view fill,
+                           int length,
+                           std::string_view right) {
+        std::string result(left);
+        for (int i = 0; i < length; ++i)
+          result += fill;
+        return result += right;
+      };
+
+      /* The room in one-point perspective, faded because it is far: */
+      const int x0 = inset_;
+      const int x1 = right_;
+      canvas.put(
+          x0, ceiling_, line("┌", "─", x1 - x0 - 1, "┐"), muted, false, true);
+      for (int y = ceiling_ + 1; y < horizon_; ++y) {
+        canvas.put(x0, y, "│", muted, false, true);
+        canvas.put(x1, y, "│", muted, false, true);
+      }
+      canvas.put(
+          x0, horizon_, line("└", "─", x1 - x0 - 1, "┘"), muted, false, true);
+      for (int k = 1; k <= ceiling_ - top_; ++k) {
+        canvas.put(x0 - k, ceiling_ - k, "╲", muted, false, true);
+        canvas.put(x1 + k, ceiling_ - k, "╱", muted, false, true);
+      }
+      for (int k = 1; k <= floor_ - horizon_; ++k) {
+        canvas.put(x0 - k, horizon_ + k, "╱", muted, false, true);
+        canvas.put(x1 + k, horizon_ + k, "╲", muted, false, true);
+      }
+
+      /* The window in the back wall, with its sill: */
+      const auto &w = window_;
+      canvas.put(w.x_min,
+                 w.y_min,
+                 line("╔", "═", w.x_max - w.x_min - 1, "╗"),
+                 muted,
+                 false,
+                 true);
+      for (int y = w.y_min + 1; y < w.y_max; ++y) {
+        canvas.put(w.x_min, y, "║", muted, false, true);
+        canvas.put(w.x_max, y, "║", muted, false, true);
+      }
+      canvas.put(w.x_min,
+                 w.y_max,
+                 line("╚", "═", w.x_max - w.x_min - 1, "╝"),
+                 muted,
+                 false,
+                 true);
+      canvas.put(w.x_min - 1,
+                 w.y_max + 1,
+                 line("", "▀", w.x_max - w.x_min + 3, ""),
+                 coffee,
+                 false,
+                 true);
+
+      for (const auto &[x, y] : drops_)
+        switch (weather_) {
+        case Weather::rain:
+          canvas.put(x, y, "╱", water, false, true, &inside_);
+          break;
+        case Weather::snow:
+          canvas.put(
+              x, y, int(x * 7) % 3 ? "*" : "·", plain, false, true, &inside_);
+          break;
+        case Weather::clear:
+          canvas.put(
+              x, y, (t / 3) % 2 ? "v" : "^", muted, false, true, &inside_);
+          break;
+        }
+
+      for (const auto &a : traffic_) {
+        Rows rows;
+        switch (a.kind) {
+        case Traffic::Kind::walker:
+          rows = {" o ", int(a.x * 2) % 2 ? " Λ " : " λ "};
+          if (a.umbrella)
+            rows.insert(rows.begin(), "╭┴╮");
+          break;
+        case Traffic::Kind::bike:
+          rows = {"  o", "o'o"};
+          break;
+        case Traffic::Kind::car:
+          rows = {" ▄▄▄ ", "▀o▀o▀"};
+          break;
+        }
+        if (a.direction < 0)
+          rows = mirror(rows);
+        canvas.sprite(a.x, inside_.y_max, rows, a.color, false, true, &inside_);
+      }
+
+      if (pigeon_) {
+        const auto &pigeon = *pigeon_;
+        const auto glyph = pigeon.flying          ? (t % 2 ? "\\v/" : "‾v‾")
+                           : pigeon.direction > 0 ? "(o>"
+                                                  : "<o)";
+        canvas.put(pigeon.x, pigeon.y, glyph, muted, false, true, &inside_);
+      }
+
+      for (const int x : mullions_)
+        for (int y = inside_.y_min; y <= inside_.y_max; ++y)
+          canvas.put(x, y, "│", muted, false, true);
+
+      /* Seated, facing right, with a hand on the table and the knees under it:
+       */
+      const Rows seated = {" o", "/|\\_", " └┐"};
+
+      /*
+       * The rows of tables, back to front. People walking pass behind the
+       * tables and the people sitting at them:
+       */
+      for (const auto &row : rows_) {
+        const int y = row.y;
+        for (const auto &guest : row.guests) {
+          if (guest.state == Guest::State::sit)
+            continue;
+          const bool step = int(guest.x * (row.near ? 1.3 : 2.)) % 2;
+          if (row.near)
+            canvas.sprite(guest.x,
+                          y,
+                          {" o", "/|\\", step ? "/ \\" : " | "},
+                          guest.color,
+                          false,
+                          false,
+                          nullptr,
+                          true);
+          else
+            canvas.sprite(guest.x,
+                          y,
+                          {" o ", step ? " Λ " : " λ "},
+                          guest.color,
+                          false,
+                          true,
+                          nullptr,
+                          true);
+        }
+        for (std::size_t i = 0; i < row.tables.size(); ++i) {
+          const int x = row.tables[i];
+          if (row.near)
+            canvas.sprite(
+                x, y, {"═╤═", " │"}, muted, false, false, nullptr, true);
+          else
+            canvas.put(x, y, "─┬─", muted, false, true);
+        }
+        for (const auto &guest : row.guests) {
+          if (guest.state != Guest::State::sit)
+            continue;
+          const int x = row.tables[guest.table];
+          const auto steam = (t / 4 + guest.table) % 2 ? "~" : "≀";
+          if (row.near && guest.laptop) {
+            canvas.sprite(
+                guest.x, y, seated, guest.color, false, false, nullptr, true);
+            canvas.put(x, y - 2, (t + guest.table) % 4 < 2 ? "▁" : "▂", muted);
+            canvas.put(x + 1, y - 2, "╱", theme.caption, true);
+          } else if (row.near) {
+            canvas.sprite(
+                guest.x, y, seated, guest.color, false, false, nullptr, true);
+            canvas.put(guest.x + 4, y - 2, "c[]", guest.color);
+            canvas.put(x + 1, y - 3, steam, guest.color, false, true);
+          } else {
+            canvas.sprite(guest.x, y, {" o ", " Λ "}, guest.color, false, true);
+            const int cup = guest.side == 0 ? x : x + 2;
+            canvas.put(cup, y - 1, "u", guest.color, false, true);
+            if ((t / 5 + guest.table + guest.side) % 3 == 0)
+              canvas.put(cup, y - 2, "~", guest.color, false, true);
+          }
+        }
+      }
+
+      /* Pendant lamps, hanging from the ceiling, that flicker now and then: */
+      for (std::size_t i = 0; i < lamps_.size(); ++i) {
+        const int x = lamps_[i];
+        const int shade = horizon_ - 4;
+        for (int y = top_; y < shade; ++y)
+          canvas.put(x + 1, y, "│", muted);
+        /* A bell-shaped shade, with the bulb peeking out right below: */
+        canvas.put(x, shade, "▄█▄", coffee);
+        const bool flicker = (t + 37 * int(i)) % 97 < 2;
+        canvas.put(x + 1,
+                   shade + 1,
+                   "▀",
+                   ftxui::Color::RGB(255, 175, 0),
+                   !flicker,
+                   flicker);
+      }
+
+      /*
+       * Ceiling fans seen from the side: the blades shorten and lengthen
+       * as they turn, one step per frame:
+       */
+      static constexpr std::array<std::string_view, 4> blades = {
+          "━━━┿━━━", " ━━┿━━ ", "  ━┿━  ", " ━━┿━━ "};
+      for (std::size_t i = 0; i < fans_.size(); ++i) {
+        const int x = fans_[i];
+        for (int y = top_; y < top_ + 3; ++y)
+          canvas.put(x + 3, y, "│", muted);
+        canvas.put(x, top_ + 3, blades[(t + 2 * i) % 4], muted);
+      }
+
+      /* The record player, spinning: */
+      static constexpr std::array<std::string_view, 4> platters = {
+          "◐", "◓", "◑", "◒"};
+      if (player_)
+        canvas.sprite(left_ + 1,
+                      floor_,
+                      {"╭──────╮",
+                       "│(" + std::string(platters[(t / 2) % 4]) + ") ╲ │",
+                       "├──────┤",
+                       "│▌▌▌▌▌▌│"},
+                      muted);
+      for (const auto &note : notes_)
+        canvas.put(
+            note.x, note.y, note.glyph, note.color, false, note.age > 28);
+
+      /* The regular, seated at a table with a laptop, typing: */
+      if (laptop_) {
+        const int x = *laptop_;
+        canvas.sprite(x + 4, floor_, {"═══╤═══", "   │"}, muted);
+        canvas.sprite(x, floor_, seated, plain);
+        canvas.put(x + 5, floor_ - 2, t % 4 < 2 ? "▁▂" : "▂▁", muted);
+        canvas.put(x + 7, floor_ - 2, "╱", theme.caption, true);
+      }
+
+      /* The cat: */
+      if (left_limit_ - 9 > left_ + 10) {
+        const bool closed = cat_.state == Cat::State::sleep ||
+                            (cat_.state == Cat::State::sit && t % 40 < 2);
+        canvas.sprite(cat_.x,
+                      floor_,
+                      {" /\\_/\\", closed ? "( -.- )" : "( o.o )"},
+                      cat_color());
+        canvas.put(cat_.x + (cat_.direction > 0 ? 7 : -1),
+                   floor_,
+                   (t / 3) % 2 ? "~" : "-",
+                   cat_color());
+        for (const auto &z : zs_)
+          canvas.put(
+              z.x, z.y, z.age < 13 ? "z" : "Z", cat_color(), false, true);
+      }
+
+      /*
+       * Back to front: people walking pass behind the tables, and the
+       * queue stands in front of everyone walking by:
+       */
+      using State = Customer::State;
+      const auto person = [&](const Customer &c) {
+        const auto legs =
+            int(c.x * 1.3) % 2 || (c.state == State::queue && c.timer) ? "/ \\"
+                                                                       : " | ";
+        if (c.cup) {
+          canvas.sprite(c.x,
+                        floor_,
+                        {" o", "/|\\c[]", legs},
+                        c.color,
+                        false,
+                        false,
+                        nullptr,
+                        true);
+          canvas.put(c.x + 4,
+                     floor_ - 2,
+                     (t / 4) % 2 ? "~" : "≀",
+                     c.color,
+                     false,
+                     true);
+        } else {
+          canvas.sprite(c.x,
+                        floor_,
+                        {" o", "/|\\", legs},
+                        c.color,
+                        false,
+                        false,
+                        nullptr,
+                        true);
+        }
+      };
+      const auto queued = [this](const Customer &c) {
+        return c.state == State::queue && c.x <= pickup_ + 14;
+      };
+      for (const auto &c : customers_)
+        if (c.state != State::seated && !queued(c))
+          person(c);
+
+      for (const int x : tables_)
+        canvas.sprite(
+            x + 4, floor_, {"═╤═", " │"}, muted, false, false, nullptr, true);
+      for (const auto &c : customers_)
+        if (c.state == State::seated) {
+          const int x = tables_[c.seat];
+          canvas.sprite(
+              x, floor_, seated, c.color, false, false, nullptr, true);
+          canvas.put(x + 4, floor_ - 2, "c[]", c.color);
+          canvas.put(
+              x + 5, floor_ - 3, (t / 4) % 2 ? "~" : "≀", c.color, false, true);
+        }
+
+      for (auto it = customers_.rbegin(); it != customers_.rend(); ++it)
+        if (queued(*it))
+          person(*it);
+    }
+
+
+    /**
+     * A pour-over coffee bar in a Cafe around the dashboard: a barista
+     * walks up, grinds the beans, weighs the grounds on the scale in the
+     * counter under the dripper, and brews a pot of coffee that is
      * ready when the simulation finishes, or after about two and a half
      * minutes if the progress of the simulation is unknown.
      */
@@ -533,14 +1532,7 @@ namespace ryujin::animation
     public:
       void draw(Stage &stage) override
       {
-        /*
-         * Mugs in flight keep their columns, so they would linger out of
-         * sight, and block new launches, once the sky moves:
-         */
-        const auto sky = sky_;
         place(stage);
-        if (sky_ != sky)
-          mugs_.clear();
         sync(stage);
         frame_.clear();
         show(stage);
@@ -564,17 +1556,16 @@ namespace ryujin::animation
         water_ = bloom_water;
         for (const auto &pour : pours)
           water_ += pour.water;
-        mugs_.clear();
         frame_.clear();
         show(stage);
       }
 
     private:
-      enum class Phase : std::uint8_t { weigh, grind, bloom, pour, done };
+      enum class Phase : std::uint8_t { grind, weigh, bloom, pour, done };
 
       /* The duration of the phases in steps of the animation: */
-      static constexpr int weigh_steps = 25;
       static constexpr int grind_steps = 30;
+      static constexpr int weigh_steps = 25;
       static constexpr int bloom_steps = 200;
       static constexpr int pour_steps = 800;
 
@@ -595,15 +1586,14 @@ namespace ryujin::animation
           {{75., 0., 0.15}, {50., 0.33, 0.43}, {100., 0.6, 0.8}}};
 
       /* The size of the coffee bar: */
-      static constexpr int bar_width = 58;
-      static constexpr int bar_height = 10;
+      static constexpr int bar_width = 47;
+      static constexpr int bar_height = 9;
 
       /* The columns of the stations, relative to the left end: */
       static constexpr int bag_x = 0;
-      static constexpr int scale_x = 15;
-      static constexpr int grinder_x = 27;
-      static constexpr int dripper_x = 38;
-      static constexpr int kettle_x = 46;
+      static constexpr int grinder_x = 15;
+      static constexpr int dripper_x = 26;
+      static constexpr int kettle_x = 34;
 
       /* The column of the barista before walking up to the bar: */
       static constexpr int barista_start = -6;
@@ -612,27 +1602,12 @@ namespace ryujin::animation
       static constexpr std::chrono::milliseconds step_duration{150};
 
       /*
-       * The mugs flying across the sky above the bar in groups, at a fixed
-       * speed in columns per step of wall time, bobbing on a wave that
-       * travels through each group:
-       */
-      static constexpr std::size_t max_mugs = 24;
-      static constexpr int mug_spacing = 7;
-      static constexpr double mug_speed = 1.;
-      static constexpr double mug_launch_chance = 0.12;
-      static constexpr double wave_amplitude = 1.5;
-      static constexpr double wave_number = 2. * std::numbers::pi / 24.;
-      static constexpr double wave_frequency = 0.6;
-      /* The rows a mug needs above and below its row on the wave: */
-      static constexpr int mug_margin = 3;
-
-      /*
        * The steps of the preparations before the pour: walking to the
-       * stations at a column every two steps, weighing, grinding, and the
+       * stations at a column every two steps, grinding, weighing, and the
        * bloom:
        */
       static constexpr double preparation_steps =
-          2 * (dripper_x - 5 - barista_start) + weigh_steps + grind_steps +
+          2 * (dripper_x - 5 - barista_start) + grind_steps + weigh_steps +
           bloom_steps;
 
       /* The time on the brew timer at the end of the bloom and in total: */
@@ -672,17 +1647,31 @@ namespace ryujin::animation
         }};
 
         origin_.reset();
-        sky_.reset();
         for (const auto &band : bands) {
           const int columns = band.x_max - band.x_min + 1;
           const int rows = band.y_max - band.y_min + 1;
           if (columns >= bar_width && rows >= bar_height) {
             origin_ = Cell{band.x_min + (columns - bar_width) / 2, band.y_max};
-            sky_ = ftxui::Box{
-                band.x_min, band.x_max, band.y_min, band.y_max - bar_height};
+
+            /* Lay out the cafe again only if the stage has changed: */
+            const Layout layout{
+                width,
+                height,
+                box,
+                {band.x_min, band.x_max, band.y_min, band.y_max}};
+            if (!cafe_ || layout != layout_) {
+              layout_ = layout;
+              cafe_.emplace(stage,
+                            layout.band,
+                            *origin_,
+                            bar_width,
+                            bar_height,
+                            weather_);
+            }
             return;
           }
         }
+        cafe_.reset();
 
         /*
          * The bar does not fit next to the dashboard. Move the dashboard
@@ -704,8 +1693,6 @@ namespace ryujin::animation
       int station() const
       {
         switch (phase_) {
-        case Phase::weigh:
-          return scale_x - 5;
         case Phase::grind:
           return grinder_x - 5;
         case Phase::done:
@@ -738,7 +1725,8 @@ namespace ryujin::animation
       void tick(const Stage &stage)
       {
         ++ticks_;
-        fly();
+        if (cafe_)
+          cafe_->step();
         int steps = 1;
         if (phase_ < Phase::pour && stage.eta > 0.) {
           const double budget = 0.25 * stage.eta / 0.15;
@@ -746,37 +1734,6 @@ namespace ryujin::animation
         }
         for (int i = 0; i < steps; ++i)
           advance(stage);
-      }
-
-      /*
-       * Move the mugs by one step of wall time, drop the ones that left
-       * the sky, and launch a new group at its left edge now and then.
-       * The mugs start in the free band, so that they never spend their
-       * time hidden behind the dashboard:
-       */
-      void fly()
-      {
-        if (!sky_)
-          return;
-
-        for (auto &mug : mugs_)
-          mug.x += mug_speed;
-        std::erase_if(mugs_,
-                      [this](const Mug &mug) { return mug.x > sky_->x_max; });
-
-        const int rows = sky_->y_max - sky_->y_min + 1;
-        const std::size_t group = 3 + pick(2);
-        if (mugs_.size() + group > max_mugs || rows <= 2 * mug_margin ||
-            !chance(mug_launch_chance))
-          return;
-
-        const int row = sky_->y_min + mug_margin + pick(rows - 2 * mug_margin);
-        const double phase = std::uniform_real_distribution<double>(
-            0., 2. * std::numbers::pi)(random);
-        const auto color = random_color();
-        for (std::size_t i = 0; i < group; ++i)
-          mugs_.push_back(
-              {sky_->x_min - 4. - double(i * mug_spacing), row, phase, color});
       }
 
       void advance(const Stage &stage)
@@ -796,12 +1753,12 @@ namespace ryujin::animation
         };
 
         switch (++phase_step_; phase_) {
-        case Phase::weigh:
-          if (phase_step_ == weigh_steps)
-            enter(Phase::grind);
-          break;
         case Phase::grind:
           if (phase_step_ == grind_steps)
+            enter(Phase::weigh);
+          break;
+        case Phase::weigh:
+          if (phase_step_ == weigh_steps)
             enter(Phase::bloom);
           break;
         case Phase::bloom:
@@ -865,34 +1822,10 @@ namespace ryujin::animation
                                 origin_->second - bar_height + 1,
                                 origin_->second};
 
-        /* The frame covers the whole screen because the mugs fly across: */
-        std::vector<Glyph> frame(width * height);
-
-        /*
-         * Write the text at (@p x, @p y) into the free cells within
-         * @p clip, skipping blanks:
-         */
-        const auto put = [&](const ftxui::Box &clip,
-                             int x,
-                             const int y,
-                             std::string_view text,
-                             ftxui::Color color,
-                             bool bold = false,
-                             bool dim = false) {
-          for (std::size_t i = 0; i < text.size(); ++x) {
-            /* The length of the UTF-8 sequence: */
-            const auto lead = static_cast<unsigned char>(text[i]);
-            const std::size_t n = lead < 0x80   ? 1
-                                  : lead < 0xe0 ? 2
-                                  : lead < 0xf0 ? 3
-                                                : 4;
-            if (text[i] != ' ' && clip.Contain(x, y) && screen.Contain(x, y) &&
-                stage.free(x, y))
-              frame[y * width + x] = {
-                  std::string(text.substr(i, n)), color, bold, dim};
-            i += n;
-          }
-        };
+        /* The frame covers the whole screen, the cafe behind the bar: */
+        Canvas canvas(stage);
+        if (cafe_)
+          cafe_->draw(canvas);
 
         /* Write the text @p row rows above the bottom of the bar: */
         const auto text = [&](int column,
@@ -901,44 +1834,55 @@ namespace ryujin::animation
                               ftxui::Color color,
                               bool bold = false,
                               bool dim = false) {
-          put(bar,
-              origin_->first + column,
-              origin_->second - row,
-              text,
-              color,
-              bold,
-              dim);
+          canvas.put(origin_->first + column,
+                     origin_->second - row,
+                     text,
+                     color,
+                     bold,
+                     dim,
+                     &bar);
         };
-
-        /*
-         * The mugs, with a whiff of steam, in the sky. The phase of the
-         * wave depends on the column, so that it travels through a group:
-         */
-        for (std::size_t i = 0; i < mugs_.size(); ++i) {
-          const auto &mug = mugs_[i];
-          const int x = int(std::floor(mug.x));
-          const int y =
-              mug.row +
-              int(std::lround(wave_amplitude *
-                              std::sin(wave_number * mug.x -
-                                       wave_frequency * ticks_ + mug.phase)));
-          put(*sky_, x, y, "c[_]", mug.color, true);
-          put(*sky_,
-              x + 2,
-              y - 1,
-              (ticks_ / 4 + i) % 2 ? "~" : "≀",
-              mug.color,
-              false,
-              true);
-        }
 
         const auto &theme = dashboard::theme;
         const auto plain = ftxui::Color::Default;
         const bool grinding = phase_ == Phase::grind && barista_ == station();
 
-        /* The counter: */
+        /*
+         * The display of the scale in the counter under the dripper: the
+         * grounds while weighing, then the timer of the brew from the
+         * start of the bloom, and the water poured so far. The timer runs
+         * as if the brew took two and a half minutes, however long the
+         * simulation takes:
+         */
+        const bool weighing = phase_ == Phase::weigh && barista_ == station();
+        char display[32];
+        if (phase_ >= Phase::bloom) {
+          const int seconds =
+              phase_ == Phase::bloom
+                  ? bloom_seconds * phase_step_ / bloom_steps
+                  : bloom_seconds +
+                        int(std::lround((brew_seconds - bloom_seconds) *
+                                        brew_));
+          std::snprintf(display,
+                        sizeof(display),
+                        "%d:%02d %3.0fg",
+                        seconds / 60,
+                        seconds % 60,
+                        water_);
+        } else {
+          std::snprintf(display,
+                        sizeof(display),
+                        "%4.1fg",
+                        weighing ? 18. * phase_step_ / weigh_steps : 0.);
+        }
+        const int length = int(std::strlen(display));
+        const int display_x = dripper_x + 3 - length / 2;
+
+        /* The counter, with a gap around the display: */
         for (int x = 0; x < bar_width; ++x)
-          text(x, 2, "━", theme.muted);
+          if (x < display_x - 1 || x > display_x + length)
+            text(x, 2, "━", theme.muted);
+        text(display_x, 2, display, theme.good, true);
         for (const int x : {0, bar_width - 1})
           for (const int row : {0, 1})
             text(x, row, "┃", theme.muted);
@@ -953,28 +1897,10 @@ namespace ryujin::animation
              true);
         text(bag_x + 9, 3, "│", theme.muted);
 
-        /* The scale, with the beans in the bowl until they are ground: */
-        const double grams = phase_ == Phase::weigh
-                                 ? 18. * phase_step_ / weigh_steps
-                             : phase_ == Phase::grind && !grinding ? 18.
-                                                                   : 0.;
-        char display[16];
-        std::snprintf(display, sizeof(display), "%4.1fg", grams);
-        text(scale_x, 3, "[", theme.muted);
-        text(scale_x + 1, 3, display, theme.good, true);
-        text(scale_x + 6, 3, "]", theme.muted);
-        text(scale_x + 1, 4, "\\___/", theme.muted);
-        const int beans = int(std::ceil(3. * grams / 18.));
-        text(scale_x + 2, 4, std::string(beans, 'o'), coffee(), true);
-        if (phase_ == Phase::weigh && barista_ == station() &&
-            phase_step_ < weigh_steps - 4)
-          text(scale_x + 3, 5 + step_ % 2, "∘", coffee(), true);
-
         /* The grinder, shaking while it grinds: */
         const int shake = grinding ? step_ % 2 : 0;
-        const bool hopper = phase_ == Phase::weigh ||
-                            (grinding && phase_step_ < 2 * grind_steps / 3) ||
-                            (phase_ == Phase::grind && !grinding);
+        const bool hopper = phase_ == Phase::grind &&
+                            (!grinding || phase_step_ < 2 * grind_steps / 3);
         text(grinder_x + 1 + shake, 6, "▄▄▄", theme.muted);
         text(grinder_x + 1 + shake, 5, "\\ /", theme.muted);
         if (hopper)
@@ -987,7 +1913,7 @@ namespace ryujin::animation
         if (grinding)
           text(grinder_x - 1 + 2 * shake, 7, "brrr", theme.muted, false, true);
 
-        /* The dripper on top of the pot: */
+        /* The dripper on top of the pot, filled with the grounds: */
         text(dripper_x, 6, "\\     /", theme.muted);
         text(dripper_x + 1, 5, "\\___/", theme.muted);
         text(dripper_x, 4, "(     )", theme.muted);
@@ -998,6 +1924,14 @@ namespace ryujin::animation
                6,
                wet && step_ % 4 < 2 ? "~~~~~" : "▒▒▒▒▒",
                wet ? theme.animation[0] : coffee());
+        } else if (weighing) {
+          const int grounds = int(std::ceil(5. * phase_step_ / weigh_steps));
+          std::string row;
+          for (int i = 0; i < grounds; ++i)
+            row += "▒";
+          text(dripper_x + 1, 6, row, coffee());
+          if (phase_step_ < weigh_steps - 4)
+            text(dripper_x + 3, 7, "∘", coffee(), true);
         }
 
         /* The coffee in the pot, in eighths of a cell: */
@@ -1030,36 +1964,10 @@ namespace ryujin::animation
             step_ % 3 == 0)
           text(dripper_x + 3, 4, "·", coffee(), true);
 
-        /*
-         * The timer of the brew, from the start of the bloom, and the
-         * water poured so far:
-         */
-        if (phase_ >= Phase::bloom) {
-          /*
-           * The timer runs as if the brew took two and a half minutes,
-           * however long the simulation takes:
-           */
-          const int seconds =
-              phase_ == Phase::bloom
-                  ? bloom_seconds * phase_step_ / bloom_steps
-                  : bloom_seconds +
-                        int(std::lround((brew_seconds - bloom_seconds) *
-                                        brew_));
-          char timer[16];
-          std::snprintf(
-              timer, sizeof(timer), "%d:%02d", seconds / 60, seconds % 60);
-          const int length = int(std::strlen(timer));
-          char water[16];
-          std::snprintf(water, sizeof(water), "%3.0fg", water_);
-          text(kettle_x, 6, timer, theme.good, true);
-          text(kettle_x + length + 1, 6, water, theme.good, true);
-        }
-
-        /* The kettle, held over the dripper while pouring: */
+        /* The kettle, pouring right into the dripper: */
         if (pouring()) {
-          text(dripper_x, 9, "▄▄", theme.muted);
-          text(dripper_x - 1, 8, "(▓▓)╮", theme.muted);
-          text(dripper_x + 3, 7, "│", theme.animation[0], true);
+          text(dripper_x, 8, "▄▄", theme.muted);
+          text(dripper_x - 1, 7, "(▓▓)╮", theme.muted);
         } else {
           text(kettle_x + 1, 4, "▄▄", theme.muted);
           text(kettle_x, 3, "(▓▓)╮", theme.muted);
@@ -1091,17 +1999,31 @@ namespace ryujin::animation
           text(x, 0, "/   \\", plain);
         }
 
-        repaint(stage, screen, frame_, std::move(frame));
+        repaint(stage, screen, frame_, std::move(canvas.cells));
       }
 
       std::optional<Cell> origin_;
 
-      /* The free cells above the bar, where the mugs fly: */
-      std::optional<ftxui::Box> sky_;
+      /* The stage the cafe is laid out for: */
+      struct Layout {
+        int width;
+        int height;
+        ftxui::Box dashboard;
+        ftxui::Box band;
+
+        bool operator==(const Layout &other) const
+        {
+          return width == other.width && height == other.height &&
+                 dashboard == other.dashboard && band == other.band;
+        }
+      };
+      Layout layout_ = {};
+      std::optional<Cafe> cafe_;
+      Cafe::Weather weather_ = Cafe::Weather(pick(3));
 
       std::string_view roaster_ = pick_roaster();
 
-      Phase phase_ = Phase::weigh;
+      Phase phase_ = Phase::grind;
       /* The steps of wall time, and the steps of the animation: */
       int ticks_ = 0;
       int step_ = 0;
@@ -1121,15 +2043,6 @@ namespace ryujin::animation
 
       /* The water poured so far in grams: */
       double water_ = 0.;
-
-      /* A mug at the real-valued column @p x on the wave about @p row: */
-      struct Mug {
-        double x;
-        int row;
-        double phase;
-        ftxui::Color color;
-      };
-      std::vector<Mug> mugs_;
 
       std::vector<Glyph> frame_;
     };
