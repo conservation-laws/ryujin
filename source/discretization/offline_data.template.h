@@ -739,6 +739,7 @@ namespace ryujin
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
+    const auto &partitioner = *this->scalar_partitioner_;
 
     this->mass_matrix_->zero_out();
     this->betaij_matrix_->zero_out();
@@ -954,6 +955,13 @@ namespace ryujin
       }
     };
 
+    const auto mass_matrix_view = this->mass_matrix_->view();
+    const auto cij_matrix_view = this->cij_matrix_->view();
+    const auto betaij_matrix_view = this->betaij_matrix_->view();
+    decltype(this->mass_matrix_inverse_->view()) mass_matrix_inverse_view;
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_view = this->mass_matrix_inverse_->view();
+
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
       const auto &dof_indices = copy.local_dof_indices_;
@@ -971,10 +979,14 @@ namespace ryujin
       distribute_local_to_global(cell_mass_matrix,
                                  dof_indices,
                                  affine_constraints,
-                                 *this->mass_matrix_);
+                                 partitioner,
+                                 mass_matrix_view);
 
-      distribute_local_to_global(
-          cell_cij_matrix, dof_indices, affine_constraints, *this->cij_matrix_);
+      distribute_local_to_global(cell_cij_matrix,
+                                 dof_indices,
+                                 affine_constraints,
+                                 partitioner,
+                                 cij_matrix_view);
 
       /*
        * Workaround: We need to catch the case local_dof_indices.size() == 0
@@ -987,7 +999,8 @@ namespace ryujin
                                        dof_indices,
                                        neighbor_dof_indices[f_index],
                                        affine_constraints,
-                                       *this->cij_matrix_);
+                                       partitioner,
+                                       cij_matrix_view);
           }
         }
       }
@@ -995,13 +1008,15 @@ namespace ryujin
       distribute_local_to_global(cell_betaij_matrix,
                                  dof_indices,
                                  affine_constraints,
-                                 *this->betaij_matrix_);
+                                 partitioner,
+                                 betaij_matrix_view);
 
       if (discretization_->have_discontinuous_ansatz())
         distribute_local_to_global(cell_mass_matrix_inverse,
                                    dof_indices,
                                    affine_constraints,
-                                   *this->mass_matrix_inverse_);
+                                   partitioner,
+                                   mass_matrix_inverse_view);
 
       this->measure_of_omega_ += cell_measure;
     };
@@ -1224,6 +1239,8 @@ namespace ryujin
         }
       };
 
+      const auto incidence_matrix_view = this->incidence_matrix_->view();
+
       const auto copy_local_to_global = [&](const auto &copy) {
         const auto &is_locally_owned = copy.is_locally_owned_;
         const auto &dof_indices = copy.local_dof_indices_;
@@ -1245,7 +1262,8 @@ namespace ryujin
                                          dof_indices,
                                          neighbor_dof_indices[f_index],
                                          affine_constraints,
-                                         *this->incidence_matrix_);
+                                         partitioner,
+                                         incidence_matrix_view);
             }
           }
         }
