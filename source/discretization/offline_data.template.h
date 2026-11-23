@@ -112,12 +112,12 @@ namespace ryujin
                                            n_precomputed_values);
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - index maps");
-      create_index_maps();
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - cell coloring");
+      color_cells();
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - cell coloring");
-      color_cells();
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - index maps");
+      create_index_maps();
     }
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - matrix storage");
@@ -596,10 +596,9 @@ namespace ryujin
     }
 
     /*
-     * Translate the local maps into index maps over all locally owned
-     * degrees of freedom. All dG degrees of freedom of a locally owned
-     * cell are locally owned, but some of the cG degrees of freedom are
-     * ghosts which we skip:
+     * Translate the local maps into an index map over all locally owned dG
+     * degrees of freedom. All of them are located on exactly one locally
+     * owned cell, so we can run over the cells in parallel:
      */
 
     const auto &locally_owned_dg =
@@ -608,34 +607,46 @@ namespace ryujin
         discretization_->dof_handler_cg().locally_owned_dofs();
 
     this->dg_to_cg_index_map_.resize(locally_owned_dg.n_elements());
-    this->cg_to_dg_index_map_.resize(locally_owned_cg.n_elements());
 
-    std::vector<types::global_dof_index> indices_dg;
-    std::vector<types::global_dof_index> indices_cg;
+    struct Scratch {
+      std::vector<types::global_dof_index> indices_dg;
+      std::vector<types::global_dof_index> indices_cg;
+    };
 
-    for (const auto &cell :
-         discretization_->dof_handler_dg().active_cell_iterators()) {
-      if (!cell->is_locally_owned())
-        continue;
+    const auto worker = [&](const auto &cell, Scratch &scratch, int &) {
+      auto &[indices_dg, indices_cg] = scratch;
 
       const auto &map = local_index_map[cell->active_fe_index()];
       indices_dg.resize(map.size());
       indices_cg.resize(map.size());
-      cell->get_dof_indices(indices_dg);
+      cell->as_dof_handler_iterator(discretization_->dof_handler_dg())
+          ->get_dof_indices(indices_dg);
       cell->as_dof_handler_iterator(discretization_->dof_handler_cg())
           ->get_dof_indices(indices_cg);
 
       for (unsigned int i = 0; i < map.size(); ++i) {
-        const auto global_dg = indices_dg[i];
-        const auto global_cg = indices_cg[map[i]];
-
-        const auto local_dg = locally_owned_dg.index_within_set(global_dg);
-        this->dg_to_cg_index_map_[local_dg] = global_cg;
-
-        const auto local_cg = locally_owned_cg.index_within_set(global_cg);
-        if (local_cg != dealii::numbers::invalid_dof_index)
-          this->cg_to_dg_index_map_[local_cg] = global_dg;
+        const auto local_dg = locally_owned_dg.index_within_set(indices_dg[i]);
+        this->dg_to_cg_index_map_[local_dg] = indices_cg[map[i]];
       }
+    };
+
+    WorkStream::run(
+        colored_cell_chunks_, worker, [](const int &) {}, Scratch(), 0);
+
+    /*
+     * Invert the map. Several dG degrees of freedom share a cG degree of
+     * freedom: we select the one with the largest index. Ghost cG degrees
+     * of freedom are skipped:
+     */
+
+    this->cg_to_dg_index_map_.resize(locally_owned_cg.n_elements());
+
+    for (unsigned int i = 0; i < this->dg_to_cg_index_map_.size(); ++i) {
+      const auto local_cg =
+          locally_owned_cg.index_within_set(this->dg_to_cg_index_map_[i]);
+      if (local_cg != dealii::numbers::invalid_dof_index)
+        this->cg_to_dg_index_map_[local_cg] =
+            locally_owned_dg.nth_index_in_set(i);
     }
   }
 
