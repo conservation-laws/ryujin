@@ -1633,148 +1633,200 @@ namespace ryujin
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
-    /*
-     * Create a temporary multimap with the (local) dof index as key:
-     */
-
     using BoundaryData = std::tuple<dealii::Tensor<1, dim, Number> /*normal*/,
                                     Number /*normal mass*/,
                                     Number /*boundary mass*/,
                                     dealii::types::boundary_id /*id*/,
                                     dealii::Point<dim>> /*position*/;
-    std::multimap<unsigned int, BoundaryData> preliminary_map;
-
     using Contribution = BoundaryContribution<dim, Number>;
-    std::vector<Contribution> contributions;
 
-    std::vector<dealii::types::global_dof_index> local_dof_indices;
+    /*
+     * Collect all cells that can have boundary degrees of freedom. Make
+     * sure to iterate over the entire locally relevant set so that we
+     * compute normals between cells with differing owners correctly. With
+     * FE_Nothing an interior cell can have boundary degrees of freedom:
+     */
 
-    dealii::hp::FEFaceValues<structdim, dim> hp_fe_face_values(
-        discretization_->mapping(),
-        discretization_->finite_element(),
-        discretization_->face_quadrature(),
-        dealii::update_normal_vectors | dealii::update_values |
-            dealii::update_JxW_values);
+    const bool have_fe_nothing = treat_fe_nothing_as_boundary_ &&
+                                 discretization_->finite_element().size() > 1;
 
+    std::vector<std::decay_t<decltype(*std::begin(cells))>> boundary_cells;
     for (const auto &cell : cells) {
-
-      /*
-       * Make sure to iterate over the entire locally relevant set so that
-       * we compute normals between cells with differing owners correctly.
-       */
       if ((cell->is_active() && cell->is_artificial()) ||
           (!cell->is_active() && cell->is_artificial_on_level()))
         continue;
+      if (have_fe_nothing || cell->at_boundary())
+        boundary_cells.push_back(cell);
+    }
 
-      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
-      const auto &support_points = cell->get_fe().get_unit_support_points();
+    /*
+     * Run over the cells in parallel in chunks of a fixed size. Every chunk
+     * uses a fresh FEFaceValues object and stores its own entries and
+     * contributions, which we merge in the order of the chunks. The result
+     * thus does not depend on the number of threads:
+     */
 
-      local_dof_indices.resize(dofs_per_cell);
-      cell->get_active_or_mg_dof_indices(local_dof_indices);
+    constexpr std::size_t chunk_size = 1024;
+    const std::size_t n_chunks =
+        (boundary_cells.size() + chunk_size - 1) / chunk_size;
 
-      for (auto f_index : cell->face_indices()) {
-        const auto face = cell->face(f_index);
-        auto id = face->boundary_id();
+    std::vector<std::vector<std::pair<unsigned int, BoundaryData>>>
+        chunk_entries(n_chunks);
+    std::vector<std::vector<Contribution>> chunk_contributions(n_chunks);
 
-        /*
-         * Skip periodic boundary faces. For our algorithm these are
-         * interior degrees of freedom (if not simultaneously located at
-         * another boundary as well).
-         */
-        if (id == Boundary::periodic)
-          continue;
+    const auto process_chunk = [&](const std::size_t chunk) {
+      auto &boundary_entries = chunk_entries[chunk];
+      auto &contributions = chunk_contributions[chunk];
 
-        /*
-         * Check for interior faces neighboring a cell with FE nothing:
-         */
-        const bool neighbor_cell_has_fe_nothing =                      //
-            treat_fe_nothing_as_boundary_ &&                           //
-            !face->at_boundary() &&                                    //
-            cell->neighbor(f_index)->is_active() &&                    //
-            !cell->neighbor(f_index)->is_artificial() &&               //
-            (dynamic_cast<const dealii::FE_Nothing<structdim, dim> *>( //
-                 &cell->neighbor(f_index)->get_fe()) != nullptr);      //
+      std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-        if (neighbor_cell_has_fe_nothing) {
+      dealii::hp::FEFaceValues<structdim, dim> hp_fe_face_values(
+          discretization_->mapping(),
+          discretization_->finite_element(),
+          discretization_->face_quadrature(),
+          dealii::update_normal_vectors | dealii::update_values |
+              dealii::update_JxW_values);
+
+      const auto end =
+          std::min(boundary_cells.size(), (chunk + 1) * chunk_size);
+      for (auto c = chunk * chunk_size; c < end; ++c) {
+        const auto &cell = boundary_cells[c];
+
+        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+        const auto &support_points = cell->get_fe().get_unit_support_points();
+
+        local_dof_indices.resize(dofs_per_cell);
+        cell->get_active_or_mg_dof_indices(local_dof_indices);
+
+        for (auto f_index : cell->face_indices()) {
+          const auto face = cell->face(f_index);
+          auto id = face->boundary_id();
+
           /*
-           * By convention, query boundary id from the material id of the
-           * neighboring cell and then continue:
+           * Skip periodic boundary faces. For our algorithm these are
+           * interior degrees of freedom (if not simultaneously located at
+           * another boundary as well).
            */
-          id = cell->neighbor(f_index)->material_id();
-
-        } else if (!face->at_boundary()) {
-          /* Bail out if we are in the interior: */
-          continue;
-        }
-
-        hp_fe_face_values.reinit(cell, f_index);
-        const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
-        const auto &mapping =
-            hp_fe_face_values.get_mapping_collection()[cell->active_fe_index()];
-
-        for (unsigned int j : fe_face_values.dof_indices()) {
-          if (!cell->get_fe().has_support_on_face(j, f_index))
+          if (id == Boundary::periodic)
             continue;
 
-          Number boundary_mass = 0.;
-          dealii::Tensor<1, dim, Number> normal;
-
-          for (unsigned int q : fe_face_values.quadrature_point_indices()) {
-            const auto JxW = fe_face_values.JxW(q);
-            const auto phi_i = fe_face_values.shape_value(j, q);
-
-            boundary_mass += phi_i * JxW;
-            normal += phi_i * fe_face_values.normal_vector(q) * JxW;
-          }
-
           /*
-           * Workaround for deal.II 9.7 and older versions:
-           *
-           * For simplices, has_support_on_face() seems to return the wrong
-           * answer (always true). Thus, check whether we accumulated any
-           * boundary mass and if not, bail out.
+           * Check for interior faces neighboring a cell with FE nothing:
            */
-          if (std::abs(boundary_mass) == 0.)
-            continue;
+          const bool neighbor_cell_has_fe_nothing =                      //
+              treat_fe_nothing_as_boundary_ &&                           //
+              !face->at_boundary() &&                                    //
+              cell->neighbor(f_index)->is_active() &&                    //
+              !cell->neighbor(f_index)->is_artificial() &&               //
+              (dynamic_cast<const dealii::FE_Nothing<structdim, dim> *>( //
+                   &cell->neighbor(f_index)->get_fe()) != nullptr);      //
 
-          const auto global_index = local_dof_indices[j];
+          if (neighbor_cell_has_fe_nothing) {
+            /*
+             * By convention, query boundary id from the material id of the
+             * neighboring cell and then continue:
+             */
+            id = cell->neighbor(f_index)->material_id();
 
-          /*
-           * Hand the contribution of a constrained degree of freedom to
-           * its constraining degrees of freedom. Such a degree of freedom
-           * might not be owned by the current rank and we might have to
-           * send the information over to a neighbor.
-           */
-          const auto *entries =
-              affine_constraints.get_constraint_entries(global_index);
-          if (entries != nullptr) {
-            if (cell->is_locally_owned())
-              for (const auto &[master, weight] : *entries)
-                contributions.push_back({master,
-                                         Number(weight) * normal,
-                                         Number(weight) * boundary_mass,
-                                         id});
+          } else if (!face->at_boundary()) {
+            /* Bail out if we are in the interior: */
             continue;
           }
 
-          const auto index = partitioner.global_to_local(global_index);
+          hp_fe_face_values.reinit(cell, f_index);
+          const auto &fe_face_values =
+              hp_fe_face_values.get_present_fe_values();
+          const auto &mapping =
+              hp_fe_face_values
+                  .get_mapping_collection()[cell->active_fe_index()];
 
-          /* Skip nonlocal degrees of freedom: */
-          if (index >= partitioner.locally_owned_size())
-            continue;
+          for (unsigned int j : fe_face_values.dof_indices()) {
+            if (!cell->get_fe().has_support_on_face(j, f_index))
+              continue;
 
-          Point<dim> position =
-              mapping.transform_unit_to_real_cell(cell, support_points[j]);
+            Number boundary_mass = 0.;
+            dealii::Tensor<1, dim, Number> normal;
 
-          /*
-           * Temporarily insert a (wrong) boundary mass value for the
-           * normal mass. We'll fix this later.
-           */
-          preliminary_map.insert(
-              {index, {normal, boundary_mass, boundary_mass, id, position}});
-        } /* j */
-      } /* f */
-    } /* cell */
+            for (unsigned int q : fe_face_values.quadrature_point_indices()) {
+              const auto JxW = fe_face_values.JxW(q);
+              const auto phi_i = fe_face_values.shape_value(j, q);
+
+              boundary_mass += phi_i * JxW;
+              normal += phi_i * fe_face_values.normal_vector(q) * JxW;
+            }
+
+            /*
+             * Workaround for deal.II 9.7 and older versions:
+             *
+             * For simplices, has_support_on_face() seems to return the wrong
+             * answer (always true). Thus, check whether we accumulated any
+             * boundary mass and if not, bail out.
+             */
+            if (std::abs(boundary_mass) == 0.)
+              continue;
+
+            const auto global_index = local_dof_indices[j];
+
+            /*
+             * Hand the contribution of a constrained degree of freedom to
+             * its constraining degrees of freedom. Such a degree of freedom
+             * might not be owned by the current rank and we might have to
+             * send the information over to a neighbor.
+             */
+            const auto *entries =
+                affine_constraints.get_constraint_entries(global_index);
+            if (entries != nullptr) {
+              if (cell->is_locally_owned())
+                for (const auto &[master, weight] : *entries)
+                  contributions.push_back({master,
+                                           Number(weight) * normal,
+                                           Number(weight) * boundary_mass,
+                                           id});
+              continue;
+            }
+
+            const auto index = partitioner.global_to_local(global_index);
+
+            /* Skip nonlocal degrees of freedom: */
+            if (index >= partitioner.locally_owned_size())
+              continue;
+
+            Point<dim> position =
+                mapping.transform_unit_to_real_cell(cell, support_points[j]);
+
+            /*
+             * Temporarily insert a (wrong) boundary mass value for the
+             * normal mass. We'll fix this later.
+             */
+            boundary_entries.push_back(
+                {index, {normal, boundary_mass, boundary_mass, id, position}});
+          } /* j */
+        } /* f */
+      } /* cell */
+    };
+
+    dealii::parallel::apply_to_subranges(
+        std::size_t(0),
+        n_chunks,
+        [&](const std::size_t first, const std::size_t last) {
+          for (auto chunk = first; chunk < last; ++chunk)
+            process_chunk(chunk);
+        },
+        1);
+
+    /*
+     * Create a temporary multimap with the (local) dof index as key:
+     */
+
+    std::multimap<unsigned int, BoundaryData> preliminary_map;
+    std::vector<Contribution> contributions;
+    for (std::size_t chunk = 0; chunk < n_chunks; ++chunk) {
+      preliminary_map.insert(chunk_entries[chunk].begin(),
+                             chunk_entries[chunk].end());
+      contributions.insert(contributions.end(),
+                           chunk_contributions[chunk].begin(),
+                           chunk_contributions[chunk].end());
+    }
 
     /*
      * Send all contributions to the owner of the constraining degree of
