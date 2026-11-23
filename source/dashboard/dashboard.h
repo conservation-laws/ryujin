@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <driver/dashboard_frame.h>
-#include <ryujin/driver/dashboard.h>
+#include <dashboard/frame.h>
+#include <dashboard/settings.h>
+#include <driver/cycle_statistics.h>
 #include <ryujin/interface/task.h>
 
 #include <atomic>
@@ -28,7 +29,7 @@ namespace ryujin
 {
   /**
    * A terminal dashboard for the cycle statistics recorded in a
-   * DashboardData snapshot. The dashboard keeps a short history of
+   * CycleStatistics snapshot. The dashboard keeps a short history of
    * the throughput.
    *
    * @ingroup Driver
@@ -61,9 +62,9 @@ namespace ryujin
      * The background thread redraws the last snapshot as soon as the
      * terminal is resized or the dashboard moves, and advances the
      * animation in between two calls. It stops with the final snapshot
-     * (DashboardData::final_time).
+     * (CycleStatistics::final_time).
      */
-    void show(const DashboardData &data);
+    void show(const CycleStatistics &data);
 
     /**
      * Return the request issued in the run panel since the last call, or
@@ -102,7 +103,7 @@ namespace ryujin
     dashboard::Frame frame_;
 
     /** The last snapshot, redrawn by the background thread. */
-    std::optional<DashboardData> data_;
+    std::optional<CycleStatistics> data_;
 
     /** The recent wall throughput, oldest first. */
     std::deque<double> wall_history_;

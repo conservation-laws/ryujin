@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_theme.h>
+#include <dashboard/theme.h>
 #include <ryujin/base/version_info.h>
 
 #include <string>
@@ -89,6 +89,41 @@ namespace ryujin::dashboard
                         Color::MagentaLight,
                         Color::White},
           .heat = {Color::Blue, Color::Yellow, Color::RedLight, Color::Red},
+      };
+
+    case DashboardColorScheme::everforest:
+      /*
+       * The soft greens of the dark Everforest palette,
+       * https://github.com/sainnhe/everforest
+       */
+      return {
+          .badge = hex(0xa7c080),
+          .badge_ink = hex(0x2d353b),
+          .ink = hex(0x2d353b),
+          .accent = hex(0xa7c080),
+          .highlight = hex(0x83c092),
+          .caption = hex(0xd3c6aa),
+          .good = hex(0xa7c080),
+          .warn = hex(0xdbbc7f),
+          .bad = hex(0xe67e80),
+          .muted = hex(0x859289),
+          .track = hex(0x3d484d),
+          .segments = {hex(0xe67e80),
+                       hex(0xe69875),
+                       hex(0xdbbc7f),
+                       hex(0xa7c080),
+                       hex(0x83c092),
+                       hex(0x7fbbb3),
+                       hex(0xd699b6),
+                       hex(0x8da101),
+                       hex(0x35a77c),
+                       hex(0x3a94c5)},
+          .animation = {hex(0xa7c080),
+                        hex(0x83c092),
+                        hex(0x7fbbb3),
+                        hex(0xdbbc7f),
+                        hex(0xd699b6)},
+          .heat = {hex(0x7fbbb3), hex(0xdbbc7f), hex(0xe69875), hex(0xe67e80)},
       };
 
     case DashboardColorScheme::gruvbox:
@@ -190,6 +225,42 @@ namespace ryujin::dashboard
                         hex(0xd0d0d0),
                         hex(0xffffff)},
           .heat = {hex(0xe4e4e4), hex(0xb2b2b2), hex(0xffffff)},
+      };
+
+    case DashboardColorScheme::nord:
+      /*
+       * The Frost and Aurora colors of the Nord palette,
+       * https://www.nordtheme.com, with a lighter gray than Nord's
+       * nord3 for secondary text, so that it stays readable:
+       */
+      return {
+          .badge = hex(0x88c0d0),
+          .badge_ink = hex(0x2e3440),
+          .ink = hex(0x2e3440),
+          .accent = hex(0x88c0d0),
+          .highlight = hex(0x8fbcbb),
+          .caption = hex(0xd8dee9),
+          .good = hex(0xa3be8c),
+          .warn = hex(0xebcb8b),
+          .bad = hex(0xbf616a),
+          .muted = hex(0x7b88a1),
+          .track = hex(0x3b4252),
+          .segments = {hex(0xbf616a),
+                       hex(0xd08770),
+                       hex(0xebcb8b),
+                       hex(0xa3be8c),
+                       hex(0xb48ead),
+                       hex(0x8fbcbb),
+                       hex(0x88c0d0),
+                       hex(0x81a1c1),
+                       hex(0x5e81ac),
+                       hex(0xd8dee9)},
+          .animation = {hex(0xa3be8c),
+                        hex(0x8fbcbb),
+                        hex(0x88c0d0),
+                        hex(0x81a1c1),
+                        hex(0xb48ead)},
+          .heat = {hex(0x81a1c1), hex(0xebcb8b), hex(0xd08770), hex(0xbf616a)},
       };
 
     case DashboardColorScheme::okabe_ito:

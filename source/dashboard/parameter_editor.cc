@@ -3,10 +3,10 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <dashboard/parameter_editor.h>
 #include <driver/terminal.h>
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/driver/equation.h>
-#include <ryujin/driver/parameter_editor.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/mpi.h>

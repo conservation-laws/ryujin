@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <ryujin/base/compile_time_options.h>
+
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/patterns.h>
 

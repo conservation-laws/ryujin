@@ -382,12 +382,13 @@
  *
  * With <code>ryujin --edit [file]</code> (or <code>--editor</code>), or if
  * the parameter file does not exist in a serial run on an interactive
- * terminal, main() calls edit_parameter_file(). Without a parameter file it
- * starts from the first equation in 2D. Equation::with_parameters constructs
- * the Simulation and the TaskComposition to declare all parameters, which
- * the editor shows in a terminal editor (ParameterModel,
- * run_parameter_editor()) with the colors, the animation, and the music
- * of the Dashboard, as configured in the subsection "M - Logger" (and
+ * terminal, main() opens the parameter editor in
+ * <code>source/dashboard/parameter_editor*.cc</code>. Without a parameter
+ * file it starts from the first equation in 2D. Equation::with_parameters
+ * constructs the Simulation and the TaskComposition to declare all
+ * parameters, which the editor collects in a ParameterModel and shows in a
+ * terminal editor with the colors, the animation, and the music of the
+ * terminal dashboard, as configured in the subsection "M - Logger" (and
  * changed right away when these parameters change). Changing the
  * equation or the dimension opens the editor again for the new equation,
  * keeping all values that still apply. "save" writes the parameter file,
@@ -396,16 +397,6 @@
  * file, and "quit" leaves the editor (and ryujin) without running the
  * simulation. Before discarding unsaved changes the editor asks for a
  * confirmation.
- *
- * <h3>Splash screen</h3>
- *
- * Before running the equation, main() shows a splash screen on rank 0,
- * see play_splash_screen(), if stdout reaches an interactive terminal.
- * By default it shows the logo, the name, and the copyright of ryujin. The
- * option <code>--arcade</code> plays an intro in the style of an arcade
- * game of the eighties instead, waits for a key press, and starts the
- * music "ryujin". The Dashboard keeps it playing, unless the run time
- * parameter "dashboard music" selects a different tune.
  *
  * <h3>Scheduler</h3>
  *

@@ -3,7 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
-#include <driver/dashboard_music.h>
+#include <dashboard/music.h>
 
 #include <deal.II/base/exceptions.h>
 
@@ -240,6 +240,44 @@ namespace ryujin
     };
 
 
+    /*
+     * DashboardMusic::jordan: a folk song for a quiet night in the forest
+     * at 96 beats per minute in G major, plucked, with a strum on the
+     * off-beats.
+     */
+    /* clang-format off */
+    constexpr std::array<Bar, 16> jordan_bars{{
+        {"G3 B3 D4 F#4",  "D6 - . B5 G5 - . B5 D6 - . G6 F#6 - D6 ."}, /* Gmaj7 */
+        {"E3 G3 B3 D4",   "E6 - . D6 B5 - . G5 B5 - - . . . . ."},     /* Em7 */
+        {"C4 E4 G4 B4",   "E6 - . E6 D6 - . C6 B5 - . C6 D6 - . ."},   /* Cmaj7 */
+        {"D4 F#4 A4 C5",  "A5 - - . F#5 - A5 . C6 - - . A5 - . ."},    /* D7 */
+        {"G3 B3 D4 F#4",  "B5 - . D6 G6 - . F#6 E6 - . D6 B5 - . ."},  /* Gmaj7 */
+        {"B3 D4 F#4 A4",  "D6 - . F#6 A6 - . F#6 D6 - - . . . . ."},   /* Bm7 */
+        {"C4 E4 G4 B4",   "G6 - . E6 C6 - . E6 D6 - . C6 B5 - . ."},   /* Cmaj7 */
+        {"D4 F#4 A4 C5",  "A5 - - - - - . . D5 - F#5 . A5 - C6 ."},    /* D7 */
+        {"E3 G3 B3 D4",   "B5 - . G5 E5 - . G5 B5 - . E6 D6 - B5 ."},  /* Em7 */
+        {"C4 E4 G4 B4",   "C6 - . E6 G6 - . E6 C6 - - . . . . ."},     /* Cmaj7 */
+        {"A3 C4 E4 G4",   "A5 - . C6 E6 - . C6 A5 - . G5 E5 - . ."},   /* Am7 */
+        {"D4 F#4 A4 C5",  "F#5 - . A5 D6 - . C6 A5 - - . F#5 - . ."},  /* D7 */
+        {"G3 B3 D4 F#4",  "G5 - . B5 D6 - . G6 F#6 - . D6 B5 - . ."},  /* Gmaj7 */
+        {"E3 G3 B3 D4",   "E6 - . D6 B5 - . G5 E5 - - . . . . ."},     /* Em7 */
+        {"D4 F#4 A4 C5",  "F#5 - . A5 C6 - . A5 F#5 - . E5 D5 - . ."}, /* D7 */
+        {"G3 B3 D4 F#4",  "G5 - - - - - - - . . . . . . . ."},         /* Gmaj7 */
+    }};
+    /* clang-format on */
+
+    constexpr Tune jordan_tune{
+        .tempo = 96.f,
+        .bars = jordan_bars,
+        .bass = "0.......4.......",
+        .arpeggio = "....123.....123.",
+        .kick = "x.......x.......",
+        .snare = "................",
+        .hihat = "....x.......x...",
+        .lead_ratio = 2.f,
+    };
+
+
     /* The tune of @p music, null for DashboardMusic::none: */
     const Tune *find_tune(DashboardMusic music)
     {
@@ -252,6 +290,8 @@ namespace ryujin
         return &matthias_tune;
       case DashboardMusic::wyatt:
         return &wyatt_tune;
+      case DashboardMusic::jordan:
+        return &jordan_tune;
       }
       __builtin_unreachable();
     }

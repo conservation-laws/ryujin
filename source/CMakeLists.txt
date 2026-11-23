@@ -27,13 +27,14 @@ set(CORE_SOURCE_FILES
   base/mpi_ensemble.cc
   base/simd.cc
   base/version_info.cc
+  dashboard/parameter_editor.cc
   discretization/discretization.cc
   discretization/mesh_adaptor.cc
   discretization/offline_data.cc
   discretization/time_integrator.cc
   discretization/time_stepping.cc
   driver/checkpointing.cc
-  driver/dashboard_text.cc
+  driver/cycle_statistics.cc
   driver/environment.cc
   driver/equation.cc
   driver/equation_euler.cc
@@ -48,7 +49,6 @@ set(CORE_SOURCE_FILES
   driver/equation_scalar_convection_diffusion.cc
   driver/equation_shallow_water.cc
   driver/logger.cc
-  driver/parameter_editor.cc
   driver/parameter_model.cc
   driver/scheduler.cc
   driver/terminal.cc
@@ -62,17 +62,17 @@ set(CORE_SOURCE_FILES
 
 if(WITH_FTXUI)
   list(APPEND CORE_SOURCE_FILES
-    driver/dashboard.cc
-    driver/dashboard_animation.cc
-    driver/dashboard_frame.cc
-    driver/dashboard_theme.cc
-    driver/parameter_editor_ui.cc
-    driver/splash_screen.cc
+    dashboard/animation.cc
+    dashboard/dashboard.cc
+    dashboard/frame.cc
+    dashboard/parameter_editor_ui.cc
+    dashboard/splash_screen.cc
+    dashboard/theme.cc
     )
 endif()
 
 if(WITH_MINIAUDIO)
-  list(APPEND CORE_SOURCE_FILES driver/dashboard_music.cc)
+  list(APPEND CORE_SOURCE_FILES dashboard/music.cc)
 endif()
 
 set_property(SOURCE base/version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
@@ -157,6 +157,7 @@ install(TARGETS libryujin
 #
 
 add_executable(ryujin main.cc)
+target_include_directories(ryujin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 deal_ii_setup_target(ryujin)
 target_link_libraries(ryujin libryujin)
