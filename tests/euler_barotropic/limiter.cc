@@ -38,8 +38,12 @@ int main(int argc, char *argv[])
 
   const auto test =
       [&](const state_type &U, const state_type &P, const bounds_type &bounds) {
-        std::cout << "State: " << U << "\nDensity: " << view.density(U)
-                  << "\nBounds: " << bounds[0] << " " << bounds[1] << std::endl;
+        const auto rho = view.density(U);
+        const auto v2 = view.momentum(U).norm_square() / (rho * rho);
+        std::cout << "State: " << U << "\nDensity: " << rho
+                  << "\nSquare of the velocity: " << v2
+                  << "\nBounds: " << bounds[0] << " " << bounds[1] << " "
+                  << bounds[2] << std::endl;
 
         const auto &[l, success] = limiter_view.limit(bounds, U, P);
 
@@ -60,25 +64,37 @@ int main(int argc, char *argv[])
     std::cout << "\nMinimum density violation:" << std::endl;
     auto U = state_type{{0.8, 1.4}};
     auto P = state_type{{-0.1, 0.1}};
-    auto bounds = bounds_type{0.9, 1.1};
+    auto bounds = bounds_type{0.9, 1.1, 9.0};
     test(U, P, bounds);
 
     std::cout << "\nMinimum density violation (eps):" << std::endl;
     U = state_type{{0.9 - 1.0e-10, 1.4}};
     P = state_type{{-1.0e-20, 0.1}};
-    bounds = bounds_type{0.9, 1.1};
+    bounds = bounds_type{0.9, 1.1, 9.0};
     test(U, P, bounds);
 
     std::cout << "\nMaximum density violation:" << std::endl;
     U = state_type{{1.2, 1.4}};
     P = state_type{{0.1, 0.1}};
-    bounds = bounds_type{0.9, 1.1};
+    bounds = bounds_type{0.9, 1.1, 9.0};
     test(U, P, bounds);
 
     std::cout << "\nMaximum density violation (eps):" << std::endl;
     U = state_type{{1.1 + 1.0e-10, 1.4}};
     P = state_type{{1.0e-20, 0.1}};
-    bounds = bounds_type{0.9, 1.1};
+    bounds = bounds_type{0.9, 1.1, 9.0};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum velocity violation:" << std::endl;
+    U = state_type{{1.0, 3.0}};
+    P = state_type{{0.0, 0.1}};
+    bounds = bounds_type{0.5, 1.5, 4.0};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum velocity violation (eps):" << std::endl;
+    U = state_type{{1.0, 2.0 + 1.0e-10}};
+    P = state_type{{0.0, 1.0e-20}};
+    bounds = bounds_type{0.5, 1.5, 4.0};
     test(U, P, bounds);
   }
 
@@ -88,25 +104,43 @@ int main(int argc, char *argv[])
     std::cout << "\nMinimum density bound" << std::endl;
     auto U = state_type{{1.0, 1.4}};
     auto P = state_type{{-0.2, 0.1}};
-    auto bounds = bounds_type{0.9, 1.1};
+    auto bounds = bounds_type{0.9, 1.1, 9.0};
     test(U, P, bounds);
 
     std::cout << "\nMinimum density bound (eps):" << std::endl;
     U = state_type{{0.9 + 1.0e-10, 1.4}};
     P = state_type{{-5.0e-10, 0.1}};
-    bounds = bounds_type{0.9, 1.1};
+    bounds = bounds_type{0.9, 1.1, 9.0};
     test(U, P, bounds);
 
     std::cout << "\nMaximum density bound" << std::endl;
     U = state_type{{1.0, 1.4}};
     P = state_type{{0.2, 0.1}};
-    bounds = bounds_type{0.9, 1.1};
+    bounds = bounds_type{0.9, 1.1, 9.0};
     test(U, P, bounds);
 
     std::cout << "\nMaximum density bound (eps):" << std::endl;
     U = state_type{{1.1 - 1.0e-10, 1.4}};
     P = state_type{{5.0e-10, 0.1}};
-    bounds = bounds_type{0.9, 1.1};
+    bounds = bounds_type{0.9, 1.1, 9.0};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum velocity bound" << std::endl;
+    U = state_type{{1.0, 1.0}};
+    P = state_type{{0.0, 3.0}};
+    bounds = bounds_type{0.5, 1.5, 4.0};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum velocity bound (eps):" << std::endl;
+    U = state_type{{1.0, 2.0 - 1.0e-10}};
+    P = state_type{{0.0, 5.0e-10}};
+    bounds = bounds_type{0.5, 1.5, 4.0};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum velocity bound near vacuum" << std::endl;
+    U = state_type{{1.0e-6, 1.0e-6}};
+    P = state_type{{0.0, 1.0e-4}};
+    bounds = bounds_type{1.0e-7, 1.0e-5, 1.21};
     test(U, P, bounds);
   }
 
