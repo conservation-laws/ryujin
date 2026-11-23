@@ -816,9 +816,6 @@ namespace ryujin
     const auto local_assemble_system = [&](const auto &cell,
                                            auto &scratch,
                                            auto &copy) {
-      /* iterate over locally owned cells and the ghost layer */
-
-      auto &is_locally_owned = copy.is_locally_owned_;
       auto &local_dof_indices = copy.local_dof_indices_;
       auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
 
@@ -832,10 +829,6 @@ namespace ryujin
       auto &hp_fe_values = scratch.hp_fe_values_;
       auto &hp_fe_face_values = scratch.hp_fe_face_values_;
       auto &hp_fe_neighbor_face_values = scratch.hp_fe_neighbor_face_values_;
-
-      is_locally_owned = cell->is_locally_owned(); /* stored in copy object */
-      if (!is_locally_owned)
-        return;
 
       const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
 
@@ -871,7 +864,7 @@ namespace ryujin
           have_inverted_cell = true;
 
         /* skip cells that have no active cells when computing domain size: */
-        if (dofs_per_cell != 0 && cell->is_locally_owned())
+        if (dofs_per_cell != 0)
           cell_measure += Number(JxW);
 
         for (unsigned int j : fe_values.dof_indices()) {
@@ -1027,7 +1020,6 @@ namespace ryujin
       mass_matrix_inverse_view = this->mass_matrix_inverse_->view();
 
     const auto copy_local_to_global = [&](const auto &copy) {
-      const auto &is_locally_owned = copy.is_locally_owned_;
       const auto &dof_indices = copy.local_dof_indices_;
       const auto &neighbor_dof_indices = copy.neighbor_local_dof_indices_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
@@ -1035,9 +1027,6 @@ namespace ryujin
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &interface_cij_matrix = copy.interface_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
-
-      if (!is_locally_owned)
-        return;
 
       distribute_local_to_global(cell_mass_matrix,
                                  dof_indices,
@@ -1173,19 +1162,12 @@ namespace ryujin
       const auto local_assemble_system = [&](const auto &cell,
                                              auto &scratch,
                                              auto &copy) {
-        /* iterate over locally owned cells and the ghost layer */
-
-        auto &is_locally_owned = copy.is_locally_owned_;
         auto &local_dof_indices = copy.local_dof_indices_;
         auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
         auto &interface_incidence_matrix = copy.interface_incidence_matrix_;
         auto &hp_fe_face_values_nodal = scratch.hp_fe_face_values_nodal_;
         auto &hp_fe_neighbor_face_values_nodal =
             scratch.hp_fe_neighbor_face_values_nodal_;
-
-        is_locally_owned = cell->is_locally_owned(); /* stored in copy object */
-        if (!is_locally_owned)
-          return;
 
         const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
 
@@ -1306,14 +1288,10 @@ namespace ryujin
       const auto incidence_matrix_view = this->incidence_matrix_->view();
 
       const auto copy_local_to_global = [&](const auto &copy) {
-        const auto &is_locally_owned = copy.is_locally_owned_;
         const auto &dof_indices = copy.local_dof_indices_;
         const auto &neighbor_dof_indices = copy.neighbor_local_dof_indices_;
         const auto &interface_incidence_matrix =
             copy.interface_incidence_matrix_;
-
-        if (!is_locally_owned)
-          return;
 
         /*
          * Workaround: We need to catch the case dof_indices.size() == 0
