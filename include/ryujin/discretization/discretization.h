@@ -327,8 +327,8 @@ namespace ryujin
      * Recompute the cached mapping after the triangulation, or the
      * transformation(), has changed.
      *
-     * The mapping is a MappingQCache if the selected geometry provides a
-     * Geometry::transformation(), or once a transformation has been set.
+     * The mapping is a MappingQCache for the standard Q_k setup on
+     * quadrilateral or hexahedral meshes.
      */
     void update_mapping();
 

@@ -320,17 +320,11 @@ namespace ryujin
                 FE_DGQ<structdim, dim>(fe_degree));
 
         /*
-         * If the geometry describes the mesh via a forward transformation of
-         * the undeformed triangulation we use a MappingQCache that is filled
-         * in update_mapping():
+         * We use a MappingQCache that is filled in update_mapping(), either
+         * with a MappingQ, or via the forward transformation of the
+         * undeformed triangulation set by the geometry:
          */
-        if (transformation_) {
-          create_mapping_cache();
-        } else {
-          collection_.mapping =
-              std::make_unique<dealii::hp::MappingCollection<structdim, dim>>(
-                  MappingQ<structdim, dim>(mapping_degree));
-        }
+        create_mapping_cache();
 
         collection_.quadrature = std::make_unique<hp::QCollection<structdim>>(
             QGauss<structdim>(quadrature_degree));
@@ -441,20 +435,16 @@ namespace ryujin
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
+    /* Only the standard Q_k setup uses a MappingQCache: */
     if (!mapping_cache_) {
-      if (!transformation_)
-        return;
-
-      /* The geometry or a MeshAdaptor has set a transformation: */
-      using HP_Collection = typename Geometry<structdim, dim>::HP_Collection;
       AssertThrow(
-          collection_type_ == HP_Collection::standard_quadrilaterals,
+          !transformation_,
           ExcMessage("Discretization: A transformation (set by the geometry "
                      "or a mesh adaptor) is only supported for the standard "
                      "Q_k setup on quadrilateral or hexahedral meshes. It "
                      "cannot be used with simplex meshes or with a geometry "
                      "that populates the hp collections itself."));
-      create_mapping_cache();
+      return;
     }
 
     const MappingQ<structdim, dim> mapping(mapping_cache_->get_degree());
