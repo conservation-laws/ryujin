@@ -1,0 +1,6 @@
+n_elements = 1000, chunk_size = 7, n_colors = 2
+sum = 2000
+n_elements = 1000, chunk_size = 1, n_colors = 2
+sum = 2000
+n_elements = 700, chunk_size = 10, n_colors = 70
+sum = 1400
