@@ -172,51 +172,67 @@ namespace ryujin
     this->n_locally_owned_ = locally_owned.n_elements();
 
     /*
-     * Initial renumbering with Cuthill McKee (because we can):
+     * We compute all reorderings on a first, temporary sparsity pattern
+     * and collect them in a single ordering of the locally owned index
+     * range: order[k] is the (current) global index that is placed at the
+     * k-th position. We renumber the dof handler only once at the end.
      */
-
-    DoFRenumbering::Cuthill_McKee(dof_handler);
+    create_constraints_and_sparsity_pattern();
+    const auto &sparsity = *this->sparsity_pattern_;
 
     /*
-     * Reorder all (individual) export indices at the beginning of the
-     * locally_internal index range to achieve a better packing:
-     *
-     * Note: This function might miss export indices that come from
-     * eliminating hanging node and periodicity constraints (which we do
-     * not know at this point because they depend on the renumbering...).
+     * Initial ordering with Cuthill McKee (because we can):
      */
-    DoFRenumbering::export_indices_first(dof_handler,
-                                         mpi_ensemble_.ensemble_communicator(),
-                                         this->n_locally_owned_,
-                                         1);
+    auto order = DoFRenumbering::Cuthill_McKee(sparsity, locally_owned);
+
+    /*
+     * Determine the set of export indices, i.e., the locally owned
+     * indices that are ghosts on other MPI ranks.
+     *
+     * Note: This set might miss export indices that come from eliminating
+     * hanging node and periodicity constraints. We therefore have to
+     * update n_export_indices_ later again.
+     */
+    const auto offset =
+        this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+    IndexSet export_indices(dof_handler.n_dofs());
+    {
+      const Utilities::MPI::Partitioner partitioner(
+          locally_owned,
+          DoFTools::extract_locally_relevant_dofs(dof_handler),
+          mpi_ensemble_.ensemble_communicator());
+      for (const auto &[first, last] : partitioner.import_indices())
+        export_indices.add_range(offset + first, offset + last);
+      export_indices.compress();
+    }
+
+    /*
+     * Reorder all (individual) export indices to the beginning of the
+     * locally owned index range to achieve a better packing:
+     */
+    DoFRenumbering::export_indices_first(
+        order, export_indices, this->n_locally_owned_, 1);
 
     /*
      * Group degrees of freedom that have the same stencil size in warps of
-     * warp_size consecutive indices.
-     *
-     * In order to determine the stencil size we have to create a first,
-     * temporary sparsity pattern:
+     * warp_size consecutive indices:
      */
-    create_constraints_and_sparsity_pattern();
-    this->n_locally_internal_ = DoFRenumbering::internal_range(
-        dof_handler, *this->sparsity_pattern_, warp_size);
+    this->n_locally_internal_ =
+        DoFRenumbering::internal_range(order, sparsity, warp_size);
 
     /*
      * Reorder all (strides of) locally internal indices that contain
      * export indices to the start of the index range. This reordering
      * preserves the binning introduced by
-     * DoFRenumbering::internal_range().
-     *
-     * Note: This function might miss export indices that come from
-     * eliminating hanging node and periodicity constraints (which we do
-     * not know at this point because they depend on the renumbering...).
-     * We therefore have to update n_export_indices_ later again.
+     * DoFRenumbering::internal_range():
      */
     this->n_export_indices_ = DoFRenumbering::export_indices_first(
-        dof_handler,
-        mpi_ensemble_.ensemble_communicator(),
-        this->n_locally_internal_,
-        warp_size);
+        order, export_indices, this->n_locally_internal_, warp_size);
+
+    std::vector<types::global_dof_index> new_order(this->n_locally_owned_);
+    for (unsigned int k = 0; k < this->n_locally_owned_; ++k)
+      new_order[order[k] - offset] = offset + k;
+    dof_handler.renumber_dofs(new_order);
   }
 
 
