@@ -1985,10 +1985,17 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
+    /* With FE_Nothing an interior cell can have boundary degrees of freedom: */
+    const bool have_fe_nothing = treat_fe_nothing_as_boundary_ &&
+                                 discretization_->finite_element().size() > 1;
+
     for (const auto &cell : cells) {
 
       /* Make sure to iterate over the entire locally relevant set: */
       if (cell->is_artificial())
+        continue;
+
+      if (!have_fe_nothing && !cell->at_boundary())
         continue;
 
       const auto &finite_element = cell->get_fe();
