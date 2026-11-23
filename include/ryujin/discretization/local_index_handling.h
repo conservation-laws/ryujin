@@ -7,13 +7,16 @@
 
 #include <ryujin/base/compile_time_options.h>
 
+#include <deal.II/base/index_set.h>
 #include <deal.II/base/partitioner.h>
 #include <deal.II/dofs/dof_handler.h>
-#include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparsity_tools.h>
+
+#include <map>
+#include <vector>
 
 namespace ryujin
 {
@@ -85,123 +88,108 @@ namespace ryujin
   namespace DoFRenumbering
   {
     /**
-     * Import the Cuthill McKee reordering from deal.II into the current
-     * namespace.
-     */
-    using dealii::DoFRenumbering::Cuthill_McKee;
-
-    /**
-     * Reorder all (strides of) locally internal indices that contain
-     * export indices to the start of the index range.
+     * Compute a Cuthill McKee ordering of the locally owned index range
+     * from the locally owned block of the sparsity pattern @p sparsity.
      *
-     * This renumbering requires MPI communication in order to determine
-     * the set of export indices.
+     * The function returns the ordering as a vector @p order of global
+     * indices: order[k] is the locally owned index that is placed at the
+     * k-th position of the locally owned index range. The functions
+     * export_indices_first() and internal_range() reorder such a vector
+     * further.
      *
      * @ingroup FiniteElement
      */
-    template <int structdim, int dim>
-    unsigned int
-    export_indices_first(dealii::DoFHandler<structdim, dim> &dof_handler,
-                         const MPI_Comm &mpi_communicator,
-                         const unsigned int n_locally_internal,
-                         const std::size_t warp_size)
+    inline std::vector<dealii::types::global_dof_index>
+    Cuthill_McKee(const dealii::DynamicSparsityPattern &sparsity,
+                  const dealii::IndexSet &locally_owned)
     {
       using namespace dealii;
-
-      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-      const auto n_locally_owned = locally_owned.n_elements();
 
       /* The locally owned index range has to be contiguous */
       Assert(locally_owned.is_contiguous() == true,
              dealii::ExcMessage(
                  "Need a contiguous set of locally owned indices."));
 
+      const auto n_locally_owned = locally_owned.n_elements();
+      if (n_locally_owned == 0)
+        return {};
+
       /* Offset to translate from global to local index range */
-      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
+      const auto offset = *locally_owned.begin();
 
-      const auto locally_relevant =
-          DoFTools::extract_locally_relevant_dofs(dof_handler);
-
-      /* Create a temporary MPI partitioner: */
-
-      Utilities::MPI::Partitioner partitioner(
-          locally_owned, locally_relevant, mpi_communicator);
-
-      IndexSet export_indices(n_locally_owned);
-      for (const auto &it : partitioner.import_indices()) {
-        export_indices.add_range(it.first, it.second);
-      }
-
-      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
-
-      /*
-       * First pass: reorder all strides containing export indices and mark
-       * all other indices with numbers::invalid_dof_index:
-       */
-
-      unsigned int n_export_indices = 0;
-
-      Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
-
-      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
-        bool export_index_present = false;
-        for (unsigned int j = 0; j < warp_size; ++j) {
-          if (export_indices.is_element(i + j)) {
-            export_index_present = true;
-            break;
-          }
+      /* Copy the locally owned block in local numbering: */
+      DynamicSparsityPattern local_sparsity(n_locally_owned, n_locally_owned);
+      std::vector<types::global_dof_index> columns;
+      for (unsigned int i = 0; i < n_locally_owned; ++i) {
+        columns.clear();
+        const auto row_length = sparsity.row_length(offset + i);
+        for (unsigned int j = 0; j < row_length; ++j) {
+          const auto column = sparsity.column_number(offset + i, j);
+          if (column >= offset && column < offset + n_locally_owned)
+            columns.push_back(column - offset);
         }
-
-        if (export_index_present) {
-          Assert(n_export_indices % warp_size == 0, dealii::ExcInternalError());
-          for (unsigned int j = 0; j < warp_size; ++j) {
-            new_order[i + j] = offset + n_export_indices++;
-          }
-        } else {
-          for (unsigned int j = 0; j < warp_size; ++j)
-            new_order[i + j] = dealii::numbers::invalid_dof_index;
-        }
+        local_sparsity.add_entries(i, columns.begin(), columns.end(), true);
       }
 
-#if DEBUG
-      unsigned int n_other = 0;
-      for (unsigned int i = n_locally_internal; i < n_locally_owned; ++i)
-        if (export_indices.is_element(i))
-          n_other++;
+      std::vector<types::global_dof_index> new_indices(n_locally_owned);
+      SparsityTools::reorder_Cuthill_McKee(local_sparsity, new_indices);
 
-      Assert(n_other + n_export_indices >= export_indices.n_elements(),
-             dealii::ExcInternalError());
-#endif
+      std::vector<types::global_dof_index> order(n_locally_owned);
+      for (unsigned int i = 0; i < n_locally_owned; ++i)
+        order[new_indices[i]] = offset + i;
 
-      unsigned int running_index = n_export_indices;
+      return order;
+    }
 
-      /*
-       * Second pass: append the rest:
-       */
 
-      for (unsigned int i = 0; i < n_locally_internal; i += warp_size) {
-        if (new_order[i] == dealii::numbers::invalid_dof_index) {
-          for (unsigned int j = 0; j < warp_size; ++j) {
-            Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
-                   dealii::ExcInternalError());
-            new_order[i + j] = offset + running_index++;
-          }
-        }
-      }
+    /**
+     * Reorder all (strides of) locally internal indices that contain
+     * export indices to the start of the index range.
+     *
+     * The function operates on an ordering @p order of the locally owned
+     * index range (see Cuthill_McKee()) and moves all strides of @p
+     * warp_size consecutive positions in [0, @p n_locally_internal) that
+     * contain an element of @p export_indices to the front. The relative
+     * order of strides is preserved. Returns the number of positions
+     * occupied by these strides.
+     *
+     * @ingroup FiniteElement
+     */
+    inline unsigned int
+    export_indices_first(std::vector<dealii::types::global_dof_index> &order,
+                         const dealii::IndexSet &export_indices,
+                         const unsigned int n_locally_internal,
+                         const std::size_t warp_size)
+    {
+      Assert(n_locally_internal <= order.size(), dealii::ExcInternalError());
+      Assert(n_locally_internal % warp_size == 0, dealii::ExcInternalError());
 
-      Assert(running_index == n_locally_internal, dealii::ExcInternalError());
+      const auto contains_export_index = [&](const unsigned int i) {
+        for (unsigned int j = 0; j < warp_size; ++j)
+          if (export_indices.is_element(order[i + j]))
+            return true;
+        return false;
+      };
 
-      for (unsigned int i = n_locally_internal; i < n_locally_owned; i++) {
-        new_order[i] = offset + running_index++;
-      }
+      std::vector<dealii::types::global_dof_index> new_order;
+      new_order.reserve(order.size());
 
-      Assert(running_index == n_locally_owned, dealii::ExcInternalError());
+      /* First pass: all strides containing export indices: */
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size)
+        if (contains_export_index(i))
+          new_order.insert(new_order.end(), &order[i], &order[i] + warp_size);
 
-      dof_handler.renumber_dofs(new_order);
+      const unsigned int n_export_indices = new_order.size();
 
-      Assert(n_export_indices % warp_size == 0, dealii::ExcInternalError());
-      Assert(n_export_indices <= n_locally_internal,
-             dealii::ExcInternalError());
+      /* Second pass: append the rest: */
+      for (unsigned int i = 0; i < n_locally_internal; i += warp_size)
+        if (!contains_export_index(i))
+          new_order.insert(new_order.end(), &order[i], &order[i] + warp_size);
+
+      new_order.insert(
+          new_order.end(), order.begin() + n_locally_internal, order.end());
+
+      order = std::move(new_order);
       return n_export_indices;
     }
 
@@ -309,32 +297,20 @@ namespace ryujin
      * \text{n_locally_owned})\f$ is available that groups dofs with same
      * stencil size in "warps" of @p warp_size consecutive indices.
      *
-     * Returns the right boundary n_internal of the internal index range.
+     * The function operates on an ordering @p order of the locally owned
+     * index range (see Cuthill_McKee()). Returns the right boundary
+     * n_internal of the internal index range.
      *
      * @ingroup FiniteElement
      */
-    template <int structdim, int dim>
-    unsigned int internal_range(dealii::DoFHandler<structdim, dim> &dof_handler,
-                                const dealii::DynamicSparsityPattern &sparsity,
-                                const std::size_t warp_size)
+    inline unsigned int
+    internal_range(std::vector<dealii::types::global_dof_index> &order,
+                   const dealii::DynamicSparsityPattern &sparsity,
+                   const std::size_t warp_size)
     {
-      using namespace dealii;
-
-      const auto &locally_owned = dof_handler.locally_owned_dofs();
-      const auto n_locally_owned = locally_owned.n_elements();
-
-      /* The locally owned index range has to be contiguous */
-
-      Assert(locally_owned.is_contiguous() == true,
-             dealii::ExcMessage(
-                 "Need a contiguous set of locally owned indices."));
-
-      /* Offset to translate from global to local index range */
-      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
-
       using dof_type = dealii::types::global_dof_index;
-      std::vector<dof_type> new_order(n_locally_owned);
-      dof_type current_index = offset;
+      std::vector<dof_type> new_order;
+      new_order.reserve(order.size());
 
       /*
        * Sort degrees of freedom into a map grouped by stencil size. Write
@@ -342,34 +318,30 @@ namespace ryujin
        * consecutive indices with same stencil size.
        */
 
-      std::map<unsigned int, std::set<dof_type>> bins;
+      std::map<unsigned int, std::vector<dof_type>> bins;
 
-      for (unsigned int i = 0; i < n_locally_owned; ++i) {
-        const dof_type index = i;
-        const unsigned int row_length = sparsity.row_length(offset + index);
-        bins[row_length].insert(index);
+      for (const auto index : order) {
+        const unsigned int row_length = sparsity.row_length(index);
+        auto &bin = bins[row_length];
+        bin.push_back(index);
 
-        if (bins[row_length].size() == warp_size) {
-          for (const auto &index : bins[row_length])
-            new_order[index] = current_index++;
+        if (bin.size() == warp_size) {
+          new_order.insert(new_order.end(), bin.begin(), bin.end());
           bins.erase(row_length);
         }
       }
 
-      unsigned int n_locally_internal = current_index - offset;
+      const unsigned int n_locally_internal = new_order.size();
 
       /* Write out the rest. */
 
-      for (const auto &entries : bins) {
-        Assert(entries.second.size() > 0, ExcInternalError());
-        for (const auto &index : entries.second)
-          new_order[index] = current_index++;
-      }
-      Assert(current_index == offset + n_locally_owned, ExcInternalError());
+      for (const auto &[row_length, bin] : bins)
+        new_order.insert(new_order.end(), bin.begin(), bin.end());
+      Assert(new_order.size() == order.size(), dealii::ExcInternalError());
 
-      dof_handler.renumber_dofs(new_order);
+      order = std::move(new_order);
 
-      Assert(n_locally_internal % warp_size == 0, ExcInternalError());
+      Assert(n_locally_internal % warp_size == 0, dealii::ExcInternalError());
       return n_locally_internal;
     }
   } // namespace DoFRenumbering
