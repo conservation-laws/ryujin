@@ -722,14 +722,11 @@ namespace ryujin
     const auto &partitioner = *this->scalar_partitioner_;
 
     /*
-     * A locally owned cell writes to the rows of its degrees of freedom,
-     * or to the rows of the constraining degrees of freedom:
+     * A cell writes to the rows of its degrees of freedom, or to the rows of
+     * the constraining degrees of freedom:
      */
     const auto get_conflict_indices = [&](const auto &cell) {
       boost::container::small_vector<types::global_dof_index, 64> indices;
-      if (!cell->is_locally_owned())
-        return indices;
-
       thread_local std::vector<types::global_dof_index> dof_indices;
       dof_indices.resize(cell->get_fe().n_dofs_per_cell());
       cell->get_dof_indices(dof_indices);
@@ -750,9 +747,14 @@ namespace ryujin
      */
     constexpr unsigned int chunk_size = 16384;
 
+    const CellIterator begin(IteratorFilters::LocallyOwnedCell(),
+                             dof_handler.begin_active());
+    const CellIterator end(IteratorFilters::LocallyOwnedCell(),
+                           dof_handler.end());
+
     colored_cell_chunks_ = WorkStream::make_colored_chunks(
-        dof_handler.begin_active(),
-        dof_handler.end(),
+        begin,
+        end,
         chunk_size,
         partitioner.locally_owned_size() + partitioner.n_ghost_indices(),
         get_conflict_indices);
