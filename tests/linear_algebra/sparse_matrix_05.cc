@@ -132,8 +132,11 @@ int main(int argc, char *argv[])
         else
           cell_matrix(i, j) = -std::pow(10., mpi_rank);
 
-    ryujin::distribute_local_to_global(
-        cell_matrix, dof_indices, affine_constraints, sparse_matrix);
+    ryujin::distribute_local_to_global(cell_matrix,
+                                       dof_indices,
+                                       affine_constraints,
+                                       *partitioner,
+                                       sparse_matrix_view);
   }
 
   sparse_matrix_view.compress(dealii::VectorOperation::add);

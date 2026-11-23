@@ -506,6 +506,10 @@ namespace ryujin
    * @note For a vector-valued matrix with n_comp > 1 the @p cell_matrix
    * must be a container with a subscript operator[] returning a matrix for
    * each component.
+   *
+   * @note The function writes through a (host) view of the matrix. It can
+   * be called concurrently as long as distinct threads write to distinct
+   * rows.
    */
   template <typename Number,
             int n_comp,
@@ -517,7 +521,13 @@ namespace ryujin
       const std::vector<dealii::types::global_dof_index> &dof_indices_row,
       const std::vector<dealii::types::global_dof_index> &dof_indices_column,
       const dealii::AffineConstraints<Number> &affine_constraints,
-      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix);
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      const SparseMatrixView<Number,
+                             n_comp,
+                             warp_size,
+                             simd_length,
+                             dealii::MemorySpace::Host,
+                             true> &sparse_matrix_view);
 
 
   /*
@@ -528,13 +538,18 @@ namespace ryujin
             int n_comp,
             int warp_size,
             int simd_length,
-            typename FullMatrix,
-            typename Vector>
+            typename FullMatrix>
   void distribute_local_to_global(
       const FullMatrix &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices,
       const dealii::AffineConstraints<Number> &affine_constraints,
-      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix);
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      const SparseMatrixView<Number,
+                             n_comp,
+                             warp_size,
+                             simd_length,
+                             dealii::MemorySpace::Host,
+                             true> &sparse_matrix_view);
 
 
 #ifndef DOXYGEN
@@ -1632,9 +1647,14 @@ namespace ryujin
       const FM &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices_row,
       const std::vector<dealii::types::global_dof_index> &dof_indices_column,
-      const dealii::AffineConstraints<Number> &affine_constraints
-      [[maybe_unused]],
-      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix)
+      const dealii::AffineConstraints<Number> &affine_constraints,
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      const SparseMatrixView<Number,
+                             n_comp,
+                             warp_size,
+                             simd_length,
+                             dealii::MemorySpace::Host,
+                             true> &sparse_matrix_view)
   {
     constexpr bool is_matrix = std::is_same_v<FM, dealii::FullMatrix<Number>>;
     constexpr bool is_array =
@@ -1656,11 +1676,7 @@ namespace ryujin
       }
     }
 
-    const auto sparse_matrix_view = sparse_matrix.view();
-
-    const auto &sparsity_pattern = sparse_matrix.sparsity_pattern();
-    const auto sparsity_pattern_view = sparsity_pattern.view();
-    const auto &partitioner = sparsity_pattern.partitioner();
+    const auto &sparsity_pattern_view = sparse_matrix_view.sparsity_pattern();
 
     /*
      * Helper that inserts a single entry into the matrix indexed by (r, c)
@@ -1700,11 +1716,11 @@ namespace ryujin
               const auto &line =
                   *affine_constraints.get_constraint_entries(j_global);
               for (const auto &[k_global, c_k] : line) {
-                const auto k = partitioner->global_to_local(k_global);
+                const auto k = partitioner.global_to_local(k_global);
                 insert_entry(r, c, i, k, c_i * c_k);
               }
             } else {
-              const auto j = partitioner->global_to_local(j_global);
+              const auto j = partitioner.global_to_local(j_global);
               insert_entry(r, c, i, j, c_i);
             }
           }
@@ -1716,11 +1732,11 @@ namespace ryujin
       if (affine_constraints.is_constrained(i_global)) {
         const auto &line = *affine_constraints.get_constraint_entries(i_global);
         for (const auto &[k_global, c_k] : line) {
-          const auto k = partitioner->global_to_local(k_global);
+          const auto k = partitioner.global_to_local(k_global);
           iterate_over_row_entries(r, k, c_k);
         }
       } else {
-        const auto i = partitioner->global_to_local(i_global);
+        const auto i = partitioner.global_to_local(i_global);
         iterate_over_row_entries(r, i, Number(1.));
       }
     }
@@ -1736,7 +1752,13 @@ namespace ryujin
       const FM &cell_matrix,
       const std::vector<dealii::types::global_dof_index> &dof_indices,
       const dealii::AffineConstraints<Number> &affine_constraints,
-      SparseMatrix<Number, n_comp, warp_size, simd_length> &sparse_matrix)
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      const SparseMatrixView<Number,
+                             n_comp,
+                             warp_size,
+                             simd_length,
+                             dealii::MemorySpace::Host,
+                             true> &sparse_matrix_view)
   {
     constexpr bool is_matrix = std::is_same_v<FM, dealii::FullMatrix<Number>>;
     constexpr bool is_array =
@@ -1747,7 +1769,8 @@ namespace ryujin
                                dof_indices,
                                dof_indices,
                                affine_constraints,
-                               sparse_matrix);
+                               partitioner,
+                               sparse_matrix_view);
   }
 
 #endif

@@ -13,6 +13,8 @@
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/interface/offline_data.h>
 
+#include <deal.II/base/iterator_range.h>
+#include <deal.II/grid/filtered_iterator.h>
 
 #include <memory>
 #include <string>
@@ -162,6 +164,16 @@ namespace ryujin
 
     std::vector<ScalarHostVector<float>> level_lumped_mass_matrix_;
 
+    using CellIterator = dealii::FilteredIterator<
+        typename dealii::DoFHandler<structdim, dim>::active_cell_iterator>;
+
+    /**
+     * Chunks of locally owned cells grouped by color, see
+     * WorkStream::make_colored_chunks().
+     */
+    std::vector<std::vector<dealii::IteratorRange<CellIterator>>>
+        colored_cell_chunks_;
+
     //@}
     /**
      * @name Internal methods
@@ -219,6 +231,14 @@ namespace ryujin
      * @note This method populates various OfflineData internal data structures.
      */
     void create_index_maps();
+
+    /**
+     * Group the locally owned cells into colored chunks for thread-parallel
+     * assembly. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void color_cells();
 
     /**
      * Set up support_points(). Internally used in update_geometry().

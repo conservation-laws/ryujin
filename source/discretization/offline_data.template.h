@@ -9,6 +9,7 @@
 #include <ryujin/base/convenience_macros.h>
 #include <ryujin/base/loop.h>
 #include <ryujin/base/simd.h>
+#include <ryujin/base/work_stream.h>
 #include <ryujin/discretization/discretization.h>
 #include <ryujin/discretization/local_index_handling.h>
 #include <ryujin/discretization/offline_data.h>
@@ -17,7 +18,6 @@
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>
-#include <deal.II/base/work_stream.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_nothing.h>
@@ -25,6 +25,8 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
+
+#include <boost/container/small_vector.hpp>
 
 #include <atomic>
 
@@ -114,11 +116,15 @@ namespace ryujin
       create_index_maps();
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - matrix storage");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - cell coloring");
+      color_cells();
+    }
+    {
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - matrix storage");
       allocate_matrices();
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - coupling pairs");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.7 topology - coupling pairs");
       create_coupling_boundary_pairs();
     }
 
@@ -126,7 +132,7 @@ namespace ryujin
     level_lumped_mass_matrix_.clear();
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.7 topology - multigrid data");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.8 topology - multigrid data");
       allocate_multigrid_data();
     }
   }
@@ -702,6 +708,59 @@ namespace ryujin
   }
 
 
+  /*
+   * Populates:
+   *     colored_cell_chunks_
+   */
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::color_cells()
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
+
+    const auto &dof_handler = discretization_->dof_handler();
+    const auto &affine_constraints = this->affine_constraints();
+    const auto &partitioner = *this->scalar_partitioner_;
+
+    /*
+     * A cell writes to the rows of its degrees of freedom, or to the rows of
+     * the constraining degrees of freedom:
+     */
+    const auto get_conflict_indices = [&](const auto &cell) {
+      boost::container::small_vector<types::global_dof_index, 64> indices;
+      thread_local std::vector<types::global_dof_index> dof_indices;
+      dof_indices.resize(cell->get_fe().n_dofs_per_cell());
+      cell->get_dof_indices(dof_indices);
+      for (const auto dof : dof_indices) {
+        const auto *entries = affine_constraints.get_constraint_entries(dof);
+        if (entries == nullptr)
+          indices.push_back(partitioner.global_to_local(dof));
+        else
+          for (const auto &[master, weight] : *entries)
+            indices.push_back(partitioner.global_to_local(master));
+      }
+      return indices;
+    };
+
+    /*
+     * A fixed chunk size so that the result of assembly does not depend on
+     * the number of threads:
+     */
+    constexpr unsigned int chunk_size = 16384;
+
+    const CellIterator begin(IteratorFilters::LocallyOwnedCell(),
+                             dof_handler.begin_active());
+    const CellIterator end(IteratorFilters::LocallyOwnedCell(),
+                           dof_handler.end());
+
+    colored_cell_chunks_ = WorkStream::make_colored_chunks(
+        begin,
+        end,
+        chunk_size,
+        partitioner.locally_owned_size() + partitioner.n_ghost_indices(),
+        get_conflict_indices);
+  }
+
+
   template <int structdim, int dim, typename Number>
   void OfflineData<structdim, dim, Number>::allocate_matrices()
   {
@@ -737,8 +796,8 @@ namespace ryujin
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
-    const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
+    const auto &partitioner = *this->scalar_partitioner_;
 
     this->mass_matrix_->zero_out();
     this->betaij_matrix_->zero_out();
@@ -748,7 +807,8 @@ namespace ryujin
       this->incidence_matrix_->zero_out();
     }
 
-    this->measure_of_omega_ = 0.;
+    std::vector<Number> cell_measures(
+        discretization_->triangulation().n_active_cells());
 
     std::atomic<bool> have_inverted_cell = false;
 
@@ -829,6 +889,8 @@ namespace ryujin
           } /* for i */
         } /* for j */
       } /* for q */
+
+      cell_measures[cell->active_cell_index()] = cell_measure;
 
       /*
        * For a discontinuous finite element ansatz we need to assemble
@@ -954,6 +1016,16 @@ namespace ryujin
       }
     };
 
+    /*
+     * The copier runs concurrently: create all views up front.
+     */
+    const auto mass_matrix_view = this->mass_matrix_->view();
+    const auto cij_matrix_view = this->cij_matrix_->view();
+    const auto betaij_matrix_view = this->betaij_matrix_->view();
+    decltype(this->mass_matrix_inverse_->view()) mass_matrix_inverse_view;
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_view = this->mass_matrix_inverse_->view();
+
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
       const auto &dof_indices = copy.local_dof_indices_;
@@ -963,7 +1035,6 @@ namespace ryujin
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &interface_cij_matrix = copy.interface_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
-      const auto &cell_measure = copy.cell_measure_;
 
       if (!is_locally_owned)
         return;
@@ -971,10 +1042,14 @@ namespace ryujin
       distribute_local_to_global(cell_mass_matrix,
                                  dof_indices,
                                  affine_constraints,
-                                 *this->mass_matrix_);
+                                 partitioner,
+                                 mass_matrix_view);
 
-      distribute_local_to_global(
-          cell_cij_matrix, dof_indices, affine_constraints, *this->cij_matrix_);
+      distribute_local_to_global(cell_cij_matrix,
+                                 dof_indices,
+                                 affine_constraints,
+                                 partitioner,
+                                 cij_matrix_view);
 
       /*
        * Workaround: We need to catch the case local_dof_indices.size() == 0
@@ -987,7 +1062,8 @@ namespace ryujin
                                        dof_indices,
                                        neighbor_dof_indices[f_index],
                                        affine_constraints,
-                                       *this->cij_matrix_);
+                                       partitioner,
+                                       cij_matrix_view);
           }
         }
       }
@@ -995,19 +1071,18 @@ namespace ryujin
       distribute_local_to_global(cell_betaij_matrix,
                                  dof_indices,
                                  affine_constraints,
-                                 *this->betaij_matrix_);
+                                 partitioner,
+                                 betaij_matrix_view);
 
       if (discretization_->have_discontinuous_ansatz())
         distribute_local_to_global(cell_mass_matrix_inverse,
                                    dof_indices,
                                    affine_constraints,
-                                   *this->mass_matrix_inverse_);
-
-      this->measure_of_omega_ += cell_measure;
+                                   partitioner,
+                                   mass_matrix_inverse_view);
     };
 
-    WorkStream::run(dof_handler.begin_active(),
-                    dof_handler.end(),
+    WorkStream::run(colored_cell_chunks_,
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<structdim, dim>(*discretization_),
@@ -1036,6 +1111,10 @@ namespace ryujin
       this->mass_matrix_inverse_->view().update_ghost_rows();
     }
 
+    /* Sum up in a fixed order that does not depend on the threads: */
+    this->measure_of_omega_ = 0.;
+    for (const auto cell_measure : cell_measures)
+      this->measure_of_omega_ += cell_measure;
     this->measure_of_omega_ = Utilities::MPI::sum(
         this->measure_of_omega_, mpi_ensemble_.ensemble_communicator());
 
@@ -1224,6 +1303,8 @@ namespace ryujin
         }
       };
 
+      const auto incidence_matrix_view = this->incidence_matrix_->view();
+
       const auto copy_local_to_global = [&](const auto &copy) {
         const auto &is_locally_owned = copy.is_locally_owned_;
         const auto &dof_indices = copy.local_dof_indices_;
@@ -1245,14 +1326,14 @@ namespace ryujin
                                          dof_indices,
                                          neighbor_dof_indices[f_index],
                                          affine_constraints,
-                                         *this->incidence_matrix_);
+                                         partitioner,
+                                         incidence_matrix_view);
             }
           }
         }
       };
 
-      WorkStream::run(dof_handler.begin_active(),
-                      dof_handler.end(),
+      WorkStream::run(colored_cell_chunks_,
                       local_assemble_system,
                       copy_local_to_global,
                       AssemblyScratchData<structdim, dim>(*discretization_),
