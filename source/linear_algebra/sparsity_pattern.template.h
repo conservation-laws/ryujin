@@ -10,9 +10,12 @@
 #include <ryujin/base/simd.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 
+#include <deal.II/base/parallel.h>
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparsity_pattern.h>
+
+#include <algorithm>
 
 namespace ryujin
 {
@@ -65,26 +68,51 @@ namespace ryujin
         partitioner->locally_owned_size() + partitioner->n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern in local indexing.
+     * First, create a static sparsity pattern in local indexing. We
+     * translate the rows of locally owned degrees of freedom in parallel.
+     * Symmetrizing adds entries to the ghost rows only, which we therefore
+     * set up afterwards and make unique. SparsityPattern::copy_from() sorts
+     * the rows.
      */
 
-    dealii::DynamicSparsityPattern dsp_local(n_locally_relevant_dofs,
-                                             n_locally_relevant_dofs);
-    for (unsigned int i = 0; i < n_locally_relevant_dofs; ++i) {
-      const auto global_row = partitioner->local_to_global(i);
-      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it) {
-        const auto global_column = it->column();
-        const auto j = partitioner->global_to_local(global_column);
-        dsp_local.add(i, j);
+    std::vector<std::vector<unsigned int>> rows(n_locally_relevant_dofs);
 
-        if (symmetrize_ghost_range && //
-            i < n_locally_owned_dofs_ && j >= n_locally_owned_dofs_)
-          dsp_local.add(j, i);
+    const auto translate_row = [&](const unsigned int i) {
+      const auto global_row = partitioner->local_to_global(i);
+      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it)
+        rows[i].push_back(partitioner->global_to_local(it->column()));
+    };
+
+    dealii::parallel::apply_to_subranges(
+        0u,
+        n_locally_owned_dofs_,
+        [&](const unsigned int begin, const unsigned int end) {
+          for (unsigned int i = begin; i < end; ++i)
+            translate_row(i);
+        },
+        4096);
+
+    for (auto i = n_locally_owned_dofs_; i < n_locally_relevant_dofs; ++i)
+      translate_row(i);
+
+    if (symmetrize_ghost_range) {
+      for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i)
+        for (const auto j : rows[i])
+          if (j >= n_locally_owned_dofs_)
+            rows[j].push_back(i);
+
+      for (auto i = n_locally_owned_dofs_; i < n_locally_relevant_dofs; ++i) {
+        std::sort(rows[i].begin(), rows[i].end());
+        rows[i].erase(std::unique(rows[i].begin(), rows[i].end()),
+                      rows[i].end());
       }
     }
 
     dealii::SparsityPattern sparsity;
-    sparsity.copy_from(dsp_local);
+    sparsity.copy_from(n_locally_relevant_dofs,
+                       n_locally_relevant_dofs,
+                       rows.begin(),
+                       rows.end());
 
     Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
     Assert(n_internal_dofs % warp_size == 0, dealii::ExcInternalError());
@@ -116,66 +144,86 @@ namespace ryujin
             "sparsity_pattern_indices_transposed",
             sparsity.n_nonzero_elements());
 
-    /* Vectorized part: */
+    /*
+     * Position of the entry (row, column) in the transposed row. Rows of
+     * the vectorized part are stored interleaved in warps of warp_size rows:
+     */
+    const auto transposed_position = [&](const unsigned int row,
+                                         const unsigned int column) {
+      const std::size_t position = sparsity(column, row);
+      if (column >= n_internal_dofs)
+        return position;
+      const unsigned int my_row_length = sparsity.row_length(column);
+      const std::size_t position_diag = sparsity(column, column);
+      const std::size_t pos_within_row = position - position_diag;
+      const unsigned int lane = column % warp_size;
+      return position - lane * my_row_length - pos_within_row + lane +
+             pos_within_row * warp_size;
+    };
+
+    /*
+     * Compute all row starts first. This allows us to fill the rows in
+     * parallel. All rows of a warp in the vectorized part have the same
+     * length:
+     */
 
     row_starts_host_[0] = 0;
-
-    unsigned int *col_ptr = column_indices_host_.data();
-    unsigned int *transposed_ptr = indices_transposed_host_.data();
-
-    for (unsigned int i = 0; i < n_internal_dofs; i += warp_size) {
-      auto jts = generate_iterators<warp_size>(
-          [&](auto k) { return sparsity.begin(i + k); });
-
-      for (; jts[0] != sparsity.end(i); increment_iterators(jts))
-        for (unsigned int k = 0; k < warp_size; ++k) {
-          const unsigned int column = jts[k]->column();
-          *col_ptr++ = column;
-          const std::size_t position = sparsity(column, i + k);
-          if (column < n_internal_dofs) {
-            const unsigned int my_row_length = sparsity.row_length(column);
-            const std::size_t position_diag = sparsity(column, column);
-            const std::size_t pos_within_row = position - position_diag;
-            const unsigned int lane = column % warp_size;
-            *transposed_ptr++ = position - lane * my_row_length -
-                                pos_within_row + lane +
-                                pos_within_row * warp_size;
-          } else
-            *transposed_ptr++ = position;
-        }
-
+    for (unsigned int i = 0; i < n_internal_dofs; i += warp_size)
       row_starts_host_[i / warp_size + 1] =
-          col_ptr - column_indices_host_.data();
-    }
-
-    /* Rest: */
+          row_starts_host_[i / warp_size] + warp_size * sparsity.row_length(i);
 
     row_starts_host_[n_internal_dofs] =
         row_starts_host_[n_internal_dofs / warp_size];
 
-    for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i) {
-      for (auto j = sparsity.begin(i); j != sparsity.end(i); ++j) {
-        const unsigned int column = j->column();
-        *col_ptr++ = column;
-        const std::size_t position = sparsity(column, i);
-        if (column < n_internal_dofs) {
-          const unsigned int my_row_length = sparsity.row_length(column);
-          const std::size_t position_diag = sparsity(column, column);
-          const std::size_t pos_within_row = position - position_diag;
-          const unsigned int lane = column % warp_size;
-          *transposed_ptr++ = position - lane * my_row_length - pos_within_row +
-                              lane + pos_within_row * warp_size;
-        } else
-          *transposed_ptr++ = position;
-      }
-      row_starts_host_[i + 1] = col_ptr - column_indices_host_.data();
-    }
+    for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i)
+      row_starts_host_[i + 1] = row_starts_host_[i] + sparsity.row_length(i);
 
-#ifdef DEBUG
-    const auto distance = std::distance(column_indices_host_.data(), col_ptr);
-    Assert(static_cast<std::size_t>(distance) == column_indices_host_.size(),
+    Assert(row_starts_host_[sparsity.n_rows()] == column_indices_host_.size(),
            dealii::ExcInternalError());
-#endif
+
+    /* Vectorized part: */
+
+    dealii::parallel::apply_to_subranges(
+        0u,
+        n_internal_dofs / warp_size,
+        [&](const unsigned int begin, const unsigned int end) {
+          for (unsigned int warp = begin; warp < end; ++warp) {
+            const unsigned int i = warp * warp_size;
+            auto position = row_starts_host_[warp];
+
+            auto jts = generate_iterators<warp_size>(
+                [&](auto k) { return sparsity.begin(i + k); });
+
+            for (; jts[0] != sparsity.end(i); increment_iterators(jts))
+              for (unsigned int k = 0; k < warp_size; ++k, ++position) {
+                const unsigned int column = jts[k]->column();
+                column_indices_host_[position] = column;
+                indices_transposed_host_[position] =
+                    transposed_position(i + k, column);
+              }
+          }
+        },
+        64);
+
+    /* Rest: */
+
+    dealii::parallel::apply_to_subranges(
+        n_internal_dofs,
+        static_cast<unsigned int>(sparsity.n_rows()),
+        [&](const unsigned int begin, const unsigned int end) {
+          for (unsigned int i = begin; i < end; ++i) {
+            auto position = row_starts_host_[i];
+            for (auto j = sparsity.begin(i); j != sparsity.end(i);
+                 ++j, ++position) {
+              const unsigned int column = j->column();
+              column_indices_host_[position] = column;
+              indices_transposed_host_[position] =
+                  transposed_position(i, column);
+            }
+          }
+        },
+        4096);
+
 
     /*
      * Compute the data exchange pattern:
