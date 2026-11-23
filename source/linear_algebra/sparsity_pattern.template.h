@@ -10,9 +10,12 @@
 #include <ryujin/base/simd.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 
+#include <deal.II/base/parallel.h>
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparsity_pattern.h>
+
+#include <algorithm>
 
 namespace ryujin
 {
@@ -65,26 +68,53 @@ namespace ryujin
         partitioner->locally_owned_size() + partitioner->n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern in local indexing.
+     * First, create a static sparsity pattern in local indexing. We
+     * translate the rows of locally owned degrees of freedom in parallel.
+     * Symmetrizing adds entries to the ghost rows only, which we therefore
+     * set up afterwards and make unique. SparsityPattern::copy_from() sorts
+     * the rows.
      */
 
-    dealii::DynamicSparsityPattern dsp_local(n_locally_relevant_dofs,
-                                             n_locally_relevant_dofs);
-    for (unsigned int i = 0; i < n_locally_relevant_dofs; ++i) {
-      const auto global_row = partitioner->local_to_global(i);
-      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it) {
-        const auto global_column = it->column();
-        const auto j = partitioner->global_to_local(global_column);
-        dsp_local.add(i, j);
+    std::vector<std::vector<unsigned int>> rows(n_locally_relevant_dofs);
 
-        if (symmetrize_ghost_range && //
-            i < n_locally_owned_dofs_ && j >= n_locally_owned_dofs_)
-          dsp_local.add(j, i);
+    const auto translate_row = [&](const unsigned int i) {
+      const auto global_row = partitioner->local_to_global(i);
+      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it)
+        rows[i].push_back(partitioner->global_to_local(it->column()));
+    };
+
+    dealii::parallel::apply_to_subranges(
+        0u,
+        n_locally_owned_dofs_,
+        [&](const unsigned int begin, const unsigned int end) {
+          for (unsigned int i = begin; i < end; ++i)
+            translate_row(i);
+        },
+        4096);
+
+    for (unsigned int i = n_locally_owned_dofs_; i < n_locally_relevant_dofs;
+         ++i)
+      translate_row(i);
+
+    if (symmetrize_ghost_range) {
+      for (unsigned int i = 0; i < n_locally_owned_dofs_; ++i)
+        for (const auto j : rows[i])
+          if (j >= n_locally_owned_dofs_)
+            rows[j].push_back(i);
+
+      for (unsigned int i = n_locally_owned_dofs_; i < n_locally_relevant_dofs;
+           ++i) {
+        std::sort(rows[i].begin(), rows[i].end());
+        rows[i].erase(std::unique(rows[i].begin(), rows[i].end()),
+                      rows[i].end());
       }
     }
 
     dealii::SparsityPattern sparsity;
-    sparsity.copy_from(dsp_local);
+    sparsity.copy_from(n_locally_relevant_dofs,
+                       n_locally_relevant_dofs,
+                       rows.begin(),
+                       rows.end());
 
     Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
     Assert(n_internal_dofs % warp_size == 0, dealii::ExcInternalError());
