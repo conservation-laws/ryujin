@@ -44,7 +44,6 @@ namespace ryujin
       struct Parameters {
         unsigned int iterations;
         double relaxation_factor;
-        bool limit_velocity;
       };
 
       //@}
@@ -54,12 +53,10 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor. The argument @p limit_velocity sets the default of
-       * the "limit velocity" parameter.
+       * Constructor.
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
-              const std::string &subsection = "/Limiter",
-              const bool limit_velocity = false)
+              const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
           , parameters_("euler_barotropic_limiter_parameters",
                         TransferPolicy::implicit_transfers_host_resident)
@@ -78,12 +75,6 @@ namespace ryujin
                       parameters.relaxation_factor,
                       "Factor for scaling the relaxation window with r_i = "
                       "factor * (m_i/|Omega|)^(1.5/d).");
-
-        parameters.limit_velocity = limit_velocity;
-        add_parameter("limit velocity",
-                      parameters.limit_velocity,
-                      "Also limit the square of the velocity |v|^2 from "
-                      "above.");
 
         /* invalidates view on default memory space */
         ParameterAcceptor::parse_parameters_call_back.connect(
@@ -202,14 +193,6 @@ namespace ryujin
       DEAL_II_HOST_DEVICE_ALWAYS_INLINE ScalarNumber relaxation_factor() const
       {
         return ScalarNumber(parameters_->relaxation_factor);
-      }
-
-      /**
-       * Return whether the square of the velocity is limited.
-       */
-      DEAL_II_HOST_DEVICE_ALWAYS_INLINE bool limit_velocity() const
-      {
-        return parameters_->limit_velocity;
       }
 
       /**
@@ -467,9 +450,6 @@ namespace ryujin
       rho_relaxation_numerator_ += beta_ij * (rho_i + rho_j);
       rho_relaxation_denominator_ += std::abs(beta_ij);
 
-      if (!limit_velocity())
-        return;
-
       /* Velocity bound and relaxation: */
 
       const auto v2_ij_bar =
@@ -631,9 +611,6 @@ namespace ryujin
         }
 #endif
       }
-
-      if (!limit_velocity())
-        return {t_r, success};
 
       /*
        * Limit the square of the velocity: Given t_l with psi(t_l) >= 0
