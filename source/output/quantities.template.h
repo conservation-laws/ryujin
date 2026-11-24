@@ -125,8 +125,7 @@ namespace ryujin
                                    "\" is not in the range 1 to 4."));
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto sparsity_simd_view =
-        offline_data_->sparsity_pattern_simd().view();
+    const auto sparsity_simd_view = offline_data_->sparsity_pattern().view();
     const auto lumped_mass_matrix_view =
         offline_data_->lumped_mass_matrix().template view<1>();
 

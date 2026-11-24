@@ -196,7 +196,7 @@ namespace ryujin
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void renumber_for_simd();
+    void renumber_for_simd(DynamicSparsityPattern &dynamic_sparsity_pattern);
 
     /**
      * Set up the affine constraints of the current numbering. Internally
@@ -207,13 +207,12 @@ namespace ryujin
     void create_constraints();
 
     /**
-     * Create the sparsity pattern in global numbering from the affine
-     * constraints and the colored cell chunks. Internally used in
-     * prepare().
-     *
-     * @note This method populates various OfflineData internal data structures.
+     * Create the sparsity pattern @p dynamic_sparsity_pattern in global
+     * numbering from the affine constraints and the colored cell chunks.
+     * Internally used in prepare().
      */
-    void create_sparsity_pattern();
+    void create_sparsity_pattern(
+        DynamicSparsityPattern &dynamic_sparsity_pattern) const;
 
     /**
      * Ensure that the SIMD stride of the renumbered degrees of freedom
@@ -222,7 +221,8 @@ namespace ryujin
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void ensure_simd_stride_consistency();
+    void ensure_simd_stride_consistency(
+        DynamicSparsityPattern &dynamic_sparsity_pattern);
 
     /**
      * Create partitioner. Internally used in prepare().
@@ -230,6 +230,7 @@ namespace ryujin
      * @note This method populates various OfflineData internal data structures.
      */
     void create_partitioner_and_simd_sparsity(
+        const DynamicSparsityPattern &dynamic_sparsity_pattern,
         const unsigned int problem_dimension,
         const unsigned int n_precomputed_values);
 

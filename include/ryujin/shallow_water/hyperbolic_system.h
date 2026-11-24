@@ -699,7 +699,7 @@ namespace ryujin
       using ScalarView = HyperbolicSystemView<dim, ScalarNumber>;
 
       const auto sparsity_simd_view =
-          offline_data.sparsity_pattern_simd().template view<MemorySpace>();
+          offline_data.sparsity_pattern().template view<MemorySpace>();
 
       const auto U_view =
           std::as_const(state_vector)

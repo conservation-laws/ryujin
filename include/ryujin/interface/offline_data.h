@@ -291,16 +291,10 @@ namespace ryujin
       ACCESSOR_READ_ONLY(coupling_boundary_pairs)
 
       /**
-       * A sparsity pattern for (standard deal.II) matrices storing indices
-       * in (deal.II typical) global numbering.
-       */
-      ACCESSOR_READ_ONLY(sparsity_pattern)
-
-      /**
        * A sparsity pattern for matrices in vectorized format. Local
        * numbering.
        */
-      ACCESSOR_READ_ONLY(sparsity_pattern_simd)
+      ACCESSOR_READ_ONLY(sparsity_pattern)
 
       /**
        * The mass matrix. (SIMD storage, local numbering)
@@ -387,8 +381,7 @@ namespace ryujin
         coupling_boundary_pairs_ =
             std::make_unique<Mirrored<CouplingDescription *>>(
                 "offline_data_coupling_boundary_pairs");
-        sparsity_pattern_ = std::make_unique<DynamicSparsityPattern>();
-        sparsity_pattern_simd_ = std::make_unique<SparsityPattern<warp_size>>();
+        sparsity_pattern_ = std::make_unique<SparsityPattern<warp_size>>();
         mass_matrix_ = std::make_unique<SparseMatrix<Number>>();
         mass_matrix_inverse_ = std::make_unique<SparseMatrix<Number>>();
         lumped_mass_matrix_ = std::make_unique<ScalarVector<Number>>();
@@ -427,9 +420,7 @@ namespace ryujin
 
       std::unique_ptr<Mirrored<CouplingDescription *>> coupling_boundary_pairs_;
 
-      std::unique_ptr<DynamicSparsityPattern> sparsity_pattern_;
-
-      std::unique_ptr<SparsityPattern<warp_size>> sparsity_pattern_simd_;
+      std::unique_ptr<SparsityPattern<warp_size>> sparsity_pattern_;
 
       std::unique_ptr<SparseMatrix<Number>> mass_matrix_;
       std::unique_ptr<SparseMatrix<Number>> mass_matrix_inverse_;

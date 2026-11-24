@@ -397,8 +397,7 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto sparsity_simd_view =
-        offline_data_->sparsity_pattern_simd().view();
+    const auto sparsity_simd_view = offline_data_->sparsity_pattern().view();
     const auto betaij_matrix_view = offline_data_->betaij_matrix().view();
     using VA = dealii::VectorizedArray<Number>;
 

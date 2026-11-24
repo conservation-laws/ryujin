@@ -96,21 +96,24 @@ namespace ryujin
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
+    /* The sparsity pattern in global numbering: */
+    DynamicSparsityPattern dynamic_sparsity_pattern;
+
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.1 topology - renumber dofs");
-      renumber_for_simd();
+      renumber_for_simd(dynamic_sparsity_pattern);
     }
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.2 topology - sparsity pattern");
       create_constraints();
       color_cells();
-      create_sparsity_pattern();
-      ensure_simd_stride_consistency();
+      create_sparsity_pattern(dynamic_sparsity_pattern);
+      ensure_simd_stride_consistency(dynamic_sparsity_pattern);
     }
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.3 topology - SIMD sparsity");
-      create_partitioner_and_simd_sparsity(problem_dimension,
-                                           n_precomputed_values);
+      create_partitioner_and_simd_sparsity(
+          dynamic_sparsity_pattern, problem_dimension, n_precomputed_values);
     }
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - index maps");
@@ -160,7 +163,8 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::renumber_for_simd()
+  void OfflineData<structdim, dim, Number>::renumber_for_simd(
+      DynamicSparsityPattern &dynamic_sparsity_pattern)
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
@@ -176,13 +180,13 @@ namespace ryujin
      */
     create_constraints();
     color_cells();
-    create_sparsity_pattern();
-    const auto &sparsity = *this->sparsity_pattern_;
+    create_sparsity_pattern(dynamic_sparsity_pattern);
 
     /*
      * Initial ordering with Cuthill McKee (because we can):
      */
-    auto order = DoFRenumbering::Cuthill_McKee(sparsity, locally_owned);
+    auto order =
+        DoFRenumbering::Cuthill_McKee(dynamic_sparsity_pattern, locally_owned);
 
     /*
      * Determine the set of export indices, i.e., the locally owned
@@ -222,8 +226,8 @@ namespace ryujin
      * Group degrees of freedom that have the same stencil size in warps of
      * warp_size consecutive indices:
      */
-    this->n_locally_internal_ =
-        DoFRenumbering::internal_range(order, sparsity, warp_size);
+    this->n_locally_internal_ = DoFRenumbering::internal_range(
+        order, dynamic_sparsity_pattern, warp_size);
 
     /*
      * Reorder all (strides of) locally internal indices that contain
@@ -339,12 +343,10 @@ namespace ryujin
   /*
    * Creates the (hyperbolic) sparsity pattern in global numbering. Cells
    * are processed in the colored chunks of color_cells().
-   *
-   * Populates:
-   *     sparsity_pattern_
    */
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::create_sparsity_pattern()
+  void OfflineData<structdim, dim, Number>::create_sparsity_pattern(
+      DynamicSparsityPattern &dynamic_sparsity_pattern) const
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
@@ -354,8 +356,7 @@ namespace ryujin
     Assert(this->n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
-    auto &sparsity_pattern = *this->sparsity_pattern_;
-    sparsity_pattern.reinit(
+    dynamic_sparsity_pattern.reinit(
         DoFTools::extract_locally_relevant_dofs(dof_handler));
 
     if (discretization_->have_discontinuous_ansatz()) {
@@ -368,12 +369,12 @@ namespace ryujin
              dealii::ExcMessage("I don't think constraints make sense for dG"));
 
       WorkStream::for_each(colored_cell_chunks_, [&](const auto &cell) {
-        DoFTools::add_cell_couplings_dg(cell, sparsity_pattern);
+        DoFTools::add_cell_couplings_dg(cell, dynamic_sparsity_pattern);
       });
 
       for (const auto &cell : dof_handler.active_cell_iterators())
         if (cell->is_ghost())
-          DoFTools::add_cell_couplings_dg(cell, sparsity_pattern);
+          DoFTools::add_cell_couplings_dg(cell, dynamic_sparsity_pattern);
 
     } else {
       /*
@@ -396,21 +397,22 @@ namespace ryujin
           }
           for (const auto &[master, weight] : *entries)
             indices.push_back(master);
-          sparsity_pattern.add_entries(dof, &dof, &dof + 1);
+          dynamic_sparsity_pattern.add_entries(dof, &dof, &dof + 1);
         }
 
         std::sort(indices.begin(), indices.end());
         indices.erase(std::unique(indices.begin(), indices.end()),
                       indices.end());
         for (const auto i : indices)
-          sparsity_pattern.add_entries(i, indices.begin(), indices.end());
+          dynamic_sparsity_pattern.add_entries(
+              i, indices.begin(), indices.end());
       };
 
       WorkStream::for_each(
           colored_cell_chunks_, worker, std::vector<types::global_dof_index>());
     }
 
-    sparsity_pattern.compress();
+    dynamic_sparsity_pattern.compress();
 
     /*
      * We have to complete the local stencil to have consistent size over
@@ -418,8 +420,8 @@ namespace ryujin
      * SparseMatrix class will fail.
      */
 
-    sparsity_pattern.distribute(locally_owned,
-                                mpi_ensemble_.ensemble_communicator());
+    dynamic_sparsity_pattern.distribute(locally_owned,
+                                        mpi_ensemble_.ensemble_communicator());
   }
 
 
@@ -428,7 +430,8 @@ namespace ryujin
    *     n_locally_internal_
    */
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency()
+  void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency(
+      DynamicSparsityPattern &dynamic_sparsity_pattern)
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
@@ -438,9 +441,9 @@ namespace ryujin
         this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
 
     const auto is_consistent = [&](const auto first, const auto last) {
-      const auto row_length = this->sparsity_pattern_->row_length(*first);
+      const auto row_length = dynamic_sparsity_pattern.row_length(*first);
       return std::all_of(first, last, [&](const auto i) {
-        return this->sparsity_pattern_->row_length(i) == row_length;
+        return dynamic_sparsity_pattern.row_length(i) == row_length;
       });
     };
 
@@ -466,7 +469,7 @@ namespace ryujin
       DoFRenumbering::renumber_dofs(dof_handler, order);
       create_constraints();
       color_cells();
-      create_sparsity_pattern();
+      create_sparsity_pattern(dynamic_sparsity_pattern);
     }
   }
 
@@ -477,11 +480,12 @@ namespace ryujin
    *     scalar_partitioner_
    *     hyperbolic_vector_partitioner_
    *     precomputed_vector_partitioner_
-   *     sparsity_pattern_simd_
+   *     sparsity_pattern_
    */
   template <int structdim, int dim, typename Number>
   void
   OfflineData<structdim, dim, Number>::create_partitioner_and_simd_sparsity(
+      const DynamicSparsityPattern &dynamic_sparsity_pattern,
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
@@ -497,9 +501,8 @@ namespace ryujin
     /* Enlarge the locally relevant set to include all additional couplings: */
     {
       IndexSet additional_dofs(dof_handler.n_dofs());
-      const auto &sparsity_pattern = *this->sparsity_pattern_;
-      for (const auto row : sparsity_pattern.row_index_set())
-        for (const auto column : sparsity_pattern.columns(row))
+      for (const auto row : dynamic_sparsity_pattern.row_index_set())
+        for (const auto column : dynamic_sparsity_pattern.columns(row))
           if (!locally_relevant.is_element(column)) {
             Assert(locally_owned.is_element(row), ExcInternalError());
             additional_dofs.add_index(column);
@@ -547,11 +550,11 @@ namespace ryujin
      * pattern from global deal.II (typical) dof indexing to local indices.
      */
 
-    this->sparsity_pattern_simd_->reinit(this->n_locally_internal_,
-                                         *this->sparsity_pattern_,
-                                         this->scalar_partitioner_,
-                                         /*symmetrize_ghost_range*/ true,
-                                         TransferPolicy::implicit_transfers);
+    this->sparsity_pattern_->reinit(this->n_locally_internal_,
+                                    dynamic_sparsity_pattern,
+                                    this->scalar_partitioner_,
+                                    /*symmetrize_ghost_range*/ true,
+                                    TransferPolicy::implicit_transfers);
   }
 
 
@@ -792,19 +795,19 @@ namespace ryujin
 
     constexpr auto policy = TransferPolicy::implicit_transfers;
 
-    this->mass_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+    this->mass_matrix_->reinit(*this->sparsity_pattern_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      this->mass_matrix_inverse_->reinit(*this->sparsity_pattern_simd_, policy);
+      this->mass_matrix_inverse_->reinit(*this->sparsity_pattern_, policy);
 
     this->lumped_mass_matrix_->reinit_with_scalar_partitioner(
         this->scalar_partitioner_, 1, policy);
     this->lumped_mass_matrix_inverse_->reinit_with_scalar_partitioner(
         this->scalar_partitioner_, 1, policy);
 
-    this->betaij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
-    this->cij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+    this->betaij_matrix_->reinit(*this->sparsity_pattern_, policy);
+    this->cij_matrix_->reinit(*this->sparsity_pattern_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      this->incidence_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+      this->incidence_matrix_->reinit(*this->sparsity_pattern_, policy);
   }
 
 
@@ -1129,7 +1132,7 @@ namespace ryujin
      */
 
     {
-      const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+      const auto sparsity_simd_view = this->sparsity_pattern_->view();
       const auto mass_matrix_view = this->mass_matrix_->view();
       const auto lumped_mass_matrix_view =
           this->lumped_mass_matrix_->template view<1>();
@@ -1360,7 +1363,7 @@ namespace ryujin
      * Verify that the mij_matrix_ object is consistent:
      */
 
-    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_->view();
     const auto mass_matrix_view = this->mass_matrix_->view();
     const auto cij_matrix_view = this->cij_matrix_->view();
 
@@ -2052,7 +2055,7 @@ namespace ryujin
      * Now, collect all coupling boundary pairs:
      */
 
-    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_->view();
 
     CouplingBoundaryPairs result;
 
