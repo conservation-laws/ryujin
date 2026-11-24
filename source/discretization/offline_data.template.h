@@ -645,7 +645,7 @@ namespace ryujin
       q_collection.push_back(dealii::Quadrature<structdim>(
           fe_collection[k].get_unit_support_points()));
 
-    dealii::hp::FEValues<structdim, dim> hp_fe_values(
+    const dealii::hp::FEValues<structdim, dim> hp_fe_values(
         discretization_->mapping(),
         fe_collection,
         q_collection,
@@ -654,25 +654,26 @@ namespace ryujin
     this->support_points_.resize(this->n_locally_owned_);
 
 #ifdef DEBUG
-    std::vector<bool> is_set(this->n_locally_owned_, false);
+    std::vector<char> is_set(this->n_locally_owned_, false);
 #endif
 
     /*
      * Every locally owned degree of freedom is located on a locally owned
-     * cell. Skip all other cells and cells without degrees of freedom
-     * (FE_Nothing):
+     * cell. Cells of the same color do not share degrees of freedom, so
+     * we can write the points directly. Skip cells without degrees of
+     * freedom (FE_Nothing):
      */
 
-    std::vector<dealii::types::global_dof_index> dof_indices;
-    for (const auto &cell : dof_handler.active_cell_iterators()) {
+    const auto worker = [&](const auto &cell, auto &fe_values) {
       const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
-      if (!cell->is_locally_owned() || dofs_per_cell == 0)
-        continue;
+      if (dofs_per_cell == 0)
+        return;
 
-      hp_fe_values.reinit(cell);
+      fe_values.reinit(cell);
       const auto &points =
-          hp_fe_values.get_present_fe_values().get_quadrature_points();
+          fe_values.get_present_fe_values().get_quadrature_points();
 
+      thread_local std::vector<dealii::types::global_dof_index> dof_indices;
       dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(dof_indices);
 
@@ -685,7 +686,9 @@ namespace ryujin
         is_set[i] = true;
 #endif
       }
-    }
+    };
+
+    WorkStream::for_each(colored_cell_chunks_, worker, hp_fe_values);
 
 #ifdef DEBUG
     Assert(std::find(is_set.begin(), is_set.end(), false) == is_set.end(),
