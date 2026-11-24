@@ -50,6 +50,8 @@ namespace ryujin::dashboard
     std::vector<ftxui::Color> animation;
     /** The color scale of the skew, from none to large. */
     std::vector<ftxui::Color> heat;
+
+    bool operator==(const Palette &) const = default;
   };
 
 
