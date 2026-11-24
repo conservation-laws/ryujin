@@ -13,8 +13,8 @@
 #include <deal.II/base/config.h>
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/partitioner.h>
-#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
+#include <ostream>
 #include <span>
 #include <vector>
 
@@ -69,9 +69,24 @@ namespace ryujin
     }
 
     /**
+     * Append the column index @p column to a @p row. Rows that are not
+     * stored are ignored.
+     */
+    void add(const size_type row, const size_type column)
+    {
+      add_entries(row, &column, &column + 1);
+    }
+
+    /**
      * Sort the column indices of all rows and remove duplicates.
      */
     void compress();
+
+    /**
+     * Print all stored rows in the format of
+     * dealii::DynamicSparsityPattern::print(): [row,column,column,...]
+     */
+    void print(std::ostream &out) const;
 
     /**
      * Send all rows that are not in @p locally_owned to their owner and
@@ -179,7 +194,7 @@ namespace ryujin
      */
     SparsityPattern(
         const unsigned int n_internal_dofs,
-        const dealii::DynamicSparsityPattern &sparsity,
+        const DynamicSparsityPattern &pattern,
         const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
             &partitioner,
         bool symmetrize_ghost_range = true,
@@ -198,18 +213,6 @@ namespace ryujin
      */
     void reinit(const unsigned int n_internal_dofs,
                 const DynamicSparsityPattern &pattern,
-                const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                    &partitioner,
-                bool symmetrize_ghost_range = true,
-                const TransferPolicy transfer_policy =
-                    TransferPolicy::explicit_transfers);
-
-    /**
-     * Variant of the reinit function above for a
-     * dealii::DynamicSparsityPattern.
-     */
-    void reinit(const unsigned int n_internal_dofs,
-                const dealii::DynamicSparsityPattern &sparsity,
                 const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
                     &partitioner,
                 bool symmetrize_ghost_range = true,

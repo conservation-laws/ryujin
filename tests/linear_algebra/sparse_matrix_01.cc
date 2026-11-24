@@ -16,7 +16,8 @@ int main(int argc, char *argv[])
   using VA = dealii::VectorizedArray<double>;
   constexpr auto simd_width = VA::size();
 
-  dealii::DynamicSparsityPattern spars(14, 14);
+  ryujin::DynamicSparsityPattern spars;
+  spars.reinit(dealii::complete_index_set(14));
   spars.add(0, 0);
   spars.add(0, 1);
   spars.add(0, 13);

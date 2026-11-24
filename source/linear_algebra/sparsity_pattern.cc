@@ -42,6 +42,17 @@ namespace ryujin
   }
 
 
+  void DynamicSparsityPattern::print(std::ostream &out) const
+  {
+    for (const auto row : rows_) {
+      out << '[' << row;
+      for (const auto column : columns(row))
+        out << ',' << column;
+      out << ']' << std::endl;
+    }
+  }
+
+
   void DynamicSparsityPattern::distribute(const dealii::IndexSet &locally_owned,
                                           const MPI_Comm communicator)
   {

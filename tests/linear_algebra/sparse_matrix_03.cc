@@ -18,7 +18,8 @@ int main(int argc, char *argv[])
 
   /* Create sparsity pattern: */
 
-  dealii::DynamicSparsityPattern dsp(1, 1);
+  ryujin::DynamicSparsityPattern dsp;
+  dsp.reinit(dealii::complete_index_set(1));
   dsp.add(0, 0);
   dsp.compress();
 

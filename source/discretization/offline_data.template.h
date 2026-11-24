@@ -378,38 +378,13 @@ namespace ryujin
 
     } else {
       /*
-       * Create cG sparsity pattern. As in
-       * AffineConstraints::add_entries_local_to_global() a cell couples
-       * all its degrees of freedom with constraints resolved, and adds a
-       * diagonal entry for every constrained degree of freedom. Cells of
-       * the same color write to different rows:
+       * Create cG sparsity pattern. Cells of the same color write to
+       * different rows:
        */
-      const auto worker = [&](const auto &cell, auto &dof_indices) {
-        dof_indices.resize(cell->get_fe().n_dofs_per_cell());
-        cell->get_dof_indices(dof_indices);
-
-        boost::container::small_vector<types::global_dof_index, 64> indices;
-        for (const auto dof : dof_indices) {
-          const auto *entries = affine_constraints.get_constraint_entries(dof);
-          if (entries == nullptr) {
-            indices.push_back(dof);
-            continue;
-          }
-          for (const auto &[master, weight] : *entries)
-            indices.push_back(master);
-          dynamic_sparsity_pattern.add_entries(dof, &dof, &dof + 1);
-        }
-
-        std::sort(indices.begin(), indices.end());
-        indices.erase(std::unique(indices.begin(), indices.end()),
-                      indices.end());
-        for (const auto i : indices)
-          dynamic_sparsity_pattern.add_entries(
-              i, indices.begin(), indices.end());
-      };
-
-      WorkStream::for_each(
-          colored_cell_chunks_, worker, std::vector<types::global_dof_index>());
+      WorkStream::for_each(colored_cell_chunks_, [&](const auto &cell) {
+        DoFTools::add_cell_couplings(
+            cell, affine_constraints, dynamic_sparsity_pattern);
+      });
     }
 
     dynamic_sparsity_pattern.compress();

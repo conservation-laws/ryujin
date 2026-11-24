@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/discretization/local_index_handling.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 
@@ -12,9 +13,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
-#include <deal.II/lac/sparsity_tools.h>
-
-#include <deal.II/lac/trilinos_sparse_matrix.h>
 
 #include <chrono>
 
@@ -29,7 +27,7 @@ namespace ryujin
   {
   public:
     Debug(const unsigned int n_internal_dofs,
-          const dealii::DynamicSparsityPattern &sparsity,
+          const DynamicSparsityPattern &sparsity,
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &partitioner)
         : SparsityPattern<simd_length>(n_internal_dofs,
@@ -120,14 +118,15 @@ int main(int argc, char *argv[])
     __builtin_trap();
   }
 
-  dealii::DynamicSparsityPattern dsp;
-  dsp.reinit(dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
+  ryujin::DynamicSparsityPattern dsp;
+  dsp.reinit(locally_relevant);
 
   /* Create temporary sparsity pattern: */
-  dealii::DoFTools::make_sparsity_pattern(
-      dof_handler, dsp, affine_constraints, false);
-  dealii::SparsityTools::distribute_sparsity_pattern(
-      dsp, locally_owned, MPI_COMM_WORLD, locally_relevant);
+  for (const auto &cell : dof_handler.active_cell_iterators())
+    if (cell->is_locally_owned())
+      ryujin::DoFTools::add_cell_couplings(cell, affine_constraints, dsp);
+  dsp.compress();
+  dsp.distribute(locally_owned, MPI_COMM_WORLD);
 
   for (unsigned int i = 0; i < n_mpi_processes; ++i) {
     if (i == mpi_rank) {
@@ -145,11 +144,12 @@ int main(int argc, char *argv[])
    */
 
   dealii::IndexSet additional_dofs(dof_handler.n_dofs());
-  for (auto &entry : dsp)
-    if (!locally_relevant.is_element(entry.column())) {
-      Assert(locally_owned.is_element(entry.row()), dealii::ExcInternalError());
-      additional_dofs.add_index(entry.column());
-    }
+  for (const auto row : dsp.row_index_set())
+    for (const auto column : dsp.columns(row))
+      if (!locally_relevant.is_element(column)) {
+        Assert(locally_owned.is_element(row), dealii::ExcInternalError());
+        additional_dofs.add_index(column);
+      }
   additional_dofs.compress();
   locally_relevant.add_indices(additional_dofs);
   locally_relevant.compress();

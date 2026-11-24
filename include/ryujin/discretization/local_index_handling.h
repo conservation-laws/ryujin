@@ -338,9 +338,6 @@ namespace ryujin
     /** Import a function from deal.II into the current namespace. */
     using dealii::DoFTools::make_periodicity_constraints;
 
-    /** Import a function from deal.II into the current namespace. */
-    using dealii::DoFTools::make_sparsity_pattern;
-
 
     /**
      * Same as FiniteElement::has_support_on_face() but with the correct
@@ -372,6 +369,49 @@ namespace ryujin
 
       const auto offset = fe.get_unit_support_points()[i] - vertex;
       return std::abs(offset * normal) < 1.e-10;
+    }
+
+
+    /**
+     * Add the couplings of a @p cell to a sparsity pattern for the
+     * continuous Galerkin formulation, as
+     * AffineConstraints::add_entries_local_to_global() with
+     * keep_constrained_entries = false does: all degrees of freedom of the
+     * cell couple with each other with constraints resolved, and every
+     * constrained degree of freedom gets a diagonal entry. The function
+     * adds to the rows of the degrees of freedom of the cell and of their
+     * constraining degrees of freedom.
+     *
+     * @ingroup FiniteElement
+     */
+    template <typename CellIterator, typename Number>
+    void add_cell_couplings(
+        const CellIterator &cell,
+        const dealii::AffineConstraints<Number> &affine_constraints,
+        DynamicSparsityPattern &sparsity)
+    {
+      thread_local std::vector<dealii::types::global_dof_index> dof_indices;
+      thread_local std::vector<dealii::types::global_dof_index> indices;
+
+      dof_indices.resize(cell->get_fe().n_dofs_per_cell());
+      cell->get_dof_indices(dof_indices);
+
+      indices.clear();
+      for (const auto dof : dof_indices) {
+        const auto *entries = affine_constraints.get_constraint_entries(dof);
+        if (entries == nullptr) {
+          indices.push_back(dof);
+          continue;
+        }
+        for (const auto &[master, weight] : *entries)
+          indices.push_back(master);
+        sparsity.add_entries(dof, &dof, &dof + 1);
+      }
+
+      std::sort(indices.begin(), indices.end());
+      indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+      for (const auto i : indices)
+        sparsity.add_entries(i, indices.begin(), indices.end());
     }
 
 

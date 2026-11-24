@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/discretization/local_index_handling.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 
@@ -11,7 +12,6 @@
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/lac/sparsity_tools.h>
 
 #include <chrono>
 #include <vector>
@@ -59,12 +59,14 @@ int main(int argc, char *argv[])
   affine_constraints.reinit(locally_owned, locally_relevant);
   affine_constraints.close();
 
-  dealii::DynamicSparsityPattern dsp;
-  dsp.reinit(dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
-  dealii::DoFTools::make_sparsity_pattern(
-      dof_handler, dsp, affine_constraints, false);
-  dealii::SparsityTools::distribute_sparsity_pattern(
-      dsp, locally_owned, MPI_COMM_WORLD, locally_relevant);
+  ryujin::DynamicSparsityPattern dsp;
+  dsp.reinit(locally_relevant);
+
+  for (const auto &cell : dof_handler.active_cell_iterators())
+    if (cell->is_locally_owned())
+      ryujin::DoFTools::add_cell_couplings(cell, affine_constraints, dsp);
+  dsp.compress();
+  dsp.distribute(locally_owned, MPI_COMM_WORLD);
 
   const auto partitioner =
       std::make_shared<dealii::Utilities::MPI::Partitioner>(

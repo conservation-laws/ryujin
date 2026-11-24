@@ -33,7 +33,8 @@ int main(int argc, char *argv[])
 
   /* A tridiagonal matrix with wrap around: every row has 3 entries. */
 
-  dealii::DynamicSparsityPattern dsp(n_dofs, n_dofs);
+  ryujin::DynamicSparsityPattern dsp;
+  dsp.reinit(dealii::complete_index_set(n_dofs));
   for (unsigned int i = 0; i < n_dofs; ++i) {
     dsp.add(i, i);
     dsp.add(i, (i + n_dofs - 1) % n_dofs);
