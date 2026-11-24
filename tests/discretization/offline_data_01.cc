@@ -129,7 +129,7 @@ void test(const std::string &name,
 
   /* Sizes: */
 
-  const auto sparsity = offline_data.sparsity_pattern_simd().view();
+  const auto sparsity = offline_data.sparsity_pattern().view();
 
   double n_entries = 0.;
   double n_constrained = 0.;

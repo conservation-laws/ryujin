@@ -133,7 +133,7 @@ namespace ryujin
 
     /* Initialize matrices: */
 
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto &sparsity_simd = offline_data_->sparsity_pattern();
     dij_matrix_.reinit(sparsity_simd);
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
@@ -527,7 +527,7 @@ namespace ryujin
     /* Sparsity pattern, matrices, boundary information: */
 
     const auto sparsity_simd_view =
-        offline_data_->sparsity_pattern_simd().template view<MemorySpace>();
+        offline_data_->sparsity_pattern().template view<MemorySpace>();
 
     const auto mass_matrix_view =
         offline_data_->mass_matrix().template view<MemorySpace>();

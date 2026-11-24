@@ -50,7 +50,7 @@ namespace
                              Snapshot &snapshot)
   {
     const unsigned int n_owned = offline_data.n_locally_owned();
-    const auto sparsity = offline_data.sparsity_pattern_simd().view();
+    const auto sparsity = offline_data.sparsity_pattern().view();
 
     auto &columns = snapshot.topology["sparsity pattern"];
     for (unsigned int i = 0; i < n_owned; ++i) {

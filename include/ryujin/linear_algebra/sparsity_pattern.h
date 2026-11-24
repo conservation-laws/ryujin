@@ -11,8 +11,12 @@
 
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/config.h>
+#include <deal.II/base/index_set.h>
 #include <deal.II/base/partitioner.h>
-#include <deal.II/lac/dynamic_sparsity_pattern.h>
+
+#include <ostream>
+#include <span>
+#include <vector>
 
 namespace ryujin
 {
@@ -29,6 +33,102 @@ namespace ryujin
 
   template <int warp_size, typename MemorySpace = dealii::MemorySpace::Host>
   class SparsityPatternView;
+
+
+  /**
+   * A sparsity pattern in global numbering that stores the column indices
+   * of a set of rows, typically the locally relevant rows of an MPI rank.
+   *
+   * In contrast to dealii::DynamicSparsityPattern, different rows can be
+   * filled concurrently.
+   *
+   * @ingroup LinearAlgebra
+   */
+  class DynamicSparsityPattern
+  {
+  public:
+    using size_type = dealii::types::global_dof_index;
+
+    /**
+     * Reinitialize the pattern with empty rows for all indices of @p rows.
+     */
+    void reinit(const dealii::IndexSet &rows);
+
+    /**
+     * Append the column indices [@p begin, @p end) to a @p row. Rows that
+     * are not stored are ignored. Different rows can be filled
+     * concurrently.
+     */
+    template <typename Iterator>
+    void
+    add_entries(const size_type row, const Iterator begin, const Iterator end)
+    {
+      const auto i = rows_.index_within_set(row);
+      if (i != dealii::numbers::invalid_dof_index)
+        columns_[i].insert(columns_[i].end(), begin, end);
+    }
+
+    /**
+     * Append the column index @p column to a @p row. Rows that are not
+     * stored are ignored.
+     */
+    void add(const size_type row, const size_type column)
+    {
+      add_entries(row, &column, &column + 1);
+    }
+
+    /**
+     * Sort the column indices of all rows and remove duplicates.
+     */
+    void compress();
+
+    /**
+     * Print all stored rows in the format of
+     * dealii::DynamicSparsityPattern::print(): [row,column,column,...]
+     */
+    void print(std::ostream &out) const;
+
+    /**
+     * Send all rows that are not in @p locally_owned to their owner and
+     * add them there. The rows are kept on the sending rank. This is
+     * SparsityTools::distribute_sparsity_pattern() for a
+     * DynamicSparsityPattern.
+     */
+    void distribute(const dealii::IndexSet &locally_owned,
+                    const MPI_Comm communicator);
+
+    /**
+     * Return the set of stored rows.
+     */
+    const dealii::IndexSet &row_index_set() const
+    {
+      return rows_;
+    }
+
+    /**
+     * Return the column indices of a @p row, or an empty range if the row
+     * is not stored.
+     */
+    std::span<const size_type> columns(const size_type row) const
+    {
+      const auto i = rows_.index_within_set(row);
+      if (i == dealii::numbers::invalid_dof_index)
+        return {};
+      return columns_[i];
+    }
+
+    /**
+     * Return the number of column indices of a @p row.
+     */
+    unsigned int row_length(const size_type row) const
+    {
+      return columns(row).size();
+    }
+
+  private:
+    dealii::IndexSet rows_;
+    std::vector<std::vector<size_type>> columns_;
+  };
 
 
   /**
@@ -94,7 +194,7 @@ namespace ryujin
      */
     SparsityPattern(
         const unsigned int n_internal_dofs,
-        const dealii::DynamicSparsityPattern &sparsity,
+        const DynamicSparsityPattern &pattern,
         const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
             &partitioner,
         bool symmetrize_ghost_range = true,
@@ -112,7 +212,7 @@ namespace ryujin
      * for our stencil based methods.
      */
     void reinit(const unsigned int n_internal_dofs,
-                const dealii::DynamicSparsityPattern &sparsity,
+                const DynamicSparsityPattern &pattern,
                 const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
                     &partitioner,
                 bool symmetrize_ghost_range = true,

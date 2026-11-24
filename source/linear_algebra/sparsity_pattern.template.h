@@ -12,8 +12,6 @@
 
 #include <deal.II/base/parallel.h>
 #include <deal.II/base/vectorization.h>
-#include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/sparsity_pattern.h>
 
 #include <algorithm>
 
@@ -29,14 +27,14 @@ namespace ryujin
   template <int warp_size>
   SparsityPattern<warp_size>::SparsityPattern(
       const unsigned int n_internal_dofs,
-      const dealii::DynamicSparsityPattern &sparsity,
+      const DynamicSparsityPattern &pattern,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &partitioner,
       bool symmetrize_ghost_range,
       const TransferPolicy transfer_policy)
   {
     reinit(n_internal_dofs,
-           sparsity,
+           pattern,
            partitioner,
            symmetrize_ghost_range,
            transfer_policy);
@@ -46,7 +44,7 @@ namespace ryujin
   template <int warp_size>
   void SparsityPattern<warp_size>::reinit(
       const unsigned int n_internal_dofs,
-      const dealii::DynamicSparsityPattern &dsp,
+      const DynamicSparsityPattern &pattern,
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
           &partitioner,
       const bool symmetrize_ghost_range,
@@ -68,19 +66,18 @@ namespace ryujin
         partitioner->locally_owned_size() + partitioner->n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern in local indexing. We
-     * translate the rows of locally owned degrees of freedom in parallel.
-     * Symmetrizing adds entries to the ghost rows only, which we therefore
-     * set up afterwards and make unique. SparsityPattern::copy_from() sorts
-     * the rows.
+     * First, create the rows in local indexing. We translate the rows of
+     * locally owned degrees of freedom in parallel. Symmetrizing adds
+     * entries to the ghost rows only, which we therefore set up
+     * afterwards.
      */
 
     std::vector<std::vector<unsigned int>> rows(n_locally_relevant_dofs);
 
     const auto translate_row = [&](const unsigned int i) {
       const auto global_row = partitioner->local_to_global(i);
-      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it)
-        rows[i].push_back(partitioner->global_to_local(it->column()));
+      for (const auto column : pattern.columns(global_row))
+        rows[i].push_back(partitioner->global_to_local(column));
     };
 
     dealii::parallel::apply_to_subranges(
@@ -100,30 +97,57 @@ namespace ryujin
         for (const auto j : rows[i])
           if (j >= n_locally_owned_dofs_)
             rows[j].push_back(i);
-
-      for (auto i = n_locally_owned_dofs_; i < n_locally_relevant_dofs; ++i) {
-        std::sort(rows[i].begin(), rows[i].end());
-        rows[i].erase(std::unique(rows[i].begin(), rows[i].end()),
-                      rows[i].end());
-      }
     }
 
-    dealii::SparsityPattern sparsity;
-    sparsity.copy_from(n_locally_relevant_dofs,
-                       n_locally_relevant_dofs,
-                       rows.begin(),
-                       rows.end());
+    /*
+     * Sort every row and store the diagonal entry first. Every row has a
+     * diagonal entry:
+     */
 
-    Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
+    dealii::parallel::apply_to_subranges(
+        0u,
+        n_locally_relevant_dofs,
+        [&](const unsigned int begin, const unsigned int end) {
+          for (unsigned int i = begin; i < end; ++i) {
+            auto &row = rows[i];
+            std::sort(row.begin(), row.end());
+            row.erase(std::unique(row.begin(), row.end()), row.end());
+            const auto diagonal = std::lower_bound(row.begin(), row.end(), i);
+            if (diagonal != row.end() && *diagonal == i)
+              std::rotate(row.begin(), diagonal, diagonal + 1);
+            else
+              row.insert(row.begin(), i);
+          }
+        },
+        4096);
+
+    std::vector<std::size_t> offsets(n_locally_relevant_dofs + 1, 0);
+    for (unsigned int i = 0; i < n_locally_relevant_dofs; ++i)
+      offsets[i + 1] = offsets[i] + rows[i].size();
+    const std::size_t n_nonzero_elements = offsets.back();
+
+    /* Position of the entry (i, j), or invalid_position: */
+    constexpr auto invalid_position = std::numeric_limits<std::size_t>::max();
+    const auto position_of = [&](const unsigned int i, const unsigned int j) {
+      if (i == j)
+        return offsets[i];
+      const auto first = rows[i].begin() + 1;
+      const auto it = std::lower_bound(first, rows[i].end(), j);
+      if (it == rows[i].end() || *it != j)
+        return invalid_position;
+      return offsets[i] + (it - rows[i].begin());
+    };
+
+    Assert(n_internal_dofs <= n_locally_relevant_dofs,
+           dealii::ExcInternalError());
     Assert(n_internal_dofs % warp_size == 0, dealii::ExcInternalError());
     Assert(n_internal_dofs <= n_locally_owned_dofs_,
            dealii::ExcInternalError());
-    Assert(n_locally_owned_dofs_ <= sparsity.n_rows(),
+    Assert(n_locally_owned_dofs_ <= n_locally_relevant_dofs,
            dealii::ExcInternalError());
 
     AssertThrow(
-        sparsity.n_nonzero_elements() <
-            std::numeric_limits<unsigned int>::max(),
+        n_nonzero_elements < std::numeric_limits<unsigned int>::max(),
         dealii::ExcMessage(
             "Transposed indices only support up to 4 billion matrix entries "
             "per MPI rank. Try to split into smaller problems with MPI"));
@@ -134,15 +158,14 @@ namespace ryujin
     using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
 
     row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-        "sparsity_pattern_row_starts", sparsity.n_rows() + 1);
+        "sparsity_pattern_row_starts", n_locally_relevant_dofs + 1);
 
     column_indices_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-        "sparsity_pattern_column_indices", sparsity.n_nonzero_elements());
+        "sparsity_pattern_column_indices", n_nonzero_elements);
 
     indices_transposed_host_ =
         Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-            "sparsity_pattern_indices_transposed",
-            sparsity.n_nonzero_elements());
+            "sparsity_pattern_indices_transposed", n_nonzero_elements);
 
     /*
      * Position of the entry (row, column) in the transposed row. Rows of
@@ -150,11 +173,11 @@ namespace ryujin
      */
     const auto transposed_position = [&](const unsigned int row,
                                          const unsigned int column) {
-      const std::size_t position = sparsity(column, row);
+      const std::size_t position = position_of(column, row);
       if (column >= n_internal_dofs)
         return position;
-      const unsigned int my_row_length = sparsity.row_length(column);
-      const std::size_t position_diag = sparsity(column, column);
+      const unsigned int my_row_length = rows[column].size();
+      const std::size_t position_diag = offsets[column];
       const std::size_t pos_within_row = position - position_diag;
       const unsigned int lane = column % warp_size;
       return position - lane * my_row_length - pos_within_row + lane +
@@ -170,15 +193,16 @@ namespace ryujin
     row_starts_host_[0] = 0;
     for (unsigned int i = 0; i < n_internal_dofs; i += warp_size)
       row_starts_host_[i / warp_size + 1] =
-          row_starts_host_[i / warp_size] + warp_size * sparsity.row_length(i);
+          row_starts_host_[i / warp_size] + warp_size * rows[i].size();
 
     row_starts_host_[n_internal_dofs] =
         row_starts_host_[n_internal_dofs / warp_size];
 
-    for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i)
-      row_starts_host_[i + 1] = row_starts_host_[i] + sparsity.row_length(i);
+    for (unsigned int i = n_internal_dofs; i < n_locally_relevant_dofs; ++i)
+      row_starts_host_[i + 1] = row_starts_host_[i] + rows[i].size();
 
-    Assert(row_starts_host_[sparsity.n_rows()] == column_indices_host_.size(),
+    Assert(row_starts_host_[n_locally_relevant_dofs] ==
+               column_indices_host_.size(),
            dealii::ExcInternalError());
 
     /* Vectorized part: */
@@ -191,12 +215,9 @@ namespace ryujin
             const unsigned int i = warp * warp_size;
             auto position = row_starts_host_[warp];
 
-            auto jts = generate_iterators<warp_size>(
-                [&](auto k) { return sparsity.begin(i + k); });
-
-            for (; jts[0] != sparsity.end(i); increment_iterators(jts))
+            for (unsigned int m = 0; m < rows[i].size(); ++m)
               for (unsigned int k = 0; k < warp_size; ++k, ++position) {
-                const unsigned int column = jts[k]->column();
+                const unsigned int column = rows[i + k][m];
                 column_indices_host_[position] = column;
                 indices_transposed_host_[position] =
                     transposed_position(i + k, column);
@@ -209,16 +230,15 @@ namespace ryujin
 
     dealii::parallel::apply_to_subranges(
         n_internal_dofs,
-        static_cast<unsigned int>(sparsity.n_rows()),
+        static_cast<unsigned int>(n_locally_relevant_dofs),
         [&](const unsigned int begin, const unsigned int end) {
           for (unsigned int i = begin; i < end; ++i) {
             auto position = row_starts_host_[i];
-            for (auto j = sparsity.begin(i); j != sparsity.end(i);
-                 ++j, ++position) {
-              const unsigned int column = j->column();
+            for (const auto column : rows[i]) {
               column_indices_host_[position] = column;
               indices_transposed_host_[position] =
                   transposed_position(i, column);
+              ++position;
             }
           }
         },
@@ -234,7 +254,7 @@ namespace ryujin
 
     std::vector<ExchangeDescription> entries_to_be_sent;
 
-    if (sparsity.n_rows() > n_locally_owned_dofs_) {
+    if (n_locally_relevant_dofs > n_locally_owned_dofs_) {
       const unsigned int mpi_tag =
           dealii::Utilities::MPI::internal::Tags::partitioner_export_start + 0;
 
@@ -273,9 +293,10 @@ namespace ryujin
         unsigned int previous_index = 0;
 
         unsigned int row_count = 0;
-        for (unsigned int i = n_locally_owned_dofs_; i < sparsity.n_rows();
+        for (unsigned int i = n_locally_owned_dofs_;
+             i < n_locally_relevant_dofs;
              ++i) {
-          index += sparsity.row_length(i);
+          index += rows[i].size();
           ++row_count;
           const auto ghost_target = ghost_targets[ghost_targets_index];
           if (row_count == ghost_target.second) {
@@ -341,11 +362,11 @@ namespace ryujin
         unsigned int ghost_targets_index = 0;
 
         unsigned int row_count = 0;
-        for (unsigned int i = n_locally_owned_dofs_; i < sparsity.n_rows();
+        for (unsigned int i = n_locally_owned_dofs_;
+             i < n_locally_relevant_dofs;
              ++i) {
           const auto i_global = partitioner_->local_to_global(i);
-          for (auto idx = sparsity.begin(i); idx != sparsity.end(i); ++idx) {
-            const unsigned int j = idx->column();
+          for (const auto j : rows[i]) {
             const auto j_global = partitioner_->local_to_global(j);
             requested_entries.push_back(i_global);
             requested_entries.push_back(j_global);
@@ -437,14 +458,14 @@ namespace ryujin
         const auto i = partitioner_->global_to_local(i_global);
         const auto j = partitioner_->global_to_local(j_global);
 
-        const std::size_t position = sparsity(i, j);
+        const std::size_t position = position_of(i, j);
         Assert(
-            position != sparsity.invalid_entry,
+            position != invalid_position,
             dealii::ExcMessage("Inconsistent global view of sparsity pattern: "
                                "the requested column index is not present on "
                                "the row stored on the owning MPI rank."));
 
-        const std::size_t position_diag = sparsity(i, i);
+        const std::size_t position_diag = offsets[i];
         const std::size_t position_within_row = position - position_diag;
 
         entries_to_be_sent.emplace_back(ExchangeDescription{

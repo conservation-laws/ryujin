@@ -96,7 +96,7 @@ namespace ryujin
         const unsigned int n_owned = offline_data.n_locally_owned();
 
         const auto sparsity_simd_view =
-            offline_data.sparsity_pattern_simd().template view<MemorySpace>();
+            offline_data.sparsity_pattern().template view<MemorySpace>();
         const auto precomputed_view =
             state_vector.precomputed
                 .template view<n_precomputed, MemorySpace>();

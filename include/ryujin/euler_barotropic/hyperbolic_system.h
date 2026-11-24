@@ -764,7 +764,7 @@ namespace ryujin
 
       {
         const auto sparsity_simd_view =
-            offline_data.sparsity_pattern_simd().template view<HostSpace>();
+            offline_data.sparsity_pattern().template view<HostSpace>();
 
         /* We only read the hyperbolic state vector: */
         const auto U_view =

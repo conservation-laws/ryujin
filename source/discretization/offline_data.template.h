@@ -23,7 +23,6 @@
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/grid/grid_tools.h>
-#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
 #include <boost/container/small_vector.hpp>
@@ -97,34 +96,35 @@ namespace ryujin
     this->have_discontinuous_ansatz_ =
         discretization_->have_discontinuous_ansatz();
 
+    /* The sparsity pattern in global numbering: */
+    DynamicSparsityPattern dynamic_sparsity_pattern;
+
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.1 topology - renumber dofs");
-      renumber_for_simd();
+      renumber_for_simd(dynamic_sparsity_pattern);
     }
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.2 topology - sparsity pattern");
-      create_constraints_and_sparsity_pattern();
-      ensure_simd_stride_consistency();
+      create_constraints();
+      color_cells();
+      create_sparsity_pattern(dynamic_sparsity_pattern);
+      ensure_simd_stride_consistency(dynamic_sparsity_pattern);
     }
     {
       RYUJIN_SETUP_TIMER_SCOPE("offline data 1.3 topology - SIMD sparsity");
-      create_partitioner_and_simd_sparsity(problem_dimension,
-                                           n_precomputed_values);
+      create_partitioner_and_simd_sparsity(
+          dynamic_sparsity_pattern, problem_dimension, n_precomputed_values);
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - cell coloring");
-      color_cells();
-    }
-    {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - index maps");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.4 topology - index maps");
       create_index_maps();
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - matrix storage");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.5 topology - matrix storage");
       allocate_matrices();
     }
     {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.7 topology - coupling pairs");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.6 topology - coupling pairs");
       create_coupling_boundary_pairs();
     }
 
@@ -132,7 +132,7 @@ namespace ryujin
     level_lumped_mass_matrix_.clear();
     if (with_multigrid_data &&
         !discretization_->dof_handler().has_hp_capabilities()) {
-      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.8 topology - multigrid data");
+      RYUJIN_SETUP_TIMER_SCOPE("offline data 1.7 topology - multigrid data");
       allocate_multigrid_data();
     }
   }
@@ -163,7 +163,8 @@ namespace ryujin
 
 
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::renumber_for_simd()
+  void OfflineData<structdim, dim, Number>::renumber_for_simd(
+      DynamicSparsityPattern &dynamic_sparsity_pattern)
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
@@ -177,21 +178,23 @@ namespace ryujin
      * range: order[k] is the (current) global index that is placed at the
      * k-th position. We renumber the dof handler only once at the end.
      */
-    create_constraints_and_sparsity_pattern();
-    const auto &sparsity = *this->sparsity_pattern_;
+    create_constraints();
+    color_cells();
+    create_sparsity_pattern(dynamic_sparsity_pattern);
 
     /*
      * Initial ordering with Cuthill McKee (because we can):
      */
-    auto order = DoFRenumbering::Cuthill_McKee(sparsity, locally_owned);
+    auto order =
+        DoFRenumbering::Cuthill_McKee(dynamic_sparsity_pattern, locally_owned);
 
     /*
      * Determine the set of export indices, i.e., the locally owned
      * indices that are ghosts on other MPI ranks.
      *
      * Note: This set might miss export indices that come from eliminating
-     * hanging node and periodicity constraints. We therefore have to
-     * update n_export_indices_ later again.
+     * hanging node and periodicity constraints. We determine
+     * n_export_indices_ in create_partitioner_and_simd_sparsity().
      */
     const auto offset =
         this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
@@ -206,19 +209,25 @@ namespace ryujin
       export_indices.compress();
     }
 
+    const auto contains_export_index = [&](const auto first, const auto last) {
+      return std::any_of(first, last, [&](const auto i) {
+        return export_indices.is_element(i);
+      });
+    };
+
     /*
      * Reorder all (individual) export indices to the beginning of the
      * locally owned index range to achieve a better packing:
      */
-    DoFRenumbering::export_indices_first(
-        order, export_indices, this->n_locally_owned_, 1);
+    DoFRenumbering::strides_first(
+        order, this->n_locally_owned_, 1, contains_export_index);
 
     /*
      * Group degrees of freedom that have the same stencil size in warps of
      * warp_size consecutive indices:
      */
-    this->n_locally_internal_ =
-        DoFRenumbering::internal_range(order, sparsity, warp_size);
+    this->n_locally_internal_ = DoFRenumbering::internal_range(
+        order, dynamic_sparsity_pattern, warp_size);
 
     /*
      * Reorder all (strides of) locally internal indices that contain
@@ -226,13 +235,10 @@ namespace ryujin
      * preserves the binning introduced by
      * DoFRenumbering::internal_range():
      */
-    this->n_export_indices_ = DoFRenumbering::export_indices_first(
-        order, export_indices, this->n_locally_internal_, warp_size);
+    DoFRenumbering::strides_first(
+        order, this->n_locally_internal_, warp_size, contains_export_index);
 
-    std::vector<types::global_dof_index> new_order(this->n_locally_owned_);
-    for (unsigned int k = 0; k < this->n_locally_owned_; ++k)
-      new_order[order[k] - offset] = offset + k;
-    dof_handler.renumber_dofs(new_order);
+    DoFRenumbering::renumber_dofs(dof_handler, order);
   }
 
 
@@ -240,12 +246,9 @@ namespace ryujin
    * Populates:
    *     affine_constraints_cg_
    *     affine_constraints_dg_
-   *     n_locally_owned_
-   *     sparsity_pattern_
    */
   template <int structdim, int dim, typename Number>
-  void
-  OfflineData<structdim, dim, Number>::create_constraints_and_sparsity_pattern()
+  void OfflineData<structdim, dim, Number>::create_constraints()
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
@@ -334,10 +337,18 @@ namespace ryujin
     /* Note: for dG the affine constraints object will be empty. */
     populate_affine_constraints(discretization_->dof_handler_dg(),
                                 *this->affine_constraints_dg_);
+  }
 
-    /*
-     * Next, set up the (hyperbolic) sparsity pattern:
-     */
+
+  /*
+   * Creates the (hyperbolic) sparsity pattern in global numbering. Cells
+   * are processed in the colored chunks of color_cells().
+   */
+  template <int structdim, int dim, typename Number>
+  void OfflineData<structdim, dim, Number>::create_sparsity_pattern(
+      DynamicSparsityPattern &dynamic_sparsity_pattern) const
+  {
+    RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
@@ -345,25 +356,38 @@ namespace ryujin
     Assert(this->n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
-    const auto locally_relevant =
-        DoFTools::extract_locally_relevant_dofs(dof_handler);
-
-    this->sparsity_pattern_->reinit(
-        dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
+    dynamic_sparsity_pattern.reinit(
+        DoFTools::extract_locally_relevant_dofs(dof_handler));
 
     if (discretization_->have_discontinuous_ansatz()) {
       /*
-       * Create dG sparsity pattern:
+       * Create dG sparsity pattern. A cell only adds to the rows of its own
+       * degrees of freedom, so cells are independent. We also add the rows
+       * of ghost cells:
        */
-      DoFTools::make_extended_sparsity_pattern_dg(
-          dof_handler, *this->sparsity_pattern_, affine_constraints, false);
+      Assert(affine_constraints.n_constraints() == 0,
+             dealii::ExcMessage("I don't think constraints make sense for dG"));
+
+      WorkStream::for_each(colored_cell_chunks_, [&](const auto &cell) {
+        DoFTools::add_cell_couplings_dg(cell, dynamic_sparsity_pattern);
+      });
+
+      for (const auto &cell : dof_handler.active_cell_iterators())
+        if (cell->is_ghost())
+          DoFTools::add_cell_couplings_dg(cell, dynamic_sparsity_pattern);
+
     } else {
       /*
-       * Create cG sparsity pattern:
+       * Create cG sparsity pattern. Cells of the same color write to
+       * different rows:
        */
-      DoFTools::make_sparsity_pattern(
-          dof_handler, *this->sparsity_pattern_, affine_constraints, false);
+      WorkStream::for_each(colored_cell_chunks_, [&](const auto &cell) {
+        DoFTools::add_cell_couplings(
+            cell, affine_constraints, dynamic_sparsity_pattern);
+      });
     }
+
+    dynamic_sparsity_pattern.compress();
 
     /*
      * We have to complete the local stencil to have consistent size over
@@ -371,11 +395,8 @@ namespace ryujin
      * SparseMatrix class will fail.
      */
 
-    SparsityTools::distribute_sparsity_pattern(
-        *this->sparsity_pattern_,
-        locally_owned,
-        mpi_ensemble_.ensemble_communicator(),
-        locally_relevant);
+    dynamic_sparsity_pattern.distribute(locally_owned,
+                                        mpi_ensemble_.ensemble_communicator());
   }
 
 
@@ -384,82 +405,47 @@ namespace ryujin
    *     n_locally_internal_
    */
   template <int structdim, int dim, typename Number>
-  void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency()
+  void OfflineData<structdim, dim, Number>::ensure_simd_stride_consistency(
+      DynamicSparsityPattern &dynamic_sparsity_pattern)
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
     auto &dof_handler = discretization_->dof_handler();
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+    const auto offset =
+        this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
 
-    /*
-     * A small lambda to check for stride-level consistency of the internal
-     * index range:
-     */
-    const auto consistent_stride_range [[maybe_unused]] = [&]() {
-      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-      const auto offset =
-          this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
-
-      unsigned int warp_row_length = 0;
-      unsigned int i = 0;
-      for (; i < this->n_locally_internal_; ++i) {
-        if (i % warp_size == 0) {
-          warp_row_length = this->sparsity_pattern_->row_length(offset + i);
-        } else {
-          if (warp_row_length !=
-              this->sparsity_pattern_->row_length(offset + i)) {
-            break;
-          }
-        }
-      }
-      return i / warp_size * warp_size;
+    const auto is_consistent = [&](const auto first, const auto last) {
+      const auto row_length = dynamic_sparsity_pattern.row_length(*first);
+      return std::all_of(first, last, [&](const auto i) {
+        return dynamic_sparsity_pattern.row_length(i) == row_length;
+      });
     };
 
     /*
-     * A small lambda that performs a "logical or" over all MPI ranks:
+     * All strides of the locally internal index range have to have the
+     * same stencil size. The elimination of constrained degrees of
+     * freedom (periodicity, or hanging node constraints) depends on the
+     * numbering, so this might not hold any more after renumbering. In
+     * this case we move inconsistent strides to the end, lower
+     * n_locally_internal_, and create the sparsity pattern again:
      */
-    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
-    };
+    while (true) {
+      std::vector<types::global_dof_index> order(this->n_locally_owned_);
+      std::iota(order.begin(), order.end(), offset);
+      const auto n_consistent = DoFRenumbering::strides_first(
+          order, this->n_locally_internal_, warp_size, is_consistent);
 
-    /*
-     * We have to ensure that the locally internal numbering range is still
-     * consistent, meaning that all strides have the same stencil size.
-     * This property might not hold any more after the elimination
-     * procedure of constrained degrees of freedom (periodicity, or hanging
-     * node constraints). Therefore, the following little dance:
-     */
+      if (!Utilities::MPI::logical_or(n_consistent != this->n_locally_internal_,
+                                      mpi_ensemble_.ensemble_communicator()))
+        break;
 
-    const auto &affine_constraints = this->affine_constraints();
-    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
-      if (mpi_allreduce_logical_or( //
-              consistent_stride_range() != this->n_locally_internal_)) {
-        /*
-         * In this case we try to fix up the numbering by pushing affected
-         * strides to the end and slightly lowering the n_locally_internal_
-         * marker.
-         */
-        this->n_locally_internal_ =
-            DoFRenumbering::inconsistent_strides_last(dof_handler,
-                                                      *this->sparsity_pattern_,
-                                                      this->n_locally_internal_,
-                                                      warp_size);
-        create_constraints_and_sparsity_pattern();
-        this->n_locally_internal_ = consistent_stride_range();
-      }
+      this->n_locally_internal_ = n_consistent;
+      DoFRenumbering::renumber_dofs(dof_handler, order);
+      create_constraints();
+      color_cells();
+      create_sparsity_pattern(dynamic_sparsity_pattern);
     }
-
-    /*
-     * Check that after all the dof manipulation and setup we still end up
-     * with indices in [0, locally_internal) that have uniform stencil size
-     * within a stride.
-     */
-    Assert(consistent_stride_range() == this->n_locally_internal_,
-           dealii::ExcInternalError());
   }
 
 
@@ -469,18 +455,18 @@ namespace ryujin
    *     scalar_partitioner_
    *     hyperbolic_vector_partitioner_
    *     precomputed_vector_partitioner_
-   *     sparsity_pattern_simd_
+   *     sparsity_pattern_
    */
   template <int structdim, int dim, typename Number>
   void
   OfflineData<structdim, dim, Number>::create_partitioner_and_simd_sparsity(
+      const DynamicSparsityPattern &dynamic_sparsity_pattern,
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
     RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &dof_handler = discretization_->dof_handler();
-    const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(this->n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -490,11 +476,12 @@ namespace ryujin
     /* Enlarge the locally relevant set to include all additional couplings: */
     {
       IndexSet additional_dofs(dof_handler.n_dofs());
-      for (auto &entry : *this->sparsity_pattern_)
-        if (!locally_relevant.is_element(entry.column())) {
-          Assert(locally_owned.is_element(entry.row()), ExcInternalError());
-          additional_dofs.add_index(entry.column());
-        }
+      for (const auto row : dynamic_sparsity_pattern.row_index_set())
+        for (const auto column : dynamic_sparsity_pattern.columns(row))
+          if (!locally_relevant.is_element(column)) {
+            Assert(locally_owned.is_element(row), ExcInternalError());
+            additional_dofs.add_index(column);
+          }
       additional_dofs.compress();
       locally_relevant.add_indices(additional_dofs);
       locally_relevant.compress();
@@ -515,48 +502,21 @@ namespace ryujin
         this->scalar_partitioner_, n_precomputed_values);
 
     /*
-     * A small lambda that performs a "logical or" over all MPI ranks:
+     * The renumbering moved all strides containing export indices to the
+     * start of the locally internal index range. Export indices that come
+     * from eliminating periodicity and hanging node constraints are not
+     * known at that point, so we determine n_export_indices_ from the
+     * partitioner:
      */
-    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
-    };
+    this->n_export_indices_ = 0;
+    for (const auto &[first, last] :
+         this->scalar_partitioner_->import_indices())
+      if (first < this->n_locally_internal_)
+        this->n_export_indices_ = std::max(
+            this->n_export_indices_, std::min(last, this->n_locally_internal_));
 
-    /*
-     * After eliminiating periodicity and hanging node constraints we need
-     * to update n_export_indices_ again. This happens because we need to
-     * call export_indices_first() with incomplete information (missing
-     * eliminated degrees of freedom).
-     */
-    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
-      /*
-       * Recalculate n_export_indices_:
-       */
-      this->n_export_indices_ = 0;
-      for (const auto &it : this->scalar_partitioner_->import_indices())
-        if (it.second <= this->n_locally_internal_)
-          this->n_export_indices_ =
-              std::max(this->n_export_indices_, it.second);
-
-      this->n_export_indices_ =
-          (this->n_export_indices_ + warp_size - 1) / warp_size * warp_size;
-    }
-
-#ifdef DEBUG
-    /* Check that n_export_indices_ is valid: */
-    unsigned int control = 0;
-    for (const auto &it : this->scalar_partitioner_->import_indices())
-      if (it.second <= this->n_locally_internal_)
-        control = std::max(control, it.second);
-
-    Assert(control <= this->n_export_indices_, ExcInternalError());
-    Assert(this->n_export_indices_ <= this->n_locally_internal_,
-           ExcInternalError());
-#endif
+    this->n_export_indices_ =
+        (this->n_export_indices_ + warp_size - 1) / warp_size * warp_size;
 
     /*
      * Set up SIMD sparsity pattern in local numbering.
@@ -565,11 +525,11 @@ namespace ryujin
      * pattern from global deal.II (typical) dof indexing to local indices.
      */
 
-    this->sparsity_pattern_simd_->reinit(this->n_locally_internal_,
-                                         *this->sparsity_pattern_,
-                                         this->scalar_partitioner_,
-                                         /*symmetrize_ghost_range*/ true,
-                                         TransferPolicy::implicit_transfers);
+    this->sparsity_pattern_->reinit(this->n_locally_internal_,
+                                    dynamic_sparsity_pattern,
+                                    this->scalar_partitioner_,
+                                    /*symmetrize_ghost_range*/ true,
+                                    TransferPolicy::implicit_transfers);
   }
 
 
@@ -629,7 +589,7 @@ namespace ryujin
       std::vector<types::global_dof_index> indices_cg;
     };
 
-    const auto worker = [&](const auto &cell, Scratch &scratch, int &) {
+    const auto worker = [&](const auto &cell, Scratch &scratch) {
       auto &[indices_dg, indices_cg] = scratch;
 
       const auto &map = local_index_map[cell->active_fe_index()];
@@ -646,8 +606,7 @@ namespace ryujin
       }
     };
 
-    WorkStream::run(
-        colored_cell_chunks_, worker, [](const int &) {}, Scratch(), 0);
+    WorkStream::for_each(colored_cell_chunks_, worker, Scratch());
 
     /*
      * Invert the map. Several dG degrees of freedom share a cG degree of
@@ -686,7 +645,7 @@ namespace ryujin
       q_collection.push_back(dealii::Quadrature<structdim>(
           fe_collection[k].get_unit_support_points()));
 
-    dealii::hp::FEValues<structdim, dim> hp_fe_values(
+    const dealii::hp::FEValues<structdim, dim> hp_fe_values(
         discretization_->mapping(),
         fe_collection,
         q_collection,
@@ -695,25 +654,26 @@ namespace ryujin
     this->support_points_.resize(this->n_locally_owned_);
 
 #ifdef DEBUG
-    std::vector<bool> is_set(this->n_locally_owned_, false);
+    std::vector<char> is_set(this->n_locally_owned_, false);
 #endif
 
     /*
      * Every locally owned degree of freedom is located on a locally owned
-     * cell. Skip all other cells and cells without degrees of freedom
-     * (FE_Nothing):
+     * cell. Cells of the same color do not share degrees of freedom, so
+     * we can write the points directly. Skip cells without degrees of
+     * freedom (FE_Nothing):
      */
 
-    std::vector<dealii::types::global_dof_index> dof_indices;
-    for (const auto &cell : dof_handler.active_cell_iterators()) {
+    const auto worker = [&](const auto &cell, auto &fe_values) {
       const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
-      if (!cell->is_locally_owned() || dofs_per_cell == 0)
-        continue;
+      if (dofs_per_cell == 0)
+        return;
 
-      hp_fe_values.reinit(cell);
+      fe_values.reinit(cell);
       const auto &points =
-          hp_fe_values.get_present_fe_values().get_quadrature_points();
+          fe_values.get_present_fe_values().get_quadrature_points();
 
+      thread_local std::vector<dealii::types::global_dof_index> dof_indices;
       dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(dof_indices);
 
@@ -726,7 +686,9 @@ namespace ryujin
         is_set[i] = true;
 #endif
       }
-    }
+    };
+
+    WorkStream::for_each(colored_cell_chunks_, worker, hp_fe_values);
 
 #ifdef DEBUG
     Assert(std::find(is_set.begin(), is_set.end(), false) == is_set.end(),
@@ -746,11 +708,25 @@ namespace ryujin
 
     const auto &dof_handler = discretization_->dof_handler();
     const auto &affine_constraints = this->affine_constraints();
-    const auto &partitioner = *this->scalar_partitioner_;
 
     /*
-     * A cell writes to the rows of its degrees of freedom, or to the rows of
-     * the constraining degrees of freedom:
+     * We number the conflict indices within the locally relevant degrees
+     * of freedom and all constraining degrees of freedom:
+     */
+    IndexSet relevant = DoFTools::extract_locally_relevant_dofs(dof_handler);
+    {
+      std::vector<types::global_dof_index> masters;
+      for (const auto &line : affine_constraints.get_lines())
+        for (const auto &[master, weight] : line.entries)
+          masters.push_back(master);
+      std::sort(masters.begin(), masters.end());
+      relevant.add_indices(masters.begin(), masters.end());
+      relevant.compress();
+    }
+
+    /*
+     * A cell writes to the rows of its degrees of freedom and to the rows
+     * of the constraining degrees of freedom:
      */
     const auto get_conflict_indices = [&](const auto &cell) {
       boost::container::small_vector<types::global_dof_index, 64> indices;
@@ -758,12 +734,11 @@ namespace ryujin
       dof_indices.resize(cell->get_fe().n_dofs_per_cell());
       cell->get_dof_indices(dof_indices);
       for (const auto dof : dof_indices) {
+        indices.push_back(relevant.index_within_set(dof));
         const auto *entries = affine_constraints.get_constraint_entries(dof);
-        if (entries == nullptr)
-          indices.push_back(partitioner.global_to_local(dof));
-        else
+        if (entries != nullptr)
           for (const auto &[master, weight] : *entries)
-            indices.push_back(partitioner.global_to_local(master));
+            indices.push_back(relevant.index_within_set(master));
       }
       return indices;
     };
@@ -780,11 +755,7 @@ namespace ryujin
                            dof_handler.end());
 
     colored_cell_chunks_ = WorkStream::make_colored_chunks(
-        begin,
-        end,
-        chunk_size,
-        partitioner.locally_owned_size() + partitioner.n_ghost_indices(),
-        get_conflict_indices);
+        begin, end, chunk_size, relevant.n_elements(), get_conflict_indices);
   }
 
 
@@ -802,19 +773,19 @@ namespace ryujin
 
     constexpr auto policy = TransferPolicy::implicit_transfers;
 
-    this->mass_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+    this->mass_matrix_->reinit(*this->sparsity_pattern_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      this->mass_matrix_inverse_->reinit(*this->sparsity_pattern_simd_, policy);
+      this->mass_matrix_inverse_->reinit(*this->sparsity_pattern_, policy);
 
     this->lumped_mass_matrix_->reinit_with_scalar_partitioner(
         this->scalar_partitioner_, 1, policy);
     this->lumped_mass_matrix_inverse_->reinit_with_scalar_partitioner(
         this->scalar_partitioner_, 1, policy);
 
-    this->betaij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
-    this->cij_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+    this->betaij_matrix_->reinit(*this->sparsity_pattern_, policy);
+    this->cij_matrix_->reinit(*this->sparsity_pattern_, policy);
     if (discretization_->have_discontinuous_ansatz())
-      this->incidence_matrix_->reinit(*this->sparsity_pattern_simd_, policy);
+      this->incidence_matrix_->reinit(*this->sparsity_pattern_, policy);
   }
 
 
@@ -1139,7 +1110,7 @@ namespace ryujin
      */
 
     {
-      const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+      const auto sparsity_simd_view = this->sparsity_pattern_->view();
       const auto mass_matrix_view = this->mass_matrix_->view();
       const auto lumped_mass_matrix_view =
           this->lumped_mass_matrix_->template view<1>();
@@ -1370,7 +1341,7 @@ namespace ryujin
      * Verify that the mij_matrix_ object is consistent:
      */
 
-    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_->view();
     const auto mass_matrix_view = this->mass_matrix_->view();
     const auto cij_matrix_view = this->cij_matrix_->view();
 
@@ -2062,7 +2033,7 @@ namespace ryujin
      * Now, collect all coupling boundary pairs:
      */
 
-    const auto sparsity_simd_view = this->sparsity_pattern_simd_->view();
+    const auto sparsity_simd_view = this->sparsity_pattern_->view();
 
     CouplingBoundaryPairs result;
 

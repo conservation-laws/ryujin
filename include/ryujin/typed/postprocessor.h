@@ -443,7 +443,7 @@ namespace ryujin
      * Then postprocess extracted components:
      */
 
-    const auto sparsity_simd_view = offline_data.sparsity_pattern_simd().view();
+    const auto sparsity_simd_view = offline_data.sparsity_pattern().view();
     const auto lumped_mass_matrix_view =
         offline_data.lumped_mass_matrix().template view<1>();
     const auto cij_matrix_view = offline_data.cij_matrix().view();

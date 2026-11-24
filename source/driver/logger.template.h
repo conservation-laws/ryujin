@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <dashboard/settings.h>
 #include <driver/cycle_statistics.h>
 #if defined(WITH_FTXUI)
 #include <dashboard/dashboard.h>

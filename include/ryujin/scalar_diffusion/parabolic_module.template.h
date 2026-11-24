@@ -321,8 +321,7 @@ namespace ryujin
 
       const auto new_U_view =
           new_state_vector.state.template view<problem_dimension>();
-      const auto sparsity_simd_view =
-          offline_data_->sparsity_pattern_simd().view();
+      const auto sparsity_simd_view = offline_data_->sparsity_pattern().view();
       const unsigned int n_internal = offline_data_->n_locally_internal();
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
