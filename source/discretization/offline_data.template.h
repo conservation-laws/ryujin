@@ -189,8 +189,8 @@ namespace ryujin
      * indices that are ghosts on other MPI ranks.
      *
      * Note: This set might miss export indices that come from eliminating
-     * hanging node and periodicity constraints. We therefore have to
-     * update n_export_indices_ later again.
+     * hanging node and periodicity constraints. We determine
+     * n_export_indices_ in create_partitioner_and_simd_sparsity().
      */
     const auto offset =
         this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
@@ -205,12 +205,18 @@ namespace ryujin
       export_indices.compress();
     }
 
+    const auto contains_export_index = [&](const auto first, const auto last) {
+      return std::any_of(first, last, [&](const auto i) {
+        return export_indices.is_element(i);
+      });
+    };
+
     /*
      * Reorder all (individual) export indices to the beginning of the
      * locally owned index range to achieve a better packing:
      */
-    DoFRenumbering::export_indices_first(
-        order, export_indices, this->n_locally_owned_, 1);
+    DoFRenumbering::strides_first(
+        order, this->n_locally_owned_, 1, contains_export_index);
 
     /*
      * Group degrees of freedom that have the same stencil size in warps of
@@ -225,13 +231,10 @@ namespace ryujin
      * preserves the binning introduced by
      * DoFRenumbering::internal_range():
      */
-    this->n_export_indices_ = DoFRenumbering::export_indices_first(
-        order, export_indices, this->n_locally_internal_, warp_size);
+    DoFRenumbering::strides_first(
+        order, this->n_locally_internal_, warp_size, contains_export_index);
 
-    std::vector<types::global_dof_index> new_order(this->n_locally_owned_);
-    for (unsigned int k = 0; k < this->n_locally_owned_; ++k)
-      new_order[order[k] - offset] = offset + k;
-    dof_handler.renumber_dofs(new_order);
+    DoFRenumbering::renumber_dofs(dof_handler, order);
   }
 
 
@@ -430,79 +433,41 @@ namespace ryujin
     RYUJIN_DEBUG_ANNOUNCE();
 
     auto &dof_handler = discretization_->dof_handler();
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+    const auto offset =
+        this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
 
-    /*
-     * A small lambda to check for stride-level consistency of the internal
-     * index range:
-     */
-    const auto consistent_stride_range [[maybe_unused]] = [&]() {
-      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-      const auto offset =
-          this->n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
-
-      unsigned int warp_row_length = 0;
-      unsigned int i = 0;
-      for (; i < this->n_locally_internal_; ++i) {
-        if (i % warp_size == 0) {
-          warp_row_length = this->sparsity_pattern_->row_length(offset + i);
-        } else {
-          if (warp_row_length !=
-              this->sparsity_pattern_->row_length(offset + i)) {
-            break;
-          }
-        }
-      }
-      return i / warp_size * warp_size;
+    const auto is_consistent = [&](const auto first, const auto last) {
+      const auto row_length = this->sparsity_pattern_->row_length(*first);
+      return std::all_of(first, last, [&](const auto i) {
+        return this->sparsity_pattern_->row_length(i) == row_length;
+      });
     };
 
     /*
-     * A small lambda that performs a "logical or" over all MPI ranks:
+     * All strides of the locally internal index range have to have the
+     * same stencil size. The elimination of constrained degrees of
+     * freedom (periodicity, or hanging node constraints) depends on the
+     * numbering, so this might not hold any more after renumbering. In
+     * this case we move inconsistent strides to the end, lower
+     * n_locally_internal_, and create the sparsity pattern again:
      */
-    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
-    };
+    while (true) {
+      std::vector<types::global_dof_index> order(this->n_locally_owned_);
+      std::iota(order.begin(), order.end(), offset);
+      const auto n_consistent = DoFRenumbering::strides_first(
+          order, this->n_locally_internal_, warp_size, is_consistent);
 
-    /*
-     * We have to ensure that the locally internal numbering range is still
-     * consistent, meaning that all strides have the same stencil size.
-     * This property might not hold any more after the elimination
-     * procedure of constrained degrees of freedom (periodicity, or hanging
-     * node constraints). Therefore, the following little dance:
-     */
+      if (!Utilities::MPI::logical_or(n_consistent != this->n_locally_internal_,
+                                      mpi_ensemble_.ensemble_communicator()))
+        break;
 
-    const auto &affine_constraints = this->affine_constraints();
-    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
-      if (mpi_allreduce_logical_or( //
-              consistent_stride_range() != this->n_locally_internal_)) {
-        /*
-         * In this case we try to fix up the numbering by pushing affected
-         * strides to the end and slightly lowering the n_locally_internal_
-         * marker.
-         */
-        this->n_locally_internal_ =
-            DoFRenumbering::inconsistent_strides_last(dof_handler,
-                                                      *this->sparsity_pattern_,
-                                                      this->n_locally_internal_,
-                                                      warp_size);
-        create_constraints();
-        color_cells();
-        create_sparsity_pattern();
-        this->n_locally_internal_ = consistent_stride_range();
-      }
+      this->n_locally_internal_ = n_consistent;
+      DoFRenumbering::renumber_dofs(dof_handler, order);
+      create_constraints();
+      color_cells();
+      create_sparsity_pattern();
     }
-
-    /*
-     * Check that after all the dof manipulation and setup we still end up
-     * with indices in [0, locally_internal) that have uniform stencil size
-     * within a stride.
-     */
-    Assert(consistent_stride_range() == this->n_locally_internal_,
-           dealii::ExcInternalError());
   }
 
 
@@ -523,7 +488,6 @@ namespace ryujin
     RYUJIN_DEBUG_ANNOUNCE();
 
     const auto &dof_handler = discretization_->dof_handler();
-    const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(this->n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -560,48 +524,21 @@ namespace ryujin
         this->scalar_partitioner_, n_precomputed_values);
 
     /*
-     * A small lambda that performs a "logical or" over all MPI ranks:
+     * The renumbering moved all strides containing export indices to the
+     * start of the locally internal index range. Export indices that come
+     * from eliminating periodicity and hanging node constraints are not
+     * known at that point, so we determine n_export_indices_ from the
+     * partitioner:
      */
-    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
-    };
+    this->n_export_indices_ = 0;
+    for (const auto &[first, last] :
+         this->scalar_partitioner_->import_indices())
+      if (first < this->n_locally_internal_)
+        this->n_export_indices_ = std::max(
+            this->n_export_indices_, std::min(last, this->n_locally_internal_));
 
-    /*
-     * After eliminiating periodicity and hanging node constraints we need
-     * to update n_export_indices_ again. This happens because we need to
-     * call export_indices_first() with incomplete information (missing
-     * eliminated degrees of freedom).
-     */
-    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
-      /*
-       * Recalculate n_export_indices_:
-       */
-      this->n_export_indices_ = 0;
-      for (const auto &it : this->scalar_partitioner_->import_indices())
-        if (it.second <= this->n_locally_internal_)
-          this->n_export_indices_ =
-              std::max(this->n_export_indices_, it.second);
-
-      this->n_export_indices_ =
-          (this->n_export_indices_ + warp_size - 1) / warp_size * warp_size;
-    }
-
-#ifdef DEBUG
-    /* Check that n_export_indices_ is valid: */
-    unsigned int control = 0;
-    for (const auto &it : this->scalar_partitioner_->import_indices())
-      if (it.second <= this->n_locally_internal_)
-        control = std::max(control, it.second);
-
-    Assert(control <= this->n_export_indices_, ExcInternalError());
-    Assert(this->n_export_indices_ <= this->n_locally_internal_,
-           ExcInternalError());
-#endif
+    this->n_export_indices_ =
+        (this->n_export_indices_ + warp_size - 1) / warp_size * warp_size;
 
     /*
      * Set up SIMD sparsity pattern in local numbering.
