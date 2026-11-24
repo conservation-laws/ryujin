@@ -22,6 +22,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace ryujin::animation
@@ -2249,7 +2250,13 @@ namespace ryujin::animation
         width_ = stage.screen.dimx();
         height_ = stage.screen.dimy();
         forest_height_ = height_ * 2 / 3;
-        plant();
+
+        /* The scenery depends only on the size of the stage and the colors: */
+        const auto planting = std::tuple{width_, height_, dashboard::theme};
+        if (planted_ != planting) {
+          plant();
+          planted_ = planting;
+        }
 
         if (clouds_.empty())
           for (int k = 0; k < std::max(1, width_ / 50); ++k)
@@ -2343,8 +2350,81 @@ namespace ryujin::animation
        */
       using Bitmap = std::vector<std::string_view>;
 
-      /* Pixels by (column, pixel row), two pixel rows per row of cells: */
-      using Pixels = std::map<Cell, Color>;
+      /*
+       * A picture in pixels by (column, pixel row), two pixel rows per row
+       * of cells, stored densely over a box. A pixel without a color is
+       * transparent, and pixels outside the box are dropped:
+       */
+      class Pixels
+      {
+      public:
+        Pixels() = default;
+
+        explicit Pixels(ftxui::Box box)
+            : box_(box)
+            , width_(std::max(0, box.x_max - box.x_min + 1))
+            , colors_(static_cast<std::size_t>(width_) *
+                      std::max(0, box.y_max - box.y_min + 1))
+        {
+        }
+
+        void set(Cell c, Color color)
+        {
+          if (box_.Contain(c.first, c.second))
+            colors_[index(c)] = color;
+        }
+
+        /* The color of the pixel @p c, null if it is transparent: */
+        const Color *find(Cell c) const
+        {
+          if (!box_.Contain(c.first, c.second))
+            return nullptr;
+          const auto &color = colors_[index(c)];
+          return color ? &*color : nullptr;
+        }
+
+        bool contains(Cell c) const
+        {
+          return find(c) != nullptr;
+        }
+
+        /* Call @p f(c, color) for every pixel c with a color: */
+        template <typename F>
+        void for_each(F f) const
+        {
+          for (int y = box_.y_min; y <= box_.y_max; ++y)
+            for (int x = box_.x_min; x <= box_.x_max; ++x)
+              if (const auto *color = find({x, y}))
+                f(Cell{x, y}, *color);
+        }
+
+        /*
+         * Call @p f(x, y, top, low) for every cell (x, y) with a pixel of
+         * a color, with the colors of its two pixels, null if transparent:
+         */
+        template <typename F>
+        void for_each_cell(F f) const
+        {
+          for (int y = box_.y_min / 2; 2 * y <= box_.y_max; ++y)
+            for (int x = box_.x_min; x <= box_.x_max; ++x) {
+              const auto *top = find({x, 2 * y});
+              const auto *low = find({x, 2 * y + 1});
+              if (top || low)
+                f(x, y, top, low);
+            }
+        }
+
+      private:
+        std::size_t index(Cell c) const
+        {
+          return static_cast<std::size_t>(c.second - box_.y_min) * width_ +
+                 (c.first - box_.x_min);
+        }
+
+        ftxui::Box box_ = {0, -1, 0, -1};
+        int width_ = 0;
+        std::vector<std::optional<Color>> colors_;
+      };
 
       struct Cloud {
         double x;
@@ -2403,6 +2483,11 @@ namespace ryujin::animation
       int ground() const
       {
         return 2 * height_ - 1;
+      }
+
+      ftxui::Box stage_pixels() const
+      {
+        return {0, width_ - 1, 0, ground()};
       }
 
       /*
@@ -2613,17 +2698,39 @@ namespace ryujin::animation
                             ".fffff.",
                             "fffffff",
                             "f.f.f.f"};
+
+      /* A fern: */
+      const Bitmap fern_ = {".fff.",
+                            "f.f.f",
+                            ".fff.",
+                            "..f.."};
+
+      /* A ring of five mushrooms, red caps with light dots: */
+      const Bitmap mushrooms_ = {"....c..c..c....",
+                                 ".c.cbccbccbc.c.",
+                                 "cbc.b..b..b.cbc",
+                                 ".b...........b."};
+
+      /* A musical note: */
+      const Bitmap note_ = {".xx",
+                            ".x.",
+                            ".x.",
+                            "xx.",
+                            "xx."};
       /* clang-format on */
 
-      /* Draw the bitmap @p b into @p into, its bottom row at pixel row @p
-       * bottom: */
+      /*
+       * Draw the bitmap @p b into @p into, its bottom row at pixel row @p
+       * bottom, in @p color if given, else in the colors of its roles:
+       */
       void paint_bitmap(Pixels &into,
                         const Bitmap &b,
                         int x,
                         int bottom,
                         int s,
                         bool left,
-                        const Pixels *behind = nullptr) const
+                        const Pixels *behind = nullptr,
+                        std::optional<Color> color = {}) const
       {
         const int w = static_cast<int>(b.front().size());
         const int h = static_cast<int>(b.size());
@@ -2632,7 +2739,7 @@ namespace ryujin::animation
             const char role = b[py / s][left ? w - 1 - px / s : px / s];
             const Cell c{x + px, bottom - h * s + 1 + py};
             if (role != '.' && (!behind || !behind->contains(c)))
-              into[c] = role_color(role);
+              into.set(c, color ? *color : role_color(role));
           }
       }
 
@@ -2678,16 +2785,25 @@ namespace ryujin::animation
         const int trunk = std::max(2, h / 8);
         const int top = ground() - h + 1;
         const int tier = std::max(4, (h - trunk) / 4);
-        Pixels crown;
+        /* The widest tier is narrower than the tree is tall: */
+        Pixels crown({x - h, x + h, top, top + h - trunk - 1});
         for (int i = 0; i < h - trunk; ++i) {
           /* Tiers that widen downwards: */
           const int half = nearest(0.17 * i + 0.5 * (i % tier));
           for (int dx = -half; dx <= half; ++dx)
-            crown[{x + dx, top + i}] = needles;
+            crown.set({x + dx, top + i}, needles);
         }
-        for (int py = ground() - trunk + 1; py <= ground(); ++py)
-          into[{x, py}] = bark;
+        paint_trunk(
+            into, x, std::max(1, nearest(h / 20.)), ground() - trunk + 1, bark);
         outline_into(into, crown, outline);
+      }
+
+      /* Paint a trunk of width w around column x, from row top down: */
+      void paint_trunk(Pixels &into, int x, int w, int top, Color bark) const
+      {
+        for (int py = top; py <= ground(); ++py)
+          for (int dx = -(w - 1) / 2; dx <= w / 2; ++dx)
+            into.set({x + dx, py}, bark);
       }
 
       /*
@@ -2703,19 +2819,25 @@ namespace ryujin::animation
                      Color outline) const
       {
         const int trunk = birch ? h / 2 : h / 3;
-        for (int py = ground() - h + 1; py <= ground(); ++py) {
-          into[{x, py}] = bark;
-          if (!birch && h > 24)
-            into[{x + 1, py}] = bark;
-        }
+        const int w = std::max(1, nearest(h / (birch ? 20. : 12.)));
+        paint_trunk(into, x, w, ground() - h + 1, bark);
         if (birch)
-          for (int py = ground() - trunk; py <= ground(); py += 3)
-            into[{x, py}] = dashboard::theme.track;
+          /* Dark dashes on the bark, from the left and right in turn: */
+          for (int py = ground() - trunk; py <= ground(); py += 3) {
+            const int left = x - (w - 1) / 2;
+            const int dash = (w + 1) / 2;
+            const int start = (py / 3) % 2 == 0 ? left : left + w - dash;
+            for (int px = start; px < start + dash; ++px)
+              into.set({px, py}, dashboard::theme.track);
+          }
 
         const double r = (h - trunk) / 2.;
         const double cy = ground() - trunk - r;
         const double reach = birch ? 0.6 : 1.0;
-        Pixels crown;
+        /* Every disc lies within 2.1 r of the trunk and 1.5 r of cy: */
+        const int span = static_cast<int>(std::ceil(3. * r)) + 2;
+        Pixels crown(
+            {x - span, x + span, nearest(cy) - span, nearest(cy) + span});
         for (int k = 0; k < 5; ++k) {
           /* The discs sit around the center, fixed for every tree: */
           const double ox =
@@ -2732,7 +2854,7 @@ namespace ryujin::animation
               const double u = (px - x - ox) / (rr * reach * 1.3);
               const double v = (py - cy - oy) / rr;
               if (u * u + v * v <= 1.)
-                crown[{px, py}] = leaves;
+                crown.set({px, py}, leaves);
             }
         }
         outline_into(into, crown, outline);
@@ -2741,13 +2863,13 @@ namespace ryujin::animation
       /* Draw @p crown into @p into, with its border in @p outline: */
       static void outline_into(Pixels &into, const Pixels &crown, Color outline)
       {
-        for (const auto &[c, color] : crown) {
+        crown.for_each([&](Cell c, Color color) {
           const bool border = !crown.contains({c.first - 1, c.second}) ||
                               !crown.contains({c.first + 1, c.second}) ||
                               !crown.contains({c.first, c.second - 1}) ||
                               !crown.contains({c.first, c.second + 1});
-          into[c] = border ? outline : color;
-        }
+          into.set(c, border ? outline : color);
+        });
       }
 
       /* Plant one row of trees, each at a fixed column: */
@@ -2779,9 +2901,6 @@ namespace ryujin::animation
           else
             broadleaf(into, x, h, birch, leaves, bark, outline);
 
-          if (layer == 2 && kind >= 5 && !birch && !owl_perch_)
-            owl_perch_ = Cell{x - 4 * scale(), ground() - h};
-
           x += min_step + static_cast<int>(hash(x, layer + 32) %
                                            (max_step - min_step + 1));
         }
@@ -2789,8 +2908,8 @@ namespace ryujin::animation
 
       void plant()
       {
-        trees_.clear();
-        front_.clear();
+        trees_ = Pixels(stage_pixels());
+        front_ = Pixels(stage_pixels());
         stars_.clear();
         bushes_.clear();
         owl_perch_.reset();
@@ -2821,13 +2940,16 @@ namespace ryujin::animation
           cabin_ = {cabin_x, cabin_x + cabin_w};
           paint_bitmap(trees_, cabin_bitmap_, cabin_x, ground(), s, false);
           chimney_ = {cabin_x + 15 * s, (ground() - cabin_h + 1) / 2 - 1};
+          /* The owl on the ridge, bitmap row 2 and columns 10 to 12: */
+          owl_perch_ =
+              Cell{cabin_x + 10 * s - scale(), ground() - cabin_h + 2 * s};
 
           pond_ = {pond_x, pond_x + pond_w};
           for (int px = pond_x; px < pond_x + pond_w; ++px) {
             const double u = 2. * (px - pond_x + 0.5) / pond_w - 1.;
             const int depth = nearest(3 * scale() * std::sqrt(1. - u * u));
             for (int py = ground() - depth + 1; py <= ground(); ++py)
-              front_[{px, py}] = role_color('w');
+              front_.set({px, py}, role_color('w'));
           }
         }
 
@@ -2850,7 +2972,8 @@ namespace ryujin::animation
           if (kind <= 1) {
             /* A bush of two discs, with berries if kind is 1: */
             w = 12 * s;
-            Pixels crown;
+            /* The larger disc reaches 9 s above the floor: */
+            Pixels crown({x, x + w - 1, ground() - 9 * s, ground()});
             for (const auto &[ox, r] :
                  {std::pair{3.5 * s, 3.5 * s}, std::pair{8. * s, 4.5 * s}})
               for (int py = nearest(ground() - r * 2); py <= ground(); ++py)
@@ -2858,40 +2981,24 @@ namespace ryujin::animation
                   const double u = (px - x - ox) / r;
                   const double v = (py - ground() + r) / r;
                   if (u * u + v * v <= 1.)
-                    crown[{px, py}] = leaves;
+                    crown.set({px, py}, leaves);
                 }
             outline_into(front_, crown, night(leaves, 0.5f));
             if (kind == 1)
-              for (const auto &[c, color] : crown)
+              crown.for_each([&](Cell c, Color) {
                 if (hash(c.first * 131 + c.second, 6) % 9 == 0)
-                  front_[c] = role_color('c');
+                  front_.set(c, role_color('c'));
+              });
             bushes_.push_back({x, x + w});
           } else if (kind == 2) {
-            /* A fern: */
-            w = 5;
-            for (int i = 0; i < 4 * s; ++i) {
-              front_[{x + 2, ground() - i}] = needles;
-              if (i % 2 == 1) {
-                front_[{x + 1, ground() - i}] = needles;
-                front_[{x + 3, ground() - i}] = needles;
-              }
-              if (i % 4 == 3) {
-                front_[{x, ground() - i + 1}] = needles;
-                front_[{x + 4, ground() - i + 1}] = needles;
-              }
-            }
+            /* A fern, in the color of the needles: */
+            w = static_cast<int>(fern_.front().size()) * s;
+            paint_bitmap(
+                front_, fern_, x, ground(), s, false, nullptr, needles);
           } else {
             /* A ring of mushrooms, red caps with light dots: */
-            w = 14;
-            for (int k = 0; k < 5; ++k) {
-              const int mx = x + 3 * k;
-              const int base = ground() - (k == 0 || k == 4 ? 0 : 1);
-              front_[{mx, base}] = role_color('b');
-              front_[{mx - 1, base - 1}] = role_color('c');
-              front_[{mx, base - 1}] = role_color('b');
-              front_[{mx + 1, base - 1}] = role_color('c');
-              front_[{mx, base - 2}] = role_color('c');
-            }
+            w = 14 * s;
+            paint_bitmap(front_, mushrooms_, x - s, ground(), s, false);
           }
           x += w + 6 + static_cast<int>((h >> 16) % 16);
         }
@@ -2899,46 +3006,41 @@ namespace ryujin::animation
         /* Tufts of grass on the floor: */
         for (int x = 0; x < width_; ++x)
           if (!front_.contains({x, ground()}) && hash(x, 5) % 3 != 0) {
-            front_[{x, ground()}] = night(needles, 0.3f);
+            front_.set({x, ground()}, night(needles, 0.3f));
             if (hash(x, 5) % 3 == 1)
-              front_[{x, ground() - 1}] = night(needles, 0.3f);
+              front_.set({x, ground() - 1}, night(needles, 0.3f));
           }
-
-        /* The scenery in cells, the undergrowth in front of the trees: */
-        Pixels scenery = trees_;
-        for (const auto &[c, color] : front_)
-          scenery[c] = color;
-        forest_.clear();
-        for (const auto &[c, color] : scenery)
-          if (c.first >= 0 && c.first < width_ && c.second >= 0)
-            forest_.emplace(Cell{c.first, c.second / 2},
-                            cell(scenery, c.first, c.second / 2));
       }
 
-      /* The glyph of the cell (x, y) of @p canvas, with half blocks: */
-      static Glyph cell(const Pixels &canvas, int x, int y)
+      /* The color of the scenery at pixel @p c, the undergrowth in front: */
+      const Color *scenery(Cell c) const
       {
-        const auto top = canvas.find({x, 2 * y});
-        const auto low = canvas.find({x, 2 * y + 1});
-        const bool has_top = top != canvas.end();
-        const bool has_low = low != canvas.end();
-        if (has_top && has_low) {
-          if (top->second == low->second)
-            return {"█", top->second};
-          return {"▀", top->second, false, false, low->second};
-        }
-        if (has_top)
-          return {"▀", top->second};
-        return {"▄", low->second};
+        const auto *color = front_.find(c);
+        return color ? color : trees_.find(c);
       }
 
-      /* The moon, waxing over the run, @p r pixels in radius: */
-      Pixels moon(int x, int top, int r) const
+      /*
+       * The glyph of a cell with half blocks, from the colors of its @p top
+       * and @p low pixel, of which at most one is null:
+       */
+      static Glyph cell(const Color *top, const Color *low)
+      {
+        if (top && low) {
+          if (*top == *low)
+            return {"█", *top};
+          return {"▀", *top, false, false, *low};
+        }
+        if (top)
+          return {"▀", *top};
+        return {"▄", *low};
+      }
+
+      /* Draw the moon, @p r pixels in radius, waxing over the run: */
+      void moon(Pixels &into, int x, int top, int r) const
       {
         /* From a crescent at the start to the full moon at the end: */
         const double phase = 0.25 + 0.75 * progress_;
         const double terminator = r * (1. - 2. * phase);
-        Pixels pixels;
         for (int py = -r; py < r; ++py)
           for (int px = -r; px < r; ++px) {
             const double u = px + 0.5;
@@ -2949,10 +3051,10 @@ namespace ryujin::animation
             if (u < terminator * edge / r)
               continue;
             const bool crater = hash((px + r) * 31 + py + r, 60) % 7 == 0;
-            pixels[{x + px + r, top + py + r}] =
-                crater ? dashboard::theme.muted : dashboard::theme.caption;
+            into.set({x + px + r, top + py + r},
+                     crater ? dashboard::theme.muted
+                            : dashboard::theme.caption);
           }
-        return pixels;
       }
 
       void roam(Animal &a)
@@ -2997,26 +3099,18 @@ namespace ryujin::animation
       {
         const auto &theme = dashboard::theme;
         Canvas canvas(stage);
-        const auto put_pixels = [&](const Pixels &pixels) {
-          std::set<Cell> cells;
-          for (const auto &[c, color] : pixels)
-            cells.emplace(c.first, c.second / 2);
-          for (const auto &c : cells)
-            canvas.put(c.first, c.second, cell(pixels, c.first, c.second));
-        };
 
-        /* The sky: stars, the moon, clouds, birds, shooting stars: */
+        /*
+         * The sky in pixels, from back to front: stars, the moon, clouds,
+         * birds, shooting stars. It ends where the forest begins:
+         */
+        Pixels sky_pixels({0, width_ - 1, 0, 2 * sky_rows() - 1});
         for (const auto &[x, y] : stars_) {
           const auto h = hash(x * 977 + y, 49);
-          static constexpr std::array<const char *, 5> glyphs = {
-              "·", "⋅", "✦", "˚", "*"};
           const bool twinkle = (h + time_ / (3 + h % 5)) % 11 == 0;
-          canvas.put(x,
-                     y,
-                     {glyphs[h % glyphs.size()],
-                      (h >> 8) % 3 == 0 ? theme.warn : theme.caption,
-                      twinkle,
-                      !twinkle});
+          const auto color = (h >> 8) % 3 == 0 ? theme.warn : theme.caption;
+          sky_pixels.set({x, 2 * y + static_cast<int>((h >> 12) % 2)},
+                         twinkle ? color : night(color, 0.4f));
         }
 
         /* The moon rises on the left and sets on the right over the run: */
@@ -3026,10 +3120,9 @@ namespace ryujin::animation
         const int moon_top =
             1 + nearest(arc * (1. - std::sin(std::numbers::pi *
                                              (0.15 + 0.7 * progress_))));
-        put_pixels(moon(moon_x, moon_top, r));
+        moon(sky_pixels, moon_x, moon_top, r);
 
         /* Soft clouds of a few discs, in front of the stars and the moon: */
-        Pixels sky_pixels;
         for (const auto &c : clouds_) {
           for (int k = 0; k < 4; ++k) {
             const double ox = 3. + 5. * k;
@@ -3043,7 +3136,7 @@ namespace ryujin::animation
                 const double u = (px - c.x - ox) / (1.5 * r);
                 const double v = (py - cy) / r;
                 if (u * u + v * v <= 1. && py <= 2 * c.y + 5)
-                  sky_pixels[{px, py}] = night(theme.caption, 0.7f);
+                  sky_pixels.set({px, py}, night(theme.caption, 0.7f));
               }
           }
         }
@@ -3059,54 +3152,59 @@ namespace ryujin::animation
                          false);
           }
         }
-        std::erase_if(sky_pixels, [&](const auto &entry) {
-          return entry.first.first < 0 || entry.first.first >= width_ ||
-                 entry.first.second < 0 || entry.first.second >= 2 * sky_rows();
+        /* A shooting star, a streak that fades toward its tail: */
+        for (const auto &m : meteors_)
+          for (int k = 0; k <= 3; ++k)
+            sky_pixels.set({nearest(m.x - 1.5 * k), nearest(2 * m.y - k)},
+                           night(theme.caption, 0.25f * k));
+        sky_pixels.for_each_cell([&](int x, int y, auto *top, auto *low) {
+          canvas.put(x, y, cell(top, low));
         });
-        put_pixels(sky_pixels);
-        for (const auto &m : meteors_) {
-          canvas.put(
-              nearest(m.x), nearest(m.y), {"✦", theme.caption, true, false});
-          for (int k = 1; k <= 3; ++k)
-            canvas.put(nearest(m.x - 1.5 * k),
-                       nearest(m.y - 0.5 * k),
-                       {"·", theme.caption, false, true});
-        }
 
         /* The forest in front of the sky: */
-        for (const auto &[c, g] : forest_)
-          canvas.put(c.first, c.second, g);
-
-        for (const auto &p : smoke_)
-          canvas.put(nearest(p.x),
-                     nearest(p.y),
-                     {p.age < 10   ? "∘"
-                      : p.age < 25 ? "○"
-                                   : "·",
-                      theme.muted,
-                      false,
-                      p.age > 25});
+        for (int y = 0; y < height_; ++y)
+          for (int x = 0; x < width_; ++x) {
+            const auto *top = scenery({x, 2 * y});
+            const auto *low = scenery({x, 2 * y + 1});
+            if (top || low)
+              canvas.put(x, y, cell(top, low));
+          }
 
         /*
-         * The figures in pixels, over the scenery: an animal that hides
-         * stays behind the undergrowth:
+         * The figures in pixels, over the scenery: the smoke first, so that
+         * the owl stays in front of it, and an animal that hides stays
+         * behind the undergrowth:
          */
-        Pixels figures;
+        Pixels figures(stage_pixels());
+        for (const auto &p : smoke_)
+          figures.set({nearest(p.x), nearest(2 * p.y)},
+                      night(theme.caption, 0.2f + 0.4f * p.age / 40.f));
         if (pond_) {
           /* The moon on the water, and ripples: */
           const int mirror = moon_x + r;
           for (int px = pond_->first + 2; px < pond_->second - 2; ++px)
             if (std::abs(px - mirror) <= scale() ||
                 (hash(px * 7 + time_ / 5, 61) % 23 == 0))
-              figures[{px, ground() - 1}] = std::abs(px - mirror) <= scale()
-                                                ? theme.caption
-                                                : night(theme.caption, 0.5f);
-          paint_bitmap(
-              figures, frog_, pond_->first - 4 * scale(), ground(), 1, false);
+              figures.set({px, ground() - 1},
+                          std::abs(px - mirror) <= scale()
+                              ? theme.caption
+                              : night(theme.caption, 0.5f));
+          paint_bitmap(figures,
+                       frog_,
+                       pond_->first - 4 * scale(),
+                       ground(),
+                       scale(),
+                       false);
+          /* A note above the frog while it croaks: */
           if (croak_ > 0)
-            canvas.put(pond_->first - 2 * scale(),
-                       (ground() - 4) / 2 - 1,
-                       {"♪", theme.good, true});
+            paint_bitmap(figures,
+                         note_,
+                         pond_->first - scale(),
+                         ground() - 5 * scale(),
+                         scale(),
+                         false,
+                         nullptr,
+                         theme.caption);
         }
         if (owl_perch_) {
           const int look = (time_ / 2) % 40 == 0 ? 3
@@ -3136,24 +3234,12 @@ namespace ryujin::animation
         }
 
         /* Each cell with a figure shows the figure over the scenery: */
-        std::set<Cell> cells;
-        for (const auto &[c, color] : figures)
-          cells.emplace(c.first, c.second / 2);
-        for (const auto &c : cells) {
-          Pixels pixels;
-          for (const int py : {2 * c.second, 2 * c.second + 1}) {
-            const Cell p{c.first, py};
-            if (const auto it = figures.find(p); it != figures.end())
-              pixels[p] = it->second;
-            else if (const auto it = front_.find(p); it != front_.end())
-              pixels[p] = it->second;
-            else if (const auto it = trees_.find(p); it != trees_.end())
-              pixels[p] = it->second;
-          }
-          auto g = cell(pixels, c.first, c.second);
+        figures.for_each_cell([&](int x, int y, auto *top, auto *low) {
+          auto g = cell(top ? top : scenery({x, 2 * y}),
+                        low ? low : scenery({x, 2 * y + 1}));
           g.bold = true;
-          canvas.put(c.first, c.second, std::move(g));
-        }
+          canvas.put(x, y, std::move(g));
+        });
 
         repaint(stage, frame_, std::move(canvas.cells));
       }
@@ -3165,9 +3251,9 @@ namespace ryujin::animation
       int time_ = 0;
       int croak_ = 0;
       int owl_look_ = 0;
+      std::optional<std::tuple<int, int, dashboard::Palette>> planted_;
       Pixels trees_;
       Pixels front_;
-      std::map<Cell, Glyph> forest_;
       Frame frame_;
       std::vector<Cell> stars_;
       std::vector<std::pair<int, int>> bushes_;
