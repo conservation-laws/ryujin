@@ -489,7 +489,7 @@ namespace ryujin
     this->reset_residency(/*host*/ true,
                           /*default*/ !have_separate_memory_spaces);
 
-    /* The transfer policy is selected last, see MirroredStorage: */
+    /* The transfer policy is selected last, see MirroredResidency: */
     this->set_transfer_policy(transfer_policy);
   }
 } // namespace ryujin

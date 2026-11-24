@@ -157,7 +157,7 @@ namespace ryujin
    * @ingroup LinearAlgebra
    */
   template <int warp_size>
-  class SparsityPattern : public MirroredStorage<SparsityPattern<warp_size>>
+  class SparsityPattern : public MirroredResidency<SparsityPattern<warp_size>>
   {
   public:
     /**
@@ -287,7 +287,7 @@ namespace ryujin
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets_;
 
     /*
-     * Storage primitives used by the MirroredStorage base class:
+     * Storage primitives used by the MirroredResidency base class:
      */
 
     template <typename MemorySpace>
@@ -300,7 +300,7 @@ namespace ryujin
     void deallocate_storage();
 
 
-    friend class MirroredStorage<SparsityPattern<warp_size>>;
+    friend class MirroredResidency<SparsityPattern<warp_size>>;
 
     template <int, typename>
     friend class SparsityPatternView;

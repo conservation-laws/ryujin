@@ -54,7 +54,7 @@ namespace ryujin
             int n_comp = 1,
             int warp_size = ryujin::warp_size,
             int simd_length = dealii::VectorizedArray<Number>::size()>
-  class SparseMatrix : public MirroredStorage<
+  class SparseMatrix : public MirroredResidency<
                            SparseMatrix<Number, n_comp, warp_size, simd_length>>
   {
   public:
@@ -141,7 +141,7 @@ namespace ryujin
     /*
      * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
      * transfer_policy(), and set_transfer_policy() methods are inherited
-     * from the MirroredStorage base class.
+     * from the MirroredResidency base class.
      */
 
     //@}
@@ -220,7 +220,7 @@ namespace ryujin
     mutable Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
 
     /*
-     * Storage primitives used by the MirroredStorage base class:
+     * Storage primitives used by the MirroredResidency base class:
      */
 
     template <typename MemorySpace>
@@ -233,7 +233,7 @@ namespace ryujin
     void deallocate_storage();
 
 
-    friend class MirroredStorage<
+    friend class MirroredResidency<
         SparseMatrix<Number, n_comp, warp_size, simd_length>>;
 
     template <typename, int, int, int, typename, bool>

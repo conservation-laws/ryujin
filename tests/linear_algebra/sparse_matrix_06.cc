@@ -8,7 +8,7 @@
 int main(int argc, char *argv[])
 {
   //
-  // Test the MirroredStorage state machine with explicit transfers:
+  // Test the MirroredResidency state machine with explicit transfers:
   // copy_to_memory_space() keeps both memory spaces resident,
   // move_to_memory_space() deallocates the moved-from memory space.
   //

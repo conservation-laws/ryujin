@@ -81,7 +81,7 @@ namespace ryujin
 
   /**
    * A policy describing how host/device memory transfers are performed
-   * when accessing a MirroredStorage object via view().
+   * when accessing a MirroredResidency object via view().
    *
    * @ingroup GPU
    */
@@ -156,7 +156,7 @@ namespace ryujin
    * copy_to_memory_space() operation).
    *
    * The @p Derived class must provide the following (private) primitives
-   * and declare `friend class MirroredStorage<Derived>;`:
+   * and declare `friend class MirroredResidency<Derived>;`:
    * ```
    *   template <typename MemorySpace> void allocate_storage() const;
    *   template <typename To, typename From> void deep_copy_storage() const;
@@ -191,7 +191,7 @@ namespace ryujin
    * @ingroup GPU
    */
   template <typename Derived>
-  class MirroredStorage
+  class MirroredResidency
   {
   public:
     /**
@@ -268,7 +268,7 @@ namespace ryujin
      */
     //@{
 
-    MirroredStorage() = default;
+    MirroredResidency() = default;
 
     /**
      * Prepare read access on the selected memory space.
@@ -334,7 +334,7 @@ namespace ryujin
 
 
   /**
-   * A convenience wrapper around MirroredStorage that maintains a
+   * A convenience wrapper around MirroredResidency that maintains a
    * (trivially copyable) payload mirrored between the host and default
    * (device) memory spaces.
    *
@@ -456,7 +456,7 @@ namespace ryujin
    * @ingroup GPU
    */
   template <typename T>
-  class Mirrored : public MirroredStorage<Mirrored<T>>
+  class Mirrored : public MirroredResidency<Mirrored<T>>
   {
   public:
     /**
@@ -494,7 +494,7 @@ namespace ryujin
      *
      * @note The selected memory space has to be consistent with the
      * transfer policy: a policy that pins the other memory space is not
-     * admissible, see MirroredStorage.
+     * admissible, see MirroredResidency.
      */
     template <typename InitializedMemorySpace = dealii::MemorySpace::Host>
     Mirrored(const std::string &label = "mirrored object",
@@ -512,7 +512,7 @@ namespace ryujin
      *
      * @note The selected memory space has to be consistent with the
      * transfer policy: a policy that pins the other memory space is not
-     * admissible, see MirroredStorage.
+     * admissible, see MirroredResidency.
      */
     template <typename InitializedMemorySpace = dealii::MemorySpace::Host>
     Mirrored(const std::string &label = "mirrored array",
@@ -583,7 +583,7 @@ namespace ryujin
     void initialize_storage();
 
     /*
-     * Storage primitives required by the MirroredStorage base class:
+     * Storage primitives required by the MirroredResidency base class:
      */
 
     template <typename MemorySpace>
@@ -603,7 +603,7 @@ namespace ryujin
     mutable KokkosView<HostSpace> host_;
     mutable KokkosView<DefaultSpace> default_;
 
-    friend class MirroredStorage<Mirrored<T>>;
+    friend class MirroredResidency<Mirrored<T>>;
 
     //@}
   };
@@ -724,7 +724,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline bool MirroredStorage<Derived>::is_resident() const
+  inline bool MirroredResidency<Derived>::is_resident() const
   {
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -746,7 +746,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline bool MirroredStorage<Derived>::is_pinned() const
+  inline bool MirroredResidency<Derived>::is_pinned() const
   {
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -769,7 +769,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline void MirroredStorage<Derived>::copy_to_memory_space() const
+  inline void MirroredResidency<Derived>::copy_to_memory_space() const
   {
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -813,7 +813,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline void MirroredStorage<Derived>::move_to_memory_space()
+  inline void MirroredResidency<Derived>::move_to_memory_space()
   {
     static_assert(std::is_same_v<MemorySpace, HostSpace> ||
                       std::is_same_v<MemorySpace, DefaultSpace>,
@@ -868,14 +868,14 @@ namespace ryujin
 
 
   template <typename Derived>
-  inline TransferPolicy MirroredStorage<Derived>::transfer_policy() const
+  inline TransferPolicy MirroredResidency<Derived>::transfer_policy() const
   {
     return transfer_policy_;
   }
 
 
   template <typename Derived>
-  inline void MirroredStorage<Derived>::set_transfer_policy(
+  inline void MirroredResidency<Derived>::set_transfer_policy(
       const TransferPolicy transfer_policy)
   {
     transfer_policy_ = transfer_policy;
@@ -898,7 +898,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline void MirroredStorage<Derived>::prepare_read_access() const
+  inline void MirroredResidency<Derived>::prepare_read_access() const
   {
     if (performs_implicit_transfers(transfer_policy_)) {
       copy_to_memory_space<MemorySpace>();
@@ -916,7 +916,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline void MirroredStorage<Derived>::prepare_write_access()
+  inline void MirroredResidency<Derived>::prepare_write_access()
   {
     if (performs_implicit_transfers(transfer_policy_)) {
       Assert(!is_pinned<other_space_t<MemorySpace>>(),
@@ -940,8 +940,8 @@ namespace ryujin
 
   template <typename Derived>
   inline void
-  MirroredStorage<Derived>::reset_residency(const bool host_resident,
-                                            const bool default_resident)
+  MirroredResidency<Derived>::reset_residency(const bool host_resident,
+                                              const bool default_resident)
   {
     if constexpr (!have_separate_memory_spaces) {
       Assert(host_resident == default_resident,
@@ -970,7 +970,7 @@ namespace ryujin
 
   template <typename Derived>
   template <typename MemorySpace>
-  inline bool &MirroredStorage<Derived>::residency_flag() const
+  inline bool &MirroredResidency<Derived>::residency_flag() const
   {
     if constexpr (std::is_same_v<MemorySpace, HostSpace>)
       return host_resident_;
@@ -980,14 +980,14 @@ namespace ryujin
 
 
   template <typename Derived>
-  inline Derived &MirroredStorage<Derived>::derived()
+  inline Derived &MirroredResidency<Derived>::derived()
   {
     return static_cast<Derived &>(*this);
   }
 
 
   template <typename Derived>
-  inline const Derived &MirroredStorage<Derived>::derived() const
+  inline const Derived &MirroredResidency<Derived>::derived() const
   {
     return static_cast<const Derived &>(*this);
   }
@@ -1003,7 +1003,7 @@ namespace ryujin
   {
     initialize_storage<InitializedMemorySpace>();
 
-    /* The transfer policy is selected last, see MirroredStorage: */
+    /* The transfer policy is selected last, see MirroredResidency: */
     this->set_transfer_policy(transfer_policy);
   }
 
@@ -1038,7 +1038,7 @@ namespace ryujin
 
     initialize_storage<InitializedMemorySpace>();
 
-    /* The transfer policy is selected last, see MirroredStorage: */
+    /* The transfer policy is selected last, see MirroredResidency: */
     this->set_transfer_policy(transfer_policy);
   }
 
