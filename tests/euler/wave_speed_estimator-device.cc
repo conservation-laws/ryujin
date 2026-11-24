@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/base/loop.h>
 #include <ryujin/euler/wave_speed_estimator.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
@@ -228,26 +229,27 @@ int main(int argc, char *argv[])
   const auto constants_view = constants.view<n_constants, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
-  using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
-  const auto exec = ExecutionSpace{};
-
-  Kokkos::parallel_for(
+  ryujin::loop<DefaultSpace, double>(
       "test_constants",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 1),
-      KOKKOS_LAMBDA(std::size_t i) {
+      [=](auto, const unsigned int i) {
         constants_view.write_tensor(
             compute_constants(device_riemann_solver_view), i);
-      });
+      },
+      0,
+      0,
+      1);
 
-  Kokkos::parallel_for(
+  ryujin::loop<DefaultSpace, double>(
       "test_quantities",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, n_states),
-      KOKKOS_LAMBDA(std::size_t i) {
+      [=](auto, const unsigned int i) {
         const auto U_i = U_view.read_tensor(i);
         const auto result = compute_quantities(
             device_view, device_system_view, pv, ipv, i, U_i, U_bar, normal);
         results_view.write_tensor(result, i);
-      });
+      },
+      0,
+      0,
+      n_states);
 
   constants.move_to_memory_space<HostSpace>();
   results.move_to_memory_space<HostSpace>();

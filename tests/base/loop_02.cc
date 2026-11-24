@@ -58,17 +58,13 @@ int main(int argc, char *argv[])
 
   /* Scalar reductions: */
 
-  const auto min_body =
-      KOKKOS_LAMBDA(auto sentinel, const auto &U_view, unsigned int i)
-  {
+  const auto min_body = [=](auto sentinel, const auto &U_view, unsigned int i) {
     using T = decltype(sentinel);
     const auto U_i = U_view.template read_tensor<T>(i);
     return U_i[1];
   };
 
-  const auto sum_body =
-      KOKKOS_LAMBDA(auto sentinel, const auto &U_view, unsigned int i)
-  {
+  const auto sum_body = [=](auto sentinel, const auto &U_view, unsigned int i) {
     using T = decltype(sentinel);
     const auto U_i = U_view.template read_tensor<T>(i);
     return U_i[0];
@@ -77,12 +73,11 @@ int main(int argc, char *argv[])
   /* Array reduction: the body returns a callable j -> contribution */
 
   const auto array_body =
-      KOKKOS_LAMBDA(auto sentinel, const auto &U_view, unsigned int i)
-  {
-    using T = decltype(sentinel);
-    const auto U_i = U_view.template read_tensor<T>(i);
-    return [=](unsigned int j) { return U_i[j]; };
-  };
+      [=](auto sentinel, const auto &U_view, unsigned int i) {
+        using T = decltype(sentinel);
+        const auto U_i = U_view.template read_tensor<T>(i);
+        return [=](unsigned int j) { return U_i[j]; };
+      };
 
   const auto run = [&](const std::string &name, auto memory_space) {
     using MemorySpace = decltype(memory_space);

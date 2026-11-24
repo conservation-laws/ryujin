@@ -18,8 +18,6 @@
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/tensor.h>
 
-#include <Kokkos_Pair.hpp>
-
 #include <algorithm>
 #include <cstdint>
 #include <optional>
@@ -99,6 +97,22 @@ namespace ryujin
     enum class Operation : std::uint8_t { value, schlieren, vorticity };
 
     /**
+     * The arrays the kernel returned by reader() reads from.
+     */
+    template <typename MemorySpace>
+    struct ReaderStorage {
+      struct Component {
+        Section section;
+        unsigned int index;
+        bool mapped;
+      };
+
+      Mirrored<Component *> components{"postprocessor_components"};
+      Mirrored<VectorView<1, MemorySpace> *> scalars{"postprocessor_scalars"};
+      Mirrored<unsigned int *> maps{"postprocessor_maps"};
+    };
+
+    /**
      * Returns a lambda kernel read(sentinel, i, write) that calls
      * write(k, value) for every component k of @p selection at the degree of
      * freedom i on MemorySpace (alternatively, i, ..., i + simd_length - 1
@@ -106,10 +120,14 @@ namespace ryujin
      *
      * @note The parts of the state vector that we need to read from are
      * made resident via copy_to_memory_space<>().
+     *
+     * @note The kernel reads from arrays stored in @p reader_storage,
+     * which thus has to outlive the kernel.
      */
     template <typename MemorySpace>
     auto reader(const Selection &selection,
-                const StateVector<Number> &state_vector) const;
+                const StateVector<Number> &state_vector,
+                ReaderStorage<MemorySpace> &reader_storage) const;
 
     dealii::ObserverPointer<const Interface::OfflineData<dim, Number>>
         offline_data_;
@@ -237,7 +255,9 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename MemorySpace>
   auto Postprocessor<Description, dim, Number>::reader(
-      const Selection &selection, const StateVector<Number> &state_vector) const
+      const Selection &selection,
+      const StateVector<Number> &state_vector,
+      ReaderStorage<MemorySpace> &reader_storage) const
   {
     const auto &selected = selection.components;
     const auto selects = [&](const Section section) {
@@ -297,20 +317,20 @@ namespace ryujin
                                 ? offline_data.dg_to_cg_index_map()
                                 : offline_data.cg_to_dg_index_map();
 
-    const auto n_components = selected.size();
-    Kokkos::View<Kokkos::pair<Section, unsigned int> *, Kokkos::HostSpace>
-        host_components("postprocessor_components", n_components);
-    Kokkos::View<VectorView<1, MemorySpace> *, Kokkos::HostSpace> host_scalars(
-        "postprocessor_scalars", n_components);
-    Kokkos::View<bool *, Kokkos::HostSpace> host_mapped("postprocessor_mapped",
-                                                        n_components);
-    Kokkos::View<unsigned int **, Kokkos::LayoutLeft, Kokkos::HostSpace>
-        host_maps("postprocessor_maps", 0, 0);
+    const unsigned int n_components = selected.size();
+    const unsigned int n_maps = index_map.size();
+
+    reader_storage.components.reinit(n_components);
+    reader_storage.scalars.reinit(n_components);
+    reader_storage.maps.reinit(0);
+
+    auto *host_components = reader_storage.components.view();
+    auto *host_scalars = reader_storage.scalars.view();
 
     for (unsigned int k = 0; k < n_components; ++k) {
       const auto section = Section(selected[k].first);
       const auto index = selected[k].second;
-      host_components[k] = {section, index};
+      host_components[k] = {section, index, false};
 
       if (section == Section::dynamic_state) {
         const auto &vector = state_vector.dynamic_state[index];
@@ -324,22 +344,23 @@ namespace ryujin
         storage.update_ghost_values();
         const auto &partitioner = *storage.get_partitioner();
 
-        if (host_maps.extent(1) == 0)
-          host_maps = decltype(host_maps)(
-              "postprocessor_maps", index_map.size(), n_components);
-        for (unsigned int i = 0; i < index_map.size(); ++i)
-          host_maps(i, k) = partitioner.global_to_local(index_map[i]);
-        host_mapped[k] = true;
+        if (reader_storage.maps.size() == 0)
+          reader_storage.maps.reinit(n_maps * n_components);
+        auto *host_maps = reader_storage.maps.view() + n_maps * k;
+        for (unsigned int i = 0; i < n_maps; ++i)
+          host_maps[i] = partitioner.global_to_local(index_map[i]);
+        host_components[k].mapped = true;
       }
     }
 
-    const auto space = typename MemorySpace::kokkos_space{};
-    const auto components =
-        Kokkos::create_mirror_view_and_copy(space, host_components);
-    const auto scalars =
-        Kokkos::create_mirror_view_and_copy(space, host_scalars);
-    const auto mapped = Kokkos::create_mirror_view_and_copy(space, host_mapped);
-    const auto maps = Kokkos::create_mirror_view_and_copy(space, host_maps);
+    reader_storage.components.template copy_to_memory_space<MemorySpace>();
+    reader_storage.scalars.template copy_to_memory_space<MemorySpace>();
+    reader_storage.maps.template copy_to_memory_space<MemorySpace>();
+
+    const auto *components =
+        reader_storage.components.template view<MemorySpace>();
+    const auto *scalars = reader_storage.scalars.template view<MemorySpace>();
+    const auto *maps = reader_storage.maps.template view<MemorySpace>();
 
     const SelectView<dim, Number, MemorySpace, HyperbolicSystem> system_views(
         *hyperbolic_system_);
@@ -369,8 +390,8 @@ namespace ryujin
       if (read_initial)
         initial_i = initial_view.template read_tensor<T>(i);
 
-      for (unsigned int k = 0; k < components.extent(0); ++k) {
-        const auto [section, index] = components[k];
+      for (unsigned int k = 0; k < n_components; ++k) {
+        const auto [section, index, mapped] = components[k];
         switch (section) {
         case Section::state:
           write(k, U_i[index]);
@@ -385,8 +406,8 @@ namespace ryujin
           write(k, initial_i[index]);
           break;
         default:
-          if (mapped[k])
-            write(k, scalars[k].template read_entry<T>(&maps(i, k)));
+          if (mapped)
+            write(k, scalars[k].template read_entry<T>(&maps[n_maps * k + i]));
           else
             write(k, scalars[k].template read_entry<T>(i));
         }
@@ -418,7 +439,9 @@ namespace ryujin
       destinations.push_back(it.begin());
     }
 
-    const auto read = reader<MemorySpace>(selection, state_vector);
+    ReaderStorage<MemorySpace> reader_storage;
+    const auto read =
+        reader<MemorySpace>(selection, state_vector, reader_storage);
     auto *const *data = destinations.data();
 
     loop<MemorySpace, Number>(
@@ -537,7 +560,9 @@ namespace ryujin
                            "individual points."));
 
     /* Every selected quantity is a value, thus components == quantities: */
-    const auto read = reader<selected_memory_space_t>(selection, state_vector);
+    ReaderStorage<selected_memory_space_t> reader_storage;
+    const auto read = reader<selected_memory_space_t>(
+        selection, state_vector, reader_storage);
     const auto n_components =
         static_cast<unsigned int>(selection.components.size());
 

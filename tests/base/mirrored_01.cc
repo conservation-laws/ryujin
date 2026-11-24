@@ -4,6 +4,7 @@
 //
 
 #include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
 
 #include <deal.II/base/mpi.h>
 
@@ -24,7 +25,6 @@ struct Parameters {
 
 using HostSpace = dealii::MemorySpace::Host;
 using DefaultSpace = dealii::MemorySpace::Default;
-using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
 
 
 void print_status(const ryujin::Mirrored<Parameters> &mirrored)
@@ -50,22 +50,26 @@ void print_on_default_space(const ryujin::Mirrored<Parameters> &mirrored)
 {
   const auto *parameters = mirrored.view<DefaultSpace>();
 
-  Kokkos::View<double *, DefaultSpace::kokkos_space> result("result", 3);
-  const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for(
+  ryujin::Mirrored<double *> result(
+      "result", 3, ryujin::TransferPolicy::explicit_transfers, DefaultSpace{});
+  auto *result_data = result.view<DefaultSpace>();
+
+  ryujin::loop<DefaultSpace, double>(
       "mirrored_01",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 1),
-      KOKKOS_LAMBDA(std::size_t) {
-        result(0) = parameters->gamma;
-        result(1) = parameters->gamma_inverse;
-        result(2) = static_cast<double>(parameters->n_iterations);
-      });
+      [=](auto, const unsigned int) {
+        result_data[0] = parameters->gamma;
+        result_data[1] = parameters->gamma_inverse;
+        result_data[2] = static_cast<double>(parameters->n_iterations);
+      },
+      0,
+      0,
+      1);
 
-  const auto result_host =
-      Kokkos::create_mirror_view_and_copy(HostSpace::kokkos_space{}, result);
+  result.copy_to_memory_space<HostSpace>();
+  const auto *result_host = result.view<HostSpace>();
 
-  std::cout << "Parameters on DefaultSpace: " << result_host(0) << " "
-            << result_host(1) << " " << result_host(2) << std::endl;
+  std::cout << "Parameters on DefaultSpace: " << result_host[0] << " "
+            << result_host[1] << " " << result_host[2] << std::endl;
 }
 
 

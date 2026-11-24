@@ -4,6 +4,7 @@
 //
 
 #include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
 
 #include <deal.II/base/mpi.h>
 
@@ -23,7 +24,6 @@ struct Payload {
 
 using HostSpace = dealii::MemorySpace::Host;
 using DefaultSpace = dealii::MemorySpace::Default;
-using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
 
 
 void print_status(const ryujin::Mirrored<Payload *> &mirrored)
@@ -52,22 +52,28 @@ void print_on_default_space(const ryujin::Mirrored<Payload *> &mirrored)
   const auto *payload = mirrored.view<DefaultSpace>();
   const std::size_t n = mirrored.size();
 
-  Kokkos::View<double *, DefaultSpace::kokkos_space> result("result", 2 * n);
-  const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for(
-      "mirrored_02",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, n),
-      KOKKOS_LAMBDA(std::size_t i) {
-        result(2 * i) = payload[i].value;
-        result(2 * i + 1) = static_cast<double>(payload[i].index);
-      });
+  ryujin::Mirrored<double *> result("result",
+                                    2 * n,
+                                    ryujin::TransferPolicy::explicit_transfers,
+                                    DefaultSpace{});
+  auto *result_data = result.view<DefaultSpace>();
 
-  const auto result_host =
-      Kokkos::create_mirror_view_and_copy(HostSpace::kokkos_space{}, result);
+  ryujin::loop<DefaultSpace, double>(
+      "mirrored_02",
+      [=](auto, const unsigned int i) {
+        result_data[2 * i] = payload[i].value;
+        result_data[2 * i + 1] = static_cast<double>(payload[i].index);
+      },
+      0,
+      0,
+      n);
+
+  result.copy_to_memory_space<HostSpace>();
+  const auto *result_host = result.view<HostSpace>();
 
   std::cout << "Payload on DefaultSpace:";
   for (std::size_t i = 0; i < n; ++i)
-    std::cout << " (" << result_host(2 * i) << " " << result_host(2 * i + 1)
+    std::cout << " (" << result_host[2 * i] << " " << result_host[2 * i + 1]
               << ")";
   std::cout << std::endl;
 }
@@ -163,15 +169,15 @@ int main(int argc, char *argv[])
 
   {
     auto *payload = mirrored_2.view<DefaultSpace>();
-    const auto exec = ExecutionSpace{};
-    Kokkos::parallel_for(
+    ryujin::loop<DefaultSpace, double>(
         "mirrored_02",
-        Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 2),
-        KOKKOS_LAMBDA(std::size_t i) {
+        [=](auto, const unsigned int i) {
           payload[i].value = 100. + double(i);
           payload[i].index = 100 + unsigned(i);
-        });
-    Kokkos::fence();
+        },
+        0,
+        0,
+        2);
   }
 
   /* A read only view on the host memory space copies the payload back: */
