@@ -154,18 +154,14 @@ namespace ryujin
 
     /* Allocate memory: */
 
-    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
+    row_starts_.reinit(n_locally_relevant_dofs + 1);
+    column_indices_.reinit(n_nonzero_elements);
+    indices_transposed_.reinit(n_nonzero_elements);
+    allocate_storage<dealii::MemorySpace::Host>();
 
-    row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-        "sparsity_pattern_row_starts", n_locally_relevant_dofs + 1);
-
-    column_indices_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-        "sparsity_pattern_column_indices", n_nonzero_elements);
-
-    indices_transposed_host_ =
-        Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-            "sparsity_pattern_indices_transposed", n_nonzero_elements);
+    auto *row_starts = row_starts_.data();
+    auto *column_indices = column_indices_.data();
+    auto *indices_transposed = indices_transposed_.data();
 
     /*
      * Position of the entry (row, column) in the transposed row. Rows of
@@ -190,19 +186,17 @@ namespace ryujin
      * length:
      */
 
-    row_starts_host_[0] = 0;
+    row_starts[0] = 0;
     for (unsigned int i = 0; i < n_internal_dofs; i += warp_size)
-      row_starts_host_[i / warp_size + 1] =
-          row_starts_host_[i / warp_size] + warp_size * rows[i].size();
+      row_starts[i / warp_size + 1] =
+          row_starts[i / warp_size] + warp_size * rows[i].size();
 
-    row_starts_host_[n_internal_dofs] =
-        row_starts_host_[n_internal_dofs / warp_size];
+    row_starts[n_internal_dofs] = row_starts[n_internal_dofs / warp_size];
 
     for (unsigned int i = n_internal_dofs; i < n_locally_relevant_dofs; ++i)
-      row_starts_host_[i + 1] = row_starts_host_[i] + rows[i].size();
+      row_starts[i + 1] = row_starts[i] + rows[i].size();
 
-    Assert(row_starts_host_[n_locally_relevant_dofs] ==
-               column_indices_host_.size(),
+    Assert(row_starts[n_locally_relevant_dofs] == column_indices_.size(),
            dealii::ExcInternalError());
 
     /* Vectorized part: */
@@ -213,13 +207,13 @@ namespace ryujin
         [&](const unsigned int begin, const unsigned int end) {
           for (unsigned int warp = begin; warp < end; ++warp) {
             const unsigned int i = warp * warp_size;
-            auto position = row_starts_host_[warp];
+            auto position = row_starts[warp];
 
             for (unsigned int m = 0; m < rows[i].size(); ++m)
               for (unsigned int k = 0; k < warp_size; ++k, ++position) {
                 const unsigned int column = rows[i + k][m];
-                column_indices_host_[position] = column;
-                indices_transposed_host_[position] =
+                column_indices[position] = column;
+                indices_transposed[position] =
                     transposed_position(i + k, column);
               }
           }
@@ -233,11 +227,10 @@ namespace ryujin
         static_cast<unsigned int>(n_locally_relevant_dofs),
         [&](const unsigned int begin, const unsigned int end) {
           for (unsigned int i = begin; i < end; ++i) {
-            auto position = row_starts_host_[i];
+            auto position = row_starts[i];
             for (const auto column : rows[i]) {
-              column_indices_host_[position] = column;
-              indices_transposed_host_[position] =
-                  transposed_position(i, column);
+              column_indices[position] = column;
+              indices_transposed[position] = transposed_position(i, column);
               ++position;
             }
           }
@@ -384,9 +377,8 @@ namespace ryujin
                dealii::ExcInternalError());
 
 #ifdef DEBUG
-        const auto ghost_offset = row_starts_host_(n_locally_owned_dofs_);
-        const auto n_nonzero_elements =
-            row_starts_host_(row_starts_host_.size() - 1);
+        const auto ghost_offset = row_starts[n_locally_owned_dofs_];
+        const auto n_nonzero_elements = row_starts[n_locally_relevant_dofs];
         Assert(requested_entries.size() ==
                    2 * (n_nonzero_elements - ghost_offset),
                dealii::ExcInternalError());

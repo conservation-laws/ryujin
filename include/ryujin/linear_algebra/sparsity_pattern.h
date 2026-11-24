@@ -269,16 +269,12 @@ namespace ryujin
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 
-    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    mutable Kokkos::View<unsigned int *, KokkosHost> row_starts_host_;
-    mutable Kokkos::View<unsigned int *, KokkosHost> column_indices_host_;
-    mutable Kokkos::View<unsigned int *, KokkosHost> indices_transposed_host_;
-
-    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
-    mutable Kokkos::View<unsigned int *, KokkosDefault> row_starts_default_;
-    mutable Kokkos::View<unsigned int *, KokkosDefault> column_indices_default_;
-    mutable Kokkos::View<unsigned int *, KokkosDefault>
-        indices_transposed_default_;
+    mutable MirroredBuffer<unsigned int *> row_starts_{
+        "sparsity_pattern_row_starts"};
+    mutable MirroredBuffer<unsigned int *> column_indices_{
+        "sparsity_pattern_column_indices"};
+    mutable MirroredBuffer<unsigned int *> indices_transposed_{
+        "sparsity_pattern_indices_transposed"};
 
     Mirrored<ExchangeDescription *> entries_to_be_sent_{
         "sparsity_pattern_entries_to_be_sent"};
@@ -490,10 +486,10 @@ namespace ryujin
     unsigned int n_internal_dofs_;
     unsigned int n_locally_owned_dofs_;
 
-    using KokkosSpace = typename MemorySpace::kokkos_space;
-    Kokkos::View<const unsigned int *, KokkosSpace> row_starts_;
-    Kokkos::View<const unsigned int *, KokkosSpace> column_indices_;
-    Kokkos::View<const unsigned int *, KokkosSpace> indices_transposed_;
+    unsigned int n_row_starts_;
+    const unsigned int *row_starts_;
+    const unsigned int *column_indices_;
+    const unsigned int *indices_transposed_;
     //@}
   };
 
@@ -521,44 +517,9 @@ namespace ryujin
   template <typename MemorySpace>
   void SparsityPattern<warp_size>::allocate_storage() const
   {
-    using HostSpace = dealii::MemorySpace::Host;
-    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
-
-    /* Note: We allocate without initializing. */
-
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      row_starts_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparsity_pattern_row_starts"),
-          row_starts_default_.extent(0));
-
-      column_indices_host_ = Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparsity_pattern_column_indices"),
-          column_indices_default_.extent(0));
-
-      indices_transposed_host_ =
-          Kokkos::View<unsigned int *, KokkosHost, Aligned>(
-              Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                                 "sparsity_pattern_indices_transposed"),
-              indices_transposed_default_.extent(0));
-
-    } else {
-      row_starts_default_ = Kokkos::View<unsigned int *, KokkosDefault>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparsity_pattern_row_starts"),
-          row_starts_host_.extent(0));
-
-      column_indices_default_ = Kokkos::View<unsigned int *, KokkosDefault>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparsity_pattern_column_indices"),
-          column_indices_host_.extent(0));
-
-      indices_transposed_default_ = Kokkos::View<unsigned int *, KokkosDefault>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparsity_pattern_indices_transposed"),
-          indices_transposed_host_.extent(0));
-    }
+    row_starts_.template allocate<MemorySpace>();
+    column_indices_.template allocate<MemorySpace>();
+    indices_transposed_.template allocate<MemorySpace>();
   }
 
 
@@ -566,21 +527,9 @@ namespace ryujin
   template <typename To, typename From>
   void SparsityPattern<warp_size>::deep_copy_storage() const
   {
-    using HostSpace = dealii::MemorySpace::Host;
-
-    if constexpr (std::is_same_v<To, HostSpace>) {
-      Kokkos::deep_copy(/*dst*/ row_starts_host_, /*src*/ row_starts_default_);
-      Kokkos::deep_copy(/*dst*/ column_indices_host_,
-                        /*src*/ column_indices_default_);
-      Kokkos::deep_copy(/*dst*/ indices_transposed_host_,
-                        /*src*/ indices_transposed_default_);
-    } else {
-      Kokkos::deep_copy(/*dst*/ row_starts_default_, /*src*/ row_starts_host_);
-      Kokkos::deep_copy(/*dst*/ column_indices_default_,
-                        /*src*/ column_indices_host_);
-      Kokkos::deep_copy(/*dst*/ indices_transposed_default_,
-                        /*src*/ indices_transposed_host_);
-    }
+    row_starts_.template deep_copy<To, From>();
+    column_indices_.template deep_copy<To, From>();
+    indices_transposed_.template deep_copy<To, From>();
   }
 
 
@@ -588,18 +537,9 @@ namespace ryujin
   template <typename MemorySpace>
   void SparsityPattern<warp_size>::deallocate_storage()
   {
-    using HostSpace = dealii::MemorySpace::Host;
-
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      row_starts_host_ = {};
-      column_indices_host_ = {};
-      indices_transposed_host_ = {};
-
-    } else {
-      row_starts_default_ = {};
-      column_indices_default_ = {};
-      indices_transposed_default_ = {};
-    }
+    row_starts_.template deallocate<MemorySpace>();
+    column_indices_.template deallocate<MemorySpace>();
+    indices_transposed_.template deallocate<MemorySpace>();
   }
 
 
@@ -618,27 +558,12 @@ namespace ryujin
     n_internal_dofs_ = sparsity_pattern.n_internal_dofs_;
     n_locally_owned_dofs_ = sparsity_pattern.n_locally_owned_dofs_;
 
-    using HostSpace = dealii::MemorySpace::Host;
-    using DefaultSpace = dealii::MemorySpace::Default;
-
-    static_assert(std::is_same_v<MemorySpace, HostSpace> ||
-                      std::is_same_v<MemorySpace, DefaultSpace>,
-                  "Unexpected memory space");
-
-    /*
-     * Note: If the host and default memory spaces coincide all views
-     * reference the host storage.
-     */
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      row_starts_ = sparsity_pattern.row_starts_default_;
-      column_indices_ = sparsity_pattern.column_indices_default_;
-      indices_transposed_ = sparsity_pattern.indices_transposed_default_;
-    } else {
-      row_starts_ = sparsity_pattern.row_starts_host_;
-      column_indices_ = sparsity_pattern.column_indices_host_;
-      indices_transposed_ = sparsity_pattern.indices_transposed_host_;
-    }
+    n_row_starts_ = sparsity_pattern.row_starts_.size();
+    row_starts_ = sparsity_pattern.row_starts_.template data<MemorySpace>();
+    column_indices_ =
+        sparsity_pattern.column_indices_.template data<MemorySpace>();
+    indices_transposed_ =
+        sparsity_pattern.indices_transposed_.template data<MemorySpace>();
   }
 
 
@@ -662,9 +587,9 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
   SparsityPatternView<warp_size, MemorySpace>::n_rows() const
   {
-    Assert(row_starts_.size() > 0, dealii::ExcNotInitialized());
+    Assert(n_row_starts_ > 0, dealii::ExcNotInitialized());
 
-    return row_starts_.size() - 1;
+    return n_row_starts_ - 1;
   }
 
 
@@ -672,9 +597,9 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE unsigned int
   SparsityPatternView<warp_size, MemorySpace>::n_nonzero_elements() const
   {
-    Assert(row_starts_.size() > 0, dealii::ExcNotInitialized());
+    Assert(n_row_starts_ > 0, dealii::ExcNotInitialized());
 
-    return row_starts_(row_starts_.size() - 1);
+    return row_starts_[n_row_starts_ - 1];
   }
 
 
@@ -700,10 +625,9 @@ namespace ryujin
     AssertIndexRange(row, n_rows());
 
     if (row < n_internal_dofs_)
-      return column_indices_.data() + row_starts_(row / warp_size) +
-             row % warp_size;
+      return column_indices_ + row_starts_[row / warp_size] + row % warp_size;
     else
-      return column_indices_.data() + row_starts_(row);
+      return column_indices_ + row_starts_[row];
   }
 
 
@@ -716,9 +640,9 @@ namespace ryujin
 
     if (row < n_internal_dofs_) {
       const unsigned int warp = row / warp_size;
-      return (row_starts_(warp + 1) - row_starts_(warp)) / warp_size;
+      return (row_starts_[warp + 1] - row_starts_[warp]) / warp_size;
     } else {
-      return row_starts_(row + 1) - row_starts_(row);
+      return row_starts_[row + 1] - row_starts_[row];
     }
   }
 
@@ -760,12 +684,12 @@ namespace ryujin
 
     if (row < n_internal_dofs_) {
       const unsigned int scalar_offset =
-          row_starts_(warp) + column_index * warp_size;
+          row_starts_[warp] + column_index * warp_size;
       return offset_type(scalar_offset) * n_components + comp * warp_size +
              lane;
 
     } else {
-      const unsigned int scalar_offset = row_starts_(row) + column_index;
+      const unsigned int scalar_offset = row_starts_[row] + column_index;
 
       return offset_type(scalar_offset) * n_components + comp;
     }
@@ -788,10 +712,10 @@ namespace ryujin
     // the sparsity pattern...
     const unsigned int scalar_offset = offset(row, column_index);
     const unsigned int transposed_scalar_offset =
-        indices_transposed_(scalar_offset);
+        indices_transposed_[scalar_offset];
 
     // ... and reconstruct the proper index for a view with n_components:
-    const unsigned int j = column_indices_(scalar_offset);
+    const unsigned int j = column_indices_[scalar_offset];
 
     offset_type transposed_offset = transposed_scalar_offset;
     if constexpr (n_components > 1) {
@@ -828,7 +752,7 @@ namespace ryujin
     const unsigned int lane = row % warp_size;
 
     const unsigned int scalar_offset =
-        row_starts_(warp) + column_index * warp_size;
+        row_starts_[warp] + column_index * warp_size;
 
     return offset_type(scalar_offset) * n_components + lane;
   }
@@ -843,7 +767,7 @@ namespace ryujin
     static_assert(n_components == 1,
                   "Vectorized transposed access to multiple components is not "
                   "yet implemented.");
-    AssertIndexRange(row, row_starts_.size() - 1);
+    AssertIndexRange(row, n_row_starts_ - 1);
     AssertIndexRange(column_index, row_length(row));
     AssertIndexRange(row, n_internal_dofs_);
 
@@ -851,10 +775,10 @@ namespace ryujin
     const unsigned int lane = row % warp_size;
 
     const unsigned int scalar_offset =
-        row_starts_(warp) + column_index * warp_size;
+        row_starts_[warp] + column_index * warp_size;
 
     // n_components == 1
-    return indices_transposed_.data() + scalar_offset + lane;
+    return indices_transposed_ + scalar_offset + lane;
   }
 
 
@@ -863,7 +787,7 @@ namespace ryujin
   DEAL_II_HOST_DEVICE_ALWAYS_INLINE offset_type
   SparsityPatternView<warp_size, MemorySpace>::ghost_offset() const
   {
-    const auto scalar_offset = row_starts_(n_locally_owned_dofs_);
+    const auto scalar_offset = row_starts_[n_locally_owned_dofs_];
     return offset_type(scalar_offset) * n_components;
   }
 

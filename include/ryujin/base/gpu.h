@@ -818,6 +818,27 @@ namespace ryujin
   }
 
 
+  /**
+   * Copy @p n objects from @p src residing in memory space @p From to
+   * @p dst residing in memory space @p To. The memory spaces have to
+   * differ.
+   *
+   * @ingroup GPU
+   */
+  template <typename To, typename From, typename T>
+  void deep_copy(T *dst, const T *src, const std::size_t n)
+  {
+    static_assert(have_separate_memory_spaces && !std::is_same_v<To, From>,
+                  "deep_copy() copies between the host and the device");
+
+    using Unmanaged = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
+    Kokkos::deep_copy(
+        Kokkos::View<T *, typename To::kokkos_space, Unmanaged>(dst, n),
+        Kokkos::View<const T *, typename From::kokkos_space, Unmanaged>(src,
+                                                                        n));
+  }
+
+
 #ifndef DOXYGEN
   /*
    * -------------------------------------------------------------------------

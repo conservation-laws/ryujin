@@ -7,6 +7,7 @@
 
 #include <ryujin/base/compile_time_options.h>
 #include <ryujin/base/gpu.h>
+#include <ryujin/base/loop.h>
 #include <ryujin/linear_algebra/sparsity_pattern.h>
 
 #include <deal.II/base/exceptions.h>
@@ -199,25 +200,22 @@ namespace ryujin
      * a const view() under the implicit_transfers policy.
      */
 
-    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    mutable Kokkos::View<Number *, KokkosHost> data_host_;
-
-    using KokkosDefault = dealii::MemorySpace::Default::kokkos_space;
-    mutable Kokkos::View<Number *, KokkosDefault> data_default_;
+    mutable MirroredBuffer<Number *> data_{"sparse_matrix_data"};
 
     /*
      * Note: Unless deal.II is configured with device-aware MPI
      * (DEAL_II_MPI_WITH_DEVICE_SUPPORT) we assume that MPI only operates
-     * on host memory. Meaning, when we populate exchange_buffer_default_
-     * on the device, we will copy over to the host prior to sending, and
+     * on host memory. Meaning, when we populate the exchange buffer on
+     * the device, we will copy over to the host prior to sending, and
      * receive ghost rows into ghost_buffer_host_. With device-aware MPI
      * update_ghost_rows_on_memory_space() sends and receives directly
      * from and into device memory.
+     *
+     * The exchange buffer is resident on both memory spaces.
      */
 
-    mutable Kokkos::View<Number *, KokkosHost> exchange_buffer_host_;
-    mutable Kokkos::View<Number *, KokkosHost> ghost_buffer_host_;
-    mutable Kokkos::View<Number *, KokkosDefault> exchange_buffer_default_;
+    Mirrored<Number *> exchange_buffer_{"sparse_matrix_exchange_buffer"};
+    std::vector<Number> ghost_buffer_host_;
 
     /*
      * Storage primitives used by the MirroredResidency base class:
@@ -482,8 +480,7 @@ namespace ryujin
 
     SparsityPatternView<warp_size, MemorySpace> sparsity_pattern_;
 
-    using KokkosSpace = typename MemorySpace::kokkos_space;
-    Kokkos::View<Number *, KokkosSpace> data_;
+    Number *data_;
 
     template <typename, int, int, int, typename, bool>
     friend class SparseMatrixView;
@@ -584,17 +581,20 @@ namespace ryujin
 
     const auto sparsity_view = sparsity.view();
 
-    using KokkosHost = dealii::MemorySpace::Host::kokkos_space;
-    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
+    /*
+     * The matrix is resident on the host memory space only. Device
+     * storage is allocated lazily on the first copy_to_memory_space() /
+     * move_to_memory_space().
+     */
+    data_.reinit(offset_type(sparsity_view.n_nonzero_elements()) *
+                 n_components);
+    data_.template allocate<dealii::MemorySpace::Host>();
+    data_.template fill<dealii::MemorySpace::Host>(Number(0.));
 
-    data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-        "sparse_matrix_data",
-        offset_type(sparsity_view.n_nonzero_elements()) * n_components);
-
-    const std::size_t n_indices = sparsity.entries_to_be_sent().size();
-
-    exchange_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-        "sparse_matrix_exchange_buffer", n_components * n_indices);
+    exchange_buffer_.reinit(n_components *
+                            sparsity.entries_to_be_sent().size());
+    exchange_buffer_
+        .template copy_to_memory_space<dealii::MemorySpace::Default>();
 
 #ifndef DEAL_II_MPI_WITH_DEVICE_SUPPORT
     if constexpr (have_separate_memory_spaces) {
@@ -603,19 +603,9 @@ namespace ryujin
       const auto end_offset =
           offset_type(sparsity_view.n_nonzero_elements()) * n_components;
 
-      ghost_buffer_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-          "sparse_matrix_ghost_buffer", end_offset - ghost_offset);
+      ghost_buffer_host_.resize(end_offset - ghost_offset);
     }
 #endif
-
-    /*
-     * The matrix is resident on the host memory space only. Device
-     * storage is allocated lazily on the first copy_to_memory_space() /
-     * move_to_memory_space(); drop possibly stale device storage from a
-     * previous reinit():
-     */
-    data_default_ = {};
-    exchange_buffer_default_ = {};
 
     this->reset_residency(/*host*/ true,
                           /*default*/ !have_separate_memory_spaces);
@@ -628,7 +618,7 @@ namespace ryujin
   void SparseMatrix<Number, n_components, warp_size, simd_length>::zero_out()
   {
     this->template prepare_write_access<dealii::MemorySpace::Host>();
-    Kokkos::deep_copy(data_host_, Number(0.));
+    std::fill_n(data_.data(), data_.size(), Number(0.));
   }
 
 
@@ -670,38 +660,7 @@ namespace ryujin
   SparseMatrix<Number, n_components, warp_size, simd_length>::allocate_storage()
       const
   {
-    using HostSpace = dealii::MemorySpace::Host;
-    using Aligned = Kokkos::MemoryTraits<Kokkos::Aligned>;
-
-    Assert(sparsity_pattern_ != nullptr, dealii::ExcNotInitialized());
-
-    const auto sparsity_view = sparsity_pattern_->view();
-
-    /*
-     * Note: We allocate without initializing because a deep_copy_storage()
-     * always follows.
-     */
-
-    const std::size_t n_data =
-        offset_type(sparsity_view.n_nonzero_elements()) * n_components;
-    const std::size_t n_exchange =
-        n_components * sparsity_pattern_->entries_to_be_sent().size();
-
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      data_host_ = Kokkos::View<Number *, KokkosHost, Aligned>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing, "sparse_matrix_data"),
-          n_data);
-
-    } else {
-      data_default_ = Kokkos::View<Number *, KokkosDefault>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing, "sparse_matrix_data"),
-          n_data);
-
-      exchange_buffer_default_ = Kokkos::View<Number *, KokkosDefault>(
-          Kokkos::view_alloc(Kokkos::WithoutInitializing,
-                             "sparse_matrix_exchange_buffer"),
-          n_exchange);
-    }
+    data_.template allocate<MemorySpace>();
   }
 
 
@@ -710,13 +669,7 @@ namespace ryujin
   void SparseMatrix<Number, n_components, warp_size, simd_length>::
       deep_copy_storage() const
   {
-    using HostSpace = dealii::MemorySpace::Host;
-
-    if constexpr (std::is_same_v<To, HostSpace>) {
-      Kokkos::deep_copy(/*dst*/ data_host_, /*src*/ data_default_);
-    } else {
-      Kokkos::deep_copy(/*dst*/ data_default_, /*src*/ data_host_);
-    }
+    data_.template deep_copy<To, From>();
   }
 
 
@@ -725,15 +678,7 @@ namespace ryujin
   void SparseMatrix<Number, n_components, warp_size, simd_length>::
       deallocate_storage()
   {
-    using HostSpace = dealii::MemorySpace::Host;
-
-    if constexpr (std::is_same_v<MemorySpace, HostSpace>) {
-      data_host_ = {};
-
-    } else {
-      data_default_ = {};
-      exchange_buffer_default_ = {};
-    }
+    data_.template deallocate<MemorySpace>();
   }
 
 
@@ -757,9 +702,7 @@ namespace ryujin
         sparsity_view.template ghost_offset<n_components>();
     const auto end_offset =
         offset_type(sparsity_view.n_nonzero_elements()) * n_components;
-    std::fill(data_host_.data() + ghost_offset,
-              data_host_.data() + end_offset,
-              Number{});
+    std::fill(data_.data() + ghost_offset, data_.data() + end_offset, Number{});
   }
 
 
@@ -768,55 +711,30 @@ namespace ryujin
   void SparseMatrix<Number, n_components, warp_size, simd_length>::
       populate_exchange_buffer_on_memory_space()
   {
-    using HostSpace = dealii::MemorySpace::Host;
-
     const auto sparsity_view = sparsity_pattern_->template view<MemorySpace>();
 
     const auto *entries_to_be_sent =
         sparsity_pattern_->entries_to_be_sent().template view<MemorySpace>();
-    const std::size_t n_entries_to_be_sent =
+    const unsigned int n_entries_to_be_sent =
         sparsity_pattern_->entries_to_be_sent().size();
 
-    /*
-     * Note: If the host and default memory spaces coincide all views
-     * reference the host storage.
-     */
-    constexpr bool on_host =
-        !have_separate_memory_spaces || std::is_same_v<MemorySpace, HostSpace>;
+    const Number *data = data_.template data<MemorySpace>();
+    Number *exchange_buffer = exchange_buffer_.template view<MemorySpace>();
 
-    const auto data = [&]() {
-      if constexpr (on_host)
-        return data_host_;
-      else
-        return data_default_;
-    }();
+    const auto body = [=](auto, const unsigned int c) {
+      const auto &[row, column_index] = entries_to_be_sent[c];
+      for (unsigned int d = 0; d < n_components; ++d) {
+        const auto offset =
+            sparsity_view.template offset<n_components>(row, column_index, d);
+        exchange_buffer[n_components * c + d] = data[offset];
+      }
+    };
 
-    const auto exchange_buffer = [&]() {
-      if constexpr (on_host)
-        return exchange_buffer_host_;
-      else
-        return exchange_buffer_default_;
-    }();
-
-    using ExecutionSpace = typename MemorySpace::kokkos_space::execution_space;
-    using Policy =
-        Kokkos::RangePolicy<ExecutionSpace, Kokkos::IndexType<std::size_t>>;
-
-    const auto exec = ExecutionSpace{};
-
-    Kokkos::parallel_for(
-        "sparse_matrix_populate_exchange_buffer",
-        Policy(exec, 0, n_entries_to_be_sent),
-        KOKKOS_LAMBDA(const std::size_t c) {
-          const auto &[row, column_index] = entries_to_be_sent[c];
-          for (unsigned int d = 0; d < n_components; ++d) {
-            const auto offset = sparsity_view.template offset<n_components>(
-                row, column_index, d);
-            exchange_buffer(n_components * c + d) = data(offset);
-          }
-        });
-
-    exec.fence();
+    loop<MemorySpace, Number>("sparse_matrix_populate_exchange_buffer",
+                              body,
+                              0,
+                              0,
+                              n_entries_to_be_sent);
   }
 
 
@@ -862,15 +780,13 @@ namespace ryujin
     if constexpr (!on_host)
       typename MemorySpace::kokkos_space::execution_space{}.fence();
 
-    Number *const receive_pointer = on_host
-                                        ? data_host_.data() + ghost_offset
-                                        : data_default_.data() + ghost_offset;
-    Number *const send_pointer = on_host ? exchange_buffer_host_.data()
-                                         : exchange_buffer_default_.data();
+    Number *const receive_pointer =
+        data_.template data<MemorySpace>() + ghost_offset;
+    Number *const send_pointer = exchange_buffer_.template view<MemorySpace>();
 #else
     Number *const receive_pointer =
-        on_host ? data_host_.data() + ghost_offset : ghost_buffer_host_.data();
-    Number *const send_pointer = exchange_buffer_host_.data();
+        on_host ? data_.data() + ghost_offset : ghost_buffer_host_.data();
+    Number *const send_pointer = exchange_buffer_.view();
 #endif
 
     for (unsigned int p = 0; p < receive_targets.size(); ++p) {
@@ -902,8 +818,10 @@ namespace ryujin
 
 #ifndef DEAL_II_MPI_WITH_DEVICE_SUPPORT
     if constexpr (!on_host)
-      Kokkos::deep_copy(/*dst*/ exchange_buffer_host_,
-                        /*src*/ exchange_buffer_default_);
+      deep_copy<dealii::MemorySpace::Host, MemorySpace>(
+          exchange_buffer_.view(),
+          exchange_buffer_.template view<MemorySpace>(),
+          exchange_buffer_.size());
 #endif
 
     for (unsigned int p = 0; p < send_targets.size(); ++p) {
@@ -943,11 +861,10 @@ namespace ryujin
 #ifndef DEAL_II_MPI_WITH_DEVICE_SUPPORT
     if constexpr (!on_host) {
       /* Copy the received ghost range back into device memory: */
-      const auto ghost_range =
-          Kokkos::subview(data_default_,
-                          Kokkos::make_pair(std::size_t(ghost_offset),
-                                            std::size_t(end_offset)));
-      Kokkos::deep_copy(/*dst*/ ghost_range, /*src*/ ghost_buffer_host_);
+      deep_copy<MemorySpace, dealii::MemorySpace::Host>(
+          data_.template data<MemorySpace>() + ghost_offset,
+          ghost_buffer_host_.data(),
+          end_offset - ghost_offset);
     }
 #endif
   }
@@ -1010,7 +927,7 @@ namespace ryujin
 #endif
 
       const int ierr =
-          MPI_Irecv(exchange_buffer_host_.data() + receive_offset,
+          MPI_Irecv(exchange_buffer_.view() + receive_offset,
                     receive_size,
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     send_targets[p].first,
@@ -1043,7 +960,7 @@ namespace ryujin
 #endif
 
       const int ierr =
-          MPI_Isend(data_host_.data() + ghost_offset + send_offset,
+          MPI_Isend(data_.data() + ghost_offset + send_offset,
                     send_size,
                     dealii::Utilities::MPI::mpi_type_id_for_type<Number>,
                     receive_targets[p].first,
@@ -1064,12 +981,15 @@ namespace ryujin
 
     /* Add back contributions and clear ghost range: */
 
+    Number *data = data_.data();
+    const Number *exchange_buffer = exchange_buffer_.view();
+
     for (std::size_t c = 0; c < n_entries_to_be_sent; ++c) {
       const auto &[row, column_index] = entries_to_be_sent[c];
       for (unsigned int d = 0; d < n_components; ++d) {
         const auto offset =
             sparsity_view.template offset<n_components>(row, column_index, d);
-        data_host_(offset) += exchange_buffer_host_(n_components * c + d);
+        data[offset] += exchange_buffer[n_components * c + d];
       }
     }
 
@@ -1169,16 +1089,7 @@ namespace ryujin
 
     sparse_matrix_ = &sparse_matrix;
 
-    /*
-     * Note: If the host and default memory spaces coincide all views
-     * reference the host storage.
-     */
-    if constexpr (have_separate_memory_spaces &&
-                  !std::is_same_v<MemorySpace, HostSpace>) {
-      data_ = sparse_matrix.data_default_;
-    } else {
-      data_ = sparse_matrix.data_host_;
-    }
+    data_ = sparse_matrix.data_.template data<MemorySpace>();
 
     sparsity_pattern_ =
         sparse_matrix.sparsity_pattern_->template view<MemorySpace>();
@@ -1248,7 +1159,7 @@ namespace ryujin
              dealii::ExcMessage(
                  "Access only supported for rows at the SIMD granularity"));
 
-      const Number *load_pos = data_.data();
+      const Number *load_pos = data_;
       load_pos +=
           sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
@@ -1263,7 +1174,7 @@ namespace ryujin
       for (unsigned int d = 0; d < n_comp; ++d) {
         const auto offset =
             sparsity_pattern_.template offset<n_comp>(row, column_index, d);
-        result[d] = data_(offset);
+        result[d] = data_[offset];
       }
     }
 
@@ -1339,7 +1250,7 @@ namespace ryujin
       const auto offsets =
           sparsity_pattern_.template transposed_offset_internal<1>(
               row, column_index);
-      result[0].gather(data_.data(), offsets);
+      result[0].gather(data_, offsets);
 
     } else if constexpr (std::is_same_v<VA, Number2> && (n_comp != 1)) {
 
@@ -1358,7 +1269,7 @@ namespace ryujin
         const auto offset =
             sparsity_pattern_.template transposed_offset<n_comp>(
                 row, column_index, d);
-        result[d] = data_(offset);
+        result[d] = data_[offset];
       }
     }
 
@@ -1435,7 +1346,7 @@ namespace ryujin
              dealii::ExcMessage(
                  "Access only supported for rows at the SIMD granularity"));
 
-      Number *store_pos = data_.data();
+      Number *store_pos = data_;
       store_pos +=
           sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
@@ -1454,7 +1365,7 @@ namespace ryujin
       for (unsigned int d = 0; d < n_comp; ++d) {
         const auto offset =
             sparsity_pattern_.template offset<n_comp>(row, column_index, d);
-        data_(offset) = tensor[d];
+        data_[offset] = tensor[d];
       }
     }
   }
@@ -1527,7 +1438,7 @@ namespace ryujin
              dealii::ExcMessage(
                  "Access only supported for rows at the SIMD granularity"));
 
-      Number *store_pos = data_.data();
+      Number *store_pos = data_;
       store_pos +=
           sparsity_pattern_.template offset_internal<n_comp>(row, column_index);
 
@@ -1546,7 +1457,7 @@ namespace ryujin
       for (unsigned int d = 0; d < n_comp; ++d) {
         const auto offset =
             sparsity_pattern_.template offset<n_comp>(row, column_index, d);
-        data_(offset) += tensor[d]; /*add*/
+        data_[offset] += tensor[d]; /*add*/
         ;
       }
     }
