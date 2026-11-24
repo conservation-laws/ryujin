@@ -890,8 +890,8 @@ namespace ryujin
         return cfl * mass / (Number(-2.) * d_sum);
       };
 
-      reduction_loop<MemorySpace>(
-          loop_name() + 'b', body, Kokkos::Min<Number>(tau_max), 0, n_owned);
+      reduction_loop<MemorySpace, Reduction::min>(
+          loop_name() + 'b', body, tau_max, 0, n_owned);
     }
 
     {

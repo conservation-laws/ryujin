@@ -15,8 +15,8 @@
 // host/device capable lambdas that receive the vector view as forwarded
 // argument and return their contribution - over the host memory space and
 // over the default memory space and compare both results. We test a
-// scalar reduction (Kokkos::Min, Kokkos::Sum) and array reductions
-// (ArrayReducer with Kokkos::Sum and Kokkos::Max). The initial contents of
+// scalar reduction (Reduction::min, Reduction::sum) and array reductions
+// (Reduction::sum, Reduction::max). The initial contents of
 // the result storage take part in the reduction.
 //
 
@@ -93,30 +93,14 @@ int main(int argc, char *argv[])
     U.template move_to_memory_space<MemorySpace>();
     const auto U_view = U.template view<n_comp, MemorySpace>();
 
-    reduction_loop<MemorySpace>("loop_02",
-                                min_body,
-                                Kokkos::Min<double>(min_result),
-                                0,
-                                n_states,
-                                U_view);
-    reduction_loop<MemorySpace>("loop_02",
-                                sum_body,
-                                Kokkos::Sum<double>(sum_result),
-                                0,
-                                n_states,
-                                U_view);
-    reduction_loop<MemorySpace>("loop_02",
-                                array_body,
-                                ArrayReducer<Kokkos::Sum<double>>(sums),
-                                0,
-                                n_states,
-                                U_view);
-    reduction_loop<MemorySpace>("loop_02",
-                                array_body,
-                                ArrayReducer<Kokkos::Max<double>>(maxima),
-                                0,
-                                n_states,
-                                U_view);
+    reduction_loop<MemorySpace, Reduction::min>(
+        "loop_02", min_body, min_result, 0, n_states, U_view);
+    reduction_loop<MemorySpace, Reduction::sum>(
+        "loop_02", sum_body, sum_result, 0, n_states, U_view);
+    reduction_loop<MemorySpace, Reduction::sum>(
+        "loop_02", array_body, sums, 0, n_states, U_view);
+    reduction_loop<MemorySpace, Reduction::max>(
+        "loop_02", array_body, maxima, 0, n_states, U_view);
 
     std::cout << name << ":\n";
     std::cout << "  min:  " << min_result << "\n";
