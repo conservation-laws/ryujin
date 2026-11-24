@@ -180,5 +180,51 @@ namespace ryujin
                               /* queue_length, ignored */ 1,
                               /* chunk_size */ 1);
     }
+
+
+    /**
+     * Variant of run() without a copier: @p worker(element, scratch_data)
+     * is called for every element, with a fresh copy of @p
+     * sample_scratch_data for every chunk. The worker writes its results
+     * directly; it may only write to data identified by the conflict
+     * indices of its element.
+     */
+    template <typename Iterator, typename Worker, typename ScratchData>
+    void
+    for_each(const std::vector<std::vector<dealii::IteratorRange<Iterator>>>
+                 &colored_chunks,
+             const Worker &worker,
+             const ScratchData &sample_scratch_data)
+    {
+      struct Empty {};
+
+      run(
+          colored_chunks,
+          [&](const Iterator &it, ScratchData &scratch_data, Empty &) {
+            worker(it, scratch_data);
+          },
+          [](const Empty &) {},
+          sample_scratch_data,
+          Empty());
+    }
+
+
+    /**
+     * Variant of for_each() without scratch data: @p worker(element) is
+     * called for every element.
+     */
+    template <typename Iterator, typename Worker>
+    void
+    for_each(const std::vector<std::vector<dealii::IteratorRange<Iterator>>>
+                 &colored_chunks,
+             const Worker &worker)
+    {
+      struct Empty {};
+
+      for_each(
+          colored_chunks,
+          [&](const Iterator &it, Empty &) { worker(it); },
+          Empty());
+    }
   } // namespace WorkStream
 } // namespace ryujin

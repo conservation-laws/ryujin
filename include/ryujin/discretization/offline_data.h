@@ -199,12 +199,21 @@ namespace ryujin
     void renumber_for_simd();
 
     /**
-     * Set up affine constraints and sparsity pattern. Internally used in
+     * Set up the affine constraints of the current numbering. Internally
+     * used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_constraints();
+
+    /**
+     * Create the sparsity pattern in global numbering from the affine
+     * constraints and the colored cell chunks. Internally used in
      * prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */
-    void create_constraints_and_sparsity_pattern();
+    void create_sparsity_pattern();
 
     /**
      * Ensure that the SIMD stride of the renumbered degrees of freedom
@@ -234,7 +243,8 @@ namespace ryujin
 
     /**
      * Group the locally owned cells into colored chunks for thread-parallel
-     * assembly. Internally used in prepare().
+     * assembly and for creating the sparsity pattern. Internally used in
+     * prepare().
      *
      * @note This method populates various OfflineData internal data structures.
      */

@@ -52,6 +52,35 @@ namespace ryujin
       const bool symmetrize_ghost_range,
       const TransferPolicy transfer_policy)
   {
+    dealii::IndexSet rows = dsp.row_index_set();
+    if (rows.size() == 0)
+      rows = dealii::complete_index_set(dsp.n_rows());
+
+    DynamicSparsityPattern pattern;
+    pattern.reinit(rows);
+    for (const auto row : rows)
+      for (auto it = dsp.begin(row); it != dsp.end(row); ++it) {
+        const auto column = it->column();
+        pattern.add_entries(row, &column, &column + 1);
+      }
+
+    reinit(n_internal_dofs,
+           pattern,
+           partitioner,
+           symmetrize_ghost_range,
+           transfer_policy);
+  }
+
+
+  template <int warp_size>
+  void SparsityPattern<warp_size>::reinit(
+      const unsigned int n_internal_dofs,
+      const DynamicSparsityPattern &pattern,
+      const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+          &partitioner,
+      const bool symmetrize_ghost_range,
+      const TransferPolicy transfer_policy)
+  {
     RYUJIN_DEBUG_ANNOUNCE();
 
     /*
@@ -79,8 +108,8 @@ namespace ryujin
 
     const auto translate_row = [&](const unsigned int i) {
       const auto global_row = partitioner->local_to_global(i);
-      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it)
-        rows[i].push_back(partitioner->global_to_local(it->column()));
+      for (const auto column : pattern.columns(global_row))
+        rows[i].push_back(partitioner->global_to_local(column));
     };
 
     dealii::parallel::apply_to_subranges(

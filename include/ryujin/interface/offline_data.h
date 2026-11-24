@@ -18,7 +18,6 @@
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/types.h>
 #include <deal.II/lac/affine_constraints.h>
-#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 #include <memory>
 #include <string>
@@ -388,7 +387,7 @@ namespace ryujin
         coupling_boundary_pairs_ =
             std::make_unique<Mirrored<CouplingDescription *>>(
                 "offline_data_coupling_boundary_pairs");
-        sparsity_pattern_ = std::make_unique<dealii::DynamicSparsityPattern>();
+        sparsity_pattern_ = std::make_unique<DynamicSparsityPattern>();
         sparsity_pattern_simd_ = std::make_unique<SparsityPattern<warp_size>>();
         mass_matrix_ = std::make_unique<SparseMatrix<Number>>();
         mass_matrix_inverse_ = std::make_unique<SparseMatrix<Number>>();
@@ -428,7 +427,7 @@ namespace ryujin
 
       std::unique_ptr<Mirrored<CouplingDescription *>> coupling_boundary_pairs_;
 
-      std::unique_ptr<dealii::DynamicSparsityPattern> sparsity_pattern_;
+      std::unique_ptr<DynamicSparsityPattern> sparsity_pattern_;
 
       std::unique_ptr<SparsityPattern<warp_size>> sparsity_pattern_simd_;
 
