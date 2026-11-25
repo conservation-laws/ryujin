@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/base/loop.h>
 #include <ryujin/euler/indicator.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
@@ -197,13 +198,9 @@ int main(int argc, char *argv[])
           .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
-  using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
-  const auto exec = ExecutionSpace{};
-
-  Kokkos::parallel_for(
+  ryujin::loop<DefaultSpace, double>(
       "test_quantities",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, n_states),
-      KOKKOS_LAMBDA(std::size_t i) {
+      [=](auto, const unsigned int i) {
         const unsigned int j_1 = (i + 1) % n_states;
         const unsigned int j_2 = (i + 7) % n_states;
         const auto U_i = U_view.read_tensor(i);
@@ -223,7 +220,10 @@ int main(int argc, char *argv[])
                                                c_ij_2,
                                                hd_i);
         results_view.write_tensor(result, i);
-      });
+      },
+      0,
+      0,
+      n_states);
 
   results.move_to_memory_space<HostSpace>();
 

@@ -653,12 +653,8 @@ namespace ryujin
     };
 
     std::vector<Number> spatial_average(stride, Number(0.));
-    reduction_loop<MemorySpace>(
-        "quantities_accumulate",
-        body,
-        ArrayReducer<Kokkos::Sum<Number>>(spatial_average),
-        0,
-        n_points);
+    reduction_loop<MemorySpace, Reduction::sum>(
+        "quantities_accumulate", body, spatial_average, 0, n_points);
 
     /* Sum over all MPI ranks and take the average: */
 

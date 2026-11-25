@@ -3,12 +3,13 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/base/loop.h>
 #include <ryujin/linear_algebra/sparse_matrix.h>
 
 int main(int argc, char *argv[])
 {
   //
-  // Test the MirroredStorage state machine with explicit transfers:
+  // Test the MirroredResidency state machine with explicit transfers:
   // copy_to_memory_space() keeps both memory spaces resident,
   // move_to_memory_space() deallocates the moved-from memory space.
   //
@@ -108,17 +109,16 @@ int main(int argc, char *argv[])
   print_status();
 
   const auto &view = sparse_matrix.template view<DefaultSpace>();
-  using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
-  const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for(
+  ryujin::loop<DefaultSpace, double>(
       "test",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
-      KOKKOS_LAMBDA(std::size_t i) {
+      [=](auto, const unsigned int i) {
         const auto a = view.read_entry(i, 1);
         const auto b = view.read_entry(i, 2);
         view.write_entry(a + b, i, 0);
-      });
-  exec.fence();
+      },
+      0,
+      0,
+      3);
 
   /* Copying back to the host keeps the device data resident: */
 

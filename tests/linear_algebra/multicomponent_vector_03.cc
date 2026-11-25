@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/base/loop.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 
 #include <iostream>
@@ -62,16 +63,16 @@ int main(int argc, char *argv[])
   print_status();
 
   const auto &view = state_vector.template view<4, DefaultSpace>();
-  using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
-  const auto exec = ExecutionSpace{};
-  Kokkos::parallel_for(
+  ryujin::loop<DefaultSpace, double>(
       "test",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, 3),
-      KOKKOS_LAMBDA(std::size_t i) {
+      [=](auto, const unsigned int i) {
         auto a = view.read_tensor(i);
         a *= 10.;
         view.write_tensor(a, i);
-      });
+      },
+      0,
+      0,
+      3);
 
   std::cout << "After move to HostSpace:" << std::endl;
   state_vector.move_to_memory_space<HostSpace>();

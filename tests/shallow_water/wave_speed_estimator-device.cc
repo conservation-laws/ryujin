@@ -3,6 +3,7 @@
 // Copyright (C) 2026 by the ryujin authors
 //
 
+#include <ryujin/base/loop.h>
 #include <ryujin/linear_algebra/multicomponent_vector.h>
 #include <ryujin/shallow_water/wave_speed_estimator.h>
 
@@ -206,20 +207,19 @@ int main(int argc, char *argv[])
           .view<HostSystemView::n_initial_precomputed_values, DefaultSpace>();
   const auto results_view = results.view<n_results, DefaultSpace>();
 
-  using ExecutionSpace = DefaultSpace::kokkos_space::execution_space;
-  const auto exec = ExecutionSpace{};
-
-  Kokkos::parallel_for(
+  ryujin::loop<DefaultSpace, double>(
       "test_quantities",
-      Kokkos::RangePolicy<ExecutionSpace>(exec, 0, n_states),
-      KOKKOS_LAMBDA(std::size_t i) {
+      [=](auto, const unsigned int i) {
         const unsigned int j = (i + 3) % n_states;
         const auto U_i = U_view.read_tensor(i);
         const auto U_j = U_view.read_tensor(j);
         const auto result = compute_quantities(
             device_view, device_system_view, pv, ipv, i, U_i, j, U_j, normal);
         results_view.write_tensor(result, i);
-      });
+      },
+      0,
+      0,
+      n_states);
 
   results.move_to_memory_space<HostSpace>();
 

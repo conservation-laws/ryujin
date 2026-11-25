@@ -58,7 +58,7 @@ namespace ryujin
    */
   template <typename Number>
   class MultiComponentVector
-      : public MirroredStorage<MultiComponentVector<Number>>
+      : public MirroredResidency<MultiComponentVector<Number>>
   {
   public:
     /**
@@ -181,7 +181,7 @@ namespace ryujin
     /*
      * The is_resident(), copy_to_memory_space(), move_to_memory_space(),
      * transfer_policy(), and set_transfer_policy() methods are inherited
-     * from the MirroredStorage base class.
+     * from the MirroredResidency base class.
      */
 
   private:
@@ -218,7 +218,7 @@ namespace ryujin
     auto &storage() const;
 
     /*
-     * Storage primitives used by the MirroredStorage base class:
+     * Storage primitives used by the MirroredResidency base class:
      */
 
     template <typename MemorySpace>
@@ -231,7 +231,7 @@ namespace ryujin
     void deallocate_storage();
 
 
-    friend class MirroredStorage<MultiComponentVector<Number>>;
+    friend class MirroredResidency<MultiComponentVector<Number>>;
 
     template <typename, int, typename, bool>
     friend class MultiComponentVectorView;
@@ -916,7 +916,7 @@ namespace ryujin
       -> MultiComponentVector &
   {
     /* Copy residency state and transfer policy: */
-    static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
+    static_cast<MirroredResidency<MultiComponentVector> &>(*this) = other;
     n_comp_ = other.n_comp_;
 
     host_vector_ = other.host_vector_;
@@ -933,7 +933,7 @@ namespace ryujin
       -> MultiComponentVector &
   {
     /* Copy residency state and transfer policy: */
-    static_cast<MirroredStorage<MultiComponentVector> &>(*this) = other;
+    static_cast<MirroredResidency<MultiComponentVector> &>(*this) = other;
     n_comp_ = other.n_comp_;
 
     host_vector_ = std::move(other.host_vector_);

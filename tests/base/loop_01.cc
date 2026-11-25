@@ -62,11 +62,10 @@ int main(int argc, char *argv[])
    * functor for the host and the device loop.
    */
 
-  const auto body = KOKKOS_LAMBDA(auto sentinel,
-                                  const auto &U_view,
-                                  const auto &results_view,
-                                  unsigned int i)
-  {
+  const auto body = [=](auto sentinel,
+                        const auto &U_view,
+                        const auto &results_view,
+                        unsigned int i) {
     using T = decltype(sentinel);
 
     const auto U_i = U_view.template read_tensor<T>(i);
