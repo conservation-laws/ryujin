@@ -114,8 +114,9 @@ namespace ryujin
 
     add_parameter("dashboard glass",
                   dashboard_settings_->glass,
-                  "Let the animation show faintly through the empty cells of "
-                  "the terminal dashboard.");
+                  "Draw the animation on the whole terminal, behind the "
+                  "terminal dashboard, and let it show faintly through the "
+                  "empty cells of the dashboard.");
 #endif
 
     debug_command_ = "";

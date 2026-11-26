@@ -297,8 +297,9 @@ namespace ryujin
     DashboardMusic music = DashboardMusic::none;
 
     /**
-     * Let the animation show faintly through the empty cells of the
-     * dashboard, as through smoked glass.
+     * Draw the animation on the whole terminal, behind the dashboard, and
+     * let it show faintly through the empty cells of the dashboard, as
+     * through smoked glass.
      */
     bool glass = false;
   };
