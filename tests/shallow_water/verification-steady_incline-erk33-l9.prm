@@ -74,7 +74,7 @@ subsection I - VTUOutput
   subsection full
     set schlieren beta             = 10
     set schlieren recompute bounds = true
-    set vtu output quantities      = h, m, bathymetry, eta_m, schlieren_h
+    set output quantities          = h, m, bathymetry, eta_m, schlieren_h
   end
 end
 

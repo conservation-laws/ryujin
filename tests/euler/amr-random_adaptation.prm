@@ -56,7 +56,7 @@ subsection L - MeshAdaptor
 
   set trigger             = time points
   set trigger time points = 0.5, 1.0, 1.5
-  subsection marking strategies
+  subsection fixed threshold
     set coarsening threshold = 0.80
     set refinement threshold = 0.90
   end

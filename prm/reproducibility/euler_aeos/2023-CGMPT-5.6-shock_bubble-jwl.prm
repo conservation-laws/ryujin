@@ -104,9 +104,9 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set trigger               = time points
-    set trigger time points   = 4e-5, 7e-5, 1e-4
-    set schlieren beta        = 15
-    set vtu output quantities = rho, v_1, v_2, p, schlieren_rho
+    set trigger             = time points
+    set trigger time points = 4e-5, 7e-5, 1e-4
+    set schlieren beta      = 15
+    set output quantities   = rho, v_1, v_2, p, schlieren_rho
   end
 end

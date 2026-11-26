@@ -98,7 +98,7 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set vtu output quantities = h, m_1, m_2, bathymetry
+    set output quantities = h, m_1, m_2, bathymetry
   end
 end
 

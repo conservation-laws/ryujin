@@ -108,6 +108,6 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set vtu output quantities = rho, m_1, m_2, p, schlieren_rho
+    set output quantities = rho, m_1, m_2, p, schlieren_rho
   end
 end

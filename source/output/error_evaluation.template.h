@@ -42,17 +42,17 @@ namespace ryujin
                   "List of conserved, primitive, precomputed, or parabolic "
                   "quantities used in the computation of the error norms.");
 
-    error_normalize_ = true;
-    add_parameter("error normalize",
-                  error_normalize_,
-                  "Flag to control whether the error should be normalized by "
-                  "the corresponding norm of the analytic solution.");
-
     error_norms_ = {"Linf", "L1", "L2"};
     add_parameter("error norms",
                   error_norms_,
                   "List of norms that are computed and reported (in the given "
                   "order). Valid choices are Linf, L1, and L2.");
+
+    error_normalize_ = true;
+    add_parameter("error normalize",
+                  error_normalize_,
+                  "Flag to control whether the error should be normalized by "
+                  "the corresponding norm of the analytic solution.");
   }
 
 

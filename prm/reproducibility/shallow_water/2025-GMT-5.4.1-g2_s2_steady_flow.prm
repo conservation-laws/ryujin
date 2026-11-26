@@ -131,7 +131,7 @@ subsection I - VTUOutput
     set trigger multiplier         = 100 # Change to 1 for nice movie
     set schlieren beta             = 10
     set schlieren recompute bounds = true
-    set vtu output quantities      = h, m_1, m_2, bathymetry, v_1, schlieren_h
+    set output quantities          = h, m_1, m_2, bathymetry, v_1, schlieren_h
   end
 end
 

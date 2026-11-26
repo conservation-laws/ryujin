@@ -93,13 +93,6 @@ namespace ryujin
                   "parabolic quantities for which statistics are accumulated "
                   "on all manifolds.");
 
-    clear_temporal_statistics_on_writeout_ = true;
-    add_parameter("clear statistics on writeout",
-                  clear_temporal_statistics_on_writeout_,
-                  "If set to true then all temporal statistics (for "
-                  "\"time_averaged\" quantities) accumulated so far are reset "
-                  "each time a writeout of quantities is performed");
-
     n_moments_ = 2;
     add_parameter("number of moments",
                   n_moments_,
@@ -107,6 +100,13 @@ namespace ryujin
                   "the time averaged and space averaged statistics: 1 (mean), "
                   "2 (mean and variance), 3 (additionally the third central "
                   "moment), 4 (additionally the fourth central moment).");
+
+    clear_temporal_statistics_on_writeout_ = true;
+    add_parameter("clear statistics on writeout",
+                  clear_temporal_statistics_on_writeout_,
+                  "If set to true then all temporal statistics (for "
+                  "\"time_averaged\" quantities) accumulated so far are reset "
+                  "each time a writeout of quantities is performed");
   }
 
 

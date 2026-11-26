@@ -34,5 +34,5 @@ written:  subsection limiter
 written:  subsection wave speed estimator
 written:  subsection full
 written:  subsection levelsets
-written:  subsection adaptation strategies
-written:  subsection marking strategies
+written:  subsection fixed threshold
+written:  subsection smoothness indicators

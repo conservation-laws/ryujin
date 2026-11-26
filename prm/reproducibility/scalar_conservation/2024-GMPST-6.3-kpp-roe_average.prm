@@ -97,6 +97,6 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set vtu output quantities = u
+    set output quantities = u
   end
 end
