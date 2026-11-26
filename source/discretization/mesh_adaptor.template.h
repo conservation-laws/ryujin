@@ -47,23 +47,44 @@ namespace ryujin
         marking_strategy_,
         "The chosen marking strategy. Possible values are: fixed threshold.");
 
-    /* Options for various adaptation strategies: */
-    this->enter_subsection("adaptation strategies");
+    min_refinement_level_ = 0;
+    this->add_parameter("minimal refinement level",
+                        min_refinement_level_,
+                        "Minimal refinement level of cells that will be "
+                        "maintained while coarsening cells.");
+
+    max_refinement_level_ = 1000;
+    this->add_parameter("maximal refinement level",
+                        max_refinement_level_,
+                        "Maximal refinement level of cells that will be "
+                        "maintained while refininig cells.");
+
+    /* Options of the adaptation strategies: */
+
+    this->enter_subsection("random adaptation");
     random_adaptation_mersenne_twister_seed_ = 42u;
     this->add_parameter(
-        "random adaptation: mersenne_twister_seed",
+        "mersenne twister seed",
         random_adaptation_mersenne_twister_seed_,
         "Seed for 64bit Mersenne Twister used for random refinement");
+    this->leave_subsection();
 
+    this->enter_subsection("smoothness indicators");
     this->add_parameter(
-        "smoothness indicators: quantities",
+        "quantities",
         smoothness_selected_quantities_,
         "List of conserved, primitive or precomputed quantities that will be "
         "used for constructing the smoothness indicator.");
 
+    smoothness_widen_stencil_ = 15;
+    this->add_parameter(
+        "stencil size",
+        smoothness_widen_stencil_,
+        "Number of layers to widen the smoothness indicator stencil.");
+
     smoothness_local_global_ratio_ = 0.5;
     this->add_parameter(
-        "smoothness indicators: local global ratio",
+        "local global ratio",
         smoothness_local_global_ratio_,
         "Ratio between local and global denominator value used for normalizing "
         "the smoothness indicator. A value of 1 indicates pure global "
@@ -71,67 +92,44 @@ namespace ryujin
 
     smoothness_min_cutoff_ = 0.0;
     this->add_parameter(
-        "smoothness indicators: min cutoff",
+        "min cutoff",
         smoothness_min_cutoff_,
         "minimal cutoff for the smoothness indicator: values below "
         "this threshold will be set to the cutoff value.");
 
     smoothness_max_cutoff_ = 1.0e16;
     this->add_parameter(
-        "smoothness indicators: max cutoff",
+        "max cutoff",
         smoothness_max_cutoff_,
         "minimal cutoff for the smoothness indicator: values above "
         "this threshold will be set to the cutoff value.");
-
-    smoothness_widen_stencil_ = 15;
-    this->add_parameter(
-        "smoothness indicators: stencil size",
-        smoothness_widen_stencil_,
-        "Number of layers to widen the smoothness indicator stencil.");
     this->leave_subsection();
 
-    /* Options for various marking strategies: */
+    /* Options of the marking strategies: */
 
-    this->enter_subsection("marking strategies");
-
+    this->enter_subsection("fixed threshold");
     coarsening_threshold_ = 0.25;
     this->add_parameter(
         "coarsening threshold",
         coarsening_threshold_,
-        "Marking: normalized or absolute threshold for selecting cells for "
-        "coarsening (used in \"fixed threshhold\" marking strategy).");
+        "Normalized or absolute threshold for selecting cells for coarsening.");
 
     refinement_threshold_ = 0.75;
     this->add_parameter(
         "refinement threshold",
         refinement_threshold_,
-        "Marking: normalized or absolute threshold for selecting cells for "
-        "refinement (used in \"fixed threshold\" marking strategy).");
+        "Normalized or absolute threshold for selecting cells for refinement.");
 
     absolute_threshold_ = false;
     this->add_parameter(
         "absolute threshold",
         absolute_threshold_,
-        "Marking: if set to true use an absolute threshold for the "
+        "If set to true use an absolute threshold for the "
         "\"refinement threshold\" and \"coarsening threshold\" "
         "values instead of a relative one. If this parameter is set "
         "to false then the smoothness indicator is normalized into "
         "the number range of [0., 1] and the threshold parameters "
         "are also expected to be a value in this interval.");
-
-    min_refinement_level_ = 0;
-    this->add_parameter(
-        "minimal refinement level",
-        min_refinement_level_,
-        "Marking: minimal refinement level of cells that will be "
-        "maintained while coarsening cells.");
-
-    max_refinement_level_ = 1000;
-    this->add_parameter(
-        "maximal refinement level",
-        max_refinement_level_,
-        "Marking: maximal refinement level of cells that will be "
-        "maintained while refininig cells.");
     this->leave_subsection();
 
     const auto call_back = [this] {

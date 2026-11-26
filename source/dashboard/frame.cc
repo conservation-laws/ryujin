@@ -42,11 +42,10 @@ namespace ryujin::dashboard
     }
 
 
-    /* Fade what the animation painted into the cell (x, y) of the glass: */
-    void fade(animation::Stage &stage, int x, int y)
+    /* Fade what the animation painted into the pixel @p p of the glass: */
+    void fade(ftxui::Pixel &p)
     {
       constexpr float strength = 0.8f;
-      auto &p = stage.screen.PixelAt(x, y);
       if (p.foreground_color != ftxui::Color::Default)
         p.foreground_color = ftxui::Color::Interpolate(
             strength, p.foreground_color, theme.track);
@@ -115,45 +114,68 @@ namespace ryujin::dashboard
 
   bool Frame::draw(animation::Stage &stage)
   {
-    if (!animation_)
-      return false;
-
-    /* Before the animation paints into the empty cells: */
-    if (settings_.glass)
-      stage.glass = glass(stage);
-    animation_->draw(stage);
-    for (const auto &[x, y] : stage.glass)
-      fade(stage, x, y);
-    return shift(stage);
+    return paint(stage, false);
   }
 
 
   bool Frame::finish(animation::Stage &stage)
   {
-    if (!animation_)
-      return false;
-
-    /* Before the animation paints into the empty cells: */
-    if (settings_.glass)
-      stage.glass = glass(stage);
-    animation_->finish(stage);
-    for (const auto &[x, y] : stage.glass)
-      fade(stage, x, y);
-    return shift(stage);
+    return paint(stage, true);
   }
 
 
   bool Frame::step(animation::Stage &stage)
   {
-    if (!animation_)
+    if (!animation_ || !backdrop_)
       return false;
 
     stage.changed.clear();
-    animation_->step(stage);
-    for (const auto &[x, y] : stage.changed)
-      if (stage.glass.contains({x, y}))
-        fade(stage, x, y);
-    return shift(stage) || stage.redraw;
+    backdrop_->changed.clear();
+    animation_->step(*backdrop_);
+    for (const auto &[x, y] : backdrop_->changed) {
+      compose(stage, x, y);
+      stage.changed.emplace_back(x, y);
+    }
+    return shift(*backdrop_) || backdrop_->redraw;
+  }
+
+
+  bool Frame::paint(animation::Stage &stage, bool finish)
+  {
+    if (!animation_)
+      return false;
+
+    const int columns = stage.screen.dimx();
+    const int rows = stage.screen.dimy();
+    backdrop_.emplace(ftxui::Screen(columns, rows),
+                      settings_.glass ? ftxui::Box{0, -1, 0, -1}
+                                      : stage.dashboard,
+                      stage.progress,
+                      stage.eta);
+    glass_.clear();
+    if (settings_.glass)
+      glass_ = glass(stage);
+
+    if (finish)
+      animation_->finish(*backdrop_);
+    else
+      animation_->draw(*backdrop_);
+    for (int y = 0; y < rows; ++y)
+      for (int x = 0; x < columns; ++x)
+        compose(stage, x, y);
+    return shift(*backdrop_);
+  }
+
+
+  void Frame::compose(animation::Stage &stage, int x, int y) const
+  {
+    const bool inside = stage.dashboard.Contain(x, y);
+    if (inside && !glass_.contains({x, y}))
+      return;
+
+    auto &p = stage.screen.PixelAt(x, y) = backdrop_->screen.PixelAt(x, y);
+    if (inside)
+      fade(p);
   }
 
 

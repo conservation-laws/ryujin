@@ -110,7 +110,7 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set vtu output quantities = rho, m_1, m_2, E
+    set output quantities = rho, m_1, m_2, E
   end
 end
 

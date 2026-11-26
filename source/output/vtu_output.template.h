@@ -51,11 +51,24 @@ namespace ryujin
     vtu_output_quantities_.push_back("schlieren_" + state_names[0]);
 
     add_parameter(
-        "vtu output quantities",
+        "output quantities",
         vtu_output_quantities_,
         "List of conserved, primitive, precomputed, or postprocessed "
         "(schlieren_<name>, vorticity_<name>) quantities that will be "
         "written to the vtu files.");
+
+#if DEAL_II_VERSION_GTE(9, 9, 0)
+    output_mode_ = VTUOutputMode::send_to_rank_0;
+#else
+    output_mode_ = VTUOutputMode::mpi_io;
+#endif
+    add_parameter("output mode",
+                  output_mode_,
+                  "How to write out the vtu record in parallel. \"mpi io\": "
+                  "a single vtu file written with MPI IO; \"send to rank 0\": "
+                  "a single vtu file written by rank 0, works on all file "
+                  "systems (requires deal.II 9.9 or newer); \"pvtu record\": "
+                  "one vtu file per rank and a pvtu record");
 
     if (levelsets_)
       add_parameter("manifolds",
@@ -82,19 +95,6 @@ namespace ryujin
         recompute_bounds_,
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
-
-#if DEAL_II_VERSION_GTE(9, 9, 0)
-    output_mode_ = VTUOutputMode::send_to_rank_0;
-#else
-    output_mode_ = VTUOutputMode::mpi_io;
-#endif
-    add_parameter("output mode",
-                  output_mode_,
-                  "How to write out the vtu record in parallel. \"mpi io\": "
-                  "a single vtu file written with MPI IO; \"send to rank 0\": "
-                  "a single vtu file written by rank 0, works on all file "
-                  "systems (requires deal.II 9.9 or newer); \"pvtu record\": "
-                  "one vtu file per rank and a pvtu record");
   }
 
 

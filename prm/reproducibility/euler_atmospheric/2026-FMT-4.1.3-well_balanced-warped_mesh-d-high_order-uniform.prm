@@ -82,7 +82,7 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set vtu output quantities = rho, v_1, v_2, theta, p
+    set output quantities = rho, v_1, v_2, theta, p
   end
 end
 

@@ -102,8 +102,8 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set trigger multiplier    = 10
-    set vtu output quantities = h, m_1, m_2, bathymetry, schlieren_h
+    set trigger multiplier = 10
+    set output quantities  = h, m_1, m_2, bathymetry, schlieren_h
   end
 end
 
@@ -122,14 +122,15 @@ subsection L - MeshAdaptor
   set trigger             = every cycle
   set trigger multiplier  = 1
 
-  subsection adaptation strategies
-    set smoothness indicators: quantities = h
+  set minimal refinement level = 4
+  set maximal refinement level = 7
+
+  subsection smoothness indicators
+    set quantities = h
   end
 
-  subsection marking strategies
-    set refinement threshold     = 0.2
-    set coarsening threshold     = 0.05
-    set minimal refinement level = 4
-    set maximal refinement level = 7
+  subsection fixed threshold
+    set refinement threshold = 0.2
+    set coarsening threshold = 0.05
   end
 end

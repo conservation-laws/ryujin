@@ -155,7 +155,7 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set trigger multiplier    = 10
-    set vtu output quantities = rho, m_1, m_2, phi, schlieren_rho
+    set trigger multiplier = 10
+    set output quantities  = rho, m_1, m_2, phi, schlieren_rho
   end
 end

@@ -98,7 +98,7 @@ end
 
 subsection I - VTUOutput
   subsection full
-    set vtu output quantities = rho, v_1, v_2, p
+    set output quantities = rho, v_1, v_2, p
   end
 end
 
@@ -109,14 +109,15 @@ subsection L - MeshAdaptor
   set trigger             = every cycle
   set trigger multiplier  = 10
 
-  subsection adaptation strategies
-    set smoothness indicators: quantities = rho
+  set minimal refinement level = 5
+  set maximal refinement level = 9
+
+  subsection smoothness indicators
+    set quantities = rho
   end
 
-  subsection marking strategies
-    set refinement threshold     = 0.2
-    set coarsening threshold     = 0.05
-    set minimal refinement level = 5
-    set maximal refinement level = 9
+  subsection fixed threshold
+    set refinement threshold = 0.2
+    set coarsening threshold = 0.05
   end
 end

@@ -10,6 +10,8 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
+#include <set>
 #include <utility>
 
 namespace ryujin::dashboard
@@ -64,14 +66,14 @@ namespace ryujin::dashboard
     void postpone();
 
     /**
-     * Fill the free cells of the freshly rendered @p stage, and move the
-     * window as the animation asks for. Return whether the whole stage
+     * Draw the animation behind the freshly rendered @p stage, and move
+     * the window as the animation asks for. Return whether the whole stage
      * has to be rendered again.
      */
     bool draw(animation::Stage &stage);
 
     /**
-     * Fill the free cells of the freshly rendered final @p stage, after
+     * Draw the animation behind the freshly rendered final @p stage, after
      * the simulation finished, and move the window as the animation asks
      * for. Return whether the whole stage has to be rendered again.
      */
@@ -93,6 +95,12 @@ namespace ryujin::dashboard
     }
 
   private:
+    /** Draw, or @p finish, the animation on a fresh backdrop. */
+    bool paint(animation::Stage &stage, bool finish);
+
+    /** Show the cell (x, y) of the backdrop on @p stage. */
+    void compose(animation::Stage &stage, int x, int y) const;
+
     /**
      * Move the window by the shift that the animation asked for on
      * @p stage. Return whether the window has moved.
@@ -104,6 +112,12 @@ namespace ryujin::dashboard
 
     /** The animation around the window, null for none. */
     std::unique_ptr<animation::Animation> animation_;
+
+    /** The stage of the animation, without the window for glass. */
+    std::optional<animation::Stage> backdrop_;
+
+    /** The empty cells of the window that show the backdrop. */
+    std::set<std::pair<int, int>> glass_;
 
     /** The fractions of the free space to the left and above. */
     std::pair<double, double> fractions_ = {0.5, 0.5};
