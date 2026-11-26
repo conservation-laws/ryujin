@@ -655,7 +655,7 @@ namespace ryujin
                   panel("throughput", throughput),
                   panel("memory [MiB]", memory_panel) | yflex,
               }) | size(WIDTH, EQUAL, 36),
-          }),
+          }) | yflex,
           panel("timers",
                 vbox({
                     hbox(std::move(composition)),
