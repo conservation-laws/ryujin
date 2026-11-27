@@ -467,11 +467,11 @@ namespace ryujin
               std::abs(beta_ij) * //
               std::max(std::abs(value_j_k), std::abs(value_i[k]));
         }
+      }
 
-        for (unsigned int k = 0; k < n_entries; ++k) {
-          write_entry<T>(numerator[k], numerator_i[k], i);
-          write_entry<T>(denominator[k], denominator_i[k], i);
-        }
+      for (unsigned int k = 0; k < n_entries; ++k) {
+        write_entry<T>(numerator[k], numerator_i[k], i);
+        write_entry<T>(denominator[k], denominator_i[k], i);
       }
     };
 
