@@ -345,7 +345,7 @@ namespace ryujin
         constexpr float eps = std::numeric_limits<float>::epsilon();
         // Ensure that if minimum == maximum we end up with 0.5 everywhere
         inv_denominator = 1.f / (maximum - minimum + 10.f * eps);
-        bias = (minimum + 5.f * eps) * inv_denominator;
+        bias = (minimum - 5.f * eps) * inv_denominator;
       }
 
       /*
