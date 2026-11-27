@@ -345,7 +345,7 @@ namespace ryujin
         constexpr float eps = std::numeric_limits<float>::epsilon();
         // Ensure that if minimum == maximum we end up with 0.5 everywhere
         inv_denominator = 1.f / (maximum - minimum + 10.f * eps);
-        bias = (minimum + 5.f * eps) * inv_denominator;
+        bias = (minimum - 5.f * eps) * inv_denominator;
       }
 
       /*
@@ -467,11 +467,11 @@ namespace ryujin
               std::abs(beta_ij) * //
               std::max(std::abs(value_j_k), std::abs(value_i[k]));
         }
+      }
 
-        for (unsigned int k = 0; k < n_entries; ++k) {
-          write_entry<T>(numerator[k], numerator_i[k], i);
-          write_entry<T>(denominator[k], denominator_i[k], i);
-        }
+      for (unsigned int k = 0; k < n_entries; ++k) {
+        write_entry<T>(numerator[k], numerator_i[k], i);
+        write_entry<T>(denominator[k], denominator_i[k], i);
       }
     };
 
