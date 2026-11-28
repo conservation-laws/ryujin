@@ -646,6 +646,13 @@ namespace ryujin
                      dealii::ExcMessage("SolutionTransfer: projection between "
                                         "different FE space is not set up."));
 
+              /*
+               * Every process that owns one of the children unpacks the
+               * parent. Only accumulate on locally owned children:
+               */
+              if (!child_cell->is_locally_owned())
+                continue;
+
               child_cell->get_dof_indices(dof_indices);
 
               /* Step 1: build up right hand side on child cell: */
